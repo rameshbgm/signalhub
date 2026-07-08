@@ -8,8 +8,9 @@ subscribers, metrics, and branding.
 ## Stack
 
 - Next.js (App Router) + TypeScript
-- Prisma + SQLite (swap `DATABASE_URL` for Postgres/MySQL in production — the
-  schema uses no SQLite-specific features)
+- MongoDB via the raw `mongodb` driver (`lib/db.ts`) — no ORM, schemaless by
+  design; document shapes in `lib/db.ts` are plain TypeScript interfaces for
+  readability only, not enforced at write time
 - Tailwind CSS
 - Server Actions for admin CRUD, Route Handlers for the public/management API
 - `jose` for signed session cookies, `bcryptjs` for password hashing
@@ -18,7 +19,8 @@ subscribers, metrics, and branding.
 
 ```bash
 npm install
-npx prisma db push
+docker compose up -d      # local MongoDB with a single-node replica set
+npm run db:indexes
 npm run db:seed
 npm run dev
 ```
@@ -95,5 +97,7 @@ rather than live third-party connections:
 - `app/admin/*` — management console (Server Actions for mutations)
 - `app/api/v1/*` — public read API, management API, feeds, embed script,
   subscribe/OTP, inbound automation webhook
-- `lib/*` — auth, status computation, notification dispatch, access control
-- `prisma/schema.prisma` — full domain model; `prisma/seed.ts` — demo data
+- `lib/*` — auth, status computation, notification dispatch, access control,
+  `db.ts` (Mongo connection + collection getters), `mongo-utils.ts` (id
+  conversion helpers), `cascade.ts` (cascading deletes), `ensure-indexes.ts`
+- `scripts/seed.ts` — demo data

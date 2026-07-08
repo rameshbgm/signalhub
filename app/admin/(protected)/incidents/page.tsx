@@ -1,19 +1,23 @@
 import Link from "next/link";
 import { requireSession } from "@/lib/require-session";
-import { prisma } from "@/lib/db";
+import { collections } from "@/lib/db";
+import { oid, toId } from "@/lib/mongo-utils";
 import { INCIDENT_STATUS_LABEL, IMPACT_LABEL, type IncidentStatus, type Impact } from "@/lib/status";
 
 export default async function IncidentsListPage() {
   const { org } = await requireSession();
-  const pages = await prisma.page.findMany({ where: { orgId: org.id } });
-  const pageIds = pages.map((p) => p.id);
+  const pages = (await collections.pages().find({ orgId: oid(org.id) }).toArray()).map(toId);
+  const pageIds = pages.map((p) => oid(p.id));
   const pageNameById = Object.fromEntries(pages.map((p) => [p.id, p.name]));
 
-  const incidents = await prisma.incident.findMany({
-    where: { pageId: { in: pageIds }, isMaintenance: false },
-    orderBy: { createdAt: "desc" },
-    take: 100,
-  });
+  const incidents = (
+    await collections
+      .incidents()
+      .find({ pageId: { $in: pageIds }, isMaintenance: false })
+      .sort({ createdAt: -1 })
+      .limit(100)
+      .toArray()
+  ).map(toId);
 
   return (
     <div>

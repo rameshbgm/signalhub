@@ -1,10 +1,11 @@
 import { requireSession } from "@/lib/require-session";
-import { prisma } from "@/lib/db";
+import { collections } from "@/lib/db";
+import { oid, toId } from "@/lib/mongo-utils";
 import { inviteMember, removeMember } from "./actions";
 
 export default async function TeamPage() {
   const { org } = await requireSession();
-  const members = await prisma.teamMember.findMany({ where: { orgId: org.id }, orderBy: { createdAt: "asc" } });
+  const members = (await collections.teamMembers().find({ orgId: oid(org.id) }).sort({ createdAt: 1 }).toArray()).map(toId);
 
   return (
     <div className="max-w-2xl space-y-6">

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
+import { collections } from "@/lib/db";
+import { toId } from "@/lib/mongo-utils";
 import { overallBanner, type ComponentStatus } from "@/lib/status";
 import { syncAutoMaintenance } from "@/lib/maintenance-sync";
 
@@ -7,44 +8,72 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ slu
   const { slug } = await params;
   await syncAutoMaintenance();
 
-  const page = await prisma.page.findUnique({ where: { slug } });
-  if (!page || page.type !== "PUBLIC") {
+  const pageDoc = await collections.pages().findOne({ slug });
+  if (!pageDoc || pageDoc.type !== "PUBLIC") {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
+  const page = toId(pageDoc);
 
-  const components = await prisma.component.findMany({ where: { pageId: page.id, visible: true }, orderBy: { order: "asc" } });
+  const components = (
+    await collections.components().find({ pageId: pageDoc._id, visible: true }).sort({ order: 1 }).toArray()
+  ).map(toId);
   const banner = overallBanner(components.map((c) => c.status as ComponentStatus));
 
-  const activeIncidents = await prisma.incident.findMany({
-    where: { pageId: page.id, isMaintenance: false, status: { not: "RESOLVED" } },
-    include: { updates: { orderBy: { createdAt: "desc" }, take: 1 }, components: { include: { component: true } } },
-  });
+  const activeIncidentDocs = await collections
+    .incidents()
+    .find({ pageId: pageDoc._id, isMaintenance: false, status: { $ne: "RESOLVED" } })
+    .toArray();
+  const upcomingMaintenanceDocs = await collections
+    .incidents()
+    .find({ pageId: pageDoc._id, isMaintenance: true, maintenanceStatus: { $ne: "COMPLETED" } })
+    .toArray();
 
-  const upcomingMaintenance = await prisma.incident.findMany({
-    where: { pageId: page.id, isMaintenance: true, maintenanceStatus: { not: "COMPLETED" } },
-    include: { components: { include: { component: true } } },
-  });
+  const allIncidentIds = [...activeIncidentDocs, ...upcomingMaintenanceDocs].map((i) => i._id);
+  const linkDocs = allIncidentIds.length
+    ? await collections.incidentComponents().find({ incidentId: { $in: allIncidentIds } }).toArray()
+    : [];
+  const linkedComponentIds = [...new Map(linkDocs.map((l) => [l.componentId.toHexString(), l.componentId])).values()];
+  const componentDocs = linkedComponentIds.length
+    ? await collections.components().find({ _id: { $in: linkedComponentIds } }).toArray()
+    : [];
+  const componentNameById = new Map(componentDocs.map((c) => [c._id.toHexString(), c.name]));
+  const linksByIncident = new Map<string, typeof linkDocs>();
+  for (const l of linkDocs) {
+    const key = l.incidentId.toHexString();
+    if (!linksByIncident.has(key)) linksByIncident.set(key, []);
+    linksByIncident.get(key)!.push(l);
+  }
+
+  const latestUpdateByIncident = new Map<string, string | null>();
+  for (const inc of activeIncidentDocs) {
+    const latest = await collections.incidentUpdates().find({ incidentId: inc._id }).sort({ createdAt: -1 }).limit(1).next();
+    latestUpdateByIncident.set(inc._id.toHexString(), latest?.body ?? null);
+  }
 
   return NextResponse.json({
     page: { name: page.name, slug: page.slug, url: `${process.env.NEXT_PUBLIC_APP_URL ?? ""}/${page.slug}` },
     status: { indicator: banner.status, description: banner.label },
     components: components.map((c) => ({ id: c.id, name: c.name, status: c.status })),
-    active_incidents: activeIncidents.map((i) => ({
-      id: i.id,
+    active_incidents: activeIncidentDocs.map((i) => ({
+      id: i._id.toHexString(),
       name: i.name,
       status: i.status,
       impact: i.impact,
       created_at: i.createdAt,
-      latest_update: i.updates[0]?.body ?? null,
-      affected_components: i.components.map((c) => c.component.name),
+      latest_update: latestUpdateByIncident.get(i._id.toHexString()) ?? null,
+      affected_components: (linksByIncident.get(i._id.toHexString()) ?? []).map(
+        (l) => componentNameById.get(l.componentId.toHexString()) ?? ""
+      ),
     })),
-    scheduled_maintenance: upcomingMaintenance.map((m) => ({
-      id: m.id,
+    scheduled_maintenance: upcomingMaintenanceDocs.map((m) => ({
+      id: m._id.toHexString(),
       name: m.name,
       status: m.maintenanceStatus,
       scheduled_start: m.scheduledStart,
       scheduled_end: m.scheduledEnd,
-      affected_components: m.components.map((c) => c.component.name),
+      affected_components: (linksByIncident.get(m._id.toHexString()) ?? []).map(
+        (l) => componentNameById.get(l.componentId.toHexString()) ?? ""
+      ),
     })),
   });
 }

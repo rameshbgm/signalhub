@@ -1,4 +1,6 @@
-import { prisma } from "@/lib/db";
+import { ObjectId } from "mongodb";
+import { collections } from "@/lib/db";
+import { oid } from "@/lib/mongo-utils";
 
 /**
  * Notification delivery is simulated: every send is recorded in NotificationLog
@@ -17,9 +19,10 @@ export type NotifyEvent = {
 };
 
 export async function dispatchNotifications(event: NotifyEvent) {
-  const subscribers = await prisma.subscriber.findMany({
-    where: { pageId: event.pageId, verified: true, quarantined: false },
-  });
+  const subscribers = await collections
+    .subscribers()
+    .find({ pageId: oid(event.pageId), verified: true, quarantined: false })
+    .toArray();
 
   const targeted = subscribers.filter((s) => {
     if (!event.componentIds || event.componentIds.length === 0) return true;
@@ -38,32 +41,32 @@ export async function dispatchNotifications(event: NotifyEvent) {
             body: JSON.stringify({ type: event.eventType, subject: event.subject, body: event.body }),
           }).catch(() => null);
         }
-        await prisma.notificationLog.create({
-          data: {
-            pageId: event.pageId,
-            channel: sub.channel,
-            contact: sub.contact,
-            subject: event.subject,
-            body: event.body,
-            status: "SENT",
-          },
+        await collections.notificationLogs().insertOne({
+          _id: new ObjectId(),
+          pageId: event.pageId,
+          channel: sub.channel,
+          contact: sub.contact,
+          subject: event.subject,
+          body: event.body,
+          status: "SENT",
+          createdAt: new Date(),
         });
       } catch {
-        await prisma.notificationLog.create({
-          data: {
-            pageId: event.pageId,
-            channel: sub.channel,
-            contact: sub.contact,
-            subject: event.subject,
-            body: event.body,
-            status: "FAILED",
-          },
+        await collections.notificationLogs().insertOne({
+          _id: new ObjectId(),
+          pageId: event.pageId,
+          channel: sub.channel,
+          contact: sub.contact,
+          subject: event.subject,
+          body: event.body,
+          status: "FAILED",
+          createdAt: new Date(),
         });
       }
     })
   );
 
-  const endpoints = await prisma.webhookEndpoint.findMany({ where: { pageId: event.pageId, active: true } });
+  const endpoints = await collections.webhookEndpoints().find({ pageId: oid(event.pageId), active: true }).toArray();
   await Promise.all(
     endpoints.map((ep) =>
       fetch(ep.url, {

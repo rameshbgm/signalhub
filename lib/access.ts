@@ -1,5 +1,6 @@
-import { prisma } from "@/lib/db";
+import { collections } from "@/lib/db";
 import { getPageAccessSession } from "@/lib/auth";
+import { oid } from "@/lib/mongo-utils";
 
 export type AccessResult =
   | { ok: true; visibleComponentIds: string[] | null } // null = all components visible
@@ -21,13 +22,11 @@ export async function checkPageAccess(page: { id: string; type: string }): Promi
 
   if (page.type === "AUDIENCE") {
     if (session?.pageId === page.id && session.userId) {
-      const user = await prisma.pageAccessUser.findUnique({
-        where: { id: session.userId },
-        include: { group: true },
-      });
+      const user = await collections.pageAccessUsers().findOne({ _id: oid(session.userId) });
       if (!user) return { ok: false, reason: "login" };
+      const group = user.groupId ? await collections.pageAccessGroups().findOne({ _id: user.groupId }) : null;
       const own: string[] = JSON.parse(user.componentIds || "[]");
-      const groupIds: string[] = user.group ? JSON.parse(user.group.componentIds || "[]") : [];
+      const groupIds: string[] = group ? JSON.parse(group.componentIds || "[]") : [];
       const merged = Array.from(new Set([...own, ...groupIds]));
       return { ok: true, visibleComponentIds: merged };
     }

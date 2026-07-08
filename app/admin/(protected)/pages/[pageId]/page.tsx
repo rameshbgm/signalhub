@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { requireSession } from "@/lib/require-session";
-import { prisma } from "@/lib/db";
+import { collections } from "@/lib/db";
+import { oid, toId } from "@/lib/mongo-utils";
 import { COMPONENT_STATUSES, COMPONENT_STATUS_LABEL } from "@/lib/status";
 import { updatePageSettings, deletePage } from "../actions";
 import { createGroup, deleteGroup, createComponent, updateComponentStatus, updateComponentDetails, deleteComponent } from "./components-actions";
@@ -9,19 +10,34 @@ import { createAccessGroup, deleteAccessGroup, createAccessUser, deleteAccessUse
 export default async function PageDetail({ params }: { params: Promise<{ pageId: string }> }) {
   const { pageId } = await params;
   const { org } = await requireSession();
-  const page = await prisma.page.findUnique({ where: { id: pageId } });
-  if (!page || page.orgId !== org.id) notFound();
+  const pageDoc = await collections.pages().findOne({ _id: oid(pageId) });
+  if (!pageDoc || pageDoc.orgId.toHexString() !== org.id) notFound();
+  const page = toId(pageDoc);
 
-  const groups = await prisma.componentGroup.findMany({
-    where: { pageId },
-    orderBy: { order: "asc" },
-    include: { components: { orderBy: { order: "asc" } } },
-  });
-  const ungrouped = await prisma.component.findMany({ where: { pageId, groupId: null }, orderBy: { order: "asc" } });
-  const providers = await prisma.thirdPartyProvider.findMany({ orderBy: { name: "asc" } });
+  const [groupDocs, ungroupedDocs, providerDocs] = await Promise.all([
+    collections.componentGroups().find({ pageId: oid(pageId) }).sort({ order: 1 }).toArray(),
+    collections.components().find({ pageId: oid(pageId), groupId: null }).sort({ order: 1 }).toArray(),
+    collections.thirdPartyProviders().find({}).sort({ name: 1 }).toArray(),
+  ]);
+  const allComponentDocs = await collections.components().find({ pageId: oid(pageId) }).sort({ order: 1 }).toArray();
+  const componentsByGroup = new Map<string, typeof allComponentDocs>();
+  for (const c of allComponentDocs) {
+    if (!c.groupId) continue;
+    const key = c.groupId.toHexString();
+    if (!componentsByGroup.has(key)) componentsByGroup.set(key, []);
+    componentsByGroup.get(key)!.push(c);
+  }
+
+  const groups = groupDocs.map((g) => ({
+    ...toId(g),
+    components: (componentsByGroup.get(g._id.toHexString()) ?? []).map(toId),
+  }));
+  const ungrouped = ungroupedDocs.map(toId);
+  const providers = providerDocs.map(toId);
   const allComponents = [...groups.flatMap((g) => g.components), ...ungrouped];
-  const accessGroups = page.type === "AUDIENCE" ? await prisma.pageAccessGroup.findMany({ where: { pageId } }) : [];
-  const accessUsers = page.type === "AUDIENCE" ? await prisma.pageAccessUser.findMany({ where: { pageId }, include: { group: true } }) : [];
+
+  const { accessGroups, accessUsers } = page.type === "AUDIENCE" ? await loadAudienceAccess(pageId) : { accessGroups: [], accessUsers: [] };
+
   const boundUpdatePage = updatePageSettings.bind(null, pageId);
   const boundDeletePage = deletePage.bind(null, pageId);
   const boundCreateGroup = createGroup.bind(null, pageId);
@@ -273,4 +289,16 @@ function Field({ label, children, full }: { label: string; children: React.React
       {children}
     </label>
   );
+}
+
+async function loadAudienceAccess(pageId: string) {
+  const accessGroupDocs = await collections.pageAccessGroups().find({ pageId: oid(pageId) }).toArray();
+  const accessGroups = accessGroupDocs.map(toId);
+  const accessGroupById = new Map(accessGroupDocs.map((g) => [g._id.toHexString(), toId(g)]));
+  const accessUserDocs = await collections.pageAccessUsers().find({ pageId: oid(pageId) }).toArray();
+  const accessUsers = accessUserDocs.map((u) => ({
+    ...toId(u),
+    group: u.groupId ? accessGroupById.get(u.groupId.toHexString()) ?? null : null,
+  }));
+  return { accessGroups, accessUsers };
 }

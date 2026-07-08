@@ -1,9 +1,12 @@
 import { requireSession } from "@/lib/require-session";
-import { prisma } from "@/lib/db";
+import { collections } from "@/lib/db";
+import { oid, toId } from "@/lib/mongo-utils";
 
 export default async function AuditLogPage() {
   const { org } = await requireSession();
-  const logs = await prisma.auditLog.findMany({ where: { orgId: org.id }, orderBy: { createdAt: "desc" }, take: 200 });
+  const logs = (
+    await collections.auditLogs().find({ orgId: oid(org.id) }).sort({ createdAt: -1 }).limit(200).toArray()
+  ).map(toId);
 
   return (
     <div className="max-w-3xl space-y-4">

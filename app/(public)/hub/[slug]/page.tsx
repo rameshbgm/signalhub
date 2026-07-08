@@ -1,7 +1,8 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { prisma } from "@/lib/db";
-import { overallBanner, COMPONENT_STATUS_COLOR, COMPONENT_STATUS_LABEL, type ComponentStatus } from "@/lib/status";
+import { collections } from "@/lib/db";
+import { toId } from "@/lib/mongo-utils";
+import { overallBanner, COMPONENT_STATUS_COLOR, type ComponentStatus } from "@/lib/status";
 import { PublicHeader, PublicFooter } from "@/components/public/PublicChrome";
 import { StatusBanner } from "@/components/public/StatusBanner";
 import { SubscribeModal } from "@/components/public/SubscribeModal";
@@ -9,15 +10,14 @@ import { PastIncidentsByDay } from "@/components/public/IncidentTimeline";
 
 export default async function HubPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const hub = await prisma.page.findUnique({
-    where: { slug },
-    include: { hubChildren: { orderBy: { createdAt: "asc" } } },
-  });
-  if (!hub || !hub.isHub) notFound();
+  const hubDoc = await collections.pages().findOne({ slug });
+  if (!hubDoc || !hubDoc.isHub) notFound();
+  const hubChildDocs = await collections.pages().find({ hubParentId: hubDoc._id }).sort({ createdAt: 1 }).toArray();
+  const hub = { ...toId(hubDoc), hubChildren: hubChildDocs.map(toId) };
 
   const childData = await Promise.all(
     hub.hubChildren.map(async (child) => {
-      const components = await prisma.component.findMany({ where: { pageId: child.id, visible: true } });
+      const components = (await collections.components().find({ pageId: hubChildDocs.find((c) => c._id.toHexString() === child.id)!._id, visible: true }).toArray()).map(toId);
       const banner = overallBanner(components.map((c) => c.status as ComponentStatus));
       return { child, banner, componentCount: components.length };
     })
@@ -25,17 +25,51 @@ export default async function HubPage({ params }: { params: Promise<{ slug: stri
 
   const aggregateBanner = overallBanner(childData.map((c) => c.banner.status));
 
-  const childIds = hub.hubChildren.map((c) => c.id);
-  const incidents = await prisma.incident.findMany({
-    where: { pageId: { in: childIds } },
-    orderBy: { createdAt: "desc" },
-    include: { updates: { orderBy: { createdAt: "asc" } }, components: { include: { component: true } } },
-    take: 50,
-  });
-  // Tag each incident's page name onto it for display context by wrapping name.
-  const incidentsWithPage = incidents.map((inc) => {
-    const childPage = hub.hubChildren.find((c) => c.id === inc.pageId);
-    return { ...inc, name: `[${childPage?.name ?? ""}] ${inc.name}`, linkSlug: childPage?.slug };
+  const childIds = hubChildDocs.map((c) => c._id);
+  const incidentDocs = await collections
+    .incidents()
+    .find({ pageId: { $in: childIds } })
+    .sort({ createdAt: -1 })
+    .limit(50)
+    .toArray();
+  const incidentIds = incidentDocs.map((i) => i._id);
+  const [updateDocs, linkDocs] = await Promise.all([
+    incidentIds.length
+      ? collections.incidentUpdates().find({ incidentId: { $in: incidentIds } }).sort({ createdAt: 1 }).toArray()
+      : Promise.resolve([]),
+    incidentIds.length ? collections.incidentComponents().find({ incidentId: { $in: incidentIds } }).toArray() : Promise.resolve([]),
+  ]);
+  const linkedComponentIdSet = new Map(linkDocs.map((l) => [l.componentId.toHexString(), l.componentId]));
+  const linkedComponentIds = [...linkedComponentIdSet.values()];
+  const componentDocs = linkedComponentIds.length
+    ? await collections.components().find({ _id: { $in: linkedComponentIds } }).toArray()
+    : [];
+  const componentById = new Map(componentDocs.map((c) => [c._id.toHexString(), toId(c)]));
+  const updatesByIncident = new Map<string, typeof updateDocs>();
+  for (const u of updateDocs) {
+    const key = u.incidentId.toHexString();
+    if (!updatesByIncident.has(key)) updatesByIncident.set(key, []);
+    updatesByIncident.get(key)!.push(u);
+  }
+  const linksByIncident = new Map<string, typeof linkDocs>();
+  for (const l of linkDocs) {
+    const key = l.incidentId.toHexString();
+    if (!linksByIncident.has(key)) linksByIncident.set(key, []);
+    linksByIncident.get(key)!.push(l);
+  }
+
+  const incidentsWithPage = incidentDocs.map((inc) => {
+    const childPage = hubChildDocs.find((c) => c._id.toHexString() === inc.pageId.toHexString());
+    return {
+      ...toId(inc),
+      updates: (updatesByIncident.get(inc._id.toHexString()) ?? []).map(toId),
+      components: (linksByIncident.get(inc._id.toHexString()) ?? []).map((l) => ({
+        ...toId(l),
+        component: componentById.get(l.componentId.toHexString())!,
+      })),
+      name: `[${childPage?.name ?? ""}] ${inc.name}`,
+      linkSlug: childPage?.slug,
+    };
   });
 
   return (

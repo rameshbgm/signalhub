@@ -1,11 +1,12 @@
 import { requireSession } from "@/lib/require-session";
-import { prisma } from "@/lib/db";
+import { collections } from "@/lib/db";
+import { oid, toId } from "@/lib/mongo-utils";
 import { PageSelect } from "@/components/admin/PageSelect";
 
 export default async function EmbedPage({ searchParams }: { searchParams: Promise<{ pageId?: string }> }) {
   const { org } = await requireSession();
   const { pageId: pageIdParam } = await searchParams;
-  const pages = await prisma.page.findMany({ where: { orgId: org.id }, orderBy: { createdAt: "asc" } });
+  const pages = (await collections.pages().find({ orgId: oid(org.id) }).sort({ createdAt: 1 }).toArray()).map(toId);
   const pageId = pageIdParam && pages.some((p) => p.id === pageIdParam) ? pageIdParam : pages[0]?.id;
   const page = pages.find((p) => p.id === pageId);
 

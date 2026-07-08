@@ -1,5 +1,6 @@
 import { requireSession } from "@/lib/require-session";
-import { prisma } from "@/lib/db";
+import { collections } from "@/lib/db";
+import { oid, toId } from "@/lib/mongo-utils";
 import { createIncident } from "../actions";
 import { IncidentForm } from "@/components/admin/IncidentForm";
 import { PageSelect } from "@/components/admin/PageSelect";
@@ -7,11 +8,15 @@ import { PageSelect } from "@/components/admin/PageSelect";
 export default async function NewIncidentPage({ searchParams }: { searchParams: Promise<{ pageId?: string }> }) {
   const { org } = await requireSession();
   const { pageId: pageIdParam } = await searchParams;
-  const pages = await prisma.page.findMany({ where: { orgId: org.id, isHub: false }, orderBy: { createdAt: "asc" } });
+  const pages = (await collections.pages().find({ orgId: oid(org.id), isHub: false }).sort({ createdAt: 1 }).toArray()).map(toId);
   const pageId = pageIdParam && pages.some((p) => p.id === pageIdParam) ? pageIdParam : pages[0]?.id;
 
-  const components = pageId ? await prisma.component.findMany({ where: { pageId }, orderBy: { order: "asc" } }) : [];
-  const templates = pageId ? await prisma.incidentTemplate.findMany({ where: { pageId } }) : [];
+  const components = pageId
+    ? (await collections.components().find({ pageId: oid(pageId) }).sort({ order: 1 }).toArray()).map(toId)
+    : [];
+  const templates = pageId
+    ? (await collections.incidentTemplates().find({ pageId: oid(pageId) }).toArray()).map(toId)
+    : [];
 
   return (
     <div className="max-w-2xl">

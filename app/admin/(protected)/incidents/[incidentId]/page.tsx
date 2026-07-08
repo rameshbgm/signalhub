@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { requireSession } from "@/lib/require-session";
-import { prisma } from "@/lib/db";
+import { collections } from "@/lib/db";
+import { oid, toId } from "@/lib/mongo-utils";
 import { INCIDENT_STATUSES, INCIDENT_STATUS_LABEL, MAINTENANCE_STATUSES, MAINTENANCE_STATUS_LABEL, IMPACT_LABEL, type Impact } from "@/lib/status";
 import { postIncidentUpdate, deleteIncident, savePostmortem } from "../actions";
 import { setMaintenanceStatus } from "../../maintenance/actions";
@@ -8,15 +9,26 @@ import { setMaintenanceStatus } from "../../maintenance/actions";
 export default async function IncidentDetailPage({ params }: { params: Promise<{ incidentId: string }> }) {
   const { incidentId } = await params;
   const { org } = await requireSession();
-  const incident = await prisma.incident.findUnique({
-    where: { id: incidentId },
-    include: {
-      updates: { orderBy: { createdAt: "asc" } },
-      components: { include: { component: true } },
-      page: true,
-    },
-  });
-  if (!incident || incident.page.orgId !== org.id) notFound();
+  const incidentDoc = await collections.incidents().findOne({ _id: oid(incidentId) });
+  if (!incidentDoc) notFound();
+  const pageDoc = await collections.pages().findOne({ _id: incidentDoc.pageId });
+  if (!pageDoc || pageDoc.orgId.toHexString() !== org.id) notFound();
+
+  const [updateDocs, linkDocs] = await Promise.all([
+    collections.incidentUpdates().find({ incidentId: incidentDoc._id }).sort({ createdAt: 1 }).toArray(),
+    collections.incidentComponents().find({ incidentId: incidentDoc._id }).toArray(),
+  ]);
+  const componentDocs = linkDocs.length
+    ? await collections.components().find({ _id: { $in: linkDocs.map((l) => l.componentId) } }).toArray()
+    : [];
+  const componentById = new Map(componentDocs.map((c) => [c._id.toHexString(), toId(c)]));
+
+  const incident = {
+    ...toId(incidentDoc),
+    updates: updateDocs.map(toId),
+    components: linkDocs.map((l) => ({ ...toId(l), component: componentById.get(l.componentId.toHexString())! })),
+    page: toId(pageDoc),
+  };
 
   const boundPostUpdate = postIncidentUpdate.bind(null, incidentId);
   const boundDelete = deleteIncident.bind(null, incidentId);

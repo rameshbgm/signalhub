@@ -1,20 +1,20 @@
 import Link from "next/link";
 import { requireSession } from "@/lib/require-session";
-import { prisma } from "@/lib/db";
+import { collections } from "@/lib/db";
+import { oid, toId } from "@/lib/mongo-utils";
 import { syncAutoMaintenance } from "@/lib/maintenance-sync";
 import { MAINTENANCE_STATUS_LABEL, type MaintenanceStatus } from "@/lib/status";
 
 export default async function MaintenanceListPage() {
   await syncAutoMaintenance();
   const { org } = await requireSession();
-  const pages = await prisma.page.findMany({ where: { orgId: org.id } });
-  const pageIds = pages.map((p) => p.id);
+  const pages = (await collections.pages().find({ orgId: oid(org.id) }).toArray()).map(toId);
+  const pageIds = pages.map((p) => oid(p.id));
   const pageNameById = Object.fromEntries(pages.map((p) => [p.id, p.name]));
 
-  const maintenance = await prisma.incident.findMany({
-    where: { pageId: { in: pageIds }, isMaintenance: true },
-    orderBy: { scheduledStart: "desc" },
-  });
+  const maintenance = (
+    await collections.incidents().find({ pageId: { $in: pageIds }, isMaintenance: true }).sort({ scheduledStart: -1 }).toArray()
+  ).map(toId);
 
   return (
     <div>

@@ -1,5 +1,6 @@
-import { prisma } from "@/lib/db";
+import { collections } from "@/lib/db";
 import { getSession } from "@/lib/auth";
+import { oid, toId } from "@/lib/mongo-utils";
 
 export class AdminAuthError extends Error {}
 
@@ -10,7 +11,7 @@ export async function requireOrgSession() {
 }
 
 export async function assertPageInOrg(pageId: string, orgId: string) {
-  const page = await prisma.page.findUnique({ where: { id: pageId } });
-  if (!page || page.orgId !== orgId) throw new AdminAuthError("Page not found in your organization");
-  return page;
+  const pageDoc = await collections.pages().findOne({ _id: oid(pageId) });
+  if (!pageDoc || pageDoc.orgId.toHexString() !== orgId) throw new AdminAuthError("Page not found in your organization");
+  return toId(pageDoc);
 }

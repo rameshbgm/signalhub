@@ -1,8 +1,9 @@
 import Link from "next/link";
-import { prisma } from "@/lib/db";
+import { collections } from "@/lib/db";
+import { toId } from "@/lib/mongo-utils";
 
 export default async function Home() {
-  const pages = await prisma.page.findMany({ where: { type: "PUBLIC" }, orderBy: { createdAt: "asc" } });
+  const pages = (await collections.pages().find({ type: "PUBLIC" }).sort({ createdAt: 1 }).toArray()).map(toId);
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-6 text-center gap-6">

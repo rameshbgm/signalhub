@@ -1,23 +1,36 @@
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
-import { prisma } from "@/lib/db";
+import { collections } from "@/lib/db";
+import { oid, toId } from "@/lib/mongo-utils";
 import { checkPageAccess } from "@/lib/access";
 import { PublicHeader, PublicFooter } from "@/components/public/PublicChrome";
 import { IncidentCard } from "@/components/public/IncidentTimeline";
 
 export default async function IncidentPermalinkPage({ params }: { params: Promise<{ slug: string; incidentId: string }> }) {
   const { slug, incidentId } = await params;
-  const page = await prisma.page.findUnique({ where: { slug } });
-  if (!page) notFound();
+  const pageDoc = await collections.pages().findOne({ slug });
+  if (!pageDoc) notFound();
+  const page = toId(pageDoc);
 
   const access = await checkPageAccess(page);
   if (!access.ok) redirect(`/${slug}/access`);
 
-  const incident = await prisma.incident.findUnique({
-    where: { id: incidentId },
-    include: { updates: { orderBy: { createdAt: "asc" } }, components: { include: { component: true } } },
-  });
-  if (!incident || incident.pageId !== page.id) notFound();
+  const incidentDoc = await collections.incidents().findOne({ _id: oid(incidentId) });
+  if (!incidentDoc || incidentDoc.pageId.toHexString() !== page.id) notFound();
+
+  const [updateDocs, linkDocs] = await Promise.all([
+    collections.incidentUpdates().find({ incidentId: incidentDoc._id }).sort({ createdAt: 1 }).toArray(),
+    collections.incidentComponents().find({ incidentId: incidentDoc._id }).toArray(),
+  ]);
+  const componentDocs = linkDocs.length
+    ? await collections.components().find({ _id: { $in: linkDocs.map((l) => l.componentId) } }).toArray()
+    : [];
+  const componentById = new Map(componentDocs.map((c) => [c._id.toHexString(), toId(c)]));
+  const incident = {
+    ...toId(incidentDoc),
+    updates: updateDocs.map(toId),
+    components: linkDocs.map((l) => ({ ...toId(l), component: componentById.get(l.componentId.toHexString())! })),
+  };
 
   return (
     <div className="min-h-screen flex flex-col">

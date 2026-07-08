@@ -1,15 +1,18 @@
 import { requireSession } from "@/lib/require-session";
-import { prisma } from "@/lib/db";
+import { collections } from "@/lib/db";
+import { oid, toId } from "@/lib/mongo-utils";
 import { createApiKey, revokeApiKey, createWebhookEndpoint, deleteWebhookEndpoint } from "./actions";
 import { PageSelect } from "@/components/admin/PageSelect";
 
 export default async function ApiKeysPage({ searchParams }: { searchParams: Promise<{ pageId?: string }> }) {
   const { org } = await requireSession();
   const { pageId: pageIdParam } = await searchParams;
-  const keys = await prisma.apiKey.findMany({ where: { orgId: org.id }, orderBy: { createdAt: "asc" } });
-  const pages = await prisma.page.findMany({ where: { orgId: org.id }, orderBy: { createdAt: "asc" } });
+  const keys = (await collections.apiKeys().find({ orgId: oid(org.id) }).sort({ createdAt: 1 }).toArray()).map(toId);
+  const pages = (await collections.pages().find({ orgId: oid(org.id) }).sort({ createdAt: 1 }).toArray()).map(toId);
   const pageId = pageIdParam && pages.some((p) => p.id === pageIdParam) ? pageIdParam : pages[0]?.id;
-  const webhookEndpoints = pageId ? await prisma.webhookEndpoint.findMany({ where: { pageId } }) : [];
+  const webhookEndpoints = pageId
+    ? (await collections.webhookEndpoints().find({ pageId: oid(pageId) }).toArray()).map(toId)
+    : [];
   const boundCreateWebhook = pageId ? createWebhookEndpoint.bind(null, pageId) : null;
 
   return (

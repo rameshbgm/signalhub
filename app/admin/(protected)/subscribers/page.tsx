@@ -1,21 +1,35 @@
 import { requireSession } from "@/lib/require-session";
-import { prisma } from "@/lib/db";
+import { collections } from "@/lib/db";
+import { oid, toId } from "@/lib/mongo-utils";
 import { addSubscriber, importSubscribersCsv, toggleQuarantine, removeSubscriber } from "./actions";
 import { PageSelect } from "@/components/admin/PageSelect";
 
 export default async function SubscribersPage({ searchParams }: { searchParams: Promise<{ pageId?: string; channel?: string }> }) {
   const { org } = await requireSession();
   const { pageId: pageIdParam, channel } = await searchParams;
-  const pages = await prisma.page.findMany({ where: { orgId: org.id, isHub: false }, orderBy: { createdAt: "asc" } });
+  const pages = (await collections.pages().find({ orgId: oid(org.id), isHub: false }).sort({ createdAt: 1 }).toArray()).map(toId);
   const pageId = pageIdParam && pages.some((p) => p.id === pageIdParam) ? pageIdParam : pages[0]?.id;
 
   if (!pageId) return <p className="text-sm text-gray-400">Create a page first.</p>;
 
-  const subscribers = await prisma.subscriber.findMany({
-    where: { pageId, ...(channel ? { channel } : {}) },
-    orderBy: { createdAt: "desc" },
-  });
-  const counts = await prisma.subscriber.groupBy({ by: ["channel"], where: { pageId }, _count: true });
+  const subscribers = (
+    await collections
+      .subscribers()
+      .find({ pageId: oid(pageId), ...(channel ? { channel } : {}) })
+      .sort({ createdAt: -1 })
+      .toArray()
+  ).map(toId);
+
+  const allForPage = channel
+    ? (await collections.subscribers().find({ pageId: oid(pageId) }).toArray()).map(toId)
+    : subscribers;
+  const counts = Object.entries(
+    allForPage.reduce<Record<string, number>>((acc, s) => {
+      acc[s.channel] = (acc[s.channel] ?? 0) + 1;
+      return acc;
+    }, {})
+  ).map(([channel, count]) => ({ channel, count }));
+
   const quarantinedCount = subscribers.filter((s) => s.quarantined).length;
   const boundAdd = addSubscriber.bind(null, pageId);
   const boundImport = importSubscribersCsv.bind(null, pageId);
@@ -32,7 +46,7 @@ export default async function SubscribersPage({ searchParams }: { searchParams: 
       <div className="grid sm:grid-cols-4 gap-4">
         {counts.map((c) => (
           <div key={c.channel} className="bg-white border rounded-lg p-4">
-            <p className="text-2xl font-semibold">{c._count}</p>
+            <p className="text-2xl font-semibold">{c.count}</p>
             <p className="text-xs text-gray-400">{c.channel}</p>
           </div>
         ))}

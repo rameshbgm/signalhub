@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
+import { collections } from "@/lib/db";
+import { oid } from "@/lib/mongo-utils";
 import { getSession } from "@/lib/auth";
 
 export async function GET(req: NextRequest) {
@@ -9,10 +10,10 @@ export async function GET(req: NextRequest) {
   const pageId = req.nextUrl.searchParams.get("pageId");
   if (!pageId) return NextResponse.json({ error: "pageId required" }, { status: 400 });
 
-  const page = await prisma.page.findUnique({ where: { id: pageId } });
-  if (!page || page.orgId !== session.orgId) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  const page = await collections.pages().findOne({ _id: oid(pageId) });
+  if (!page || page.orgId.toHexString() !== session.orgId) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  const subscribers = await prisma.subscriber.findMany({ where: { pageId } });
+  const subscribers = await collections.subscribers().find({ pageId: oid(pageId) }).toArray();
   const rows = ["channel,contact,verified,quarantined,created_at"];
   for (const s of subscribers) {
     rows.push([s.channel, s.contact, s.verified, s.quarantined, s.createdAt.toISOString()].join(","));

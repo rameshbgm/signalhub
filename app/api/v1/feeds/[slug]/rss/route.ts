@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
+import { collections } from "@/lib/db";
 
 function escapeXml(s: string) {
   return s.replace(/[<>&'"]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", "'": "&apos;", '"': "&quot;" }[c]!));
@@ -7,26 +7,24 @@ function escapeXml(s: string) {
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const page = await prisma.page.findUnique({ where: { slug } });
+  const page = await collections.pages().findOne({ slug });
   if (!page) return new NextResponse("Not found", { status: 404 });
 
-  const incidents = await prisma.incident.findMany({
-    where: { pageId: page.id },
-    orderBy: { createdAt: "desc" },
-    take: 50,
-    include: { updates: { orderBy: { createdAt: "desc" }, take: 1 } },
-  });
+  const incidents = await collections.incidents().find({ pageId: page._id }).sort({ createdAt: -1 }).limit(50).toArray();
+  const latestUpdates = await Promise.all(
+    incidents.map((inc) => collections.incidentUpdates().find({ incidentId: inc._id }).sort({ createdAt: -1 }).limit(1).next())
+  );
 
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
   const items = incidents
     .map(
-      (inc) => `
+      (inc, i) => `
     <item>
       <title>${escapeXml(inc.name)}</title>
-      <link>${baseUrl}/${page.slug}/incidents/${inc.id}</link>
-      <guid>${baseUrl}/${page.slug}/incidents/${inc.id}</guid>
+      <link>${baseUrl}/${page.slug}/incidents/${inc._id.toHexString()}</link>
+      <guid>${baseUrl}/${page.slug}/incidents/${inc._id.toHexString()}</guid>
       <pubDate>${new Date(inc.createdAt).toUTCString()}</pubDate>
-      <description>${escapeXml(inc.updates[0]?.body ?? "")}</description>
+      <description>${escapeXml(latestUpdates[i]?.body ?? "")}</description>
     </item>`
     )
     .join("");

@@ -1,5 +1,6 @@
 import { requireSession } from "@/lib/require-session";
-import { prisma } from "@/lib/db";
+import { collections } from "@/lib/db";
+import { oid, toId } from "@/lib/mongo-utils";
 import { INCIDENT_STATUSES, INCIDENT_STATUS_LABEL, IMPACTS, IMPACT_LABEL } from "@/lib/status";
 import { createTemplateGroup, createTemplate, deleteTemplate } from "./actions";
 import { PageSelect } from "@/components/admin/PageSelect";
@@ -7,16 +8,29 @@ import { PageSelect } from "@/components/admin/PageSelect";
 export default async function TemplatesPage({ searchParams }: { searchParams: Promise<{ pageId?: string }> }) {
   const { org } = await requireSession();
   const { pageId: pageIdParam } = await searchParams;
-  const pages = await prisma.page.findMany({ where: { orgId: org.id, isHub: false }, orderBy: { createdAt: "asc" } });
+  const pages = (await collections.pages().find({ orgId: oid(org.id), isHub: false }).sort({ createdAt: 1 }).toArray()).map(toId);
   const pageId = pageIdParam && pages.some((p) => p.id === pageIdParam) ? pageIdParam : pages[0]?.id;
 
   if (!pageId) {
     return <p className="text-sm text-gray-400">Create a page first.</p>;
   }
 
-  const groups = await prisma.templateGroup.findMany({ where: { pageId }, include: { templates: true } });
-  const ungroupedTemplates = await prisma.incidentTemplate.findMany({ where: { pageId, groupId: null } });
-  const components = await prisma.component.findMany({ where: { pageId } });
+  const [groupDocs, ungroupedTemplateDocs, componentDocs] = await Promise.all([
+    collections.templateGroups().find({ pageId: oid(pageId) }).toArray(),
+    collections.incidentTemplates().find({ pageId: oid(pageId), groupId: null }).toArray(),
+    collections.components().find({ pageId: oid(pageId) }).toArray(),
+  ]);
+  const allTemplateDocs = await collections
+    .incidentTemplates()
+    .find({ pageId: oid(pageId), groupId: { $in: groupDocs.map((g) => g._id) } })
+    .toArray();
+
+  const ungroupedTemplates = ungroupedTemplateDocs.map(toId);
+  const components = componentDocs.map(toId);
+  const groups = groupDocs.map((g) => ({
+    ...toId(g),
+    templates: allTemplateDocs.filter((t) => t.groupId?.toHexString() === g._id.toHexString()).map(toId),
+  }));
 
   const boundCreateGroup = createTemplateGroup.bind(null, pageId);
   const boundCreateTemplate = createTemplate.bind(null, pageId);

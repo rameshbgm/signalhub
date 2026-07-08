@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
+import { collections } from "@/lib/db";
+import { toId } from "@/lib/mongo-utils";
 import { verifyPassword, createPageAccessSession } from "@/lib/auth";
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const page = await prisma.page.findUnique({ where: { slug } });
-  if (!page) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  const pageDoc = await collections.pages().findOne({ slug });
+  if (!pageDoc) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  const page = toId(pageDoc);
 
   const body = await req.json().catch(() => ({}));
 
@@ -18,10 +20,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
   }
 
   if (page.type === "AUDIENCE") {
-    const user = await prisma.pageAccessUser.findUnique({ where: { pageId_email: { pageId: page.id, email: body.email ?? "" } } });
-    if (!user || !(await verifyPassword(body.password ?? "", user.passwordHash))) {
+    const userDoc = await collections.pageAccessUsers().findOne({ pageId: pageDoc._id, email: body.email ?? "" });
+    if (!userDoc || !(await verifyPassword(body.password ?? "", userDoc.passwordHash))) {
       return NextResponse.json({ error: "Invalid email or password" }, { status: 401 });
     }
+    const user = toId(userDoc);
     await createPageAccessSession(page.id, { userId: user.id, email: user.email });
     return NextResponse.json({ ok: true });
   }

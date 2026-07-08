@@ -1,17 +1,30 @@
 import { requireSession } from "@/lib/require-session";
-import { prisma } from "@/lib/db";
+import { collections } from "@/lib/db";
+import { oid, toId } from "@/lib/mongo-utils";
 import { createMetric, pushMetricPoint, toggleMetricVisible, deleteMetric } from "./actions";
 import { PageSelect } from "@/components/admin/PageSelect";
 
 export default async function MetricsPage({ searchParams }: { searchParams: Promise<{ pageId?: string }> }) {
   const { org } = await requireSession();
   const { pageId: pageIdParam } = await searchParams;
-  const pages = await prisma.page.findMany({ where: { orgId: org.id, isHub: false }, orderBy: { createdAt: "asc" } });
+  const pages = (await collections.pages().find({ orgId: oid(org.id), isHub: false }).sort({ createdAt: 1 }).toArray()).map(toId);
   const pageId = pageIdParam && pages.some((p) => p.id === pageIdParam) ? pageIdParam : pages[0]?.id;
   if (!pageId) return <p className="text-sm text-gray-400">Create a page first.</p>;
 
-  const metrics = await prisma.metric.findMany({ where: { pageId }, include: { points: { orderBy: { timestamp: "desc" }, take: 1 } } });
-  const components = await prisma.component.findMany({ where: { pageId } });
+  const metricDocs = await collections.metrics().find({ pageId: oid(pageId) }).toArray();
+  const metricIds = metricDocs.map((m) => m._id);
+  const latestPoints = await Promise.all(
+    metricIds.map((id) =>
+      collections.metricPoints().find({ metricId: id }).sort({ timestamp: -1 }).limit(1).next()
+    )
+  );
+  const latestByMetric = new Map(metricIds.map((id, i) => [id.toHexString(), latestPoints[i]]));
+  const metrics = metricDocs.map((m) => ({
+    ...toId(m),
+    points: latestByMetric.get(m._id.toHexString()) ? [toId(latestByMetric.get(m._id.toHexString())!)] : [],
+  }));
+
+  const components = (await collections.components().find({ pageId: oid(pageId) }).toArray()).map(toId);
   const boundCreate = createMetric.bind(null, pageId);
 
   return (

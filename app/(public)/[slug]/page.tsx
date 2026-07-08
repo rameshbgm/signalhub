@@ -1,5 +1,6 @@
 import { notFound, redirect } from "next/navigation";
-import { prisma } from "@/lib/db";
+import { collections } from "@/lib/db";
+import { oid, toId } from "@/lib/mongo-utils";
 import { checkPageAccess } from "@/lib/access";
 import { getComponentsForPage, getIncidentsForPage, splitActiveAndPast } from "@/lib/public-data";
 import { PublicHeader, PublicFooter } from "@/components/public/PublicChrome";
@@ -14,8 +15,10 @@ import Link from "next/link";
 export default async function PublicStatusPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   await syncAutoMaintenance();
-  const page = await prisma.page.findUnique({ where: { slug }, include: { hubParent: true } });
-  if (!page) notFound();
+  const pageDoc = await collections.pages().findOne({ slug });
+  if (!pageDoc) notFound();
+  const hubParentDoc = pageDoc.hubParentId ? await collections.pages().findOne({ _id: pageDoc.hubParentId }) : null;
+  const page = { ...toId(pageDoc), hubParent: hubParentDoc ? toId(hubParentDoc) : null };
 
   const access = await checkPageAccess(page);
   if (!access.ok) redirect(`/${slug}/access`);
@@ -28,10 +31,11 @@ export default async function PublicStatusPage({ params }: { params: Promise<{ s
   const activeMaintenance = active.filter((i) => i.isMaintenance);
   const upcomingMaintenance = incidents.filter((i) => i.isMaintenance && i.maintenanceStatus === "SCHEDULED");
 
-  const metrics = await prisma.metric.findMany({
-    where: { pageId: page.id, visible: true },
-    include: { points: { orderBy: { timestamp: "asc" }, take: 200 } },
-  });
+  const metricDocs = await collections.metrics().find({ pageId: oid(page.id), visible: true }).toArray();
+  const metricPointsByMetric = await Promise.all(
+    metricDocs.map((m) => collections.metricPoints().find({ metricId: m._id }).sort({ timestamp: 1 }).limit(200).toArray())
+  );
+  const metrics = metricDocs.map((m, i) => ({ ...toId(m), points: metricPointsByMetric[i].map(toId) }));
 
   const allComponentsFlat = [...groups.flatMap((g) => g.components), ...ungrouped];
 

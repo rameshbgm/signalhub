@@ -1,4 +1,5 @@
-import { prisma } from "@/lib/db";
+import { ObjectId } from "mongodb";
+import { collections } from "@/lib/db";
 
 /**
  * Opportunistically advances scheduled-maintenance lifecycle state based on
@@ -8,31 +9,43 @@ import { prisma } from "@/lib/db";
 export async function syncAutoMaintenance() {
   const now = new Date();
 
-  const toStart = await prisma.incident.findMany({
-    where: { isMaintenance: true, autoTransition: true, maintenanceStatus: "SCHEDULED", scheduledStart: { lte: now } },
-    include: { components: true },
-  });
+  const toStart = await collections
+    .incidents()
+    .find({ isMaintenance: true, autoTransition: true, maintenanceStatus: "SCHEDULED", scheduledStart: { $lte: now } })
+    .toArray();
   for (const inc of toStart) {
-    await prisma.incident.update({ where: { id: inc.id }, data: { maintenanceStatus: "IN_PROGRESS" } });
-    for (const ic of inc.components) {
-      await prisma.component.update({ where: { id: ic.componentId }, data: { status: ic.newStatus } });
+    const components = await collections.incidentComponents().find({ incidentId: inc._id }).toArray();
+    await collections.incidents().updateOne({ _id: inc._id }, { $set: { maintenanceStatus: "IN_PROGRESS" } });
+    for (const ic of components) {
+      await collections.components().updateOne({ _id: ic.componentId }, { $set: { status: ic.newStatus } });
     }
-    await prisma.incidentUpdate.create({
-      data: { incidentId: inc.id, status: "INVESTIGATING", body: "This scheduled maintenance window has started automatically." },
+    await collections.incidentUpdates().insertOne({
+      _id: new ObjectId(),
+      incidentId: inc._id,
+      status: "INVESTIGATING",
+      body: "This scheduled maintenance window has started automatically.",
+      createdAt: new Date(),
+      notified: false,
     });
   }
 
-  const toComplete = await prisma.incident.findMany({
-    where: { isMaintenance: true, autoTransition: true, maintenanceStatus: "IN_PROGRESS", scheduledEnd: { lte: now } },
-    include: { components: true },
-  });
+  const toComplete = await collections
+    .incidents()
+    .find({ isMaintenance: true, autoTransition: true, maintenanceStatus: "IN_PROGRESS", scheduledEnd: { $lte: now } })
+    .toArray();
   for (const inc of toComplete) {
-    await prisma.incident.update({ where: { id: inc.id }, data: { maintenanceStatus: "COMPLETED", resolvedAt: now } });
-    for (const ic of inc.components) {
-      await prisma.component.update({ where: { id: ic.componentId }, data: { status: "OPERATIONAL" } });
+    const components = await collections.incidentComponents().find({ incidentId: inc._id }).toArray();
+    await collections.incidents().updateOne({ _id: inc._id }, { $set: { maintenanceStatus: "COMPLETED", resolvedAt: now } });
+    for (const ic of components) {
+      await collections.components().updateOne({ _id: ic.componentId }, { $set: { status: "OPERATIONAL" } });
     }
-    await prisma.incidentUpdate.create({
-      data: { incidentId: inc.id, status: "RESOLVED", body: "This scheduled maintenance window has completed automatically." },
+    await collections.incidentUpdates().insertOne({
+      _id: new ObjectId(),
+      incidentId: inc._id,
+      status: "RESOLVED",
+      body: "This scheduled maintenance window has completed automatically.",
+      createdAt: new Date(),
+      notified: false,
     });
   }
 }

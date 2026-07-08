@@ -1,11 +1,12 @@
 import Link from "next/link";
 import { requireSession } from "@/lib/require-session";
-import { prisma } from "@/lib/db";
+import { collections } from "@/lib/db";
+import { oid, toId } from "@/lib/mongo-utils";
 import { createPage } from "./actions";
 
 export default async function PagesListPage() {
   const { org } = await requireSession();
-  const pages = await prisma.page.findMany({ where: { orgId: org.id }, orderBy: { createdAt: "asc" } });
+  const pages = (await collections.pages().find({ orgId: oid(org.id) }).sort({ createdAt: 1 }).toArray()).map(toId);
   const hubs = pages.filter((p) => p.isHub);
 
   return (

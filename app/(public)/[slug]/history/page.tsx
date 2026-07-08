@@ -1,23 +1,22 @@
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
-import { prisma } from "@/lib/db";
+import { collections } from "@/lib/db";
+import { toId } from "@/lib/mongo-utils";
 import { checkPageAccess } from "@/lib/access";
+import { getIncidentsForPage } from "@/lib/public-data";
 import { PublicHeader, PublicFooter } from "@/components/public/PublicChrome";
 import { IncidentCard } from "@/components/public/IncidentTimeline";
 
 export default async function HistoryPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const page = await prisma.page.findUnique({ where: { slug } });
-  if (!page) notFound();
+  const pageDoc = await collections.pages().findOne({ slug });
+  if (!pageDoc) notFound();
+  const page = toId(pageDoc);
 
   const access = await checkPageAccess(page);
   if (!access.ok) redirect(`/${slug}/access`);
 
-  const incidents = await prisma.incident.findMany({
-    where: { pageId: page.id },
-    orderBy: { createdAt: "desc" },
-    include: { updates: { orderBy: { createdAt: "asc" } }, components: { include: { component: true } } },
-  });
+  const incidents = await getIncidentsForPage(page.id);
 
   const byMonth = new Map<string, typeof incidents>();
   for (const inc of incidents) {

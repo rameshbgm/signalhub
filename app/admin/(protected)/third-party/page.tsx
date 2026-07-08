@@ -1,9 +1,12 @@
 import { requireSession } from "@/lib/require-session";
-import { prisma } from "@/lib/db";
+import { collections } from "@/lib/db";
+import { toId } from "@/lib/mongo-utils";
 
 export default async function ThirdPartyCatalogPage() {
   await requireSession();
-  const providers = await prisma.thirdPartyProvider.findMany({ orderBy: [{ category: "asc" }, { name: "asc" }] });
+  const providers = (
+    await collections.thirdPartyProviders().find({}).sort({ category: 1, name: 1 }).toArray()
+  ).map(toId);
   const byCategory = new Map<string, typeof providers>();
   for (const p of providers) {
     if (!byCategory.has(p.category)) byCategory.set(p.category, []);

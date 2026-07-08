@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
+import { ObjectId } from "mongodb";
+import { collections } from "@/lib/db";
 import { generateOtpCode } from "@/lib/notify";
 import { z } from "zod";
 
@@ -15,7 +16,7 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   const { pageSlug, channel, contact, componentIds } = parsed.data;
 
-  const page = await prisma.page.findUnique({ where: { slug: pageSlug } });
+  const page = await collections.pages().findOne({ slug: pageSlug });
   if (!page) return NextResponse.json({ error: "Page not found" }, { status: 404 });
 
   if (channel === "EMAIL" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contact)) {
@@ -26,27 +27,27 @@ export async function POST(req: NextRequest) {
   }
 
   const code = generateOtpCode();
-  await prisma.subscriptionOtp.create({
-    data: {
-      pageId: page.id,
-      channel,
-      contact,
-      code,
-      componentIds: JSON.stringify(componentIds),
-      expiresAt: new Date(Date.now() + 10 * 60 * 1000),
-    },
+  await collections.subscriptionOtps().insertOne({
+    _id: new ObjectId(),
+    pageId: page._id.toHexString(),
+    channel,
+    contact,
+    code,
+    componentIds: JSON.stringify(componentIds),
+    expiresAt: new Date(Date.now() + 10 * 60 * 1000),
+    createdAt: new Date(),
   });
 
   // Simulated delivery: the OTP is logged instead of actually sent over SMTP/SMS.
-  await prisma.notificationLog.create({
-    data: {
-      pageId: page.id,
-      channel,
-      contact,
-      subject: "Your verification code",
-      body: `Your verification code is ${code}. It expires in 10 minutes.`,
-      status: "SENT",
-    },
+  await collections.notificationLogs().insertOne({
+    _id: new ObjectId(),
+    pageId: page._id.toHexString(),
+    channel,
+    contact,
+    subject: "Your verification code",
+    body: `Your verification code is ${code}. It expires in 10 minutes.`,
+    status: "SENT",
+    createdAt: new Date(),
   });
 
   return NextResponse.json({ ok: true, devCode: process.env.NODE_ENV !== "production" ? code : undefined });

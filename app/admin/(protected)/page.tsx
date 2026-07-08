@@ -1,23 +1,25 @@
 import Link from "next/link";
 import { requireSession } from "@/lib/require-session";
-import { prisma } from "@/lib/db";
+import { collections } from "@/lib/db";
+import { oid, toId } from "@/lib/mongo-utils";
 
 export default async function AdminDashboard() {
   const { org } = await requireSession();
 
-  const pages = await prisma.page.findMany({ where: { orgId: org.id }, orderBy: { createdAt: "asc" } });
-  const pageIds = pages.map((p) => p.id);
+  const pages = (await collections.pages().find({ orgId: oid(org.id) }).sort({ createdAt: 1 }).toArray()).map(toId);
+  const pageIds = pages.map((p) => oid(p.id));
 
-  const [openIncidents, subscriberCount, componentCount, upcomingMaintenance] = await Promise.all([
-    prisma.incident.findMany({
-      where: { pageId: { in: pageIds }, isMaintenance: false, status: { not: "RESOLVED" } },
-      include: { updates: true },
-      orderBy: { createdAt: "desc" },
-    }),
-    prisma.subscriber.count({ where: { pageId: { in: pageIds } } }),
-    prisma.component.count({ where: { pageId: { in: pageIds } } }),
-    prisma.incident.count({ where: { pageId: { in: pageIds }, isMaintenance: true, maintenanceStatus: "SCHEDULED" } }),
+  const [openIncidentDocs, subscriberCount, componentCount, upcomingMaintenance] = await Promise.all([
+    collections
+      .incidents()
+      .find({ pageId: { $in: pageIds }, isMaintenance: false, status: { $ne: "RESOLVED" } })
+      .sort({ createdAt: -1 })
+      .toArray(),
+    collections.subscribers().countDocuments({ pageId: { $in: pageIds } }),
+    collections.components().countDocuments({ pageId: { $in: pageIds } }),
+    collections.incidents().countDocuments({ pageId: { $in: pageIds }, isMaintenance: true, maintenanceStatus: "SCHEDULED" }),
   ]);
+  const openIncidents = openIncidentDocs.map(toId);
 
   return (
     <div>

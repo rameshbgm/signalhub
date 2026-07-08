@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
+import { ObjectId } from "mongodb";
+import { collections } from "@/lib/db";
 import { z } from "zod";
 
 const schema = z.object({
@@ -14,25 +15,37 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   const { pageSlug, channel, contact, code } = parsed.data;
 
-  const page = await prisma.page.findUnique({ where: { slug: pageSlug } });
+  const page = await collections.pages().findOne({ slug: pageSlug });
   if (!page) return NextResponse.json({ error: "Page not found" }, { status: 404 });
 
-  const otp = await prisma.subscriptionOtp.findFirst({
-    where: { pageId: page.id, channel, contact, code },
-    orderBy: { createdAt: "desc" },
-  });
+  const otp = await collections
+    .subscriptionOtps()
+    .find({ pageId: page._id.toHexString(), channel, contact, code })
+    .sort({ createdAt: -1 })
+    .limit(1)
+    .next();
   if (!otp || otp.expiresAt < new Date()) {
     return NextResponse.json({ error: "Invalid or expired code" }, { status: 400 });
   }
 
   const componentIds = otp.componentIds;
-  await prisma.subscriber.upsert({
-    where: { pageId_channel_contact: { pageId: page.id, channel, contact } },
-    update: { verified: true, quarantined: false, componentIds },
-    create: { pageId: page.id, channel, contact, verified: true, componentIds },
-  });
+  await collections.subscribers().updateOne(
+    { pageId: page._id, channel, contact },
+    {
+      $set: { verified: true, quarantined: false, componentIds },
+      $setOnInsert: {
+        _id: new ObjectId(),
+        pageId: page._id,
+        channel,
+        contact,
+        unsubscribeToken: new ObjectId().toHexString(),
+        createdAt: new Date(),
+      },
+    },
+    { upsert: true }
+  );
 
-  await prisma.subscriptionOtp.deleteMany({ where: { pageId: page.id, channel, contact } });
+  await collections.subscriptionOtps().deleteMany({ pageId: page._id.toHexString(), channel, contact });
 
   return NextResponse.json({ ok: true });
 }
