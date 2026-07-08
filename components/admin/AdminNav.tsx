@@ -10,6 +10,7 @@ const GROUPS = [
       { href: "/admin", label: "Dashboard", icon: "◧" },
       { href: "/admin/pages", label: "Pages", icon: "▦" },
       { href: "/admin/audit-log", label: "Audit Log", icon: "≣" },
+      { href: "/admin/help", label: "Help Center", icon: "?" },
     ],
   },
   {
