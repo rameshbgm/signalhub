@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { jwtVerify } from "jose";
+import { getSessionSecret } from "@/lib/session-secret";
 
 function getSecret() {
-  const secret = process.env.SESSION_SECRET || "dev-secret-change-me";
-  return new TextEncoder().encode(secret);
+  return getSessionSecret();
 }
 
 // Hosts that serve the app itself (admin, marketing, slug-based status pages).

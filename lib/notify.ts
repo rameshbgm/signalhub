@@ -1,3 +1,4 @@
+import { randomInt } from "node:crypto";
 import { ObjectId } from "mongodb";
 import { collections } from "@/lib/db";
 import { oid } from "@/lib/mongo-utils";
@@ -101,5 +102,7 @@ export async function dispatchNotifications(event: NotifyEvent) {
 }
 
 export function generateOtpCode() {
-  return Math.floor(100000 + Math.random() * 900000).toString();
+  // crypto.randomInt (CSPRNG) instead of Math.random so verification codes
+  // aren't predictable from PRNG state. Range 100000-999999 inclusive.
+  return randomInt(100000, 1000000).toString();
 }

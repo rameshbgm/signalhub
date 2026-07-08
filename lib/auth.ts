@@ -1,13 +1,13 @@
 import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
 import bcrypt from "bcryptjs";
+import { getSessionSecret } from "@/lib/session-secret";
 
 const SESSION_COOKIE = "sp_session";
 const ACCESS_COOKIE_PREFIX = "sp_access_"; // per-page access cookie for private/audience pages
 
 function getSecret() {
-  const secret = process.env.SESSION_SECRET || "dev-secret-change-me";
-  return new TextEncoder().encode(secret);
+  return getSessionSecret();
 }
 
 export type SessionPayload = {

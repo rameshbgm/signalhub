@@ -68,6 +68,19 @@ export async function POST(req: NextRequest) {
   const pageDoc = await collections.pages().findOne({ _id: oid(pageId) });
   if (!pageDoc || pageDoc.orgId.toHexString() !== apiKey.orgId) return NextResponse.json({ error: "Page not found" }, { status: 404 });
 
+  // Authorize every referenced component: it must belong to this page (and thus
+  // this org). Without this a valid API key could flip components on any other
+  // tenant's page by passing their component ids — cross-tenant IDOR write.
+  if (components.length) {
+    const componentDocs = await collections
+      .components()
+      .find({ _id: { $in: components.map((c) => oid(c.componentId)) }, pageId: pageDoc._id })
+      .toArray();
+    if (componentDocs.length !== new Set(components.map((c) => c.componentId)).size) {
+      return NextResponse.json({ error: "One or more components do not belong to this page" }, { status: 400 });
+    }
+  }
+
   const incidentId = new ObjectId();
   await collections.incidents().insertOne({
     _id: incidentId,
