@@ -5,16 +5,21 @@ import { ObjectId } from "mongodb";
 import { collections } from "@/lib/db";
 import { oid, toId } from "@/lib/mongo-utils";
 import { hashPassword } from "@/lib/auth";
-import { requireOrgSession } from "@/lib/admin-guard";
+import { requireOrgAdmin } from "@/lib/admin-guard";
+import { assertWithinLimit } from "@/lib/billing";
 
 export async function inviteMember(formData: FormData) {
-  const session = await requireOrgSession();
+  const session = await requireOrgAdmin();
   const email = String(formData.get("email") ?? "").trim();
   const name = String(formData.get("name") ?? "").trim();
   const role = String(formData.get("role") ?? "EDITOR");
   const password = String(formData.get("password") ?? "changeme123");
 
   if (!email || !name) throw new Error("Name and email are required");
+  await assertWithinLimit(session.orgId, "teamMembers");
+  if (await collections.teamMembers().findOne({ email })) {
+    throw new Error("An account with this email already exists");
+  }
 
   await collections.teamMembers().insertOne({
     _id: new ObjectId(),
@@ -38,7 +43,8 @@ export async function inviteMember(formData: FormData) {
 }
 
 export async function removeMember(memberId: string) {
-  const session = await requireOrgSession();
+  const session = await requireOrgAdmin();
+  if (memberId === session.teamMemberId) throw new Error("You can't remove yourself");
   const memberDoc = await collections.teamMembers().findOne({ _id: oid(memberId) });
   if (!memberDoc || memberDoc.orgId.toHexString() !== session.orgId) return;
   await collections.teamMembers().deleteOne({ _id: oid(memberId) });

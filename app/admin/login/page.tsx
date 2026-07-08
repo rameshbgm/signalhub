@@ -39,6 +39,12 @@ export default function LoginPage() {
         <button disabled={loading} className="w-full bg-blue-600 text-white rounded-md py-2 text-sm font-medium disabled:opacity-50">
           {loading ? "Signing in..." : "Sign in"}
         </button>
+        <p className="text-xs text-gray-400 text-center">
+          New here?{" "}
+          <a href="/signup" className="text-blue-600 hover:underline">
+            Create an organization
+          </a>
+        </p>
       </form>
     </div>
   );

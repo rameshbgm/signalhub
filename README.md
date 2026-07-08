@@ -37,6 +37,22 @@ Visit `http://localhost:3000`.
 
 ## What's implemented
 
+- **Multi-tenant SaaS**: self-serve signup (`/signup`) creates an
+  organization with an OWNER account; every query is org-scoped
+  (`assertPageInOrg`, org-scoped sessions), so tenants are fully isolated.
+- **Billing & plans** (`/admin/billing`): Free / Pro ($29) / Enterprise ($99)
+  with enforced limits (status pages, team members, subscribers per page)
+  and plan-gated features (custom domains, branding removal). Payments are
+  simulated — plan switches record an Invoice instead of charging a card;
+  swap `lib/billing.ts#changePlan` for Stripe in production.
+- **Tenant admin** (`/admin/settings`): org name/billing email, role-gated
+  (OWNER/ADMIN) team & billing management, owner-only org deletion with a
+  full cascade (pages, incidents, subscribers, keys, invoices).
+- **Custom domains**: a Pro+ page can claim a domain (Page settings).
+  Middleware detects non-app hosts and rewrites the root to the page that
+  claimed the domain (`app/custom-domain/[domain]`). Point a CNAME at the
+  app domain; set `NEXT_PUBLIC_APP_DOMAIN` so the middleware knows which
+  host is the app itself.
 - **Page types**: public, private (password), and audience-specific
   (per-user/group login with scoped component visibility), plus a hub page
   that aggregates child pages (like status.atlassian.com).

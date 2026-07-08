@@ -28,7 +28,20 @@ export interface OrganizationDoc {
   _id: ObjectId;
   name: string;
   slug: string;
+  plan: string; // free, pro, enterprise
+  planRenewsAt?: Date | null;
+  billingEmail?: string | null;
+  createdAt: Date;
+}
+
+export interface InvoiceDoc {
+  _id: ObjectId;
+  orgId: ObjectId;
   plan: string;
+  amountUsd: number;
+  status: string; // PAID, FAILED
+  periodStart: Date;
+  periodEnd: Date;
   createdAt: Date;
 }
 
@@ -280,5 +293,6 @@ export const collections = {
   metricPoints: () => db.collection<MetricPointDoc>("metricPoints"),
   webhookEndpoints: () => db.collection<WebhookEndpointDoc>("webhookEndpoints"),
   notificationLogs: () => db.collection<NotificationLogDoc>("notificationLogs"),
+  invoices: () => db.collection<InvoiceDoc>("invoices"),
   thirdPartyProviders: () => db.collection<ThirdPartyProviderDoc>("thirdPartyProviders"),
 };

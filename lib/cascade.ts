@@ -71,6 +71,22 @@ export async function deleteComponentCascade(componentId: string) {
   });
 }
 
+/** Deletes an entire tenant: every page (with its children), team, keys, logs, invoices, org. */
+export async function deleteOrgCascade(orgId: string) {
+  const id = oid(orgId);
+  const pageDocs = await collections.pages().find({ orgId: id }, { projection: { _id: 1 } }).toArray();
+  for (const p of pageDocs) {
+    await deletePageCascade(p._id.toHexString());
+  }
+  await Promise.all([
+    collections.teamMembers().deleteMany({ orgId: id }),
+    collections.apiKeys().deleteMany({ orgId: id }),
+    collections.auditLogs().deleteMany({ orgId: id }),
+    collections.invoices().deleteMany({ orgId: id }),
+  ]);
+  await collections.organizations().deleteOne({ _id: id });
+}
+
 export async function deleteMetricCascade(metricId: string) {
   const id = oid(metricId);
   await withTransaction(async (session) => {

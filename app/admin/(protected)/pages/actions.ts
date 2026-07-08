@@ -8,6 +8,7 @@ import { oid, toId } from "@/lib/mongo-utils";
 import { hashPassword } from "@/lib/auth";
 import { requireOrgSession, assertPageInOrg } from "@/lib/admin-guard";
 import { deletePageCascade } from "@/lib/cascade";
+import { assertWithinLimit, getOrgPlan } from "@/lib/billing";
 
 function slugify(input: string) {
   return input
@@ -27,6 +28,7 @@ export async function createPage(formData: FormData) {
   const password = String(formData.get("password") ?? "");
 
   if (!name || !slug) throw new Error("Name is required");
+  await assertWithinLimit(session.orgId, "pages");
 
   const existing = await collections.pages().findOne({ slug });
   if (existing) slug = `${slug}-${Math.random().toString(36).slice(2, 6)}`;
@@ -73,6 +75,18 @@ export async function updatePageSettings(pageId: string, formData: FormData) {
   await assertPageInOrg(pageId, session.orgId);
 
   const password = String(formData.get("password") ?? "");
+  const plan = await getOrgPlan(session.orgId);
+
+  const customDomain = String(formData.get("customDomain") ?? "").trim().toLowerCase() || null;
+  if (customDomain && !plan.customDomain) {
+    throw new Error(`Custom domains require the Pro plan or higher. Upgrade in Billing.`);
+  }
+  if (customDomain) {
+    const taken = await collections.pages().findOne({ customDomain, _id: { $ne: oid(pageId) } });
+    if (taken) throw new Error("This domain is already connected to another status page");
+  }
+
+  const removeBranding = formData.get("removeBranding") === "on" && plan.removeBranding;
 
   await collections.pages().updateOne(
     { _id: oid(pageId) },
@@ -85,10 +99,10 @@ export async function updatePageSettings(pageId: string, formData: FormData) {
         brandColor: String(formData.get("brandColor") ?? "#0052CC"),
         logoUrl: String(formData.get("logoUrl") ?? "") || null,
         faviconUrl: String(formData.get("faviconUrl") ?? "") || null,
-        customDomain: String(formData.get("customDomain") ?? "") || null,
+        customDomain,
         timezone: String(formData.get("timezone") ?? "UTC"),
         language: String(formData.get("language") ?? "en"),
-        removeBranding: formData.get("removeBranding") === "on",
+        removeBranding,
         customCss: String(formData.get("customCss") ?? "") || null,
         ...(password ? { passwordHash: await hashPassword(password) } : {}),
       },

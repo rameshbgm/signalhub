@@ -6,6 +6,9 @@ export async function ensureIndexes() {
     collections.teamMembers().createIndex({ orgId: 1, email: 1 }, { unique: true }),
     collections.apiKeys().createIndex({ key: 1 }, { unique: true }),
     collections.pages().createIndex({ slug: 1 }, { unique: true }),
+    collections
+      .pages()
+      .createIndex({ customDomain: 1 }, { unique: true, partialFilterExpression: { customDomain: { $type: "string" } } }),
     collections.pageAccessUsers().createIndex({ pageId: 1, email: 1 }, { unique: true }),
     collections.components().createIndex({ automationToken: 1 }, { unique: true }),
     collections.incidentComponents().createIndex({ incidentId: 1, componentId: 1 }, { unique: true }),

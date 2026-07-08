@@ -78,7 +78,7 @@ export default async function PageDetail({ params }: { params: Promise<{ pageId:
           <Field label="Favicon URL">
             <input name="faviconUrl" defaultValue={page.faviconUrl ?? ""} className="w-full border rounded-md px-3 py-2 text-sm" />
           </Field>
-          <Field label="Custom domain">
+          <Field label="Custom domain (Pro+) — point a CNAME at this app's domain">
             <input name="customDomain" defaultValue={page.customDomain ?? ""} placeholder="status.yourcompany.com" className="w-full border rounded-md px-3 py-2 text-sm" />
           </Field>
           <Field label="Timezone">
