@@ -88,7 +88,9 @@ export interface PageDoc {
   aboutText: string;
   logoUrl: string | null;
   faviconUrl: string | null;
+  coverImageUrl: string | null;
   brandColor: string;
+  layout: string; // STANDARD, COVER
   supportUrl: string | null;
   customDomain: string | null;
   passwordHash: string | null;

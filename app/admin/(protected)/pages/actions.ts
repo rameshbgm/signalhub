@@ -48,7 +48,9 @@ export async function createPage(formData: FormData) {
     aboutText: "",
     logoUrl: null,
     faviconUrl: null,
+    coverImageUrl: null,
     brandColor: "#0052CC",
+    layout: "STANDARD",
     supportUrl: null,
     customDomain: null,
     passwordHash: type === "PRIVATE" && password ? await hashPassword(password) : null,
@@ -67,7 +69,7 @@ export async function createPage(formData: FormData) {
   });
 
   revalidatePath("/admin/pages");
-  redirect(`/admin/pages/${_id.toHexString()}`);
+  redirect(`/admin/pages/${_id.toHexString()}/setup/components`);
 }
 
 export async function updatePageSettings(pageId: string, formData: FormData) {
@@ -99,6 +101,8 @@ export async function updatePageSettings(pageId: string, formData: FormData) {
         brandColor: String(formData.get("brandColor") ?? "#0052CC"),
         logoUrl: String(formData.get("logoUrl") ?? "") || null,
         faviconUrl: String(formData.get("faviconUrl") ?? "") || null,
+        coverImageUrl: String(formData.get("coverImageUrl") ?? "") || null,
+        layout: String(formData.get("layout") ?? "STANDARD") === "COVER" ? "COVER" : "STANDARD",
         customDomain,
         timezone: String(formData.get("timezone") ?? "UTC"),
         language: String(formData.get("language") ?? "en"),

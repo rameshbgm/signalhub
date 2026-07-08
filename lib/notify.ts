@@ -3,11 +3,13 @@ import { collections } from "@/lib/db";
 import { oid } from "@/lib/mongo-utils";
 
 /**
- * Notification delivery is simulated: every send is recorded in NotificationLog
- * (visible in the admin console under Subscribers > Delivery Log) so the full
+ * Notification delivery is simulated for Email/SMS: every send is recorded in
+ * NotificationLog (visible under Subscribers > Delivery Log) so the full
  * create -> update -> resolve fan-out flow can be verified end to end without
- * a real email/SMS provider wired up. Webhook subscribers DO receive a real
- * HTTP POST. Wire a real ESP/SMS provider by replacing sendEmail/sendSms below.
+ * a real ESP/SMS provider wired up. Webhook, Slack, and Microsoft Teams
+ * subscribers DO receive a real HTTP POST (Slack/Teams URLs are incoming
+ * webhooks, so the same POST mechanic applies with a platform-shaped body).
+ * Wire a real ESP/SMS provider by replacing the Email/SMS branch below.
  */
 
 export type NotifyEvent = {
@@ -39,6 +41,24 @@ export async function dispatchNotifications(event: NotifyEvent) {
             method: "POST",
             headers: { "content-type": "application/json" },
             body: JSON.stringify({ type: event.eventType, subject: event.subject, body: event.body }),
+          }).catch(() => null);
+        } else if (sub.channel === "SLACK") {
+          await fetch(sub.contact, {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ text: `*${event.subject}*\n${event.body}` }),
+          }).catch(() => null);
+        } else if (sub.channel === "MICROSOFT_TEAMS") {
+          await fetch(sub.contact, {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({
+              "@type": "MessageCard",
+              "@context": "http://schema.org/extensions",
+              summary: event.subject,
+              title: event.subject,
+              text: event.body,
+            }),
           }).catch(() => null);
         }
         await collections.notificationLogs().insertOne({

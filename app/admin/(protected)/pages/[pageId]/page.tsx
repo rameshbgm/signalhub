@@ -6,6 +6,7 @@ import { COMPONENT_STATUSES, COMPONENT_STATUS_LABEL } from "@/lib/status";
 import { updatePageSettings, deletePage } from "../actions";
 import { createGroup, deleteGroup, createComponent, updateComponentStatus, updateComponentDetails, deleteComponent } from "./components-actions";
 import { createAccessGroup, deleteAccessGroup, createAccessUser, deleteAccessUser } from "./access-actions";
+import { LayoutPicker } from "@/components/admin/LayoutPicker";
 
 export default async function PageDetail({ params }: { params: Promise<{ pageId: string }> }) {
   const { pageId } = await params;
@@ -57,6 +58,7 @@ export default async function PageDetail({ params }: { params: Promise<{ pageId:
       <section className="bg-white border rounded-lg p-5">
         <h2 className="font-semibold mb-4">Branding & Settings</h2>
         <form action={boundUpdatePage} className="grid sm:grid-cols-2 gap-4">
+          <LayoutPicker defaultValue={page.layout ?? "STANDARD"} brandColor={page.brandColor} />
           <Field label="Page name">
             <input name="name" defaultValue={page.name} className="w-full border rounded-md px-3 py-2 text-sm" />
           </Field>
@@ -77,6 +79,9 @@ export default async function PageDetail({ params }: { params: Promise<{ pageId:
           </Field>
           <Field label="Favicon URL">
             <input name="faviconUrl" defaultValue={page.faviconUrl ?? ""} className="w-full border rounded-md px-3 py-2 text-sm" />
+          </Field>
+          <Field label="Cover image URL (used by cover layout)">
+            <input name="coverImageUrl" defaultValue={page.coverImageUrl ?? ""} className="w-full border rounded-md px-3 py-2 text-sm" />
           </Field>
           <Field label="Custom domain (Pro+) — point a CNAME at this app's domain">
             <input name="customDomain" defaultValue={page.customDomain ?? ""} placeholder="status.yourcompany.com" className="w-full border rounded-md px-3 py-2 text-sm" />

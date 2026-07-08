@@ -27,6 +27,9 @@ export default async function PagesListPage() {
                 <a href={`/${p.slug}`} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">
                   View
                 </a>
+                <Link href={`/admin/pages/${p.id}/setup/components`} className="text-blue-600 hover:underline">
+                  Build my page
+                </Link>
                 <Link href={`/admin/pages/${p.id}`} className="text-blue-600 hover:underline">
                   Manage
                 </Link>

@@ -41,7 +41,15 @@ export default async function PublicStatusPage({ params }: { params: Promise<{ s
 
   return (
     <div className="min-h-screen flex flex-col">
-      <PublicHeader name={page.name} logoUrl={page.logoUrl} supportUrl={page.supportUrl} hubSlug={page.hubParent?.slug ?? (page.isHub ? page.slug : null)} />
+      <PublicHeader
+        name={page.name}
+        logoUrl={page.logoUrl}
+        supportUrl={page.supportUrl}
+        hubSlug={page.hubParent?.slug ?? (page.isHub ? page.slug : null)}
+        layout={page.layout}
+        coverImageUrl={page.coverImageUrl}
+        brandColor={page.brandColor}
+      />
       <main className="max-w-4xl mx-auto px-4 py-8 flex-1 w-full">
         {page.aboutText && <p className="text-sm text-gray-500 mb-4">{page.aboutText}</p>}
 
