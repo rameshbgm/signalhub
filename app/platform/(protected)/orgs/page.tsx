@@ -9,38 +9,57 @@ export default async function PlatformOrgsPage() {
 
   return (
     <div className="max-w-4xl space-y-6">
-      <h1 className="text-xl font-semibold">Organizations</h1>
+      <div>
+        <h1 className="font-display text-2xl font-medium tracking-tight text-[var(--ink)]">Organizations</h1>
+        <p className="mt-1 text-sm text-[var(--ink-soft)]">
+          {orgs.length} organization{orgs.length === 1 ? "" : "s"} across the platform.
+        </p>
+      </div>
 
-      <div className="bg-white border rounded-lg divide-y">
+      <div className="rounded-xl border border-black/[0.06] bg-white shadow-sm divide-y divide-black/[0.06]">
         {orgs.map((org, i) => (
           <div key={org.id} className="flex items-center justify-between p-4 text-sm">
-            <div>
-              <span className="font-medium">{org.name}</span>
-              <span className="text-xs text-gray-400 ml-2">{org.slug}</span>
-              <span className="text-xs bg-gray-100 rounded px-1.5 py-0.5 ml-2">{org.plan}</span>
-              <span className="text-xs text-gray-400 ml-2">{memberCounts[i]} member{memberCounts[i] === 1 ? "" : "s"}</span>
-              {org.suspended && <span className="text-xs bg-red-100 text-red-700 rounded px-1.5 py-0.5 ml-2">suspended</span>}
+            <div className="flex items-center gap-3">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--ink)] font-display text-xs font-semibold text-white">
+                {org.name.slice(0, 1).toUpperCase()}
+              </span>
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-medium text-[var(--ink)]">{org.name}</span>
+                  <span className="rounded-full bg-black/[0.04] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--ink-soft)]">
+                    {org.plan}
+                  </span>
+                  {org.suspended && (
+                    <span className="rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-red-600">
+                      Suspended
+                    </span>
+                  )}
+                </div>
+                <span className="text-xs text-[var(--ink-soft)]">
+                  {org.slug} · {memberCounts[i]} member{memberCounts[i] === 1 ? "" : "s"}
+                </span>
+              </div>
             </div>
-            <div className="flex gap-3">
+            <div className="flex items-center gap-4 text-xs font-semibold">
               <form action={impersonateOrg.bind(null, org.id)}>
-                <button className="text-xs text-blue-600 hover:underline">Manage</button>
+                <button className="text-[var(--up)] hover:underline">Manage</button>
               </form>
               {org.suspended ? (
                 <form action={unsuspendOrg.bind(null, org.id)}>
-                  <button className="text-xs text-blue-600 hover:underline">Unsuspend</button>
+                  <button className="text-[var(--up)] hover:underline">Unsuspend</button>
                 </form>
               ) : (
                 <form action={suspendOrg.bind(null, org.id)}>
-                  <button className="text-xs text-amber-600 hover:underline">Suspend</button>
+                  <button className="text-amber-600 hover:underline">Suspend</button>
                 </form>
               )}
               <form action={deleteOrgAsPlatform.bind(null, org.id)}>
-                <button className="text-xs text-red-600 hover:underline">Delete</button>
+                <button className="text-red-600 hover:underline">Delete</button>
               </form>
             </div>
           </div>
         ))}
-        {orgs.length === 0 && <p className="p-4 text-sm text-gray-400">No organizations yet.</p>}
+        {orgs.length === 0 && <p className="p-4 text-sm text-[var(--ink-soft)]">No organizations yet.</p>}
       </div>
     </div>
   );

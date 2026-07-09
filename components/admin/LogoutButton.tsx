@@ -11,7 +11,7 @@ export function LogoutButton() {
         router.push("/admin/login");
         router.refresh();
       }}
-      className="mt-2 text-blue-600 hover:underline"
+      className="mt-2 font-medium text-[var(--up)] hover:underline"
     >
       Sign out
     </button>

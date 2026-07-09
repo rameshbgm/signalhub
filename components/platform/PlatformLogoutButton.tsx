@@ -11,7 +11,7 @@ export function PlatformLogoutButton() {
         router.push("/platform/login");
         router.refresh();
       }}
-      className="mt-2 text-gray-300 hover:underline"
+      className="mt-2 font-medium text-white/60 hover:text-white hover:underline"
     >
       Sign out
     </button>
