@@ -3,8 +3,7 @@ import { updateOrgSettings, deleteOrganization } from "./actions";
 
 export default async function OrgSettingsPage() {
   const { session, org } = await requireSession();
-  const isAdmin = session.role === "OWNER" || session.role === "ADMIN";
-  const isOwner = session.role === "OWNER";
+  const isAdmin = session.role === "TENANT_ADMIN";
 
   return (
     <div className="max-w-2xl space-y-8">
@@ -26,11 +25,11 @@ export default async function OrgSettingsPage() {
             <input name="billingEmail" type="email" defaultValue={org.billingEmail ?? ""} className="w-full border rounded-md px-3 py-2 text-sm" disabled={!isAdmin} />
           </label>
           {isAdmin && <button className="bg-blue-600 text-white rounded-md px-4 py-2 text-sm font-medium">Save</button>}
-          {!isAdmin && <p className="text-xs text-gray-400">Only owners and admins can change organization settings.</p>}
+          {!isAdmin && <p className="text-xs text-gray-400">Only tenant admins can change organization settings.</p>}
         </form>
       </section>
 
-      {isOwner && (
+      {isAdmin && (
         <section className="bg-white border border-red-200 rounded-lg p-5">
           <h2 className="font-semibold text-sm text-red-700 mb-2">Danger Zone</h2>
           <p className="text-xs text-gray-500 mb-3">

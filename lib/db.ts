@@ -31,6 +31,16 @@ export interface OrganizationDoc {
   plan: string; // free, pro, enterprise
   planRenewsAt?: Date | null;
   billingEmail?: string | null;
+  suspended?: boolean; // platform-admin suspend, blocks tenant admin access without deleting
+  createdAt: Date;
+}
+
+/** Spans all tenants — never scoped to an orgId. Separate identity space from TeamMemberDoc. */
+export interface PlatformAdminDoc {
+  _id: ObjectId;
+  email: string;
+  passwordHash: string;
+  name: string;
   createdAt: Date;
 }
 
@@ -51,7 +61,7 @@ export interface TeamMemberDoc {
   email: string;
   passwordHash: string;
   name: string;
-  role: string; // OWNER, ADMIN, EDITOR, RESPONDER
+  role: string; // TENANT_ADMIN, TENANT_USER
   twoFactorEnabled: boolean;
   createdAt: Date;
 }
@@ -244,6 +254,69 @@ export interface MetricPointDoc {
   value: number;
 }
 
+export interface MonitorDoc {
+  _id: ObjectId;
+  pageId: ObjectId;
+  componentId: ObjectId | null;
+  name: string;
+  type: string; // HTTP, TCP, PING, SSL, KEYWORD
+  enabled: boolean;
+
+  // target
+  target: string; // URL (HTTP/SSL/KEYWORD) or host (TCP/PING)
+  port: number | null; // TCP
+  method: string; // HTTP: GET/POST/HEAD
+  requestBody: string | null;
+  requestHeaders: string; // JSON object string, custom headers
+
+  // assertions
+  expectedStatusRange: string; // e.g. "200-299"
+  keywordMatch: string | null;
+  keywordAbsent: string | null;
+  sslWarnDays: number | null;
+
+  // security / auth (HTTP)
+  authType: string; // NONE, BASIC, BEARER, HEADER
+  authUsername: string | null;
+  authSecret: string | null;
+  authHeaderName: string | null;
+  verifyTls: boolean;
+
+  // scheduling & thresholds
+  intervalSec: number;
+  timeoutMs: number;
+  failThreshold: number;
+  recoverThreshold: number;
+  downStatus: string;
+
+  // automated actions
+  actionFlipStatus: boolean;
+  actionRecordMetric: boolean;
+  actionAutoIncident: boolean;
+  actionNotify: boolean;
+  metricId: ObjectId | null;
+
+  // runtime state
+  lastCheckedAt: Date | null;
+  lastLatencyMs: number | null;
+  lastOk: boolean | null;
+  lastError: string | null;
+  consecutiveFails: number;
+  consecutiveOks: number;
+  currentIncidentId: ObjectId | null;
+  createdAt: Date;
+}
+
+export interface MonitorCheckDoc {
+  _id: ObjectId;
+  monitorId: ObjectId;
+  checkedAt: Date;
+  ok: boolean;
+  latencyMs: number | null;
+  statusCode: number | null;
+  error: string | null;
+}
+
 export interface WebhookEndpointDoc {
   _id: ObjectId;
   pageId: ObjectId;
@@ -275,6 +348,7 @@ export interface ThirdPartyProviderDoc {
 
 export const collections = {
   organizations: () => db.collection<OrganizationDoc>("organizations"),
+  platformAdmins: () => db.collection<PlatformAdminDoc>("platformAdmins"),
   teamMembers: () => db.collection<TeamMemberDoc>("teamMembers"),
   apiKeys: () => db.collection<ApiKeyDoc>("apiKeys"),
   auditLogs: () => db.collection<AuditLogDoc>("auditLogs"),
@@ -293,6 +367,8 @@ export const collections = {
   subscriptionOtps: () => db.collection<SubscriptionOtpDoc>("subscriptionOtps"),
   metrics: () => db.collection<MetricDoc>("metrics"),
   metricPoints: () => db.collection<MetricPointDoc>("metricPoints"),
+  monitors: () => db.collection<MonitorDoc>("monitors"),
+  monitorChecks: () => db.collection<MonitorCheckDoc>("monitorChecks"),
   webhookEndpoints: () => db.collection<WebhookEndpointDoc>("webhookEndpoints"),
   notificationLogs: () => db.collection<NotificationLogDoc>("notificationLogs"),
   invoices: () => db.collection<InvoiceDoc>("invoices"),

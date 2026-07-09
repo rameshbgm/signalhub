@@ -15,17 +15,16 @@ export default async function SetupTeamPage({ params }: { params: Promise<{ page
       <SetupStepper pageId={pageId} current="team" />
       <h1 className="text-2xl font-semibold">Invite your team</h1>
       <p className="mt-3 text-sm text-gray-600 leading-relaxed max-w-lg">
-        Owners and admins can post incidents, manage billing, and change tenant settings. Editors can run incidents day-to-day.
-        Responders can post updates on incidents they're assigned to.
+        Tenant admins can post incidents, manage billing, and change tenant settings. Tenant users can run incidents day-to-day
+        and post updates.
       </p>
 
       <form action={inviteMember} className="mt-8 bg-white border rounded-lg p-4 grid sm:grid-cols-2 gap-3">
         <input name="name" placeholder="Full name" className="border rounded-md px-3 py-2 text-sm" required />
         <input name="email" type="email" placeholder="Email" className="border rounded-md px-3 py-2 text-sm" required />
         <select name="role" className="border rounded-md px-3 py-2 text-sm">
-          <option value="ADMIN">Admin</option>
-          <option value="EDITOR">Editor</option>
-          <option value="RESPONDER">Responder</option>
+          <option value="TENANT_ADMIN">Tenant Admin</option>
+          <option value="TENANT_USER">Tenant User</option>
         </select>
         <input name="password" type="password" placeholder="Temporary password" className="border rounded-md px-3 py-2 text-sm" required />
         <button className="bg-blue-600 text-white rounded-md px-4 py-2 text-sm font-medium sm:col-span-2">Invite Member</button>

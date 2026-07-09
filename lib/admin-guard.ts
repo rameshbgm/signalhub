@@ -1,5 +1,5 @@
 import { collections } from "@/lib/db";
-import { getSession } from "@/lib/auth";
+import { getSession, getPlatformSession } from "@/lib/auth";
 import { oid, toId } from "@/lib/mongo-utils";
 
 export class AdminAuthError extends Error {}
@@ -13,9 +13,16 @@ export async function requireOrgSession() {
 /** Tenant-admin gate: billing, org settings, team management. */
 export async function requireOrgAdmin() {
   const session = await requireOrgSession();
-  if (session.role !== "OWNER" && session.role !== "ADMIN") {
-    throw new AdminAuthError("Only organization owners and admins can do this");
+  if (session.role !== "TENANT_ADMIN") {
+    throw new AdminAuthError("Only tenant admins can do this");
   }
+  return session;
+}
+
+/** Platform gate: spans all tenants, separate identity from org sessions. */
+export async function requirePlatformSession() {
+  const session = await getPlatformSession();
+  if (!session) throw new AdminAuthError("Not authenticated");
   return session;
 }
 

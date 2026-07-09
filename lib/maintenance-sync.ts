@@ -1,5 +1,6 @@
 import { ObjectId } from "mongodb";
 import { collections } from "@/lib/db";
+import { setComponentStatus } from "@/lib/component-status";
 
 /**
  * Opportunistically advances scheduled-maintenance lifecycle state based on
@@ -17,7 +18,7 @@ export async function syncAutoMaintenance() {
     const components = await collections.incidentComponents().find({ incidentId: inc._id }).toArray();
     await collections.incidents().updateOne({ _id: inc._id }, { $set: { maintenanceStatus: "IN_PROGRESS" } });
     for (const ic of components) {
-      await collections.components().updateOne({ _id: ic.componentId }, { $set: { status: ic.newStatus } });
+      await setComponentStatus(ic.componentId, ic.newStatus);
     }
     await collections.incidentUpdates().insertOne({
       _id: new ObjectId(),
@@ -37,7 +38,7 @@ export async function syncAutoMaintenance() {
     const components = await collections.incidentComponents().find({ incidentId: inc._id }).toArray();
     await collections.incidents().updateOne({ _id: inc._id }, { $set: { maintenanceStatus: "COMPLETED", resolvedAt: now } });
     for (const ic of components) {
-      await collections.components().updateOne({ _id: ic.componentId }, { $set: { status: "OPERATIONAL" } });
+      await setComponentStatus(ic.componentId, "OPERATIONAL");
     }
     await collections.incidentUpdates().insertOne({
       _id: new ObjectId(),

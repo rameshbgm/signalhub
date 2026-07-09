@@ -15,7 +15,7 @@ export default async function BillingPage() {
   const invoices = (
     await collections.invoices().find({ orgId: oid(org.id) }).sort({ createdAt: -1 }).limit(24).toArray()
   ).map(toId);
-  const isAdmin = session.role === "OWNER" || session.role === "ADMIN";
+  const isAdmin = session.role === "TENANT_ADMIN";
 
   return (
     <div className="max-w-3xl space-y-8">
@@ -64,7 +64,7 @@ export default async function BillingPage() {
                   </button>
                 </form>
               ) : (
-                <span className="text-xs text-center text-gray-400 py-1.5">Ask an owner/admin to switch</span>
+                <span className="text-xs text-center text-gray-400 py-1.5">Ask a tenant admin to switch</span>
               )}
             </div>
           ))}

@@ -26,6 +26,7 @@ const GROUPS = [
     items: [
       { href: "/admin/subscribers", label: "Subscribers", icon: "@" },
       { href: "/admin/metrics", label: "Metrics", icon: "▲" },
+      { href: "/admin/monitors", label: "Monitors", icon: "◉" },
       { href: "/admin/embed", label: "Status Embed", icon: "◨" },
       { href: "/admin/third-party", label: "Third-Party Catalog", icon: "◈" },
     ],

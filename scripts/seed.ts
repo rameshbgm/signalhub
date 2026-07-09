@@ -92,14 +92,29 @@ async function main() {
   const org = (await collections.organizations().findOne({ slug: "acme" }))!;
 
   const passwordHash = await bcrypt.hash("password123", 10);
+  // Old 4-role seed accounts (OWNER/ADMIN/EDITOR/RESPONDER) collapsed to 2 under the 3-role model.
+  await collections.teamMembers().deleteMany({ orgId: org._id, email: { $in: ["admin2@acme.test", "responder@acme.test"] } });
   await collections.teamMembers().updateOne(
     { orgId: org._id, email: "admin@acme.test" },
-    { $setOnInsert: { orgId: org._id, email: "admin@acme.test", passwordHash, name: "Ada Admin", role: "OWNER", twoFactorEnabled: false, createdAt: new Date() } },
+    {
+      $set: { role: "TENANT_ADMIN" },
+      $setOnInsert: { orgId: org._id, email: "admin@acme.test", passwordHash, name: "Ada Admin", twoFactorEnabled: false, createdAt: new Date() },
+    },
     { upsert: true }
   );
   await collections.teamMembers().updateOne(
-    { orgId: org._id, email: "responder@acme.test" },
-    { $setOnInsert: { orgId: org._id, email: "responder@acme.test", passwordHash, name: "Riley Responder", role: "RESPONDER", twoFactorEnabled: false, createdAt: new Date() } },
+    { orgId: org._id, email: "editor@acme.test" },
+    {
+      $set: { role: "TENANT_USER" },
+      $setOnInsert: { orgId: org._id, email: "editor@acme.test", passwordHash, name: "Eden Editor", twoFactorEnabled: false, createdAt: new Date() },
+    },
+    { upsert: true }
+  );
+
+  console.log("Seeding platform admin...");
+  await collections.platformAdmins().updateOne(
+    { email: "platform@statuspage.test" },
+    { $setOnInsert: { email: "platform@statuspage.test", passwordHash, name: "Priya Platform", createdAt: new Date() } },
     { upsert: true }
   );
 

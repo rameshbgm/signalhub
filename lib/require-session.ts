@@ -8,5 +8,6 @@ export async function requireSession() {
   if (!session) redirect("/admin/login");
   const orgDoc = await collections.organizations().findOne({ _id: oid(session.orgId) });
   if (!orgDoc) redirect("/admin/login");
+  if (orgDoc.suspended) redirect("/admin/suspended");
   return { session, org: toId(orgDoc) };
 }

@@ -4,6 +4,7 @@ import bcrypt from "bcryptjs";
 import { getSessionSecret } from "@/lib/session-secret";
 
 const SESSION_COOKIE = "sp_session";
+const PLATFORM_SESSION_COOKIE = "sp_platform_session";
 const ACCESS_COOKIE_PREFIX = "sp_access_"; // per-page access cookie for private/audience pages
 
 function getSecret() {
@@ -21,6 +22,7 @@ export type SessionPayload = {
 export async function createSession(payload: SessionPayload) {
   const token = await new SignJWT({ ...payload })
     .setProtectedHeader({ alg: "HS256" })
+    .setAudience("org")
     .setIssuedAt()
     .setExpirationTime("30d")
     .sign(getSecret());
@@ -45,7 +47,8 @@ export async function getSession(): Promise<SessionPayload | null> {
   const token = store.get(SESSION_COOKIE)?.value;
   if (!token) return null;
   try {
-    const { payload } = await jwtVerify(token, getSecret());
+    const { payload } = await jwtVerify(token, getSecret(), { audience: "org" });
+    if (typeof payload.teamMemberId !== "string" || typeof payload.orgId !== "string") return null;
     return payload as unknown as SessionPayload;
   } catch {
     return null;
@@ -58,6 +61,50 @@ export async function hashPassword(password: string) {
 
 export async function verifyPassword(password: string, hash: string) {
   return bcrypt.compare(password, hash);
+}
+
+// ---- Platform-admin sessions (span all tenants, separate cookie/identity from org sessions) ----
+
+export type PlatformSessionPayload = {
+  platformAdminId: string;
+  email: string;
+  name: string;
+};
+
+export async function createPlatformSession(payload: PlatformSessionPayload) {
+  const token = await new SignJWT({ ...payload })
+    .setProtectedHeader({ alg: "HS256" })
+    .setAudience("platform")
+    .setIssuedAt()
+    .setExpirationTime("30d")
+    .sign(getSecret());
+
+  const store = await cookies();
+  store.set(PLATFORM_SESSION_COOKIE, token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: 60 * 60 * 24 * 30,
+  });
+}
+
+export async function destroyPlatformSession() {
+  const store = await cookies();
+  store.delete(PLATFORM_SESSION_COOKIE);
+}
+
+export async function getPlatformSession(): Promise<PlatformSessionPayload | null> {
+  const store = await cookies();
+  const token = store.get(PLATFORM_SESSION_COOKIE)?.value;
+  if (!token) return null;
+  try {
+    const { payload } = await jwtVerify(token, getSecret(), { audience: "platform" });
+    if (typeof payload.platformAdminId !== "string") return null;
+    return payload as unknown as PlatformSessionPayload;
+  } catch {
+    return null;
+  }
 }
 
 // ---- Page-visitor access sessions (for PRIVATE / AUDIENCE pages) ----

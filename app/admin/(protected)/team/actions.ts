@@ -8,14 +8,17 @@ import { hashPassword } from "@/lib/auth";
 import { requireOrgAdmin } from "@/lib/admin-guard";
 import { assertWithinLimit } from "@/lib/billing";
 
+const INVITABLE_ROLES = ["TENANT_ADMIN", "TENANT_USER"];
+
 export async function inviteMember(formData: FormData) {
   const session = await requireOrgAdmin();
   const email = String(formData.get("email") ?? "").trim();
   const name = String(formData.get("name") ?? "").trim();
-  const role = String(formData.get("role") ?? "EDITOR");
+  const role = String(formData.get("role") ?? "TENANT_USER");
   const password = String(formData.get("password") ?? "changeme123");
 
   if (!email || !name) throw new Error("Name and email are required");
+  if (!INVITABLE_ROLES.includes(role)) throw new Error("Invalid role");
   await assertWithinLimit(session.orgId, "teamMembers");
   if (await collections.teamMembers().findOne({ email })) {
     throw new Error("An account with this email already exists");

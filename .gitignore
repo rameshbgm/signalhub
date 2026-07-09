@@ -11,3 +11,6 @@ npm-debug.log*
 .DS_Store
 next-env.d.ts
 .playwright-mcp
+monitor-service/.venv
+monitor-service/__pycache__
+monitor-service/*.pyc

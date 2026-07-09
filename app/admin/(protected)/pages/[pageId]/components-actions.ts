@@ -6,6 +6,7 @@ import { collections } from "@/lib/db";
 import { oid, toId } from "@/lib/mongo-utils";
 import { requireOrgSession, assertPageInOrg } from "@/lib/admin-guard";
 import { deleteComponentCascade } from "@/lib/cascade";
+import { setComponentStatus } from "@/lib/component-status";
 
 export async function createGroup(pageId: string, formData: FormData) {
   const session = await requireOrgSession();
@@ -60,25 +61,7 @@ export async function updateComponentStatus(pageId: string, componentId: string,
   await assertPageInOrg(pageId, session.orgId);
   const status = String(formData.get("status") ?? "OPERATIONAL");
 
-  const componentDoc = await collections.components().findOne({ _id: oid(componentId) });
-  if (!componentDoc) throw new Error("Component not found");
-
-  if (componentDoc.status !== status) {
-    await collections.componentStatusEvents().updateMany(
-      { componentId: oid(componentId), endedAt: null },
-      { $set: { endedAt: new Date() } }
-    );
-    await collections.componentStatusEvents().insertOne({
-      _id: new ObjectId(),
-      componentId: oid(componentId),
-      status,
-      startedAt: new Date(),
-      endedAt: null,
-      isMaintenance: status === "UNDER_MAINTENANCE",
-    });
-  }
-
-  await collections.components().updateOne({ _id: oid(componentId) }, { $set: { status } });
+  await setComponentStatus(oid(componentId), status);
   revalidatePath(`/admin/pages/${pageId}`);
   const pageDoc = await collections.pages().findOne({ _id: oid(pageId) });
   revalidatePath(`/${pageDoc?.slug}`);

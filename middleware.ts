@@ -37,10 +37,23 @@ export async function middleware(req: NextRequest) {
     const token = req.cookies.get("sp_session")?.value;
     if (!token) return NextResponse.redirect(new URL("/admin/login", req.url));
     try {
-      await jwtVerify(token, getSecret());
+      await jwtVerify(token, getSecret(), { audience: "org" });
       return NextResponse.next();
     } catch {
       return NextResponse.redirect(new URL("/admin/login", req.url));
+    }
+  }
+
+  if (pathname === "/platform/login") return NextResponse.next();
+
+  if (pathname.startsWith("/platform")) {
+    const token = req.cookies.get("sp_platform_session")?.value;
+    if (!token) return NextResponse.redirect(new URL("/platform/login", req.url));
+    try {
+      await jwtVerify(token, getSecret(), { audience: "platform" });
+      return NextResponse.next();
+    } catch {
+      return NextResponse.redirect(new URL("/platform/login", req.url));
     }
   }
 

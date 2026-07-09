@@ -32,7 +32,6 @@ export async function updateOrgSettings(formData: FormData) {
 
 export async function deleteOrganization(formData: FormData) {
   const session = await requireOrgAdmin();
-  if (session.role !== "OWNER") throw new Error("Only the organization owner can delete the organization");
   const confirm = String(formData.get("confirm") ?? "");
   const org = await collections.organizations().findOne({ _id: oid(session.orgId) });
   if (!org) throw new Error("Organization not found");

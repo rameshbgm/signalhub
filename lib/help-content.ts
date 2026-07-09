@@ -260,16 +260,14 @@ export const HELP_CATEGORIES: HelpCategory[] = [
             heading: "Roles",
             paragraphs: [],
             list: [
-              "OWNER — full control, including deleting the organization.",
-              "ADMIN — manage billing, team, and org settings.",
-              "EDITOR — run day-to-day incidents and maintenance.",
-              "RESPONDER — post updates on incidents they're assigned to.",
+              "TENANT_ADMIN — full control of this organization: billing, team, org settings, and deleting the organization.",
+              "TENANT_USER — run day-to-day incidents, maintenance, and updates.",
             ],
           },
           {
             heading: "Inviting someone",
             paragraphs: [
-              "Go to Team → fill in name, email, role, and a temporary password → Invite Member. Only Owners/Admins can invite or remove members, and team size is capped by your plan (see Billing).",
+              "Go to Team → fill in name, email, role, and a temporary password → Invite Member. Only Tenant Admins can invite or remove members, and team size is capped by your plan (see Billing).",
             ],
           },
         ],
@@ -311,7 +309,7 @@ export const HELP_CATEGORIES: HelpCategory[] = [
           {
             heading: "Switching plans",
             paragraphs: [
-              "Only Owners/Admins can switch plans. Payments are simulated in this build — switching succeeds instantly and records an invoice below; no card is charged.",
+              "Only Tenant Admins can switch plans. Payments are simulated in this build — switching succeeds instantly and records an invoice below; no card is charged.",
               "Usage bars show how close you are to your current plan's limits for pages, team members, and subscribers.",
             ],
           },
@@ -320,16 +318,16 @@ export const HELP_CATEGORIES: HelpCategory[] = [
       {
         slug: "settings",
         title: "Settings",
-        summary: "Organization name, billing email, and — for owners — deleting the organization entirely.",
+        summary: "Organization name, billing email, and — for tenant admins — deleting the organization entirely.",
         body: [
           {
             heading: "General settings",
-            paragraphs: ["Update your organization's display name and billing email. Only Owners/Admins can change these."],
+            paragraphs: ["Update your organization's display name and billing email. Only Tenant Admins can change these."],
           },
           {
             heading: "Deleting the organization",
             paragraphs: [
-              "Owner-only, and irreversible: removes every page, incident, subscriber, team member, API key, and invoice. You must type the organization's slug to confirm before it runs.",
+              "Tenant Admin-only, and irreversible: removes every page, incident, subscriber, team member, API key, and invoice. You must type the organization's slug to confirm before it runs.",
             ],
           },
         ],

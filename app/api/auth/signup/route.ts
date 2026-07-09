@@ -52,7 +52,7 @@ export async function POST(req: NextRequest) {
     email,
     passwordHash: await hashPassword(password),
     name,
-    role: "OWNER",
+    role: "TENANT_ADMIN",
     twoFactorEnabled: false,
     createdAt: new Date(),
   });
@@ -71,7 +71,7 @@ export async function POST(req: NextRequest) {
     orgId: orgId.toHexString(),
     email,
     name,
-    role: "OWNER",
+    role: "TENANT_ADMIN",
   });
 
   return NextResponse.json({ ok: true });

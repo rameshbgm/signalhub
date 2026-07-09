@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { ObjectId } from "mongodb";
 import { collections } from "@/lib/db";
 import { toId } from "@/lib/mongo-utils";
 import { COMPONENT_STATUSES } from "@/lib/status";
+import { setComponentStatus } from "@/lib/component-status";
 import { z } from "zod";
 
 /**
@@ -25,21 +25,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
   const parsed = schema.safeParse(await req.json().catch(() => ({})));
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
 
-  if (component.status !== parsed.data.status) {
-    await collections.componentStatusEvents().updateMany(
-      { componentId: componentDoc._id, endedAt: null },
-      { $set: { endedAt: new Date() } }
-    );
-    await collections.componentStatusEvents().insertOne({
-      _id: new ObjectId(),
-      componentId: componentDoc._id,
-      status: parsed.data.status,
-      startedAt: new Date(),
-      endedAt: null,
-      isMaintenance: false,
-    });
-  }
-
-  await collections.components().updateOne({ _id: componentDoc._id }, { $set: { status: parsed.data.status } });
+  await setComponentStatus(componentDoc._id, parsed.data.status, { isMaintenance: false });
   return NextResponse.json({ ok: true, component: component.name, status: parsed.data.status });
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type CSSProperties } from "react";
 
 type Component = { id: string; name: string };
 
@@ -27,27 +27,45 @@ export function SubscribeModal({ pageSlug, brandColor, components }: { pageSlug:
     <>
       <button
         onClick={() => setOpen(true)}
-        className="rounded-md px-4 py-2 text-white text-sm font-medium shadow-sm hover:opacity-90"
+        className="inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-white text-sm font-medium shadow-sm hover:opacity-90 transition-opacity cursor-pointer"
         style={{ backgroundColor: brandColor }}
       >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+          <path
+            d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
         Subscribe to Updates
       </button>
       {open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setOpen(false)}>
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold">Get notified</h3>
-              <button onClick={() => setOpen(false)} className="text-gray-400 hover:text-gray-600" aria-label="Close">
-                ✕
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 animate-[fadeIn_150ms_ease-out]"
+          onClick={() => setOpen(false)}
+        >
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-5">
+              <h3 className="text-lg font-display font-semibold text-gray-900">Get notified</h3>
+              <button
+                onClick={() => setOpen(false)}
+                className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-md p-1 transition-colors cursor-pointer"
+                aria-label="Close"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                  <path d="M6 6l12 12M6 18L18 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                </svg>
               </button>
             </div>
-            <div className="flex gap-1 mb-4 border-b overflow-x-auto text-sm">
+            <div className="flex gap-1 mb-5 border-b border-gray-200 overflow-x-auto text-sm">
               {(["email", "sms", "slack", "webhook", "feed"] as const).map((t) => (
                 <button
                   key={t}
                   onClick={() => setTab(t)}
-                  className={`px-3 py-2 capitalize whitespace-nowrap border-b-2 ${
-                    tab === t ? "border-blue-600 text-blue-600 font-medium" : "border-transparent text-gray-500"
+                  className={`px-3 py-2 capitalize whitespace-nowrap border-b-2 transition-colors cursor-pointer ${
+                    tab === t ? "border-blue-600 text-blue-600 font-medium" : "border-transparent text-gray-500 hover:text-gray-700"
                   }`}
                 >
                   {t}
@@ -74,9 +92,9 @@ function ComponentPicker({ components, selected, onChange }: { components: Compo
   return (
     <div className="mb-3">
       <p className="text-xs text-gray-500 mb-1">Only notify me about (leave empty for all):</p>
-      <div className="max-h-28 overflow-y-auto border rounded-md p-2 space-y-1">
+      <div className="max-h-28 overflow-y-auto border border-gray-200 rounded-lg p-2 space-y-1.5">
         {components.map((c) => (
-          <label key={c.id} className="flex items-center gap-2 text-sm">
+          <label key={c.id} className="flex items-center gap-2 text-sm cursor-pointer">
             <input
               type="checkbox"
               checked={selected.includes(c.id)}
@@ -132,9 +150,9 @@ function EmailTab({ pageSlug, components, brandColor }: { pageSlug: string; comp
     return (
       <div>
         <p className="text-sm text-gray-600 mb-2">We sent a 6-digit code to {email}. Enter it below.</p>
-        <input value={code} onChange={(e) => setCode(e.target.value)} placeholder="123456" className="w-full border rounded-md px-3 py-2 text-sm mb-2" />
+        <input value={code} onChange={(e) => setCode(e.target.value)} placeholder="123456" className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-offset-0 mb-2 transition-shadow" style={{ "--tw-ring-color": brandColor } as CSSProperties} />
         {msg && <p className="text-xs text-red-600 mb-2">{msg}</p>}
-        <button disabled={loading} onClick={verifyOtp} style={{ backgroundColor: brandColor }} className="w-full text-white rounded-md py-2 text-sm font-medium disabled:opacity-50">
+        <button disabled={loading} onClick={verifyOtp} style={{ backgroundColor: brandColor }} className="w-full text-white rounded-lg py-2.5 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-90 transition-opacity cursor-pointer">
           {loading ? "Verifying..." : "Verify & Subscribe"}
         </button>
       </div>
@@ -148,11 +166,11 @@ function EmailTab({ pageSlug, components, brandColor }: { pageSlug: string; comp
         onChange={(e) => setEmail(e.target.value)}
         type="email"
         placeholder="you@example.com"
-        className="w-full border rounded-md px-3 py-2 text-sm mb-3"
+        className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 mb-3 transition-shadow" style={{ "--tw-ring-color": brandColor } as CSSProperties}
       />
       <ComponentPicker components={components} selected={selected} onChange={setSelected} />
       {msg && <p className="text-xs text-red-600 mb-2">{msg}</p>}
-      <button disabled={loading || !email} onClick={requestOtp} style={{ backgroundColor: brandColor }} className="w-full text-white rounded-md py-2 text-sm font-medium disabled:opacity-50">
+      <button disabled={loading || !email} onClick={requestOtp} style={{ backgroundColor: brandColor }} className="w-full text-white rounded-lg py-2.5 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-90 transition-opacity cursor-pointer">
         {loading ? "Sending..." : "Send verification code"}
       </button>
     </div>
@@ -201,9 +219,9 @@ function SmsTab({ pageSlug, components, brandColor }: { pageSlug: string; compon
     return (
       <div>
         <p className="text-sm text-gray-600 mb-2">We sent a 6-digit code to {fullNumber}. Enter it below.</p>
-        <input value={code} onChange={(e) => setCode(e.target.value)} placeholder="123456" className="w-full border rounded-md px-3 py-2 text-sm mb-2" />
+        <input value={code} onChange={(e) => setCode(e.target.value)} placeholder="123456" className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-offset-0 mb-2 transition-shadow" style={{ "--tw-ring-color": brandColor } as CSSProperties} />
         {msg && <p className="text-xs text-red-600 mb-2">{msg}</p>}
-        <button disabled={loading} onClick={verifyOtp} style={{ backgroundColor: brandColor }} className="w-full text-white rounded-md py-2 text-sm font-medium disabled:opacity-50">
+        <button disabled={loading} onClick={verifyOtp} style={{ backgroundColor: brandColor }} className="w-full text-white rounded-lg py-2.5 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-90 transition-opacity cursor-pointer">
           {loading ? "Verifying..." : "Verify & Subscribe"}
         </button>
       </div>
@@ -213,18 +231,18 @@ function SmsTab({ pageSlug, components, brandColor }: { pageSlug: string; compon
   return (
     <div>
       <div className="flex gap-2 mb-3">
-        <select value={country} onChange={(e) => setCountry(e.target.value)} className="border rounded-md px-2 py-2 text-sm">
+        <select value={country} onChange={(e) => setCountry(e.target.value)} className="border border-gray-300 rounded-lg px-2 py-2.5 text-sm focus:outline-none focus:ring-2 transition-shadow" style={{ "--tw-ring-color": brandColor } as CSSProperties}>
           {COUNTRY_CODES.map((c) => (
             <option key={c.code} value={c.code}>
               {c.code} {c.label}
             </option>
           ))}
         </select>
-        <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="5551234567" className="flex-1 border rounded-md px-3 py-2 text-sm" />
+        <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="5551234567" className="flex-1 border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 transition-shadow" style={{ "--tw-ring-color": brandColor } as CSSProperties} />
       </div>
       <ComponentPicker components={components} selected={selected} onChange={setSelected} />
       {msg && <p className="text-xs text-red-600 mb-2">{msg}</p>}
-      <button disabled={loading || !phone} onClick={requestOtp} style={{ backgroundColor: brandColor }} className="w-full text-white rounded-md py-2 text-sm font-medium disabled:opacity-50">
+      <button disabled={loading || !phone} onClick={requestOtp} style={{ backgroundColor: brandColor }} className="w-full text-white rounded-lg py-2.5 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-90 transition-opacity cursor-pointer">
         {loading ? "Sending..." : "Send verification code"}
       </button>
     </div>
@@ -255,9 +273,9 @@ function SimpleChannelTab({ pageSlug, channel, placeholder, label, brandColor }:
   return (
     <div>
       <label className="text-xs text-gray-500 mb-1 block">{label}</label>
-      <input value={contact} onChange={(e) => setContact(e.target.value)} placeholder={placeholder} className="w-full border rounded-md px-3 py-2 text-sm mb-3" />
+      <input value={contact} onChange={(e) => setContact(e.target.value)} placeholder={placeholder} className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 mb-3 transition-shadow" style={{ "--tw-ring-color": brandColor } as CSSProperties} />
       {msg && <p className="text-xs text-red-600 mb-2">{msg}</p>}
-      <button disabled={loading || !contact} onClick={subscribe} style={{ backgroundColor: brandColor }} className="w-full text-white rounded-md py-2 text-sm font-medium disabled:opacity-50">
+      <button disabled={loading || !contact} onClick={subscribe} style={{ backgroundColor: brandColor }} className="w-full text-white rounded-lg py-2.5 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-90 transition-opacity cursor-pointer">
         {loading ? "Subscribing..." : "Subscribe"}
       </button>
     </div>

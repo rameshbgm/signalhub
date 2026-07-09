@@ -15,10 +15,8 @@ export default async function TeamPage() {
         <input name="name" placeholder="Full name" className="border rounded-md px-3 py-2 text-sm" required />
         <input name="email" type="email" placeholder="Email" className="border rounded-md px-3 py-2 text-sm" required />
         <select name="role" className="border rounded-md px-3 py-2 text-sm">
-          <option value="OWNER">Owner</option>
-          <option value="ADMIN">Admin</option>
-          <option value="EDITOR">Editor</option>
-          <option value="RESPONDER">Responder</option>
+          <option value="TENANT_ADMIN">Tenant Admin</option>
+          <option value="TENANT_USER">Tenant User</option>
         </select>
         <input name="password" type="password" placeholder="Temporary password" className="border rounded-md px-3 py-2 text-sm" required />
         <button className="bg-blue-600 text-white rounded-md px-4 py-2 text-sm font-medium sm:col-span-2">Invite Member</button>
