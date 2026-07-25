@@ -12,24 +12,24 @@ export function SetupStepper({ pageId, current }: { pageId: string; current: str
   const currentIndex = STEPS.findIndex((s) => s.key === current);
 
   return (
-    <div className="border-b border-gray-200 pb-5 mb-8">
-      <div className="flex items-center justify-center gap-2">
+    <div className="border-b border-[var(--line)] pb-5 mb-8 overflow-x-auto">
+      <div className="flex items-center justify-center gap-2 min-w-max px-1">
         {STEPS.map((s, i) => (
           <div key={s.key} className="flex items-center">
             <Link
               href={`/admin/pages/${pageId}/setup/${s.key}`}
-              className={`flex items-center gap-2 text-sm font-medium ${
-                i === currentIndex ? "text-blue-600" : i < currentIndex ? "text-gray-700" : "text-gray-400"
+              className={`flex items-center gap-2 text-sm font-medium whitespace-nowrap ${
+                i === currentIndex ? "text-[var(--cyan)]" : i < currentIndex ? "text-[var(--fg)]" : "text-[var(--fg-dim)]"
               }`}
             >
               <span
                 className={`flex h-2.5 w-2.5 rounded-full ${
-                  i === currentIndex ? "bg-blue-600 ring-4 ring-blue-100" : i < currentIndex ? "bg-gray-700" : "bg-gray-300"
+                  i === currentIndex ? "bg-[var(--cyan)] ring-4 ring-[var(--cyan-soft)]" : i < currentIndex ? "bg-[var(--fg)]" : "bg-[var(--line-bright)]"
                 }`}
               />
               {s.label}
             </Link>
-            {i < STEPS.length - 1 && <span className="mx-3 h-px w-10 bg-gray-200" />}
+            {i < STEPS.length - 1 && <span className="mx-3 h-px w-10 bg-[var(--line)]" />}
           </div>
         ))}
       </div>

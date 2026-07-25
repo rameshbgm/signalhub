@@ -1,0 +1,69 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+      - run: npm audit --omit=dev --audit-level=high
+
+  container:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          tags: status:ci
+
+  helm:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-helm@v4
+      - run: helm lint deploy/helm/status --set secrets.databaseUrl=mongodb://example/status --set secrets.sessionSecret=01234567890123456789012345678901 --set secrets.encryptionKey=01234567890123456789012345678901
+      - run: helm template ci deploy/helm/status --set secrets.databaseUrl=mongodb://example/status --set secrets.sessionSecret=01234567890123456789012345678901 --set secrets.encryptionKey=01234567890123456789012345678901 > /dev/null
+
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: |
+          SESSION_SECRET=012345678901234567890123456789012345678901234567 \
+          ENCRYPTION_KEY=012345678901234567890123456789012345678901234567 \
+          docker compose up -d --build
+      - run: |
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:3301/api/health/ready >/dev/null; then exit 0; fi
+            sleep 5
+          done
+          docker compose logs
+          exit 1
+      - run: npm run test:e2e
+      - if: always()
+        run: docker compose down -v

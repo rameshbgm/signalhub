@@ -1,51 +1,110 @@
-import { NextRequest, NextResponse } from "next/server";
 import { ObjectId } from "mongodb";
-import { collections } from "@/lib/db";
+import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { apiError, routeError, validationError } from "@/lib/api-response";
+import { collections } from "@/lib/db";
+import { canonicalizeEmail } from "@/lib/identity";
+import { consumeRateLimit, RateLimitError, requestIp } from "@/lib/rate-limit";
+import { secretMatches } from "@/lib/secrets";
+import { isPageOrganizationActive } from "@/lib/public-page";
+import { withTransaction } from "@/lib/cascade";
+import { fenceActiveOrganizationMutation } from "@/lib/organization-mutation";
 
 const schema = z.object({
-  pageSlug: z.string(),
+  pageSlug: z.string().trim().min(1),
   channel: z.enum(["EMAIL", "SMS"]),
-  contact: z.string(),
-  code: z.string(),
+  contact: z.string().min(3).max(320),
+  code: z.string().regex(/^\d{6}$/),
 });
 
-export async function POST(req: NextRequest) {
-  const parsed = schema.safeParse(await req.json().catch(() => ({})));
-  if (!parsed.success) return NextResponse.json({ error: "Invalid request" }, { status: 400 });
-  const { pageSlug, channel, contact, code } = parsed.data;
-
-  const page = await collections.pages().findOne({ slug: pageSlug });
-  if (!page) return NextResponse.json({ error: "Page not found" }, { status: 404 });
-
-  const otp = await collections
-    .subscriptionOtps()
-    .find({ pageId: page._id.toHexString(), channel, contact, code })
-    .sort({ createdAt: -1 })
-    .limit(1)
-    .next();
-  if (!otp || otp.expiresAt < new Date()) {
-    return NextResponse.json({ error: "Invalid or expired code" }, { status: 400 });
-  }
-
-  const componentIds = otp.componentIds;
-  await collections.subscribers().updateOne(
-    { pageId: page._id, channel, contact },
-    {
-      $set: { verified: true, quarantined: false, componentIds },
-      $setOnInsert: {
-        _id: new ObjectId(),
-        pageId: page._id,
-        channel,
+export async function POST(request: NextRequest) {
+  try {
+    const parsed = schema.safeParse(await request.json().catch(() => ({})));
+    if (!parsed.success) return validationError(parsed.error);
+    await consumeRateLimit(`otp-verify:${parsed.data.pageSlug}`, requestIp(request), {
+      limit: 30,
+      windowMs: 15 * 60_000,
+    });
+    const contact =
+      parsed.data.channel === "EMAIL"
+        ? canonicalizeEmail(parsed.data.contact)
+        : parsed.data.contact.replace(/[\s()-]/g, "");
+    const page = await collections.pages().findOne({ slug: parsed.data.pageSlug });
+    if (!page) return apiError(404, "PAGE_NOT_FOUND", "Page not found");
+    if (!(await isPageOrganizationActive(page.orgId))) {
+      return apiError(404, "PAGE_NOT_FOUND", "Page not found");
+    }
+    const otp = await collections
+      .subscriptionOtps()
+      .find({
+        pageId: page._id.toHexString(),
+        channel: parsed.data.channel,
         contact,
-        unsubscribeToken: new ObjectId().toHexString(),
-        createdAt: new Date(),
-      },
-    },
-    { upsert: true }
-  );
+        expiresAt: { $gt: new Date() },
+      })
+      .sort({ createdAt: -1 })
+      .limit(1)
+      .next();
+    if (!otp || otp.attempts >= 5 || !secretMatches(parsed.data.code, otp.codeHash)) {
+      if (otp) {
+        await collections.subscriptionOtps().updateOne({ _id: otp._id }, { $inc: { attempts: 1 } });
+      }
+      return apiError(400, "INVALID_OTP", "Invalid or expired verification code");
+    }
 
-  await collections.subscriptionOtps().deleteMany({ pageId: page._id.toHexString(), channel, contact });
-
-  return NextResponse.json({ ok: true });
+    await withTransaction(async (databaseSession) => {
+      await fenceActiveOrganizationMutation(page.orgId, databaseSession);
+      const currentPage = await collections.pages().findOne(
+        { _id: page._id, orgId: page.orgId, slug: parsed.data.pageSlug },
+        { session: databaseSession }
+      );
+      const currentOtp = currentPage
+        ? await collections.subscriptionOtps().findOne(
+            {
+              _id: otp._id,
+              pageId: currentPage._id.toHexString(),
+              channel: parsed.data.channel,
+              contact,
+              expiresAt: { $gt: new Date() },
+              attempts: { $lt: 5 },
+            },
+            { session: databaseSession }
+          )
+        : null;
+      if (!currentPage || !currentOtp || !secretMatches(parsed.data.code, currentOtp.codeHash)) {
+        throw new Error("Verification state changed; request a new code");
+      }
+      await collections.subscribers().updateOne(
+        { pageId: currentPage._id, channel: parsed.data.channel, contact },
+        {
+          $set: { verified: true, quarantined: false, componentIds: currentOtp.componentIds },
+          $setOnInsert: {
+            _id: new ObjectId(),
+            pageId: currentPage._id,
+            channel: parsed.data.channel,
+            contact,
+            unsubscribeToken: new ObjectId().toHexString(),
+            createdAt: new Date(),
+          },
+        },
+        { upsert: true, session: databaseSession }
+      );
+      await collections.subscriptionOtps().deleteMany(
+        {
+          pageId: currentPage._id.toHexString(),
+          channel: parsed.data.channel,
+          contact,
+        },
+        { session: databaseSession }
+      );
+    });
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    if (error instanceof RateLimitError) {
+      const response = apiError(429, "RATE_LIMITED", "Too many verification attempts");
+      response.headers.set("retry-after", String(error.retryAfterSeconds));
+      return response;
+    }
+    return routeError(error);
+  }
 }

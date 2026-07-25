@@ -1,82 +1,128 @@
 import { requireSession } from "@/lib/require-session";
+import {
+  removeMember,
+  updateMemberRole,
+} from "./actions";
+import {
+  TeamInviteForm,
+  TeamInviteRenewForm,
+  TeamMemberReactivationForm,
+} from "@/components/admin/TeamInviteForm";
+import { getOrganizationMembers } from "@/lib/memberships";
 import { collections } from "@/lib/db";
 import { oid, toId } from "@/lib/mongo-utils";
-import { inviteMember, removeMember } from "./actions";
+import { MEMBERSHIP_ROLES } from "@/lib/identity";
+import { requireCapability } from "@/lib/admin-guard";
 
 export default async function TeamPage() {
   const { org } = await requireSession();
-  const members = (await collections.teamMembers().find({ orgId: oid(org.id) }).sort({ createdAt: 1 }).toArray()).map(toId);
+  const session = await requireCapability("team.manage");
+  const [members, pages] = await Promise.all([
+    getOrganizationMembers(org.id),
+    collections.pages().find({ orgId: oid(org.id), isHub: false }).sort({ name: 1 }).toArray().then((docs) => docs.map(toId)),
+  ]);
 
   return (
-    <div className="max-w-2xl space-y-8">
+    <div className="max-w-5xl space-y-8">
       <div>
-        <h1 className="font-display text-2xl font-medium tracking-tight text-[var(--ink)]">Team</h1>
-        <p className="mt-1 text-sm text-[var(--ink-soft)]">Invite teammates and control what they can do.</p>
+        <h1 className="font-mono text-2xl font-semibold tracking-tight text-[var(--fg)]">Team</h1>
+        <p className="mt-1 text-sm text-[var(--fg-soft)]">
+          Grant an explicit operational role and optionally limit access to selected pages.
+        </p>
       </div>
 
-      <form action={inviteMember} className="rounded-xl border border-black/[0.06] bg-white p-5 shadow-sm">
-        <p className="mb-3 font-mono text-[10px] uppercase tracking-wider text-[var(--ink-soft)]">Invite a member</p>
-        <div className="grid sm:grid-cols-2 gap-3">
-          <input
-            name="name"
-            placeholder="Full name"
-            className="rounded-lg border border-black/10 px-3 py-2.5 text-sm outline-none transition-colors focus:border-[var(--ink)]"
-            required
-          />
-          <input
-            name="email"
-            type="email"
-            placeholder="Email"
-            className="rounded-lg border border-black/10 px-3 py-2.5 text-sm outline-none transition-colors focus:border-[var(--ink)]"
-            required
-          />
-          <select
-            name="role"
-            className="rounded-lg border border-black/10 px-3 py-2.5 text-sm outline-none transition-colors focus:border-[var(--ink)]"
-          >
-            <option value="TENANT_ADMIN">Tenant Admin</option>
-            <option value="TENANT_USER">Tenant User</option>
-          </select>
-          <input
-            name="password"
-            type="password"
-            placeholder="Temporary password"
-            className="rounded-lg border border-black/10 px-3 py-2.5 text-sm outline-none transition-colors focus:border-[var(--ink)]"
-            required
-          />
-          <button className="rounded-full bg-[var(--ink)] py-2.5 text-sm font-semibold text-white transition-transform hover:-translate-y-0.5 sm:col-span-2">
-            Invite Member
-          </button>
-        </div>
-      </form>
+      <TeamInviteForm
+        pages={pages}
+        canGrantOwnership={session.role === "OWNER"}
+      />
 
-      <div className="rounded-xl border border-black/[0.06] bg-white shadow-sm divide-y divide-black/[0.06]">
+      <div className="divide-y divide-[var(--line)] border border-[var(--line)] bg-[var(--surface)]">
         {members.map((m) => (
-          <div key={m.id} className="flex items-center justify-between p-4 text-sm">
+          <div key={m.id} className="flex flex-col gap-3 p-4 text-sm sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-3">
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--paper)] font-display text-xs font-semibold text-[var(--ink)]">
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--surface-raised)] font-mono text-xs font-semibold text-[var(--fg)]">
                 {m.name.slice(0, 1).toUpperCase()}
               </span>
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="font-medium text-[var(--ink)]">{m.name}</span>
+                  <span className="font-medium text-[var(--fg)]">{m.name}</span>
                   <span
-                    className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
-                      m.role === "TENANT_ADMIN" ? "bg-[var(--up-soft)] text-[var(--up)]" : "bg-black/[0.04] text-[var(--ink-soft)]"
-                    }`}
+                    className="px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide bg-[var(--surface-raised)] text-[var(--fg-soft)]"
                   >
-                    {m.role === "TENANT_ADMIN" ? "Admin" : "Member"}
+                    {m.role}
+                  </span>
+                  <span className={`px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
+                    m.status === "ACTIVE"
+                      ? "bg-[var(--green-soft)] text-[var(--green)]"
+                      : m.status === "INVITED"
+                        ? "bg-[var(--amber-soft)] text-[var(--amber)]"
+                        : "bg-[var(--red-soft)] text-[var(--red)]"
+                  }`}>
+                    {m.status}
                   </span>
                 </div>
-                <span className="text-xs text-[var(--ink-soft)]">{m.email}</span>
+                <span className="text-xs text-[var(--fg-dim)]">{m.email}</span>
               </div>
             </div>
-            <form action={removeMember.bind(null, m.id)}>
-              <button className="text-xs font-semibold text-red-600 hover:underline">Remove</button>
-            </form>
+            <div className="flex flex-wrap items-center gap-2">
+              {m.status !== "REVOKED" &&
+                (session.role === "OWNER" || m.role !== "OWNER") && (
+                <details className="relative">
+                  <summary className="cursor-pointer border border-[var(--line)] px-2.5 py-1 text-xs">
+                    Edit access
+                  </summary>
+                  <form
+                    action={updateMemberRole.bind(null, m.id)}
+                    className="absolute right-0 z-20 mt-1 w-72 space-y-3 border border-[var(--line)] bg-[var(--surface)] p-3 shadow-xl"
+                  >
+                    <label className="block text-xs text-[var(--fg-soft)]">
+                      Role
+                      <select name="role" defaultValue={m.role} className="mt-1 w-full border border-[var(--line)] bg-[var(--bg)] px-2 py-1.5 text-xs text-[var(--fg)]">
+                        {MEMBERSHIP_ROLES.filter(
+                          (role) => session.role === "OWNER" || role !== "OWNER"
+                        ).map((role) => (
+                          <option key={role} value={role}>
+                            {role.replaceAll("_", " ")}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <fieldset className="border border-[var(--line)] p-2">
+                      <legend className="px-1 text-[10px] text-[var(--fg-dim)]">
+                        Page scope (empty means all)
+                      </legend>
+                      <div className="max-h-36 space-y-1 overflow-y-auto">
+                        {pages.map((page) => (
+                          <label key={page.id} className="flex items-center gap-2 text-xs text-[var(--fg-soft)]">
+                            <input
+                              type="checkbox"
+                              name="pageIds"
+                              value={page.id}
+                              defaultChecked={m.pageIds?.includes(page.id)}
+                            />
+                            {page.name}
+                          </label>
+                        ))}
+                      </div>
+                    </fieldset>
+                    <button className="w-full bg-[var(--cyan)] px-2 py-1.5 text-xs font-semibold text-[var(--on-cyan)]">
+                      Save access
+                    </button>
+                  </form>
+                </details>
+              )}
+              {m.status === "INVITED" && (
+                <TeamInviteRenewForm membershipId={m.id} />
+              )}
+              {m.status === "REVOKED" ? (
+                <TeamMemberReactivationForm membershipId={m.id} />
+              ) : <form action={removeMember.bind(null, m.id)}>
+                <button className="border border-[var(--red)]/30 px-2.5 py-1 text-xs font-semibold text-[var(--red)] transition-colors hover:bg-[var(--red-soft)]">Remove</button>
+              </form>}
+            </div>
           </div>
         ))}
-        {members.length === 0 && <p className="p-4 text-sm text-[var(--ink-soft)]">No teammates yet.</p>}
+        {members.length === 0 && <p className="p-4 text-sm text-[var(--fg-dim)]">No teammates yet.</p>}
       </div>
     </div>
   );

@@ -1,79 +1,37 @@
 import { NextRequest, NextResponse } from "next/server";
+import { apiError, routeError } from "@/lib/api-response";
 import { collections } from "@/lib/db";
-import { toId } from "@/lib/mongo-utils";
-import { overallBanner, type ComponentStatus } from "@/lib/status";
-import { syncAutoMaintenance } from "@/lib/maintenance-sync";
+import { authorizePublicSurface } from "@/lib/feed-access";
+import { buildStatusPayload } from "@/lib/public-api";
+import { consumeRateLimit, RateLimitError, requestIp } from "@/lib/rate-limit";
+import { absolutePublicPageUrl } from "@/lib/public-url";
 
-export async function GET(_req: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
-  const { slug } = await params;
-  await syncAutoMaintenance();
-
-  const pageDoc = await collections.pages().findOne({ slug });
-  if (!pageDoc || pageDoc.type !== "PUBLIC") {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ slug: string }> }
+) {
+  try {
+    const { slug } = await params;
+    await consumeRateLimit(`public-status:${slug}`, requestIp(request), {
+      limit: 300,
+      windowMs: 60_000,
+    });
+    const page = await collections.pages().findOne({ slug });
+    if (!page) return apiError(404, "PAGE_NOT_FOUND", "Page not found");
+    const access = await authorizePublicSurface(request, page);
+    if (!access.ok) return apiError(404, "PAGE_NOT_FOUND", "Page not found");
+    const response = NextResponse.json(
+      await buildStatusPayload(page, access.visibleComponentIds, absolutePublicPageUrl(request, page))
+    );
+    response.headers.set("cache-control", page.type === "PUBLIC" ? "public, max-age=15" : "private, no-store");
+    response.headers.set("access-control-allow-origin", "*");
+    return response;
+  } catch (error) {
+    if (error instanceof RateLimitError) {
+      const response = apiError(429, "RATE_LIMITED", "Too many status requests");
+      response.headers.set("retry-after", String(error.retryAfterSeconds));
+      return response;
+    }
+    return routeError(error);
   }
-  const page = toId(pageDoc);
-
-  const components = (
-    await collections.components().find({ pageId: pageDoc._id, visible: true }).sort({ order: 1 }).toArray()
-  ).map(toId);
-  const banner = overallBanner(components.map((c) => c.status as ComponentStatus));
-
-  const activeIncidentDocs = await collections
-    .incidents()
-    .find({ pageId: pageDoc._id, isMaintenance: false, status: { $ne: "RESOLVED" } })
-    .toArray();
-  const upcomingMaintenanceDocs = await collections
-    .incidents()
-    .find({ pageId: pageDoc._id, isMaintenance: true, maintenanceStatus: { $ne: "COMPLETED" } })
-    .toArray();
-
-  const allIncidentIds = [...activeIncidentDocs, ...upcomingMaintenanceDocs].map((i) => i._id);
-  const linkDocs = allIncidentIds.length
-    ? await collections.incidentComponents().find({ incidentId: { $in: allIncidentIds } }).toArray()
-    : [];
-  const linkedComponentIds = [...new Map(linkDocs.map((l) => [l.componentId.toHexString(), l.componentId])).values()];
-  const componentDocs = linkedComponentIds.length
-    ? await collections.components().find({ _id: { $in: linkedComponentIds } }).toArray()
-    : [];
-  const componentNameById = new Map(componentDocs.map((c) => [c._id.toHexString(), c.name]));
-  const linksByIncident = new Map<string, typeof linkDocs>();
-  for (const l of linkDocs) {
-    const key = l.incidentId.toHexString();
-    if (!linksByIncident.has(key)) linksByIncident.set(key, []);
-    linksByIncident.get(key)!.push(l);
-  }
-
-  const latestUpdateByIncident = new Map<string, string | null>();
-  for (const inc of activeIncidentDocs) {
-    const latest = await collections.incidentUpdates().find({ incidentId: inc._id }).sort({ createdAt: -1 }).limit(1).next();
-    latestUpdateByIncident.set(inc._id.toHexString(), latest?.body ?? null);
-  }
-
-  return NextResponse.json({
-    page: { name: page.name, slug: page.slug, url: `${process.env.NEXT_PUBLIC_APP_URL ?? ""}/${page.slug}` },
-    status: { indicator: banner.status, description: banner.label },
-    components: components.map((c) => ({ id: c.id, name: c.name, status: c.status })),
-    active_incidents: activeIncidentDocs.map((i) => ({
-      id: i._id.toHexString(),
-      name: i.name,
-      status: i.status,
-      impact: i.impact,
-      created_at: i.createdAt,
-      latest_update: latestUpdateByIncident.get(i._id.toHexString()) ?? null,
-      affected_components: (linksByIncident.get(i._id.toHexString()) ?? []).map(
-        (l) => componentNameById.get(l.componentId.toHexString()) ?? ""
-      ),
-    })),
-    scheduled_maintenance: upcomingMaintenanceDocs.map((m) => ({
-      id: m._id.toHexString(),
-      name: m.name,
-      status: m.maintenanceStatus,
-      scheduled_start: m.scheduledStart,
-      scheduled_end: m.scheduledEnd,
-      affected_components: (linksByIncident.get(m._id.toHexString()) ?? []).map(
-        (l) => componentNameById.get(l.componentId.toHexString()) ?? ""
-      ),
-    })),
-  });
 }

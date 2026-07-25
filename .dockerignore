@@ -1,0 +1,13 @@
+.git
+.github
+.next
+dist-runtime
+node_modules
+coverage
+playwright-report
+test-results
+.env
+.env.*
+*.log
+*.png
+.DS_Store

@@ -1,0 +1,149 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "status.fullname" . }}-migrate-{{ .Release.Revision }}
+  labels:
+    {{- include "status.labels" . | nindent 4 }}
+    app.kubernetes.io/component: migrate
+  annotations:
+    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 3
+  template:
+    metadata:
+      labels:
+        {{- include "status.labels" . | nindent 8 }}
+        app.kubernetes.io/component: migrate
+    spec:
+      restartPolicy: OnFailure
+      serviceAccountName: {{ include "status.serviceAccountName" . }}
+      securityContext: { runAsNonRoot: true, seccompProfile: { type: RuntimeDefault } }
+      containers:
+        - name: migrate
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["node", "dist-runtime/migrate.mjs"]
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: ["ALL"] }
+            readOnlyRootFilesystem: true
+          envFrom:
+            - secretRef: { name: {{ include "status.secretName" . }} }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "status.fullname" . }}-web
+  labels:
+    {{- include "status.labels" . | nindent 4 }}
+    app.kubernetes.io/component: web
+spec:
+  replicas: {{ .Values.replicaCount }}
+  strategy: { type: RollingUpdate, rollingUpdate: { maxUnavailable: 0, maxSurge: 1 } }
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "status.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: web
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ include "status.name" . }}
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/component: web
+      annotations:
+        checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
+        {{- with .Values.podAnnotations }}{{ toYaml . | nindent 8 }}{{- end }}
+    spec:
+      serviceAccountName: {{ include "status.serviceAccountName" . }}
+      securityContext: { runAsNonRoot: true, fsGroup: 1001, seccompProfile: { type: RuntimeDefault } }
+      topologySpreadConstraints: {{ toYaml .Values.topologySpreadConstraints | nindent 8 }}
+      containers:
+        - name: web
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports: [{ name: http, containerPort: 3000 }]
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: ["ALL"] }
+            readOnlyRootFilesystem: true
+          env:
+            - { name: NEXT_PUBLIC_APP_URL, value: {{ .Values.config.appUrl | quote }} }
+            - { name: NEXT_PUBLIC_APP_DOMAIN, value: {{ .Values.config.appDomain | quote }} }
+            - { name: ASSET_STORAGE_DRIVER, value: {{ .Values.config.assetStorageDriver | quote }} }
+            - { name: REQUIRE_WORKER, value: {{ .Values.config.requireWorker | quote }} }
+            - { name: TRUST_PROXY_HEADERS, value: {{ .Values.config.trustProxyHeaders | quote }} }
+            - { name: TRUSTED_PROXY_HOPS, value: {{ .Values.config.trustedProxyHops | quote }} }
+            - { name: LOG_LEVEL, value: {{ .Values.config.logLevel | quote }} }
+            - { name: TENANT_SESSION_IDLE_SECONDS, value: {{ .Values.config.tenantSessionIdleSeconds | quote }} }
+            - { name: TENANT_SESSION_ABSOLUTE_SECONDS, value: {{ .Values.config.tenantSessionAbsoluteSeconds | quote }} }
+            - { name: PLATFORM_SESSION_IDLE_SECONDS, value: {{ .Values.config.platformSessionIdleSeconds | quote }} }
+            - { name: PLATFORM_SESSION_ABSOLUTE_SECONDS, value: {{ .Values.config.platformSessionAbsoluteSeconds | quote }} }
+            - { name: PASSWORD_MIN_LENGTH, value: {{ .Values.config.passwordMinLength | quote }} }
+            - { name: PLATFORM_ADMIN_ALLOWED_CIDRS, value: {{ .Values.config.platformAdminAllowedCidrs | quote }} }
+            - { name: OTEL_EXPORTER_OTLP_ENDPOINT, value: {{ .Values.config.otlpEndpoint | quote }} }
+          envFrom:
+            - secretRef: { name: {{ include "status.secretName" . }} }
+          readinessProbe: { httpGet: { path: /api/health/ready, port: http }, periodSeconds: 10, timeoutSeconds: 5 }
+          livenessProbe: { httpGet: { path: /api/health/live, port: http }, periodSeconds: 20, timeoutSeconds: 5 }
+          startupProbe: { httpGet: { path: /api/health/live, port: http }, failureThreshold: 30, periodSeconds: 5 }
+          resources: {{ toYaml .Values.web.resources | nindent 12 }}
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - name: tmp
+          emptyDir: {}
+      {{- with .Values.nodeSelector }}nodeSelector: {{ toYaml . | nindent 8 }}{{- end }}
+      {{- with .Values.tolerations }}tolerations: {{ toYaml . | nindent 8 }}{{- end }}
+      {{- with .Values.affinity }}affinity: {{ toYaml . | nindent 8 }}{{- end }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "status.fullname" . }}-worker
+  labels:
+    {{- include "status.labels" . | nindent 4 }}
+    app.kubernetes.io/component: worker
+spec:
+  replicas: {{ .Values.workerReplicaCount }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "status.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: worker
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ include "status.name" . }}
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/component: worker
+    spec:
+      serviceAccountName: {{ include "status.serviceAccountName" . }}
+      securityContext: { runAsNonRoot: true, fsGroup: 1001, seccompProfile: { type: RuntimeDefault } }
+      topologySpreadConstraints: {{ toYaml .Values.topologySpreadConstraints | nindent 8 }}
+      containers:
+        - name: worker
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["node", "dist-runtime/worker.mjs"]
+          ports: [{ name: health, containerPort: 8081 }]
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: ["ALL"] }
+            readOnlyRootFilesystem: true
+          env:
+            - { name: ASSET_STORAGE_DRIVER, value: {{ .Values.config.assetStorageDriver | quote }} }
+            - { name: WORKER_HEALTH_PORT, value: "8081" }
+            - { name: LOG_LEVEL, value: {{ .Values.config.logLevel | quote }} }
+            - { name: OTEL_EXPORTER_OTLP_ENDPOINT, value: {{ .Values.config.otlpEndpoint | quote }} }
+          envFrom:
+            - secretRef: { name: {{ include "status.secretName" . }} }
+          readinessProbe: { httpGet: { path: /ready, port: health }, periodSeconds: 10, timeoutSeconds: 5 }
+          livenessProbe: { httpGet: { path: /live, port: health }, periodSeconds: 20, timeoutSeconds: 5 }
+          resources: {{ toYaml .Values.worker.resources | nindent 12 }}
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - name: tmp
+          emptyDir: {}

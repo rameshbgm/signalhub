@@ -1,11 +1,23 @@
 import { ObjectId } from "mongodb";
 
+export class InvalidObjectIdError extends Error {
+  constructor(public readonly value: string) {
+    super("Malformed identifier");
+    this.name = "InvalidObjectIdError";
+  }
+}
+
 export function oid(id: string): ObjectId {
+  if (!ObjectId.isValid(id)) throw new InvalidObjectIdError(id);
   return new ObjectId(id);
 }
 
 export function isValidOid(id: string): boolean {
   return ObjectId.isValid(id);
+}
+
+export function tryOid(id: string): ObjectId | null {
+  return ObjectId.isValid(id) ? new ObjectId(id) : null;
 }
 
 type StringifyObjectIds<T> = {

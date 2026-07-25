@@ -1,9 +1,17 @@
-import { nanoid } from "nanoid";
+import { generateSecret } from "@/lib/secrets";
 
 export function generateApiKey() {
-  return `sp_live_${nanoid(32)}`;
+  return generateSecret("status_live_");
 }
 
 export function generateWebhookSecret() {
-  return nanoid(24);
+  return generateSecret("whsec_");
+}
+
+export function generateAutomationToken() {
+  return generateSecret("component_");
+}
+
+export function generateFeedToken() {
+  return generateSecret("feed_");
 }

@@ -1,0 +1,7 @@
+SignalHub is installed.
+
+Run the deployment preflight:
+  kubectl exec deploy/{{ include "status.fullname" . }}-web -- node dist-runtime/signalhubctl.mjs doctor
+
+The production chart does not bundle MongoDB or object storage. Use a replica-set
+DATABASE_URL and S3-compatible storage for multi-replica installations.

@@ -3,36 +3,153 @@
 @tailwind utilities;
 
 :root {
-  --brand: #0052cc;
-  --paper: #faf9f6;
-  --ink: #101511;
-  --ink-soft: #4a544c;
-  --up: #0a9d58;
-  --up-soft: #e3f4ea;
-  --amber: #f4c20d;
-  --font-display-family: var(--font-display), Georgia, serif;
-  --font-body-family: var(--font-body), -apple-system, sans-serif;
-  --font-mono-family: var(--font-mono), ui-monospace, monospace;
+  --bg: #f4f5f7;
+  --surface: #ffffff;
+  --surface-raised: #ffffff;
+  --line: #d8dce3;
+  --line-bright: #b8bfcb;
+  --fg: #12161c;
+  --fg-soft: #4b5563;
+  --fg-dim: #8a93a1;
+
+  --cyan: #0891b2;
+  --cyan-soft: rgba(8, 145, 178, 0.1);
+  --green: #16a34a;
+  --green-soft: rgba(22, 163, 74, 0.1);
+  --amber: #b45309;
+  --amber-soft: rgba(180, 83, 9, 0.1);
+  --orange: #c2410c;
+  --orange-soft: rgba(194, 65, 12, 0.1);
+  --red: #dc2626;
+  --red-soft: rgba(220, 38, 38, 0.1);
+  --blue: #1d4ed8;
+  --blue-soft: rgba(29, 78, 216, 0.1);
+
+  --on-cyan: #ffffff;
+  --on-green: #ffffff;
+
+  --hover-overlay: rgba(0, 0, 0, 0.035);
+  --hover-overlay-strong: rgba(0, 0, 0, 0.06);
+  --panel-glass: rgba(255, 255, 255, 0.7);
+  --input-overlay-bg: rgba(0, 0, 0, 0.03);
+  --input-overlay-border: rgba(0, 0, 0, 0.12);
+  --input-overlay-border-focus: rgba(0, 0, 0, 0.4);
+  --placeholder-overlay: rgba(0, 0, 0, 0.35);
+
+  --font-body-family: "Avenir Next", "Segoe UI", Helvetica, Arial, sans-serif;
+  --font-mono-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+
+  color-scheme: light;
+}
+
+:root.dark {
+  --bg: #0a0e14;
+  --surface: #11151c;
+  --surface-raised: #161b24;
+  --line: #232a36;
+  --line-bright: #333d4d;
+  --fg: #e6edf3;
+  --fg-soft: #8b96a5;
+  --fg-dim: #5c6773;
+
+  --cyan: #22d3ee;
+  --cyan-soft: rgba(34, 211, 238, 0.12);
+  --green: #4ade80;
+  --green-soft: rgba(74, 222, 128, 0.12);
+  --amber: #fbbf24;
+  --amber-soft: rgba(251, 191, 36, 0.12);
+  --orange: #fb923c;
+  --orange-soft: rgba(251, 146, 60, 0.12);
+  --red: #f87171;
+  --red-soft: rgba(248, 113, 113, 0.12);
+  --blue: #60a5fa;
+  --blue-soft: rgba(96, 165, 250, 0.12);
+
+  --on-cyan: #0a0e14;
+  --on-green: #0a0e14;
+
+  --hover-overlay: rgba(255, 255, 255, 0.03);
+  --hover-overlay-strong: rgba(255, 255, 255, 0.06);
+  --panel-glass: rgba(255, 255, 255, 0.03);
+  --input-overlay-bg: rgba(255, 255, 255, 0.05);
+  --input-overlay-border: rgba(255, 255, 255, 0.15);
+  --input-overlay-border-focus: rgba(255, 255, 255, 0.4);
+  --placeholder-overlay: rgba(255, 255, 255, 0.3);
+
+  color-scheme: dark;
+}
+
+/* Public pages own their palette. This prevents the admin theme and custom
+   status-page theme from leaking into each other. */
+.status-theme {
+  --bg: #f5f7fb;
+  --surface: #ffffff;
+  --surface-raised: #f8fafc;
+  --line: #d9e0ea;
+  --line-bright: #aeb9c8;
+  --fg: #132033;
+  --fg-soft: #526174;
+  --fg-dim: #7d8999;
+  --cyan: var(--page-brand, #0f8ca8);
+  --cyan-soft: color-mix(in srgb, var(--page-brand, #0f8ca8) 12%, transparent);
+  --on-cyan: #ffffff;
+  color-scheme: light;
+}
+
+.status-theme[data-theme-preset="CALM"] {
+  --bg: #f7f7f4;
+  --surface: #fffefa;
+  --surface-raised: #f0efe9;
+  --line: #deddd5;
+  --line-bright: #b8b5a9;
+  --fg: #20221f;
+  --fg-soft: #5e625b;
+  --fg-dim: #898d84;
+}
+
+.status-theme[data-theme-preset="CONTRAST"] {
+  --bg: #ffffff;
+  --surface: #ffffff;
+  --surface-raised: #f3f4f6;
+  --line: #c6cbd2;
+  --line-bright: #667085;
+  --fg: #070b12;
+  --fg-soft: #344054;
+  --fg-dim: #667085;
+}
+
+.status-theme[data-theme-mode="DARK"],
+:root.dark .status-theme[data-theme-mode="SYSTEM"] {
+  --bg: #090d13;
+  --surface: #111720;
+  --surface-raised: #18202b;
+  --line: #273241;
+  --line-bright: #425066;
+  --fg: #edf3f8;
+  --fg-soft: #a2adba;
+  --fg-dim: #707c8c;
+  --cyan: var(--page-brand, #22c5df);
+  --cyan-soft: color-mix(in srgb, var(--page-brand, #22c5df) 16%, transparent);
+  --on-cyan: #071014;
+  color-scheme: dark;
 }
 
 body {
   font-family: var(--font-body-family);
+  transition: background-color 0.15s ease, color 0.15s ease;
 }
 
-.font-display {
-  font-family: var(--font-display-family);
-}
 .font-mono {
   font-family: var(--font-mono-family);
 }
 
 @layer utilities {
   .status-dot {
-    @apply inline-block w-2.5 h-2.5 rounded-full mr-2 align-middle;
+    @apply inline-block w-2.5 h-2.5 mr-2 align-middle;
   }
 }
 
-/* ---------- Landing: scroll reveal ---------- */
+/* ---------- scroll reveal ---------- */
 
 .reveal {
   opacity: 0;
@@ -63,7 +180,7 @@ body {
   }
 }
 
-/* ---------- Landing: 3D hero ---------- */
+/* ---------- 3D hero ---------- */
 
 .scene {
   perspective: 1400px;
@@ -115,7 +232,7 @@ body {
   animation: float-c 8s ease-in-out infinite;
 }
 
-/* ---------- Landing: pulsing live dot ---------- */
+/* ---------- pulsing live dot ---------- */
 
 .pulse-dot {
   position: relative;
@@ -125,7 +242,7 @@ body {
   position: absolute;
   inset: 0;
   border-radius: 9999px;
-  background: var(--up);
+  background: var(--pulse-color, var(--cyan));
   animation: pulse-ring 2.2s cubic-bezier(0.16, 1, 0.3, 1) infinite;
 }
 @keyframes pulse-ring {
@@ -140,7 +257,7 @@ body {
   }
 }
 
-/* ---------- Landing: uptime ticker marquee ---------- */
+/* ---------- uptime ticker marquee ---------- */
 
 .ticker-track {
   display: flex;
@@ -156,13 +273,52 @@ body {
   }
 }
 
-/* ---------- Landing: paper grain + mesh ---------- */
+/* ---------- console grid + scanline texture ---------- */
 
+.grain {
+  position: relative;
+}
 .grain::before {
   content: "";
   position: absolute;
   inset: 0;
   pointer-events: none;
-  opacity: 0.35;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.04 0'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
+  opacity: 0.5;
+  background-image:
+    linear-gradient(rgba(34, 211, 238, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(34, 211, 238, 0.05) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+.grain::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.4;
+  background: repeating-linear-gradient(
+    to bottom,
+    transparent 0,
+    transparent 3px,
+    rgba(0, 0, 0, 0.15) 3px,
+    rgba(0, 0, 0, 0.15) 4px
+  );
+}
+
+/* ---------- help tooltip ---------- */
+
+.help-tip {
+  position: relative;
+  display: inline-flex;
+}
+.help-tip .help-bubble {
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(4px);
+  transition: opacity 0.15s ease, transform 0.15s ease, visibility 0.15s;
+}
+.help-tip:hover .help-bubble,
+.help-tip:focus-within .help-bubble {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
 }

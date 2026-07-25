@@ -1,31 +1,22 @@
 import type { Metadata } from "next";
-import { Fraunces, Schibsted_Grotesk, IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
 
-const display = Fraunces({
-  subsets: ["latin"],
-  variable: "--font-display",
-  weight: ["400", "500", "600", "700"],
-  style: ["normal", "italic"],
-});
-
-const body = Schibsted_Grotesk({
-  subsets: ["latin"],
-  variable: "--font-body",
-  weight: ["400", "500", "600", "700"],
-});
-
-const mono = IBM_Plex_Mono({
-  subsets: ["latin"],
-  variable: "--font-mono",
-  weight: ["400", "500", "600"],
-});
-
 export const metadata: Metadata = {
-  title: "Statuspage — status pages your customers actually trust",
+  metadataBase: new URL("https://signalhub.at"),
+  title: "SignalHub — reliable self-hosted status pages",
   description:
-    "Build a branded status page, run incidents with a clear timeline, and keep every subscriber informed — email, SMS, webhooks, and custom domains.",
+    "Apache-2.0 status pages, incident communication, monitoring, email, signed webhooks, and custom domains on your infrastructure.",
 };
+
+const THEME_INIT = `
+(function () {
+  try {
+    var stored = localStorage.getItem("theme");
+    var prefersDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+    if (stored === "dark" || (!stored && prefersDark)) document.documentElement.classList.add("dark");
+  } catch (e) {}
+})();
+`;
 
 export default function RootLayout({
   children,
@@ -33,8 +24,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${display.variable} ${body.variable} ${mono.variable}`}>
-      <body className="bg-gray-50 text-gray-900 antialiased">{children}</body>
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_INIT }} />
+      </head>
+      <body className="bg-[var(--bg)] text-[var(--fg)] antialiased">{children}</body>
     </html>
   );
 }

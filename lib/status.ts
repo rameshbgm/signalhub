@@ -26,11 +26,11 @@ export const COMPONENT_STATUS_LABEL: Record<ComponentStatus, string> = {
 };
 
 export const COMPONENT_STATUS_COLOR: Record<ComponentStatus, string> = {
-  OPERATIONAL: "#0a9d58",
-  DEGRADED_PERFORMANCE: "#f4c20d",
-  PARTIAL_OUTAGE: "#e8710a",
-  MAJOR_OUTAGE: "#d93025",
-  UNDER_MAINTENANCE: "#2f80ed",
+  OPERATIONAL: "#16a34a",
+  DEGRADED_PERFORMANCE: "#eab308",
+  PARTIAL_OUTAGE: "#f97316",
+  MAJOR_OUTAGE: "#dc2626",
+  UNDER_MAINTENANCE: "#3b82f6",
 };
 
 // Higher = worse. Used to compute the "worst" status across components/days.
@@ -42,9 +42,48 @@ const SEVERITY_RANK: Record<ComponentStatus, number> = {
   MAJOR_OUTAGE: 4,
 };
 
+function isComponentStatus(value: string): value is ComponentStatus {
+  return COMPONENT_STATUSES.includes(value as ComponentStatus);
+}
+
 export function worstStatus(statuses: ComponentStatus[]): ComponentStatus {
   if (statuses.length === 0) return "OPERATIONAL";
   return statuses.reduce((worst, s) => (SEVERITY_RANK[s] > SEVERITY_RANK[worst] ? s : worst), "OPERATIONAL" as ComponentStatus);
+}
+
+const INCIDENT_IMPACT_STATUS: Record<string, ComponentStatus> = {
+  NONE: "OPERATIONAL",
+  MINOR: "DEGRADED_PERFORMANCE",
+  MAJOR: "PARTIAL_OUTAGE",
+  CRITICAL: "MAJOR_OUTAGE",
+};
+
+export type PageHealthSignals = {
+  componentStatuses: string[];
+  activeIncidentImpacts: string[];
+  maintenanceActive: boolean;
+  downMonitorStatuses: string[];
+  hasHealthyMonitor?: boolean;
+};
+
+/**
+ * Summarize the signals that can materially affect a page. A null result means
+ * the page has no observed component, incident, maintenance, or monitor state;
+ * callers must not present that as an operational page.
+ */
+export function pageHealthStatus(signals: PageHealthSignals): ComponentStatus | null {
+  const statuses = signals.componentStatuses.filter(isComponentStatus);
+
+  for (const impact of signals.activeIncidentImpacts) {
+    statuses.push(INCIDENT_IMPACT_STATUS[impact] ?? "DEGRADED_PERFORMANCE");
+  }
+  if (signals.maintenanceActive) statuses.push("UNDER_MAINTENANCE");
+  for (const status of signals.downMonitorStatuses) {
+    statuses.push(isComponentStatus(status) ? status : "MAJOR_OUTAGE");
+  }
+  if (signals.hasHealthyMonitor) statuses.push("OPERATIONAL");
+
+  return statuses.length ? worstStatus(statuses) : null;
 }
 
 export function overallBanner(statuses: ComponentStatus[]): { label: string; color: string; status: ComponentStatus } {
@@ -64,10 +103,10 @@ export function overallBanner(statuses: ComponentStatus[]): { label: string; col
 }
 
 export const IMPACT_COLOR: Record<Impact, string> = {
-  NONE: "#6b7280",
-  MINOR: "#f4c20d",
-  MAJOR: "#e8710a",
-  CRITICAL: "#d93025",
+  NONE: "#5c6773",
+  MINOR: "#eab308",
+  MAJOR: "#f97316",
+  CRITICAL: "#dc2626",
 };
 
 export const IMPACT_LABEL: Record<Impact, string> = {
@@ -95,12 +134,22 @@ export const MAINTENANCE_STATUS_LABEL: Record<MaintenanceStatus, string> = {
  * Compute per-day uptime percentage buckets from a list of status events.
  * Maintenance windows are excluded from downtime math per spec.
  */
+export type DailyUptimeBucket = {
+  date: string;
+  status: ComponentStatus;
+  uptimePct: number | null;
+  observedMs: number;
+};
+
 export function computeDailyUptime(
   events: { status: string; startedAt: Date; endedAt: Date | null; isMaintenance: boolean }[],
-  days: number
-): { date: string; status: ComponentStatus; uptimePct: number }[] {
-  const now = new Date();
-  const result: { date: string; status: ComponentStatus; uptimePct: number }[] = [];
+  days: number,
+  now = new Date(),
+  observationStart?: Date
+): DailyUptimeBucket[] {
+  const result: DailyUptimeBucket[] = [];
+  const safeObservationStart =
+    observationStart && Number.isFinite(observationStart.getTime()) ? observationStart : null;
 
   for (let i = days - 1; i >= 0; i--) {
     const dayStart = new Date(now);
@@ -108,30 +157,83 @@ export function computeDailyUptime(
     dayStart.setUTCDate(dayStart.getUTCDate() - i);
     const dayEnd = new Date(dayStart);
     dayEnd.setUTCDate(dayEnd.getUTCDate() + 1);
+    const effectiveDayEnd = dayEnd > now ? now : dayEnd;
+    const effectiveDayStart =
+      safeObservationStart && safeObservationStart > dayStart ? safeObservationStart : dayStart;
+    const observedMs = Math.max(0, effectiveDayEnd.getTime() - effectiveDayStart.getTime());
 
-    let downMs = 0;
+    if (observedMs === 0) {
+      result.push({
+        date: dayStart.toISOString().slice(0, 10),
+        status: "OPERATIONAL",
+        uptimePct: null,
+        observedMs: 0,
+      });
+      continue;
+    }
+
+    const outageIntervals: { start: number; end: number }[] = [];
     let worst: ComponentStatus = "OPERATIONAL";
 
     for (const ev of events) {
       if (ev.isMaintenance) continue;
-      const evStart = ev.startedAt < dayStart ? dayStart : ev.startedAt;
-      const evEnd = (ev.endedAt ?? now) > dayEnd ? dayEnd : ev.endedAt ?? now;
+      const evStart = ev.startedAt < effectiveDayStart ? effectiveDayStart : ev.startedAt;
+      const evEnd = (ev.endedAt ?? now) > effectiveDayEnd ? effectiveDayEnd : ev.endedAt ?? now;
       if (evEnd <= evStart) continue;
       if (ev.status === "OPERATIONAL") continue;
-      downMs += evEnd.getTime() - evStart.getTime();
+      outageIntervals.push({ start: evStart.getTime(), end: evEnd.getTime() });
       const s = ev.status as ComponentStatus;
-      if (SEVERITY_RANK[s] > SEVERITY_RANK[worst]) worst = s;
+      if (isComponentStatus(s) && SEVERITY_RANK[s] > SEVERITY_RANK[worst]) worst = s;
     }
 
-    const dayMs = dayEnd.getTime() - dayStart.getTime();
-    const uptimePct = dayStart > now ? 100 : Math.max(0, 100 - (downMs / dayMs) * 100);
+    outageIntervals.sort((a, b) => a.start - b.start || a.end - b.end);
+    let downMs = 0;
+    let mergedStart: number | null = null;
+    let mergedEnd: number | null = null;
+    for (const interval of outageIntervals) {
+      if (mergedStart === null || mergedEnd === null) {
+        mergedStart = interval.start;
+        mergedEnd = interval.end;
+      } else if (interval.start <= mergedEnd) {
+        mergedEnd = Math.max(mergedEnd, interval.end);
+      } else {
+        downMs += mergedEnd - mergedStart;
+        mergedStart = interval.start;
+        mergedEnd = interval.end;
+      }
+    }
+    if (mergedStart !== null && mergedEnd !== null) downMs += mergedEnd - mergedStart;
+
+    const uptimePct = Math.max(0, 100 - (downMs / observedMs) * 100);
 
     result.push({
       date: dayStart.toISOString().slice(0, 10),
       status: worst,
-      uptimePct: Math.round(uptimePct * 100) / 100,
+      uptimePct,
+      observedMs,
     });
   }
 
   return result;
+}
+
+export function weightedUptime(buckets: DailyUptimeBucket[]): number | null {
+  const observedMs = buckets.reduce((total, bucket) => total + bucket.observedMs, 0);
+  if (!observedMs) return null;
+
+  const upMs = buckets.reduce(
+    (total, bucket) =>
+      total + (bucket.uptimePct === null ? 0 : (bucket.uptimePct / 100) * bucket.observedMs),
+    0
+  );
+  return Math.max(0, Math.min(100, (upMs / observedMs) * 100));
+}
+
+export function metricDecimals(value: number | null | undefined) {
+  if (typeof value !== "number" || !Number.isInteger(value) || value < 0 || value > 10) return 0;
+  return value;
+}
+
+export function formatMetricValue(value: number, decimals: number | null | undefined) {
+  return value.toFixed(metricDecimals(decimals));
 }

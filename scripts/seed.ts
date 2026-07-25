@@ -2,60 +2,14 @@ import bcrypt from "bcryptjs";
 import { ObjectId } from "mongodb";
 import { collections, mongoClient } from "@/lib/db";
 import { ensureIndexes } from "@/lib/ensure-indexes";
-
-const THIRD_PARTY_PROVIDERS = [
-  { name: "AWS", category: "Cloud Infrastructure" },
-  { name: "Google Cloud Platform", category: "Cloud Infrastructure" },
-  { name: "Microsoft Azure", category: "Cloud Infrastructure" },
-  { name: "Cloudflare", category: "CDN / Networking" },
-  { name: "Fastly", category: "CDN / Networking" },
-  { name: "Stripe", category: "Payments" },
-  { name: "PayPal", category: "Payments" },
-  { name: "Braintree", category: "Payments" },
-  { name: "Twilio", category: "Communications" },
-  { name: "SendGrid", category: "Email" },
-  { name: "Mailgun", category: "Email" },
-  { name: "Postmark", category: "Email" },
-  { name: "Auth0", category: "Identity" },
-  { name: "Okta", category: "Identity" },
-  { name: "GitHub", category: "Developer Tools" },
-  { name: "GitLab", category: "Developer Tools" },
-  { name: "npm", category: "Developer Tools" },
-  { name: "Docker Hub", category: "Developer Tools" },
-  { name: "MongoDB Atlas", category: "Database" },
-  { name: "PlanetScale", category: "Database" },
-  { name: "Redis Cloud", category: "Database" },
-  { name: "Elastic Cloud", category: "Search / Analytics" },
-  { name: "Algolia", category: "Search / Analytics" },
-  { name: "Segment", category: "Analytics" },
-  { name: "Datadog", category: "Monitoring" },
-  { name: "New Relic", category: "Monitoring" },
-  { name: "Pingdom", category: "Monitoring" },
-  { name: "PagerDuty", category: "Incident Response" },
-  { name: "Opsgenie", category: "Incident Response" },
-  { name: "Slack", category: "ChatOps" },
-  { name: "Microsoft Teams", category: "ChatOps" },
-  { name: "Zendesk", category: "Support / ITSM" },
-  { name: "Jira Service Management", category: "Support / ITSM" },
-  { name: "Intercom", category: "Support / ITSM" },
-  { name: "Akamai", category: "CDN / Networking" },
-  { name: "DigitalOcean", category: "Cloud Infrastructure" },
-  { name: "Heroku", category: "Cloud Infrastructure" },
-  { name: "Vercel", category: "Cloud Infrastructure" },
-  { name: "Netlify", category: "Cloud Infrastructure" },
-  { name: "Firebase", category: "Cloud Infrastructure" },
-  { name: "Shopify", category: "E-commerce" },
-  { name: "Zoom", category: "Communications" },
-  { name: "Twitter / X API", category: "Social" },
-  { name: "Google Maps Platform", category: "Location" },
-  { name: "Plaid", category: "Fintech" },
-  { name: "Recurly", category: "Billing" },
-  { name: "Chargebee", category: "Billing" },
-  { name: "LaunchDarkly", category: "Feature Flags" },
-  { name: "Sentry", category: "Monitoring" },
-  { name: "CircleCI", category: "CI/CD" },
-  { name: "Travis CI", category: "CI/CD" },
-];
+import { DEFAULT_MONITOR_TEMPLATES } from "@/lib/default-monitor-templates";
+import { canonicalizeEmail } from "@/lib/identity";
+import { generateApiKey, generateAutomationToken } from "@/lib/tokens";
+import {
+  assertDevelopmentSeedEnabled,
+  generateDevelopmentPassword,
+  printGeneratedSecrets,
+} from "@/scripts/dev-seed";
 
 function daysAgo(n: number) {
   const d = new Date();
@@ -74,55 +28,96 @@ async function upsertPage(slug: string, data: Record<string, unknown>) {
 }
 
 async function main() {
+  assertDevelopmentSeedEnabled("The Acme sample-data seed");
+
+  const adminPassword = generateDevelopmentPassword();
+  const responderPassword = generateDevelopmentPassword();
+  const privatePagePassword = generateDevelopmentPassword();
+  const customerAPassword = generateDevelopmentPassword();
+  const customerBPassword = generateDevelopmentPassword();
+  const developmentApiKey = generateApiKey();
+
   console.log("Ensuring indexes...");
   await ensureIndexes();
 
-  console.log("Seeding third-party provider catalog...");
-  await collections.thirdPartyProviders().deleteMany({});
-  await collections.thirdPartyProviders().insertMany(
-    THIRD_PARTY_PROVIDERS.map((p) => ({ _id: new ObjectId(), name: p.name, category: p.category, homepage: "" }))
-  );
+  console.log("Seeding monitor templates...");
+  for (const template of DEFAULT_MONITOR_TEMPLATES) {
+    await collections.monitorTemplates().updateOne(
+      { name: template.name },
+      { $setOnInsert: { _id: new ObjectId(), ...template } },
+      { upsert: true }
+    );
+  }
 
   console.log("Seeding organization + team...");
   await collections.organizations().updateOne(
     { slug: "acme" },
-    { $setOnInsert: { name: "Acme Corporation", slug: "acme", plan: "enterprise", createdAt: new Date() } },
+    {
+      $setOnInsert: {
+        name: "Acme Corporation",
+        slug: "acme",
+        contactEmail: "admin@acme.test",
+        suspended: false,
+        status: "ACTIVE",
+        statusReason: null,
+        statusChangedAt: new Date(),
+        statusChangedBy: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+    },
     { upsert: true }
   );
   const org = (await collections.organizations().findOne({ slug: "acme" }))!;
 
-  const passwordHash = await bcrypt.hash("password123", 10);
-  // Old 4-role seed accounts (OWNER/ADMIN/EDITOR/RESPONDER) collapsed to 2 under the 3-role model.
-  await collections.teamMembers().deleteMany({ orgId: org._id, email: { $in: ["admin2@acme.test", "responder@acme.test"] } });
-  await collections.teamMembers().updateOne(
-    { orgId: org._id, email: "admin@acme.test" },
-    {
-      $set: { role: "TENANT_ADMIN" },
-      $setOnInsert: { orgId: org._id, email: "admin@acme.test", passwordHash, name: "Ada Admin", twoFactorEnabled: false, createdAt: new Date() },
-    },
-    { upsert: true }
-  );
-  await collections.teamMembers().updateOne(
-    { orgId: org._id, email: "editor@acme.test" },
-    {
-      $set: { role: "TENANT_USER" },
-      $setOnInsert: { orgId: org._id, email: "editor@acme.test", passwordHash, name: "Eden Editor", twoFactorEnabled: false, createdAt: new Date() },
-    },
-    { upsert: true }
-  );
+  async function seedMember(
+    email: string,
+    name: string,
+    role: "OWNER" | "ADMIN" | "RESPONDER",
+    password: string
+  ) {
+    const canonicalEmail = canonicalizeEmail(email);
+    const passwordHash = await bcrypt.hash(password, 10);
+    await collections.users().updateOne(
+      { canonicalEmail },
+      {
+        $set: { email, canonicalEmail, name, passwordHash, twoFactorEnabled: false, disabled: false, updatedAt: new Date() },
+        $setOnInsert: { _id: new ObjectId(), createdAt: new Date() },
+      },
+      { upsert: true }
+    );
+    const user = (await collections.users().findOne({ canonicalEmail }))!;
+    await collections.memberships().updateOne(
+      { orgId: org._id, userId: user._id },
+      {
+        $set: { role, status: "ACTIVE", pageIds: null, invitationExpiresAt: null },
+        $setOnInsert: { _id: new ObjectId(), activatedAt: new Date(), createdAt: new Date() },
+      },
+      { upsert: true }
+    );
+  }
+  await seedMember("admin@acme.test", "Ada Admin", "OWNER", adminPassword);
+  await seedMember("editor@acme.test", "Eden Editor", "RESPONDER", responderPassword);
 
-  console.log("Seeding platform admin...");
-  await collections.platformAdmins().updateOne(
-    { email: "platform@statuspage.test" },
-    { $setOnInsert: { email: "platform@statuspage.test", passwordHash, name: "Priya Platform", createdAt: new Date() } },
-    { upsert: true }
-  );
-
-  await collections.apiKeys().updateOne(
-    { key: "sp_live_demo_1234567890abcdef1234567890ab" },
-    { $setOnInsert: { orgId: org._id, name: "Default API Key", key: "sp_live_demo_1234567890abcdef1234567890ab", createdAt: new Date(), lastUsedAt: null } },
-    { upsert: true }
-  );
+  console.log("Rotating the development sample API key...");
+  await collections.apiKeys().deleteMany({
+    orgId: org._id,
+    $or: [
+      { name: "Development sample API key" },
+      { name: "Default API Key", prefix: /^status_live_demo_/ },
+    ],
+  });
+  await collections.apiKeys().insertOne({
+    _id: new ObjectId(),
+    orgId: org._id,
+    name: "Development sample API key",
+    keyHash: developmentApiKey.hash,
+    prefix: developmentApiKey.prefix,
+    lastFour: developmentApiKey.lastFour,
+    createdAt: new Date(),
+    lastUsedAt: null,
+    revokedAt: null,
+  });
 
   console.log("Seeding hub page...");
   const hub = await upsertPage("acme", {
@@ -134,7 +129,7 @@ async function main() {
     timezone: "UTC",
     language: "en",
     headline: "Acme Status",
-    aboutText: "Real-time status and incident history for every Acme product.",
+    aboutText: "Illustrative status and incident history for Acme sample products.",
     logoUrl: null,
     faviconUrl: null,
     brandColor: "#0052CC",
@@ -188,6 +183,7 @@ async function main() {
   });
 
   console.log("Seeding private internal-tools page...");
+  const privatePagePasswordHash = await bcrypt.hash(privatePagePassword, 10);
   const internalPage = await upsertPage("internal-tools", {
     orgId: org._id,
     name: "Internal Tools",
@@ -203,10 +199,14 @@ async function main() {
     brandColor: "#5E35B1",
     supportUrl: null,
     customDomain: null,
-    passwordHash: await bcrypt.hash("internal123", 10),
+    passwordHash: privatePagePasswordHash,
     removeBranding: false,
     customCss: null,
   });
+  await collections.pages().updateOne(
+    { _id: internalPage._id },
+    { $set: { passwordHash: privatePagePasswordHash } }
+  );
 
   console.log("Seeding audience-specific enterprise page...");
   const audiencePage = await upsertPage("enterprise-customers", {
@@ -229,6 +229,43 @@ async function main() {
     customCss: null,
   });
 
+  // Development sample content is intentionally replaceable. Reset only the records managed by
+  // this seed so rerunning it repairs the sample without duplicating history or
+  // deleting administrator-created integrations and uploaded branding.
+  console.log("Resetting generated sample content...");
+  const samplePageIds = [apiPage._id, appPage._id, internalPage._id, audiencePage._id];
+  const [existingComponents, existingIncidents, existingMetrics] = await Promise.all([
+    collections.components().find({ pageId: { $in: samplePageIds } }, { projection: { _id: 1 } }).toArray(),
+    collections.incidents().find({ pageId: { $in: samplePageIds } }, { projection: { _id: 1 } }).toArray(),
+    collections.metrics().find({ pageId: { $in: samplePageIds } }, { projection: { _id: 1 } }).toArray(),
+  ]);
+  const existingComponentIds = existingComponents.map((component) => component._id);
+  const existingIncidentIds = existingIncidents.map((incident) => incident._id);
+  const existingMetricIds = existingMetrics.map((metric) => metric._id);
+  await Promise.all([
+    existingComponentIds.length
+      ? collections.componentStatusEvents().deleteMany({ componentId: { $in: existingComponentIds } })
+      : Promise.resolve(),
+    existingIncidentIds.length
+      ? collections.incidentUpdates().deleteMany({ incidentId: { $in: existingIncidentIds } })
+      : Promise.resolve(),
+    existingIncidentIds.length
+      ? collections.incidentComponents().deleteMany({ incidentId: { $in: existingIncidentIds } })
+      : Promise.resolve(),
+    existingMetricIds.length
+      ? collections.metricPoints().deleteMany({ metricId: { $in: existingMetricIds } })
+      : Promise.resolve(),
+    collections.components().deleteMany({ pageId: { $in: samplePageIds } }),
+    collections.componentGroups().deleteMany({ pageId: { $in: samplePageIds } }),
+    collections.incidents().deleteMany({ pageId: { $in: samplePageIds } }),
+    collections.incidentTemplates().deleteMany({ pageId: { $in: samplePageIds } }),
+    collections.templateGroups().deleteMany({ pageId: { $in: samplePageIds } }),
+    collections.metrics().deleteMany({ pageId: { $in: samplePageIds } }),
+    collections.subscribers().deleteMany({ pageId: { $in: samplePageIds } }),
+    collections.pageAccessUsers().deleteMany({ pageId: audiencePage._id }),
+    collections.pageAccessGroups().deleteMany({ pageId: audiencePage._id }),
+  ]);
+
   // ---- Components for API Platform ----
   async function createGroup(pageId: ObjectId, name: string, order: number) {
     const _id = new ObjectId();
@@ -245,6 +282,7 @@ async function main() {
     thirdPartyProvider?: string | null;
   }) {
     const _id = new ObjectId();
+    const automationToken = generateAutomationToken();
     await collections.components().insertOne({
       _id,
       pageId: data.pageId,
@@ -252,12 +290,15 @@ async function main() {
       name: data.name,
       description: "",
       status: data.status,
+      manualStatus: data.status,
       order: data.order,
       visible: true,
       showUptime: true,
       isThirdParty: data.isThirdParty ?? false,
       thirdPartyProvider: data.thirdPartyProvider ?? null,
-      automationToken: new ObjectId().toHexString(),
+      automationTokenHash: automationToken.hash,
+      automationTokenPrefix: automationToken.prefix,
+      automationTokenLastFour: automationToken.lastFour,
       createdAt: new Date(),
     });
     return _id;
@@ -308,7 +349,7 @@ async function main() {
     _id: new ObjectId(),
     pageId: audiencePage._id,
     email: "customerA@example.com",
-    passwordHash: await bcrypt.hash("demo123", 10),
+    passwordHash: await bcrypt.hash(customerAPassword, 10),
     groupId: groupA,
     componentIds: "[]",
     createdAt: new Date(),
@@ -317,7 +358,7 @@ async function main() {
     _id: new ObjectId(),
     pageId: audiencePage._id,
     email: "customerB@example.com",
-    passwordHash: await bcrypt.hash("demo123", 10),
+    passwordHash: await bcrypt.hash(customerBPassword, 10),
     groupId: groupB,
     componentIds: "[]",
     createdAt: new Date(),
@@ -374,6 +415,7 @@ async function main() {
       name: data.name,
       status: data.status,
       impact: data.impact,
+      pageWide: data.components.length === 0,
       isMaintenance: data.isMaintenance ?? false,
       maintenanceStatus: data.maintenanceStatus ?? null,
       scheduledStart: data.scheduledStart ?? null,
@@ -560,10 +602,15 @@ async function main() {
     { _id: new ObjectId(), pageId: appPage._id, channel: "EMAIL", contact: "pending@example.com", componentIds: "[]", verified: false, quarantined: false, unsubscribeToken: new ObjectId().toHexString(), createdAt: new Date() },
   ]);
 
-  console.log("Seed complete.");
-  console.log("Admin login: admin@acme.test / password123");
-  console.log("Private page password (internal-tools): internal123");
-  console.log("Audience page logins: customerA@example.com / demo123, customerB@example.com / demo123");
+  console.log("Development sample seed complete.");
+  printGeneratedSecrets("Acme development sample", [
+    { label: "Owner (admin@acme.test)", value: adminPassword },
+    { label: "Responder (editor@acme.test)", value: responderPassword },
+    { label: "Private page (/internal-tools)", value: privatePagePassword },
+    { label: "Audience user (customerA@example.com)", value: customerAPassword },
+    { label: "Audience user (customerB@example.com)", value: customerBPassword },
+    { label: "Management API key", value: developmentApiKey.token },
+  ]);
 }
 
 main()

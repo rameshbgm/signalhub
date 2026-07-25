@@ -1,6 +1,13 @@
 import bcrypt from "bcryptjs";
 import { ObjectId } from "mongodb";
 import { collections, mongoClient } from "@/lib/db";
+import { canonicalizeEmail } from "@/lib/identity";
+import { generateAutomationToken } from "@/lib/tokens";
+import {
+  assertDevelopmentSeedEnabled,
+  generateDevelopmentPassword,
+  printGeneratedSecrets,
+} from "@/scripts/dev-seed";
 
 function daysAgo(n: number, hour = 12) {
   const d = new Date();
@@ -11,33 +18,59 @@ function daysAgo(n: number, hour = 12) {
 }
 
 async function main() {
+  assertDevelopmentSeedEnabled("The Globex sample-data seed");
+  const ownerPassword = generateDevelopmentPassword();
+  const responderPassword = generateDevelopmentPassword();
+
   console.log("Seeding Globex organization + page...");
   await collections.organizations().updateOne(
     { slug: "globex" },
-    { $setOnInsert: { name: "Globex Corporation", slug: "globex", plan: "enterprise", createdAt: new Date() } },
+    {
+      $setOnInsert: {
+        name: "Globex Corporation",
+        slug: "globex",
+        contactEmail: "admin@globex.test",
+        suspended: false,
+        status: "ACTIVE",
+        statusReason: null,
+        statusChangedAt: new Date(),
+        statusChangedBy: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+    },
     { upsert: true }
   );
   const org = (await collections.organizations().findOne({ slug: "globex" }))!;
 
-  const passwordHash = await bcrypt.hash("password123", 10);
-  // Old 4-role seed accounts (OWNER/ADMIN/EDITOR/RESPONDER) collapsed to 2 under the 3-role model.
-  await collections.teamMembers().deleteMany({ orgId: org._id, email: { $in: ["admin2@globex.test", "responder@globex.test"] } });
-  await collections.teamMembers().updateOne(
-    { orgId: org._id, email: "admin@globex.test" },
-    {
-      $set: { role: "TENANT_ADMIN" },
-      $setOnInsert: { orgId: org._id, email: "admin@globex.test", passwordHash, name: "Hank Scorpio", twoFactorEnabled: false, createdAt: new Date() },
-    },
-    { upsert: true }
-  );
-  await collections.teamMembers().updateOne(
-    { orgId: org._id, email: "editor@globex.test" },
-    {
-      $set: { role: "TENANT_USER" },
-      $setOnInsert: { orgId: org._id, email: "editor@globex.test", passwordHash, name: "Edie Editor", twoFactorEnabled: false, createdAt: new Date() },
-    },
-    { upsert: true }
-  );
+  async function seedMember(
+    email: string,
+    name: string,
+    role: "OWNER" | "ADMIN" | "RESPONDER",
+    password: string
+  ) {
+    const canonicalEmail = canonicalizeEmail(email);
+    const passwordHash = await bcrypt.hash(password, 10);
+    await collections.users().updateOne(
+      { canonicalEmail },
+      {
+        $set: { email, canonicalEmail, name, passwordHash, twoFactorEnabled: false, disabled: false, updatedAt: new Date() },
+        $setOnInsert: { _id: new ObjectId(), createdAt: new Date() },
+      },
+      { upsert: true }
+    );
+    const user = (await collections.users().findOne({ canonicalEmail }))!;
+    await collections.memberships().updateOne(
+      { orgId: org._id, userId: user._id },
+      {
+        $set: { role, status: "ACTIVE", pageIds: null, invitationExpiresAt: null },
+        $setOnInsert: { _id: new ObjectId(), activatedAt: new Date(), createdAt: new Date() },
+      },
+      { upsert: true }
+    );
+  }
+  await seedMember("admin@globex.test", "Hank Scorpio", "OWNER", ownerPassword);
+  await seedMember("editor@globex.test", "Edie Editor", "RESPONDER", responderPassword);
 
   const existing = await collections.pages().findOne({ slug: "globex" });
   if (existing) {
@@ -68,11 +101,13 @@ async function main() {
     timezone: "UTC",
     language: "en",
     headline: "Globex Status",
-    aboutText: "Real-time status and incident history for the Globex platform.",
+    aboutText: "Illustrative status and incident history for the Globex sample platform.",
     logoUrl: null,
     faviconUrl: null,
     brandColor: "#7C3AED",
     supportUrl: "https://globex.test/support",
+    termsUrl: null,
+    privacyUrl: null,
     customDomain: null,
     passwordHash: null,
     removeBranding: false,
@@ -98,6 +133,7 @@ async function main() {
     thirdPartyProvider?: string | null;
   }) {
     const cid = new ObjectId();
+    const automationToken = generateAutomationToken();
     await collections.components().insertOne({
       _id: cid,
       pageId: page._id,
@@ -105,12 +141,15 @@ async function main() {
       name: data.name,
       description: "",
       status: data.status,
+      manualStatus: data.status,
       order: data.order,
       visible: true,
       showUptime: true,
       isThirdParty: data.isThirdParty ?? false,
       thirdPartyProvider: data.thirdPartyProvider ?? null,
-      automationToken: new ObjectId().toHexString(),
+      automationTokenHash: automationToken.hash,
+      automationTokenPrefix: automationToken.prefix,
+      automationTokenLastFour: automationToken.lastFour,
       createdAt: new Date(),
     });
     return cid;
@@ -171,6 +210,7 @@ async function main() {
       name: data.name,
       status: data.status,
       impact: data.impact,
+      pageWide: data.components.length === 0,
       isMaintenance: data.isMaintenance ?? false,
       maintenanceStatus: data.maintenanceStatus ?? null,
       scheduledStart: data.scheduledStart ?? null,
@@ -347,9 +387,12 @@ async function main() {
     { _id: new ObjectId(), pageId: page._id, channel: "SMS", contact: "+14155550199", componentIds: "[]", verified: true, quarantined: false, unsubscribeToken: new ObjectId().toHexString(), createdAt: new Date() },
   ]);
 
-  console.log("\nGlobex seed complete.");
+  console.log("\nGlobex development sample seed complete.");
   console.log("Public page: /globex");
-  console.log("Admin login: admin@globex.test / password123");
+  printGeneratedSecrets("Globex development sample", [
+    { label: "Owner (admin@globex.test)", value: ownerPassword },
+    { label: "Responder (editor@globex.test)", value: responderPassword },
+  ]);
 }
 
 main()

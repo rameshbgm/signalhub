@@ -8,6 +8,7 @@ import {
   type IncidentStatus,
   type MaintenanceStatus,
 } from "@/lib/status";
+import { formatPageDate, pageDateKey } from "@/lib/page-locale";
 
 export type IncidentUpdateRow = { id: string; status: string; body: string; createdAt: Date };
 export type IncidentRow = {
@@ -28,22 +29,43 @@ export type IncidentRow = {
   linkSlug?: string;
 };
 
-function fmt(d: Date) {
-  return new Date(d).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+function fmt(d: Date, locale: string, timeZone: string) {
+  return formatPageDate(d, {
+    language: locale,
+    timeZone,
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
 }
 
-export function IncidentCard({ incident, pageSlug, linkPermalink = true }: { incident: IncidentRow; pageSlug: string; linkPermalink?: boolean }) {
+export function IncidentCard({
+  incident,
+  pageSlug,
+  linkPermalink = true,
+  locale = "en",
+  timeZone = "UTC",
+}: {
+  incident: IncidentRow;
+  pageSlug: string;
+  linkPermalink?: boolean;
+  locale?: string;
+  timeZone?: string;
+}) {
+  const incidentBasePath = incident.linkSlug ? `/${incident.linkSlug}` : pageSlug ? `/${pageSlug}` : "";
   const impact = incident.impact as Impact;
+  const color = incident.isMaintenance ? "var(--blue)" : IMPACT_COLOR[impact];
   const label = incident.isMaintenance
     ? MAINTENANCE_STATUS_LABEL[(incident.maintenanceStatus as MaintenanceStatus) ?? "SCHEDULED"]
     : INCIDENT_STATUS_LABEL[incident.status as IncidentStatus];
 
   return (
-    <div className="border border-gray-200 rounded-xl p-5 bg-white shadow-sm">
-      <div className="flex items-start justify-between gap-3">
-        <h3 className="font-display font-semibold text-sm text-gray-900">
+    <div className="border border-[var(--line)] border-l-2 bg-[var(--surface)] p-5" style={{ borderLeftColor: color }}>
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <h3 className="font-mono font-semibold text-sm text-[var(--fg)]">
           {linkPermalink ? (
-            <Link href={`/${incident.linkSlug ?? pageSlug}/incidents/${incident.id}`} className="hover:underline underline-offset-2">
+            <Link href={`${incidentBasePath}/incidents/${incident.id}`} className="hover:underline underline-offset-2">
               {incident.name}
             </Link>
           ) : (
@@ -51,32 +73,35 @@ export function IncidentCard({ incident, pageSlug, linkPermalink = true }: { inc
           )}
         </h3>
         {!incident.isMaintenance && (
-          <span className="text-xs font-medium px-2.5 py-1 rounded-full text-white shrink-0" style={{ backgroundColor: IMPACT_COLOR[impact] }}>
+          <span
+            className="text-xs font-mono font-medium px-2.5 py-1 shrink-0 border"
+            style={{ color, borderColor: color, backgroundColor: "color-mix(in srgb, " + color + " 12%, transparent)" }}
+          >
             {IMPACT_LABEL[impact]}
           </span>
         )}
       </div>
       {incident.components.length > 0 && (
-        <p className="text-xs text-gray-400 mt-1.5">Affects: {incident.components.map((c) => c.component.name).join(", ")}</p>
+        <p className="text-xs text-[var(--fg-dim)] mt-1.5">Affects: {incident.components.map((c) => c.component.name).join(", ")}</p>
       )}
       {incident.isMaintenance && incident.scheduledStart && (
-        <p className="text-xs text-gray-500 mt-1.5">
-          Window: {fmt(incident.scheduledStart)} — {incident.scheduledEnd ? fmt(incident.scheduledEnd) : "TBD"}
+        <p className="text-xs font-mono text-[var(--fg-soft)] mt-1.5">
+          Window: {fmt(incident.scheduledStart, locale, timeZone)} — {incident.scheduledEnd ? fmt(incident.scheduledEnd, locale, timeZone) : "TBD"}
         </p>
       )}
-      <div className="mt-4 space-y-4 border-l-2 border-gray-100 pl-4">
+      <div className="mt-4 space-y-4 border-l-2 border-[var(--line)] pl-4">
         {incident.updates.map((u) => (
           <div key={u.id} className="text-sm">
-            <span className="font-medium text-gray-900">{incident.isMaintenance ? label : INCIDENT_STATUS_LABEL[u.status as IncidentStatus]}</span>
-            <span className="text-gray-400 text-xs ml-2">{fmt(u.createdAt)}</span>
-            <p className="text-gray-600 mt-1 whitespace-pre-wrap leading-relaxed">{u.body}</p>
+            <span className="font-medium text-[var(--fg)]">{incident.isMaintenance ? label : INCIDENT_STATUS_LABEL[u.status as IncidentStatus]}</span>
+            <span className="text-[var(--fg-dim)] font-mono text-xs ml-2">{fmt(u.createdAt, locale, timeZone)}</span>
+            <p className="text-[var(--fg-soft)] mt-1 whitespace-pre-wrap leading-relaxed">{u.body}</p>
           </div>
         ))}
       </div>
       {incident.postmortemPublishedAt && incident.postmortemBody && (
         <Link
-          href={`/${incident.linkSlug ?? pageSlug}/incidents/${incident.id}`}
-          className="inline-block mt-4 text-xs text-blue-600 underline underline-offset-2 hover:text-blue-700"
+          href={`${incidentBasePath}/incidents/${incident.id}`}
+          className="inline-block mt-4 text-xs text-[var(--cyan)] underline underline-offset-2 hover:opacity-80"
         >
           Read postmortem
         </Link>
@@ -85,17 +110,35 @@ export function IncidentCard({ incident, pageSlug, linkPermalink = true }: { inc
   );
 }
 
-export function PastIncidentsByDay({ incidents, pageSlug, days = 14 }: { incidents: IncidentRow[]; pageSlug: string; days?: number }) {
+export function PastIncidentsByDay({
+  incidents,
+  pageSlug,
+  days = 14,
+  locale = "en",
+  timeZone = "UTC",
+}: {
+  incidents: IncidentRow[];
+  pageSlug: string;
+  days?: number;
+  locale?: string;
+  timeZone?: string;
+}) {
   const buckets: { date: string; label: string; incidents: IncidentRow[] }[] = [];
   const now = new Date();
   for (let i = 0; i < days; i++) {
     const d = new Date(now);
     d.setDate(d.getDate() - i);
-    const key = d.toISOString().slice(0, 10);
+    const key = pageDateKey(d, timeZone);
     buckets.push({
       date: key,
-      label: d.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" }),
-      incidents: incidents.filter((inc) => new Date(inc.createdAt).toISOString().slice(0, 10) === key),
+      label: formatPageDate(d, {
+        language: locale,
+        timeZone,
+        weekday: "short",
+        month: "short",
+        day: "numeric",
+      }),
+      incidents: incidents.filter((inc) => pageDateKey(inc.createdAt, timeZone) === key),
     });
   }
 
@@ -103,13 +146,19 @@ export function PastIncidentsByDay({ incidents, pageSlug, days = 14 }: { inciden
     <div className="space-y-6">
       {buckets.map((b) => (
         <div key={b.date}>
-          <h4 className="text-sm font-semibold text-gray-500 mb-2.5">{b.label}</h4>
+          <h4 className="text-sm font-mono font-semibold text-[var(--fg-soft)] mb-2.5">{b.label}</h4>
           {b.incidents.length === 0 ? (
-            <p className="text-sm text-gray-400">No incidents reported.</p>
+            <p className="text-sm text-[var(--fg-dim)]">No incidents reported.</p>
           ) : (
             <div className="space-y-3">
               {b.incidents.map((inc) => (
-                <IncidentCard key={inc.id} incident={inc} pageSlug={pageSlug} />
+                <IncidentCard
+                  key={inc.id}
+                  incident={inc}
+                  pageSlug={pageSlug}
+                  locale={locale}
+                  timeZone={timeZone}
+                />
               ))}
             </div>
           )}

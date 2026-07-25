@@ -24,56 +24,217 @@ export const db = globalForMongo.mongoDb!;
 // change a field on any document without touching these; they exist purely
 // to make call sites easier to read and typo-check.
 
+export type OrganizationStatus = "PROVISIONING" | "ACTIVE" | "SUSPENDED" | "DELETING";
+
 export interface OrganizationDoc {
   _id: ObjectId;
   name: string;
   slug: string;
-  plan: string; // free, pro, enterprise
-  planRenewsAt?: Date | null;
-  billingEmail?: string | null;
-  suspended?: boolean; // platform-admin suspend, blocks tenant admin access without deleting
+  contactEmail?: string | null;
+  /** `suspended` is retained while older installations migrate to `status`. */
+  suspended?: boolean;
+  status?: OrganizationStatus;
+  statusReason?: string | null;
+  statusChangedAt?: Date | null;
+  statusChangedBy?: ObjectId | null;
+  /**
+   * Incremented by tenant mutations inside their MongoDB transaction.
+   * This is a write-conflict fence against lifecycle transitions and purge.
+   */
+  mutationRevision?: number;
   createdAt: Date;
+  updatedAt?: Date;
 }
 
 /** Spans all tenants — never scoped to an orgId. Separate identity space from TeamMemberDoc. */
+export type PlatformRole = "OWNER" | "OPERATOR" | "AUDITOR";
+export type PlatformAdminStatus = "ACTIVE" | "DISABLED";
+
 export interface PlatformAdminDoc {
   _id: ObjectId;
   email: string;
+  canonicalEmail?: string;
   passwordHash: string;
   name: string;
+  role?: PlatformRole;
+  status?: PlatformAdminStatus;
+  sessionVersion?: number;
+  totpSecretCiphertext?: string | null;
+  pendingTotpSecretCiphertext?: string | null;
+  recoveryCodeHashes?: string[];
+  mfaEnrolledAt?: Date | null;
+  lastLoginAt?: Date | null;
+  disabledAt?: Date | null;
+  disabledBy?: ObjectId | null;
   createdAt: Date;
+  updatedAt?: Date;
 }
 
-export interface InvoiceDoc {
+export interface UserDoc {
   _id: ObjectId;
-  orgId: ObjectId;
-  plan: string;
-  amountUsd: number;
-  status: string; // PAID, FAILED
-  periodStart: Date;
-  periodEnd: Date;
-  createdAt: Date;
-}
-
-export interface TeamMemberDoc {
-  _id: ObjectId;
-  orgId: ObjectId;
   email: string;
-  passwordHash: string;
+  canonicalEmail: string;
+  passwordHash: string | null;
   name: string;
-  role: string; // TENANT_ADMIN, TENANT_USER
   twoFactorEnabled: boolean;
+  oidcIssuer?: string | null;
+  oidcSubject?: string | null;
+  disabled?: boolean;
+  mustChangePassword?: boolean;
+  sessionVersion?: number;
+  mfaRequired?: boolean;
+  totpSecretCiphertext?: string | null;
+  pendingTotpSecretCiphertext?: string | null;
+  recoveryCodeHashes?: string[];
+  mfaEnrolledAt?: Date | null;
   createdAt: Date;
+  updatedAt: Date;
+}
+
+export type MembershipRole =
+  | "OWNER"
+  | "ADMIN"
+  | "INCIDENT_MANAGER"
+  | "RESPONDER"
+  | "VIEWER";
+
+export interface MembershipDoc {
+  _id: ObjectId;
+  orgId: ObjectId;
+  userId: ObjectId;
+  role: MembershipRole;
+  status?: "INVITED" | "ACTIVE" | "REVOKED";
+  pageIds?: ObjectId[] | null;
+  invitationExpiresAt?: Date | null;
+  invitationTokenHash?: string | null;
+  activatedAt?: Date | null;
+  createdAt: Date;
+}
+
+export interface SupportSessionDoc {
+  _id: ObjectId;
+  platformAdminId: ObjectId;
+  orgId: ObjectId;
+  reason: string;
+  mode?: "VIEW" | "OPERATE";
+  scopes?: string[];
+  tokenHash: string;
+  expiresAt: Date;
+  revokedAt: Date | null;
+  revokedBy?: ObjectId | null;
+  revokedReason?: string | null;
+  endedAt?: Date | null;
+  createdAt: Date;
+}
+
+export interface PlatformInviteDoc {
+  _id: ObjectId;
+  email: string;
+  canonicalEmail: string;
+  name: string;
+  role: PlatformRole;
+  tokenHash: string;
+  createdBy: ObjectId;
+  expiresAt: Date;
+  acceptedAt: Date | null;
+  revokedAt: Date | null;
+  createdAt: Date;
+}
+
+export interface PlatformAuditLogDoc {
+  _id: ObjectId;
+  actorId: ObjectId | null;
+  actorEmail: string;
+  actorRole: PlatformRole | "SYSTEM";
+  action: string;
+  targetType: string;
+  targetId: string;
+  organizationId?: ObjectId | null;
+  reason?: string | null;
+  metadata?: Record<string, unknown> | null;
+  previousHash?: string | null;
+  entryHash?: string | null;
+  chainSequence?: number | null;
+  createdAt: Date;
+}
+
+export type PlatformJobStatus =
+  | "QUEUED"
+  | "PROCESSING"
+  | "SUCCEEDED"
+  | "FAILED"
+  | "CANCELLED";
+
+export interface OrganizationPurgeScopeDoc {
+  pageIds: ObjectId[];
+  componentIds: ObjectId[];
+  incidentIds: ObjectId[];
+  metricIds: ObjectId[];
+  monitorIds: ObjectId[];
+}
+
+export interface PlatformJobDoc {
+  _id: ObjectId;
+  type: "PURGE_ORGANIZATION";
+  status: PlatformJobStatus;
+  organizationId: ObjectId;
+  organizationSlug: string;
+  organizationName: string;
+  requestedBy: ObjectId;
+  reason: string;
+  attempts: number;
+  maxAttempts: number;
+  nextAttemptAt: Date;
+  leaseOwner: string | null;
+  leaseExpiresAt: Date | null;
+  lastError: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+  startedAt: Date | null;
+  completedAt: Date | null;
+  /** Durable descendant keys allow an interrupted/legacy purge to resume even if roots disappeared. */
+  purgeScope?: OrganizationPurgeScopeDoc;
+}
+
+export interface OrganizationTombstoneDoc {
+  _id: ObjectId;
+  organizationId: ObjectId;
+  slug: string;
+  name: string;
+  requestedBy: ObjectId;
+  reason: string;
+  purgedAt: Date;
+  /** Retained for fixed-point repair of any abnormally late legacy writer. */
+  purgeScope?: OrganizationPurgeScopeDoc;
 }
 
 export interface ApiKeyDoc {
   _id: ObjectId;
   orgId: ObjectId;
   name: string;
-  key: string;
+  keyHash: string;
+  prefix: string;
+  lastFour: string;
   createdAt: Date;
   lastUsedAt: Date | null;
+  revokedAt: Date | null;
+  createdBy?: ObjectId | null;
+  scopes?: ApiKeyScope[];
+  pageIds?: ObjectId[] | null;
+  expiresAt?: Date | null;
+  allowedCidrs?: string[] | null;
+  legacyFullAccess?: boolean;
 }
+
+export type ApiKeyScope =
+  | "status.read"
+  | "components.read"
+  | "components.write"
+  | "incidents.read"
+  | "incidents.write"
+  | "metrics.read"
+  | "metrics.write"
+  | "analytics.read";
 
 export interface AuditLogDoc {
   _id: ObjectId;
@@ -81,7 +242,182 @@ export interface AuditLogDoc {
   actor: string;
   action: string;
   target: string;
+  metadata?: Record<string, unknown> | null;
+  supportSessionId?: ObjectId | null;
+  requestId?: string | null;
+  sourceIp?: string | null;
+  userAgent?: string | null;
+  outcome?: "SUCCESS" | "FAILURE";
+  previousHash?: string | null;
+  entryHash?: string | null;
+  chainSequence?: number | null;
   createdAt: Date;
+}
+
+export type IdentityConnectionType = "OIDC" | "SAML";
+export type IdentityConnectionAudience = "ORGANIZATION" | "PLATFORM";
+
+export interface IdentityRoleMapping {
+  group: string;
+  role: MembershipRole | PlatformRole;
+  pageIds?: ObjectId[] | null;
+}
+
+export interface IdentityConnectionDoc {
+  _id: ObjectId;
+  name: string;
+  slug: string;
+  type: IdentityConnectionType;
+  audience: IdentityConnectionAudience;
+  orgId: ObjectId | null;
+  enabled: boolean;
+  configCiphertext: string;
+  roleMappings: IdentityRoleMapping[];
+  defaultRole?: MembershipRole | PlatformRole | null;
+  acceptedAcrValues?: string[];
+  acceptedAmrValues?: string[];
+  allowJitProvisioning: boolean;
+  lastTestedAt: Date | null;
+  lastTestOk: boolean | null;
+  lastError: string | null;
+  createdBy: ObjectId;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface ExternalIdentityDoc {
+  _id: ObjectId;
+  connectionId: ObjectId;
+  userId?: ObjectId | null;
+  platformAdminId?: ObjectId | null;
+  subject: string;
+  canonicalEmail: string;
+  groups: string[];
+  version?: number;
+  lastLoginAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface AuthSessionDoc {
+  _id: ObjectId;
+  kind: "TENANT" | "PLATFORM";
+  tokenHash: string;
+  userId?: ObjectId | null;
+  membershipId?: ObjectId | null;
+  orgId?: ObjectId | null;
+  platformAdminId?: ObjectId | null;
+  sessionVersion: number;
+  authMethod: "PASSWORD" | "OIDC" | "SAML" | "SUPPORT";
+  mfaVerified: boolean;
+  ipAddress: string | null;
+  userAgent: string | null;
+  createdAt: Date;
+  lastSeenAt: Date;
+  idleExpiresAt: Date;
+  absoluteExpiresAt: Date;
+  revokedAt: Date | null;
+  revokedReason: string | null;
+}
+
+export interface ScimTokenDoc {
+  _id: ObjectId;
+  connectionId: ObjectId;
+  tokenHash: string;
+  prefix: string;
+  lastFour: string;
+  createdBy: ObjectId;
+  createdAt: Date;
+  lastUsedAt: Date | null;
+  expiresAt: Date | null;
+  revokedAt: Date | null;
+}
+
+export interface ScimGroupDoc {
+  _id: ObjectId;
+  connectionId: ObjectId;
+  externalId: string | null;
+  displayName: string;
+  memberExternalIds: string[];
+  version: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface SamlRequestDoc {
+  _id: string;
+  value: string;
+  createdAt: Date;
+  expiresAt: Date;
+}
+
+export interface RetentionPolicyDoc {
+  _id: ObjectId;
+  orgId: ObjectId | null;
+  monitorChecksDays: number;
+  analyticsDays: number;
+  notificationLogsDays: number;
+  resolvedIncidentsDays: number;
+  auditLogsDays: number;
+  createdAt: Date;
+  updatedAt: Date;
+  updatedBy: ObjectId;
+}
+
+export interface DataExportJobDoc {
+  _id: ObjectId;
+  orgId: ObjectId;
+  status: "QUEUED" | "PROCESSING" | "SUCCEEDED" | "FAILED";
+  requestedBy: ObjectId;
+  storageKey: string | null;
+  storageDriver?: "LOCAL" | "S3" | null;
+  checksum: string | null;
+  attempts: number;
+  leaseOwner: string | null;
+  leaseExpiresAt: Date | null;
+  lastError: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+  completedAt: Date | null;
+}
+
+export interface AuditChainStateDoc {
+  _id: string;
+  latestHash: string | null;
+  sequence: number;
+  retainedSequence?: number;
+  retainedPreviousHash?: string | null;
+  updatedAt: Date;
+}
+
+export interface AuditSinkDoc {
+  _id: ObjectId;
+  name: string;
+  orgId: ObjectId | null;
+  url: string;
+  secretCiphertext: string;
+  enabled: boolean;
+  createdBy: ObjectId;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface AuditDeliveryJobDoc {
+  _id: ObjectId;
+  sinkId: ObjectId;
+  deduplicationKey: string;
+  payload: Record<string, unknown>;
+  status: "PENDING" | "PROCESSING" | "SENT" | "DEAD_LETTER";
+  attempts: number;
+  maxAttempts: number;
+  nextAttemptAt: Date;
+  leaseOwner: string | null;
+  leaseExpiresAt: Date | null;
+  lastError: string | null;
+  responseStatus: number | null;
+  createdAt: Date;
+  updatedAt: Date;
+  sentAt: Date | null;
 }
 
 export interface PageDoc {
@@ -100,12 +436,18 @@ export interface PageDoc {
   faviconUrl: string | null;
   coverImageUrl: string | null;
   brandColor: string;
-  layout: string; // STANDARD, COVER
+  layout: string; // STANDARD, COVER, MINIMAL
   supportUrl: string | null;
+  termsUrl: string | null;
+  privacyUrl: string | null;
   customDomain: string | null;
   passwordHash: string | null;
   removeBranding: boolean;
   customCss: string | null;
+  themePreset?: string;
+  themeMode?: "SYSTEM" | "LIGHT" | "DARK";
+  allowThemeOverride?: boolean;
+  analyticsEnabled?: boolean;
   createdAt: Date;
 }
 
@@ -145,9 +487,12 @@ export interface ComponentDoc {
   order: number;
   visible: boolean;
   showUptime: boolean;
+  manualStatus: string;
   isThirdParty: boolean;
   thirdPartyProvider: string | null;
-  automationToken: string;
+  automationTokenHash: string;
+  automationTokenPrefix: string;
+  automationTokenLastFour: string;
   createdAt: Date;
 }
 
@@ -166,11 +511,14 @@ export interface IncidentDoc {
   name: string;
   status: string; // INVESTIGATING, IDENTIFIED, MONITORING, RESOLVED
   impact: string; // NONE, MINOR, MAJOR, CRITICAL
+  pageWide: boolean;
   isMaintenance: boolean;
   maintenanceStatus: string | null;
   scheduledStart: Date | null;
   scheduledEnd: Date | null;
   autoTransition: boolean;
+  reminderMinutesBefore?: number | null;
+  reminderSentAt?: Date | null;
   notifySubscribers: boolean;
   postmortemBody: string | null;
   postmortemPublishedAt: Date | null;
@@ -210,6 +558,11 @@ export interface IncidentTemplateDoc {
   defaultStatus: string;
   defaultImpact: string;
   defaultComponentIds: string;
+  kind?: "INCIDENT" | "UPDATE" | "RESOLUTION" | "MAINTENANCE" | "POSTMORTEM";
+  variables?: string[];
+  notifyByDefault?: boolean;
+  archivedAt?: Date | null;
+  updatedAt?: Date;
   createdAt: Date;
 }
 
@@ -219,6 +572,7 @@ export interface SubscriberDoc {
   channel: string; // EMAIL, SMS, WEBHOOK, SLACK
   contact: string;
   componentIds: string;
+  eventTypes?: string[];
   verified: boolean;
   quarantined: boolean;
   unsubscribeToken: string;
@@ -230,8 +584,9 @@ export interface SubscriptionOtpDoc {
   pageId: string;
   channel: string;
   contact: string;
-  code: string;
+  codeHash: string;
   componentIds: string;
+  attempts: number;
   expiresAt: Date;
   createdAt: Date;
 }
@@ -303,8 +658,65 @@ export interface MonitorDoc {
   lastError: string | null;
   consecutiveFails: number;
   consecutiveOks: number;
+  isDown: boolean;
   currentIncidentId: ObjectId | null;
+  leaseOwner: string | null;
+  leaseExpiresAt: Date | null;
+  runRequestedAt: Date | null;
   createdAt: Date;
+  tags?: string[];
+  groupName?: string | null;
+  heartbeatTokenHash?: string | null;
+  heartbeatGraceSec?: number | null;
+  lastHeartbeatAt?: Date | null;
+  dnsRecordType?: string | null;
+  dnsExpectedValue?: string | null;
+}
+
+export interface AssetDoc {
+  _id: ObjectId;
+  orgId: ObjectId;
+  pageId: ObjectId;
+  kind: "LOGO" | "FAVICON" | "COVER";
+  storageDriver: "LOCAL" | "S3";
+  storageKey: string;
+  publicUrl: string;
+  mimeType: string;
+  byteSize: number;
+  width: number | null;
+  height: number | null;
+  createdBy: ObjectId;
+  createdAt: Date;
+  deletedAt: Date | null;
+}
+
+export interface NotificationDestinationDoc {
+  _id: ObjectId;
+  pageId: ObjectId;
+  name: string;
+  channel: string;
+  configCiphertext: string;
+  active: boolean;
+  verifiedAt: Date | null;
+  lastTestedAt: Date | null;
+  lastTestOk: boolean | null;
+  lastError: string | null;
+  eventTypes: string[];
+  componentIds: ObjectId[] | null;
+  createdAt: Date;
+}
+
+export interface AnalyticsDailyDoc {
+  _id: string;
+  pageId: ObjectId;
+  date: string;
+  views: number;
+  incidentViews: number;
+  subscriptionStarts: number;
+  subscriptionCompletions: number;
+  referrers: Record<string, number>;
+  expiresAt: Date;
+  updatedAt: Date;
 }
 
 export interface MonitorCheckDoc {
@@ -321,8 +733,13 @@ export interface WebhookEndpointDoc {
   _id: ObjectId;
   pageId: ObjectId;
   url: string;
-  secret: string;
+  secretHash: string;
+  secretCiphertext: string;
+  secretPrefix: string;
+  secretLastFour: string;
   active: boolean;
+  verifiedAt: Date | null;
+  verificationTokenHash: string | null;
   createdAt: Date;
 }
 
@@ -334,14 +751,96 @@ export interface NotificationLogDoc {
   subject: string;
   body: string;
   status: string; // SENT, FAILED
+  responseStatus?: number | null;
+  error?: string | null;
+  attempt?: number;
   createdAt: Date;
 }
 
-export interface ThirdPartyProviderDoc {
+export type NotificationJobStatus =
+  | "PENDING"
+  | "PROCESSING"
+  | "SENT"
+  | "FAILED"
+  | "DEAD_LETTER"
+  | "BLOCKED";
+
+export interface NotificationJobDoc {
+  _id: ObjectId;
+  pageId: ObjectId;
+  subscriberId: ObjectId | null;
+  endpointId: ObjectId | null;
+  destinationId?: ObjectId | null;
+  channel: string;
+  contact: string;
+  subject: string;
+  body: string;
+  eventType: string;
+  payload: Record<string, unknown>;
+  deduplicationKey: string;
+  status: NotificationJobStatus;
+  attempts: number;
+  maxAttempts: number;
+  nextAttemptAt: Date;
+  leaseOwner: string | null;
+  leaseExpiresAt: Date | null;
+  responseStatus: number | null;
+  lastError: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+  sentAt: Date | null;
+}
+
+export interface WorkerHeartbeatDoc {
+  _id: ObjectId;
+  workerId: string;
+  startedAt: Date;
+  lastSeenAt: Date;
+  version: string;
+  status: "STARTING" | "READY" | "STOPPING";
+  lastLoopAt?: Date | null;
+  lastError?: string | null;
+}
+
+export interface MigrationDoc {
+  _id: string;
+  appliedAt: Date;
+  checksum: string;
+}
+
+export interface FeedTokenDoc {
+  _id: ObjectId;
+  pageId: ObjectId;
+  name: string;
+  tokenHash: string;
+  prefix: string;
+  lastFour: string;
+  componentIds: ObjectId[] | null;
+  createdBy: ObjectId;
+  createdAt: Date;
+  expiresAt: Date | null;
+  revokedAt: Date | null;
+  lastUsedAt: Date | null;
+}
+
+export interface RateLimitDoc {
+  _id: string;
+  count: number;
+  windowStartedAt: Date;
+  expiresAt: Date;
+}
+
+export interface MonitorTemplateDoc {
   _id: ObjectId;
   name: string;
   category: string;
-  homepage: string;
+  description: string;
+  type: string;
+  target: string;
+  port: number | null;
+  expectedStatusRange: string;
+  keywordMatch: string | null;
+  enabled: boolean;
 }
 
 // ---------- Collection getters ----------
@@ -349,7 +848,29 @@ export interface ThirdPartyProviderDoc {
 export const collections = {
   organizations: () => db.collection<OrganizationDoc>("organizations"),
   platformAdmins: () => db.collection<PlatformAdminDoc>("platformAdmins"),
-  teamMembers: () => db.collection<TeamMemberDoc>("teamMembers"),
+  platformInvites: () => db.collection<PlatformInviteDoc>("platformInvites"),
+  platformAuditLogs: () => db.collection<PlatformAuditLogDoc>("platformAuditLogs"),
+  platformJobs: () => db.collection<PlatformJobDoc>("platformJobs"),
+  organizationTombstones: () =>
+    db.collection<OrganizationTombstoneDoc>("organizationTombstones"),
+  users: () => db.collection<UserDoc>("users"),
+  memberships: () => db.collection<MembershipDoc>("memberships"),
+  supportSessions: () => db.collection<SupportSessionDoc>("supportSessions"),
+  authSessions: () => db.collection<AuthSessionDoc>("authSessions"),
+  identityConnections: () =>
+    db.collection<IdentityConnectionDoc>("identityConnections"),
+  externalIdentities: () =>
+    db.collection<ExternalIdentityDoc>("externalIdentities"),
+  scimTokens: () => db.collection<ScimTokenDoc>("scimTokens"),
+  scimGroups: () => db.collection<ScimGroupDoc>("scimGroups"),
+  samlRequests: () => db.collection<SamlRequestDoc>("samlRequests"),
+  retentionPolicies: () =>
+    db.collection<RetentionPolicyDoc>("retentionPolicies"),
+  dataExportJobs: () => db.collection<DataExportJobDoc>("dataExportJobs"),
+  auditChainStates: () => db.collection<AuditChainStateDoc>("auditChainStates"),
+  auditSinks: () => db.collection<AuditSinkDoc>("auditSinks"),
+  auditDeliveryJobs: () =>
+    db.collection<AuditDeliveryJobDoc>("auditDeliveryJobs"),
   apiKeys: () => db.collection<ApiKeyDoc>("apiKeys"),
   auditLogs: () => db.collection<AuditLogDoc>("auditLogs"),
   pages: () => db.collection<PageDoc>("pages"),
@@ -371,6 +892,14 @@ export const collections = {
   monitorChecks: () => db.collection<MonitorCheckDoc>("monitorChecks"),
   webhookEndpoints: () => db.collection<WebhookEndpointDoc>("webhookEndpoints"),
   notificationLogs: () => db.collection<NotificationLogDoc>("notificationLogs"),
-  invoices: () => db.collection<InvoiceDoc>("invoices"),
-  thirdPartyProviders: () => db.collection<ThirdPartyProviderDoc>("thirdPartyProviders"),
+  notificationJobs: () => db.collection<NotificationJobDoc>("notificationJobs"),
+  workerHeartbeats: () => db.collection<WorkerHeartbeatDoc>("workerHeartbeats"),
+  migrations: () => db.collection<MigrationDoc>("migrations"),
+  feedTokens: () => db.collection<FeedTokenDoc>("feedTokens"),
+  rateLimits: () => db.collection<RateLimitDoc>("rateLimits"),
+  monitorTemplates: () => db.collection<MonitorTemplateDoc>("monitorTemplates"),
+  assets: () => db.collection<AssetDoc>("assets"),
+  notificationDestinations: () =>
+    db.collection<NotificationDestinationDoc>("notificationDestinations"),
+  analyticsDaily: () => db.collection<AnalyticsDailyDoc>("analyticsDaily"),
 };

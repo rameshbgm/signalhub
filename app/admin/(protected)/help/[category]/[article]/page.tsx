@@ -18,28 +18,28 @@ export default async function HelpArticlePage({ params }: { params: Promise<{ ca
 
   return (
     <div className="max-w-3xl">
-      <nav className="text-xs text-gray-400 mb-4">
-        <Link href="/admin/help" className="hover:text-gray-700">
+      <nav className="mb-4 text-xs text-[var(--fg-dim)]">
+        <Link href="/admin/help" className="hover:text-[var(--fg)]">
           Help Center
         </Link>
         <span className="mx-1.5">/</span>
         <span>{category.label}</span>
       </nav>
 
-      <h1 className="text-2xl font-semibold">{article.title}</h1>
-      <p className="mt-2 text-sm text-gray-500">{article.summary}</p>
+      <h1 className="font-mono text-2xl font-semibold text-[var(--fg)]">{article.title}</h1>
+      <p className="mt-2 text-sm text-[var(--fg-soft)]">{article.summary}</p>
 
       <div className="mt-8 space-y-8">
         {article.body.map((section) => (
           <div key={section.heading}>
-            <h2 className="font-semibold text-base mb-2">{section.heading}</h2>
+            <h2 className="mb-2 font-mono text-base font-semibold text-[var(--fg)]">{section.heading}</h2>
             {section.paragraphs.map((p, i) => (
-              <p key={i} className="text-sm text-gray-600 leading-relaxed mb-2">
+              <p key={i} className="mb-2 text-sm leading-relaxed text-[var(--fg-soft)]">
                 {p}
               </p>
             ))}
             {section.list && (
-              <ul className="list-disc list-inside text-sm text-gray-600 space-y-1 mt-2">
+              <ul className="mt-2 list-inside list-disc space-y-1 text-sm text-[var(--fg-soft)]">
                 {section.list.map((item, i) => (
                   <li key={i}>{item}</li>
                 ))}
@@ -49,20 +49,20 @@ export default async function HelpArticlePage({ params }: { params: Promise<{ ca
         ))}
       </div>
 
-      <div className="flex items-center justify-between mt-12 pt-6 border-t text-sm">
+      <div className="mt-12 flex items-center justify-between border-t border-[var(--line)] pt-6 text-sm">
         {prev ? (
-          <Link href={`/admin/help/${category.slug}/${prev.slug}`} className="text-blue-600 hover:underline">
+          <Link href={`/admin/help/${category.slug}/${prev.slug}`} className="text-[var(--cyan)] hover:underline">
             ← {prev.title}
           </Link>
         ) : (
           <span />
         )}
         {next ? (
-          <Link href={`/admin/help/${category.slug}/${next.slug}`} className="text-blue-600 hover:underline">
+          <Link href={`/admin/help/${category.slug}/${next.slug}`} className="text-[var(--cyan)] hover:underline">
             {next.title} →
           </Link>
         ) : (
-          <Link href="/admin/help" className="text-blue-600 hover:underline">
+          <Link href="/admin/help" className="text-[var(--cyan)] hover:underline">
             Back to Help Center
           </Link>
         )}

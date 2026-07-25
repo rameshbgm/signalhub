@@ -1,19 +1,177 @@
+name: signalhub
+
+x-signalhub-environment: &signalhub-environment
+  DATABASE_URL: mongodb://mongo:27017/signalhub?replicaSet=rs0
+  SESSION_SECRET: ${SESSION_SECRET:?Set SESSION_SECRET in .env}
+  ENCRYPTION_KEY: ${ENCRYPTION_KEY:?Set ENCRYPTION_KEY in .env}
+  SESSION_SIGNING_KEYS: ${SESSION_SIGNING_KEYS:-}
+  SESSION_ACTIVE_KEY_ID: ${SESSION_ACTIVE_KEY_ID:-}
+  ENCRYPTION_KEYS: ${ENCRYPTION_KEYS:-}
+  ENCRYPTION_ACTIVE_KEY_ID: ${ENCRYPTION_ACTIVE_KEY_ID:-}
+  NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-http://localhost:3301}
+  NEXT_PUBLIC_APP_DOMAIN: ${NEXT_PUBLIC_APP_DOMAIN:-localhost}
+  ALLOW_PUBLIC_SIGNUP: ${ALLOW_PUBLIC_SIGNUP:-false}
+  TENANT_SESSION_IDLE_SECONDS: ${TENANT_SESSION_IDLE_SECONDS:-28800}
+  TENANT_SESSION_ABSOLUTE_SECONDS: ${TENANT_SESSION_ABSOLUTE_SECONDS:-604800}
+  PLATFORM_SESSION_IDLE_SECONDS: ${PLATFORM_SESSION_IDLE_SECONDS:-3600}
+  PLATFORM_SESSION_ABSOLUTE_SECONDS: ${PLATFORM_SESSION_ABSOLUTE_SECONDS:-43200}
+  ARGON2_MEMORY_KIB: ${ARGON2_MEMORY_KIB:-19456}
+  ARGON2_TIME_COST: ${ARGON2_TIME_COST:-2}
+  ARGON2_PARALLELISM: ${ARGON2_PARALLELISM:-1}
+  PASSWORD_MIN_LENGTH: ${PASSWORD_MIN_LENGTH:-14}
+  TRUST_PROXY_HEADERS: ${TRUST_PROXY_HEADERS:-false}
+  TRUSTED_PROXY_HOPS: ${TRUSTED_PROXY_HOPS:-1}
+  PLATFORM_ADMIN_ALLOWED_CIDRS: ${PLATFORM_ADMIN_ALLOWED_CIDRS:-}
+  METRICS_TOKEN: ${METRICS_TOKEN:-}
+  LOG_LEVEL: ${LOG_LEVEL:-info}
+  OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+  OTEL_EXPORTER_OTLP_HEADERS: ${OTEL_EXPORTER_OTLP_HEADERS:-}
+  MONITOR_ALLOW_PRIVATE_TARGETS: ${MONITOR_ALLOW_PRIVATE_TARGETS:-false}
+  MONITOR_ENABLE_ICMP: ${MONITOR_ENABLE_ICMP:-false}
+  MONITOR_MAX_RESPONSE_BYTES: ${MONITOR_MAX_RESPONSE_BYTES:-1048576}
+  REQUIRE_WORKER: ${REQUIRE_WORKER:-true}
+  SMTP_HOST: ${SMTP_HOST:-}
+  SMTP_PORT: ${SMTP_PORT:-587}
+  SMTP_SECURE: ${SMTP_SECURE:-false}
+  SMTP_USERNAME: ${SMTP_USERNAME:-}
+  SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+  SMTP_FROM: ${SMTP_FROM:-SignalHub <signalhub@localhost>}
+  TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID:-}
+  TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN:-}
+  TWILIO_FROM_NUMBER: ${TWILIO_FROM_NUMBER:-}
+  OIDC_ISSUER: ${OIDC_ISSUER:-}
+  OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-}
+  OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:-}
+  NEXT_PUBLIC_OIDC_ENABLED: ${NEXT_PUBLIC_OIDC_ENABLED:-false}
+  ASSET_STORAGE_DRIVER: ${ASSET_STORAGE_DRIVER:-local}
+  ASSET_LOCAL_DIR: ${ASSET_LOCAL_DIR:-/app/data/uploads}
+  S3_ENDPOINT: ${S3_ENDPOINT:-}
+  S3_REGION: ${S3_REGION:-us-east-1}
+  S3_BUCKET: ${S3_BUCKET:-}
+  S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-}
+  S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-}
+  S3_FORCE_PATH_STYLE: ${S3_FORCE_PATH_STYLE:-false}
+
 services:
   mongo:
-    image: mongo:latest
-    container_name: status-mongo
+    image: mongo:8.2
     restart: unless-stopped
-    command: ["--replSet", "rs0", "--bind_ip_all"]
+    command: ["mongod", "--replSet", "rs0", "--bind_ip_all"]
     ports:
-      - "27017:27017"
+      - "127.0.0.1:${MONGO_PORT:-27017}:27017"
     volumes:
       - mongo_data:/data/db
+    networks: [database]
     healthcheck:
-      test: mongosh --quiet --eval "try { rs.status().ok } catch (e) { rs.initiate({_id:'rs0',members:[{_id:0,host:'localhost:27017'}]}).ok }"
+      test:
+        [
+          "CMD-SHELL",
+          "mongosh --host 127.0.0.1 --quiet --eval \"try { quit(rs.status().ok ? 0 : 1) } catch (e) { rs.initiate({_id:'rs0',members:[{_id:0,host:'mongo:27017'}]}); quit(1) }\"",
+        ]
       interval: 5s
       timeout: 5s
-      retries: 10
+      retries: 30
       start_period: 5s
+
+  migrate:
+    build:
+      context: .
+      target: runtime
+    image: ${STATUS_IMAGE:-signalhub:local}
+    command: ["node", "dist-runtime/migrate.mjs"]
+    environment: *signalhub-environment
+    depends_on:
+      mongo:
+        condition: service_healthy
+    restart: "no"
+    networks: [database]
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: ["ALL"]
+
+  worker:
+    image: ${STATUS_IMAGE:-signalhub:local}
+    # The migration service is the single image builder. Avoid a registry pull
+    # for this deliberately local default tag before that build completes.
+    pull_policy: never
+    command: ["node", "dist-runtime/worker.mjs"]
+    environment:
+      <<: *signalhub-environment
+      WORKER_HEALTH_PORT: 8081
+      WORKER_POLL_INTERVAL_MS: ${WORKER_POLL_INTERVAL_MS:-1000}
+      WORKER_MONITOR_CONCURRENCY: ${WORKER_MONITOR_CONCURRENCY:-20}
+      WORKER_NOTIFICATION_BATCH: ${WORKER_NOTIFICATION_BATCH:-25}
+    depends_on:
+      mongo:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:8081/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    volumes:
+      - asset_data:/app/data/uploads
+    networks: [database, egress]
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: ["ALL"]
+    stop_grace_period: 30s
+
+  web:
+    image: ${STATUS_IMAGE:-signalhub:local}
+    pull_policy: never
+    command: ["node", "server.js"]
+    environment: *signalhub-environment
+    ports:
+      - "127.0.0.1:${STATUS_PORT:-3301}:3000"
+    depends_on:
+      mongo:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+      worker:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/api/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    volumes:
+      - asset_data:/app/data/uploads
+    networks: [database, egress]
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: ["ALL"]
+    stop_grace_period: 30s
+
+  mailpit:
+    image: axllent/mailpit:v1.27
+    profiles: ["dev-mail"]
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${MAILPIT_SMTP_PORT:-1025}:1025"
+      - "127.0.0.1:${MAILPIT_UI_PORT:-8025}:8025"
 
 volumes:
   mongo_data:
+  asset_data:
+
+networks:
+  database:
+    internal: true
+  egress: {}

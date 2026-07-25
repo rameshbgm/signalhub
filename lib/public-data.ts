@@ -1,6 +1,6 @@
 import type { ObjectId } from "mongodb";
 import { collections } from "@/lib/db";
-import { oid, toId } from "@/lib/mongo-utils";
+import { isValidOid, oid, toId } from "@/lib/mongo-utils";
 import { overallBanner, type ComponentStatus } from "@/lib/status";
 
 export async function getPageBySlug(slug: string) {
@@ -23,7 +23,8 @@ export async function getPageBySlug(slug: string) {
 
 export async function getComponentsForPage(pageId: string, visibleIds: string[] | null) {
   const pid = oid(pageId);
-  const idFilter = visibleIds ? { _id: { $in: visibleIds.map(oid) } } : {};
+  const safeVisibleIds = visibleIds?.filter(isValidOid) ?? null;
+  const idFilter = safeVisibleIds ? { _id: { $in: safeVisibleIds.map(oid) } } : {};
 
   const [groupDocs, allVisibleDocs] = await Promise.all([
     collections.componentGroups().find({ pageId: pid }).sort({ order: 1 }).toArray(),
@@ -63,15 +64,18 @@ export async function getComponentsForPage(pageId: string, visibleIds: string[] 
 
 export async function getIncidentsForPage(pageId: string, componentIds?: string[] | null) {
   const pid = oid(pageId);
+  const scopedIds = componentIds?.filter(isValidOid) ?? componentIds;
 
-  let incidentIdFilter: { _id: { $in: ObjectId[] } } | Record<string, never> = {};
-  if (componentIds) {
+  let incidentIdFilter:
+    | { $or: ({ pageWide: true } | { _id: { $in: ObjectId[] } })[] }
+    | Record<string, never> = {};
+  if (scopedIds) {
     const links = await collections
       .incidentComponents()
-      .find({ componentId: { $in: componentIds.map(oid) } })
+      .find({ componentId: { $in: scopedIds.map(oid) } })
       .toArray();
     const incidentIds = Array.from(new Set(links.map((l) => l.incidentId.toHexString()))).map(oid);
-    incidentIdFilter = { _id: { $in: incidentIds } };
+    incidentIdFilter = { $or: [{ pageWide: true }, { _id: { $in: incidentIds } }] };
   }
 
   const incidentDocs = await collections
@@ -90,9 +94,14 @@ export async function getIncidentsForPage(pageId: string, componentIds?: string[
       : Promise.resolve([]),
   ]);
 
-  const linkedComponentIds = Array.from(new Set(linkDocs.map((l) => l.componentId.toHexString()))).map(oid);
+  const visibleLinkDocs = scopedIds
+    ? linkDocs.filter((link) => scopedIds.includes(link.componentId.toHexString()))
+    : linkDocs;
+  const linkedComponentIds = Array.from(
+    new Set(visibleLinkDocs.map((l) => l.componentId.toHexString()))
+  ).map(oid);
   const componentDocs = linkedComponentIds.length
-    ? await collections.components().find({ _id: { $in: linkedComponentIds } }).toArray()
+    ? await collections.components().find({ _id: { $in: linkedComponentIds }, pageId: pid }).toArray()
     : [];
   const componentById = new Map(componentDocs.map((c) => [c._id.toHexString(), toId(c)]));
 
@@ -103,7 +112,7 @@ export async function getIncidentsForPage(pageId: string, componentIds?: string[
     updatesByIncident.get(key)!.push(u);
   }
   const linksByIncident = new Map<string, typeof linkDocs>();
-  for (const l of linkDocs) {
+  for (const l of visibleLinkDocs) {
     const key = l.incidentId.toHexString();
     if (!linksByIncident.has(key)) linksByIncident.set(key, []);
     linksByIncident.get(key)!.push(l);
@@ -121,11 +130,75 @@ export async function getIncidentsForPage(pageId: string, componentIds?: string[
   return incidents;
 }
 
+export async function isIncidentVisibleToScope(
+  incidentId: string,
+  pageId: string,
+  visibleComponentIds: string[] | null
+) {
+  const incident = await collections.incidents().findOne({
+    _id: oid(incidentId),
+    pageId: oid(pageId),
+  });
+  if (!incident) return false;
+  if (visibleComponentIds === null || incident.pageWide) return true;
+  if (!visibleComponentIds.length) return false;
+  return Boolean(
+    await collections.incidentComponents().findOne({
+      incidentId: incident._id,
+      componentId: { $in: visibleComponentIds.filter(isValidOid).map(oid) },
+    })
+  );
+}
+
+export async function getMetricsForPage(
+  pageId: string,
+  visibleComponentIds: string[] | null,
+  pointLimit = 200
+) {
+  const pid = oid(pageId);
+  const scope =
+    visibleComponentIds === null
+      ? {}
+      : {
+          // Audience access is strictly component-scoped.  Unlike incidents,
+          // metrics do not have an explicit page-wide flag, so a metric with no
+          // component must never be implicitly exposed to an audience viewer.
+          componentId: {
+            $in: visibleComponentIds.filter(isValidOid).map(oid),
+          },
+        };
+  const metricDocs = await collections
+    .metrics()
+    .find({ pageId: pid, visible: true, ...scope })
+    .toArray();
+  const pointsByMetric = await Promise.all(
+    metricDocs.map(async (metric) => {
+      const newestFirst = await collections
+        .metricPoints()
+        .find({ metricId: metric._id })
+        .sort({ timestamp: -1 })
+        .limit(pointLimit)
+        .toArray();
+      return newestFirst.reverse();
+    })
+  );
+  return metricDocs.map((metric, index) => ({
+    ...toId(metric),
+    points: pointsByMetric[index].map(toId),
+  }));
+}
+
 export function splitActiveAndPast(incidents: Awaited<ReturnType<typeof getIncidentsForPage>>) {
   const active = incidents.filter((i) => {
-    if (i.isMaintenance) return i.maintenanceStatus !== "COMPLETED";
+    if (i.isMaintenance) {
+      return i.maintenanceStatus === "IN_PROGRESS" || i.maintenanceStatus === "VERIFYING";
+    }
     return i.status !== "RESOLVED";
   });
-  const past = incidents.filter((i) => !active.includes(i));
+  const past = incidents.filter(
+    (incident) =>
+      !active.includes(incident) &&
+      (!incident.isMaintenance || incident.maintenanceStatus === "COMPLETED")
+  );
   return { active, past };
 }

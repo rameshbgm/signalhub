@@ -9,11 +9,11 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        operational: "#0a9d58",
-        degraded: "#f4c20d",
-        partial: "#e8710a",
-        major: "#d93025",
-        maintenance: "#2f80ed",
+        operational: "#16a34a",
+        degraded: "#eab308",
+        partial: "#f97316",
+        major: "#dc2626",
+        maintenance: "#3b82f6",
       },
     },
   },

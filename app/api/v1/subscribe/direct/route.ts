@@ -1,38 +1,13 @@
-import { NextRequest, NextResponse } from "next/server";
-import { ObjectId } from "mongodb";
-import { collections } from "@/lib/db";
-import { z } from "zod";
+import { NextResponse } from "next/server";
 
-const schema = z.object({
-  pageSlug: z.string(),
-  channel: z.enum(["WEBHOOK", "SLACK"]),
-  contact: z.string().url(),
-});
-
-export async function POST(req: NextRequest) {
-  const parsed = schema.safeParse(await req.json().catch(() => ({})));
-  if (!parsed.success) return NextResponse.json({ error: "Invalid request" }, { status: 400 });
-  const { pageSlug, channel, contact } = parsed.data;
-
-  const page = await collections.pages().findOne({ slug: pageSlug });
-  if (!page) return NextResponse.json({ error: "Page not found" }, { status: 404 });
-
-  await collections.subscribers().updateOne(
-    { pageId: page._id, channel, contact },
+export async function POST() {
+  return NextResponse.json(
     {
-      $set: { verified: true, quarantined: false },
-      $setOnInsert: {
-        _id: new ObjectId(),
-        pageId: page._id,
-        channel,
-        contact,
-        componentIds: "[]",
-        unsubscribeToken: new ObjectId().toHexString(),
-        createdAt: new Date(),
+      error: {
+        code: "ADMIN_CONFIGURATION_REQUIRED",
+        message: "Webhook, Slack, and Teams destinations must be configured by an organization administrator",
       },
     },
-    { upsert: true }
+    { status: 410 }
   );
-
-  return NextResponse.json({ ok: true });
 }

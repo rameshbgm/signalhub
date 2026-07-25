@@ -1,83 +1,93 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
-const DEMO_ACCOUNTS = [
-  {
-    label: "Platform Admin",
-    sub: "Spans all organizations",
-    email: "platform@statuspage.test",
-    password: "password123",
-    endpoint: "/api/auth/platform-login",
-    redirectTo: "/platform/orgs",
-    hue: "bg-gray-900",
-  },
-  {
-    label: "Tenant Admin",
-    sub: "Acme · full tenant control",
-    email: "admin@acme.test",
-    password: "password123",
-    endpoint: "/api/auth/login",
-    redirectTo: "/admin",
-    hue: "bg-[var(--up)]",
-  },
-  {
-    label: "Tenant User",
-    sub: "Acme · day-to-day incidents",
-    email: "editor@acme.test",
-    password: "password123",
-    endpoint: "/api/auth/login",
-    redirectTo: "/admin",
-    hue: "bg-blue-500",
-  },
-];
+type QuickAccount = {
+  key: string;
+  audience: "tenant" | "platform";
+  email: string;
+  name: string;
+  role: string;
+  description: string;
+};
 
-export function QuickLogin() {
+export function QuickLogin({ audience }: { audience: QuickAccount["audience"] }) {
   const router = useRouter();
+  const [accounts, setAccounts] = useState<QuickAccount[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  async function quick(account: (typeof DEMO_ACCOUNTS)[number]) {
-    setBusy(account.email);
+  useEffect(() => {
+    fetch("/api/auth/dev-login", { cache: "no-store" })
+      .then((response) => response.ok ? response.json() : { accounts: [] })
+      .then((body) => {
+        setAccounts(
+          Array.isArray(body.accounts)
+            ? body.accounts.filter((account: QuickAccount) => account.audience === audience)
+            : []
+        );
+      })
+      .catch(() => setAccounts([]));
+  }, [audience]);
+
+  if (!accounts.length) return null;
+
+  async function login(account: QuickAccount) {
+    setBusy(account.key);
     setError(null);
-    const res = await fetch(account.endpoint, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ email: account.email, password: account.password }),
-    });
-    if (res.ok) {
-      router.push(account.redirectTo);
+    try {
+      const response = await fetch("/api/auth/dev-login", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ key: account.key }),
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        setError(body.error ?? "Quick login is unavailable");
+        return;
+      }
+      router.push(body.redirectTo ?? (audience === "platform" ? "/platform" : "/admin"));
       router.refresh();
-    } else {
+    } catch {
+      setError("Unable to reach the development login endpoint");
+    } finally {
       setBusy(null);
-      setError("Demo account unavailable — run npm run db:seed");
     }
   }
 
   return (
-    <div className="space-y-2">
-      <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-gray-400">One-click demo access</p>
-      <div className="grid grid-cols-1 gap-2">
-        {DEMO_ACCOUNTS.map((a) => (
+    <section className="mt-5 border border-[var(--cyan)]/30 bg-[var(--surface)] p-3">
+      <div className="flex items-center justify-between gap-3">
+        <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--cyan)]">
+          Development quick login
+        </p>
+        <span className="text-[9px] uppercase tracking-wider text-[var(--fg-dim)]">Local only</span>
+      </div>
+      <div className="mt-2 grid gap-2">
+        {accounts.map((account) => (
           <button
-            key={a.email}
+            key={account.key}
             type="button"
-            onClick={() => quick(a)}
+            onClick={() => login(account)}
             disabled={busy !== null}
-            className="group flex items-center gap-2.5 rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-left transition-all hover:border-gray-900 hover:shadow-sm disabled:opacity-50"
+            className="flex items-center justify-between gap-3 border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-left hover:border-[var(--cyan)] disabled:opacity-50"
           >
-            <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${a.hue} font-mono text-[11px] font-semibold text-white`}>
-              {a.label[0]}
-            </span>
             <span className="min-w-0">
-              <span className="block text-xs font-semibold leading-tight">{busy === a.email ? "Signing in…" : a.label}</span>
-              <span className="block truncate text-[10px] text-gray-400">{a.sub}</span>
+              <span className="block text-xs font-semibold text-[var(--fg)]">
+                {busy === account.key ? "Signing in…" : account.name}
+              </span>
+              <span className="block truncate text-[10px] text-[var(--fg-dim)]">
+                {account.description}
+              </span>
+            </span>
+            <span className="shrink-0 font-mono text-[10px] font-semibold text-[var(--cyan)]">
+              {account.role.replaceAll("_", " ")}
             </span>
           </button>
         ))}
       </div>
-      {error && <p className="text-xs text-red-600">{error}</p>}
-    </div>
+      {error && <p role="alert" className="mt-2 text-xs text-[var(--red)]">{error}</p>}
+    </section>
   );
 }

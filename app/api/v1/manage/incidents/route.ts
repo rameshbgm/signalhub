@@ -1,150 +1,69 @@
 import { NextRequest, NextResponse } from "next/server";
-import { ObjectId } from "mongodb";
+import { apiKeyAllowsPage, authenticateApiKey } from "@/lib/api-auth";
+import { apiError, routeError, validationError } from "@/lib/api-response";
 import { collections } from "@/lib/db";
+import { createIncident, createIncidentInputSchema } from "@/lib/domain/incidents";
 import { oid, toId } from "@/lib/mongo-utils";
-import { authenticateApiKey } from "@/lib/api-auth";
-import { dispatchNotifications } from "@/lib/notify";
-import { z } from "zod";
 
-const schema = z.object({
-  pageId: z.string(),
-  name: z.string().min(1),
-  status: z.enum(["INVESTIGATING", "IDENTIFIED", "MONITORING", "RESOLVED"]).default("INVESTIGATING"),
-  impact: z.enum(["NONE", "MINOR", "MAJOR", "CRITICAL"]).default("MINOR"),
-  body: z.string().default(""),
-  notify: z.boolean().default(true),
-  components: z.array(z.object({ componentId: z.string(), status: z.string() })).default([]),
-});
-
-export async function GET(req: NextRequest) {
-  const apiKey = await authenticateApiKey(req);
-  if (!apiKey) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-  const pageId = req.nextUrl.searchParams.get("pageId");
-  const pages = await collections
-    .pages()
-    .find({ orgId: oid(apiKey.orgId), ...(pageId ? { _id: oid(pageId) } : {}) })
-    .toArray();
-  const incidentDocs = await collections
-    .incidents()
-    .find({ pageId: { $in: pages.map((p) => p._id) } })
-    .sort({ createdAt: -1 })
-    .limit(100)
-    .toArray();
-  const incidentIds = incidentDocs.map((i) => i._id);
-  const [updateDocs, linkDocs] = await Promise.all([
-    incidentIds.length ? collections.incidentUpdates().find({ incidentId: { $in: incidentIds } }).toArray() : Promise.resolve([]),
-    incidentIds.length ? collections.incidentComponents().find({ incidentId: { $in: incidentIds } }).toArray() : Promise.resolve([]),
-  ]);
-  const updatesByIncident = new Map<string, typeof updateDocs>();
-  for (const u of updateDocs) {
-    const key = u.incidentId.toHexString();
-    if (!updatesByIncident.has(key)) updatesByIncident.set(key, []);
-    updatesByIncident.get(key)!.push(u);
+export async function GET(request: NextRequest) {
+  try {
+    const apiKey = await authenticateApiKey(request, "incidents.read");
+    if (!apiKey) return apiError(401, "UNAUTHENTICATED", "A valid API key is required");
+    const pageId = request.nextUrl.searchParams.get("pageId");
+    const pages = await collections
+      .pages()
+      .find({
+        orgId: oid(apiKey.orgId),
+        ...(pageId ? { _id: oid(pageId) } : {}),
+        ...(apiKey.pageIds?.length ? { _id: { $in: apiKey.pageIds } } : {}),
+      })
+      .toArray();
+    if (pageId && !pages.length) return apiError(404, "PAGE_NOT_FOUND", "Page not found");
+    const incidentDocs = await collections
+      .incidents()
+      .find({ pageId: { $in: pages.map((page) => page._id) } })
+      .sort({ createdAt: -1 })
+      .limit(100)
+      .toArray();
+    const incidentIds = incidentDocs.map((incident) => incident._id);
+    const [updates, links] = await Promise.all([
+      incidentIds.length
+        ? collections.incidentUpdates().find({ incidentId: { $in: incidentIds } }).sort({ createdAt: 1 }).toArray()
+        : Promise.resolve([]),
+      incidentIds.length
+        ? collections.incidentComponents().find({ incidentId: { $in: incidentIds } }).toArray()
+        : Promise.resolve([]),
+    ]);
+    return NextResponse.json({
+      incidents: incidentDocs.map((incident) => ({
+        ...toId(incident),
+        updates: updates.filter((update) => update.incidentId.equals(incident._id)).map(toId),
+        components: links.filter((link) => link.incidentId.equals(incident._id)).map(toId),
+      })),
+    });
+  } catch (error) {
+    return routeError(error);
   }
-  const linksByIncident = new Map<string, typeof linkDocs>();
-  for (const l of linkDocs) {
-    const key = l.incidentId.toHexString();
-    if (!linksByIncident.has(key)) linksByIncident.set(key, []);
-    linksByIncident.get(key)!.push(l);
-  }
-  const incidents = incidentDocs.map((inc) => ({
-    ...toId(inc),
-    updates: (updatesByIncident.get(inc._id.toHexString()) ?? []).map(toId),
-    components: (linksByIncident.get(inc._id.toHexString()) ?? []).map(toId),
-  }));
-
-  return NextResponse.json({ incidents });
 }
 
-export async function POST(req: NextRequest) {
-  const apiKey = await authenticateApiKey(req);
-  if (!apiKey) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-  const parsed = schema.safeParse(await req.json().catch(() => ({})));
-  if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
-  const { pageId, name, status, impact, body, notify, components } = parsed.data;
-
-  const pageDoc = await collections.pages().findOne({ _id: oid(pageId) });
-  if (!pageDoc || pageDoc.orgId.toHexString() !== apiKey.orgId) return NextResponse.json({ error: "Page not found" }, { status: 404 });
-
-  // Authorize every referenced component: it must belong to this page (and thus
-  // this org). Without this a valid API key could flip components on any other
-  // tenant's page by passing their component ids — cross-tenant IDOR write.
-  if (components.length) {
-    const componentDocs = await collections
-      .components()
-      .find({ _id: { $in: components.map((c) => oid(c.componentId)) }, pageId: pageDoc._id })
-      .toArray();
-    if (componentDocs.length !== new Set(components.map((c) => c.componentId)).size) {
-      return NextResponse.json({ error: "One or more components do not belong to this page" }, { status: 400 });
+export async function POST(request: NextRequest) {
+  try {
+    const apiKey = await authenticateApiKey(request, "incidents.write");
+    if (!apiKey) return apiError(401, "UNAUTHENTICATED", "A valid API key is required");
+    const parsed = createIncidentInputSchema.safeParse(await request.json().catch(() => ({})));
+    if (!parsed.success) return validationError(parsed.error);
+    if (!apiKeyAllowsPage(apiKey, parsed.data.pageId)) {
+      return apiError(404, "PAGE_NOT_FOUND", "Page not found");
     }
+    const incident = await createIncident(apiKey.orgId, parsed.data);
+    return NextResponse.json({ incident }, { status: 201 });
+  } catch (error) {
+    if (error instanceof Error && error.message.includes("Page not found")) {
+      return apiError(404, "PAGE_NOT_FOUND", "Page not found");
+    }
+    if (error instanceof Error && error.message.includes("components")) {
+      return apiError(400, "INVALID_COMPONENT_SCOPE", error.message);
+    }
+    return routeError(error);
   }
-
-  const incidentId = new ObjectId();
-  await collections.incidents().insertOne({
-    _id: incidentId,
-    pageId: oid(pageId),
-    name,
-    status,
-    impact,
-    isMaintenance: false,
-    maintenanceStatus: null,
-    scheduledStart: null,
-    scheduledEnd: null,
-    autoTransition: false,
-    notifySubscribers: notify,
-    postmortemBody: null,
-    postmortemPublishedAt: null,
-    createdAt: new Date(),
-    resolvedAt: status === "RESOLVED" ? new Date() : null,
-    backfilled: false,
-  });
-  const linkDocs = components.map((c) => ({
-    _id: new ObjectId(),
-    incidentId,
-    componentId: oid(c.componentId),
-    newStatus: c.status,
-  }));
-  if (linkDocs.length) await collections.incidentComponents().insertMany(linkDocs);
-  await collections.incidentUpdates().insertOne({
-    _id: new ObjectId(),
-    incidentId,
-    status,
-    body: body || `Incident created: ${name}`,
-    createdAt: new Date(),
-    notified: notify,
-  });
-
-  for (const c of components) {
-    await collections.componentStatusEvents().updateMany(
-      { componentId: oid(c.componentId), endedAt: null },
-      { $set: { endedAt: new Date() } }
-    );
-    await collections.componentStatusEvents().insertOne({
-      _id: new ObjectId(),
-      componentId: oid(c.componentId),
-      status: c.status,
-      startedAt: new Date(),
-      endedAt: null,
-      isMaintenance: false,
-    });
-    await collections.components().updateOne({ _id: oid(c.componentId) }, { $set: { status: c.status } });
-  }
-
-  if (notify) {
-    await dispatchNotifications({
-      pageId,
-      subject: `[Incident] ${name}`,
-      body: body || `A new incident has been created: ${name}`,
-      eventType: "incident.created",
-      componentIds: components.map((c) => c.componentId),
-    });
-  }
-
-  const incidentDoc = await collections.incidents().findOne({ _id: incidentId });
-  return NextResponse.json(
-    { incident: { ...toId(incidentDoc!), components: linkDocs.map(toId) } },
-    { status: 201 }
-  );
 }

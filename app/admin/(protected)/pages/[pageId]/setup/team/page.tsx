@@ -1,56 +1,55 @@
 import Link from "next/link";
 import { requireSession } from "@/lib/require-session";
-import { collections } from "@/lib/db";
-import { oid, toId } from "@/lib/mongo-utils";
 import { SetupStepper } from "@/components/admin/SetupStepper";
-import { inviteMember } from "@/app/admin/(protected)/team/actions";
+import { TeamInviteForm } from "@/components/admin/TeamInviteForm";
+import { getOrganizationMembers } from "@/lib/memberships";
+import { assertPageInOrg, requireCapability } from "@/lib/admin-guard";
 
 export default async function SetupTeamPage({ params }: { params: Promise<{ pageId: string }> }) {
   const { pageId } = await params;
   const { org } = await requireSession();
-  const members = (await collections.teamMembers().find({ orgId: oid(org.id) }).sort({ createdAt: 1 }).toArray()).map(toId);
+  const session = await requireCapability("team.manage", pageId);
+  await assertPageInOrg(pageId, session.orgId);
+  const members = await getOrganizationMembers(org.id);
 
   return (
     <div>
       <SetupStepper pageId={pageId} current="team" />
-      <h1 className="text-2xl font-semibold">Invite your team</h1>
-      <p className="mt-3 text-sm text-gray-600 leading-relaxed max-w-lg">
-        Tenant admins can post incidents, manage billing, and change tenant settings. Tenant users can run incidents day-to-day
-        and post updates.
+      <h1 className="font-mono text-2xl font-semibold text-[var(--fg)]">Invite your team</h1>
+      <p className="mt-3 text-sm text-[var(--fg-soft)] leading-relaxed max-w-lg">
+        Owners control organization ownership. Admins manage users and
+        configuration. Responders run incidents and day-to-day reliability
+        workflows. Organization deletion is handled by platform administrators
+        through the suspend-and-purge lifecycle.
       </p>
 
-      <form action={inviteMember} className="mt-8 bg-white border rounded-lg p-4 grid sm:grid-cols-2 gap-3">
-        <input name="name" placeholder="Full name" className="border rounded-md px-3 py-2 text-sm" required />
-        <input name="email" type="email" placeholder="Email" className="border rounded-md px-3 py-2 text-sm" required />
-        <select name="role" className="border rounded-md px-3 py-2 text-sm">
-          <option value="TENANT_ADMIN">Tenant Admin</option>
-          <option value="TENANT_USER">Tenant User</option>
-        </select>
-        <input name="password" type="password" placeholder="Temporary password" className="border rounded-md px-3 py-2 text-sm" required />
-        <button className="bg-blue-600 text-white rounded-md px-4 py-2 text-sm font-medium sm:col-span-2">Invite Member</button>
-      </form>
+      <TeamInviteForm
+        scopedPageId={pageId}
+        canGrantOwnership={session.role === "OWNER"}
+        className="mt-8 grid gap-3 border border-[var(--line)] bg-[var(--surface)] p-4 sm:grid-cols-2"
+      />
 
-      <div className="mt-6 bg-white border rounded-lg divide-y">
+      <div className="mt-6 bg-[var(--surface)] border border-[var(--line)] divide-y divide-[var(--line)]">
         {members.map((m) => (
-          <div key={m.id} className="flex items-center justify-between p-3 text-sm">
-            <div>
-              <span className="font-medium">{m.name}</span>
-              <span className="text-xs text-gray-400 ml-2">{m.email}</span>
+          <div key={m.id} className="flex items-center justify-between p-3 text-sm gap-2">
+            <div className="min-w-0">
+              <span className="font-medium text-[var(--fg)]">{m.name}</span>
+              <span className="text-xs text-[var(--fg-dim)] ml-2">{m.email}</span>
             </div>
-            <span className="text-xs bg-gray-100 rounded px-1.5 py-0.5">{m.role}</span>
+            <span className="text-[10px] uppercase tracking-wide bg-[var(--surface-raised)] text-[var(--fg-soft)] px-1.5 py-0.5 shrink-0">{m.role}</span>
           </div>
         ))}
       </div>
 
-      <div className="flex justify-between items-center mt-12 pt-6 border-t">
-        <Link href={`/admin/pages/${pageId}/setup/notifications`} className="text-sm text-gray-500 hover:text-gray-800">
+      <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center mt-12 pt-6 border-t border-[var(--line)]">
+        <Link href={`/admin/pages/${pageId}/setup/notifications`} className="text-sm text-[var(--fg-soft)] hover:text-[var(--fg)]">
           ← Back
         </Link>
-        <div className="flex gap-3">
-          <Link href={`/admin/pages/${pageId}/setup/incidents`} className="text-sm text-gray-500 hover:text-gray-800 self-center">
+        <div className="flex gap-3 items-center">
+          <Link href={`/admin/pages/${pageId}/setup/incidents`} className="text-sm text-[var(--fg-soft)] hover:text-[var(--fg)] self-center">
             Skip
           </Link>
-          <Link href={`/admin/pages/${pageId}/setup/incidents`} className="bg-blue-600 text-white rounded-md px-5 py-2.5 text-sm font-medium">
+          <Link href={`/admin/pages/${pageId}/setup/incidents`} className="bg-[var(--cyan)] text-[var(--on-cyan)] px-5 py-2.5 text-sm font-semibold font-mono">
             Next: Incidents →
           </Link>
         </div>

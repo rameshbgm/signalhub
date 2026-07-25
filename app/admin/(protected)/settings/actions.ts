@@ -1,43 +1,114 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 import { ObjectId } from "mongodb";
 import { collections } from "@/lib/db";
 import { oid } from "@/lib/mongo-utils";
-import { requireOrgAdmin } from "@/lib/admin-guard";
-import { deleteOrgCascade } from "@/lib/cascade";
-import { destroySession } from "@/lib/auth";
+import { requireCapability } from "@/lib/admin-guard";
+import { withTransaction } from "@/lib/cascade";
+import { fenceActiveOrganizationMutation } from "@/lib/organization-mutation";
+import { RETENTION_BOUNDS } from "@/lib/retention";
 
 export async function updateOrgSettings(formData: FormData) {
-  const session = await requireOrgAdmin();
+  const session = await requireCapability("organization.manage");
   const name = String(formData.get("name") ?? "").trim();
-  const billingEmail = String(formData.get("billingEmail") ?? "").trim();
+  const contactEmail = String(formData.get("contactEmail") ?? "").trim();
   if (!name) throw new Error("Organization name is required");
 
-  await collections.organizations().updateOne(
-    { _id: oid(session.orgId) },
-    { $set: { name, billingEmail: billingEmail || null } }
+  await withTransaction(async (databaseSession) => {
+    await fenceActiveOrganizationMutation(session.orgId, databaseSession);
+    const changed = await collections.organizations().updateOne(
+      { _id: oid(session.orgId) },
+      { $set: { name, contactEmail: contactEmail || null } },
+      { session: databaseSession }
+    );
+    if (!changed.matchedCount) throw new Error("Organization not found");
+    await collections.auditLogs().insertOne({
+      _id: new ObjectId(),
+      orgId: oid(session.orgId),
+      actor: session.email,
+      action: "UPDATE_ORG_SETTINGS",
+      target: name,
+      createdAt: new Date(),
+    }, { session: databaseSession });
+  });
+  revalidatePath("/admin/settings");
+}
+
+export async function updateOrgRetention(formData: FormData) {
+  const session = await requireCapability("organization.manage");
+  if (session.role !== "OWNER") throw new Error("Only an organization Owner can change retention");
+  const values = Object.fromEntries(
+    Object.entries(RETENTION_BOUNDS).map(([key, bounds]) => {
+      const value = Number(formData.get(key));
+      if (!Number.isInteger(value) || value < bounds.min || value > bounds.max) {
+        throw new Error(`${key} must be between ${bounds.min} and ${bounds.max} days`);
+      }
+      return [key, value];
+    })
+  );
+  const now = new Date();
+  await collections.retentionPolicies().updateOne(
+    { orgId: oid(session.orgId) },
+    {
+      $set: {
+        ...values,
+        updatedAt: now,
+        updatedBy: oid(session.userId),
+      },
+      $setOnInsert: {
+        _id: new ObjectId(),
+        orgId: oid(session.orgId),
+        createdAt: now,
+      },
+    },
+    { upsert: true }
   );
   await collections.auditLogs().insertOne({
     _id: new ObjectId(),
     orgId: oid(session.orgId),
     actor: session.email,
-    action: "UPDATE_ORG_SETTINGS",
-    target: name,
-    createdAt: new Date(),
+    action: "RETENTION_POLICY_UPDATED",
+    target: session.orgId,
+    metadata: values,
+    createdAt: now,
   });
   revalidatePath("/admin/settings");
 }
 
-export async function deleteOrganization(formData: FormData) {
-  const session = await requireOrgAdmin();
-  const confirm = String(formData.get("confirm") ?? "");
-  const org = await collections.organizations().findOne({ _id: oid(session.orgId) });
-  if (!org) throw new Error("Organization not found");
-  if (confirm !== org.slug) throw new Error(`Type "${org.slug}" to confirm deletion`);
-
-  await deleteOrgCascade(session.orgId);
-  await destroySession();
-  redirect("/");
+export async function requestOrgExport() {
+  const session = await requireCapability("organization.manage");
+  if (session.role !== "OWNER") throw new Error("Only an organization Owner can request an export");
+  const now = new Date();
+  const active = await collections.dataExportJobs().findOne({
+    orgId: oid(session.orgId),
+    status: { $in: ["QUEUED", "PROCESSING"] },
+  });
+  if (active) throw new Error("An organization export is already in progress");
+  const id = new ObjectId();
+  await collections.dataExportJobs().insertOne({
+    _id: id,
+    orgId: oid(session.orgId),
+    status: "QUEUED",
+    requestedBy: oid(session.userId),
+    storageKey: null,
+    storageDriver: null,
+    checksum: null,
+    attempts: 0,
+    leaseOwner: null,
+    leaseExpiresAt: null,
+    lastError: null,
+    createdAt: now,
+    updatedAt: now,
+    completedAt: null,
+  });
+  await collections.auditLogs().insertOne({
+    _id: new ObjectId(),
+    orgId: oid(session.orgId),
+    actor: session.email,
+    action: "ORGANIZATION_EXPORT_REQUESTED",
+    target: id.toHexString(),
+    createdAt: now,
+  });
+  revalidatePath("/admin/settings");
 }

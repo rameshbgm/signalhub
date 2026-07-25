@@ -77,7 +77,7 @@ export const HELP_CATEGORIES: HelpCategory[] = [
           {
             heading: "What's recorded",
             paragraphs: [
-              "Every meaningful admin action — creating or deleting a page, changing settings, inviting or removing a team member, switching billing plans, revoking an API key — writes one entry here with who did it and when.",
+              "Every meaningful admin action — creating or deleting a page, changing settings, inviting or removing a team member, starting a support session, or revoking an API key — writes one entry here with who did it and when.",
               "The log shows the 200 most recent entries, newest first. It cannot be edited or deleted from the UI.",
             ],
           },
@@ -112,7 +112,7 @@ export const HELP_CATEGORIES: HelpCategory[] = [
             heading: "Posting updates",
             paragraphs: [
               "Open an incident's detail page to post further updates, change its status, or (once Resolved) write and publish a postmortem.",
-              "Affected components automatically flip back to Operational when the incident resolves.",
+              "Affected component status is reconciled against every remaining incident, maintenance window, monitor, and manual override when an incident resolves.",
             ],
           },
         ],
@@ -167,23 +167,23 @@ export const HELP_CATEGORIES: HelpCategory[] = [
       {
         slug: "subscribers",
         title: "Subscribers",
-        summary: "Everyone who gets notified when something changes — by Email, SMS, Slack, Microsoft Teams, or webhook.",
+        summary: "Verified email subscribers, feeds, and administrator-managed webhook integrations.",
         body: [
           {
             heading: "Channels supported",
             paragraphs: [],
             list: [
               "Email — verified via a one-time code sent to the inbox.",
-              "SMS — verified via a one-time code sent by text.",
               "Slack — posts to a channel via an incoming webhook URL.",
               "Microsoft Teams — posts to a channel via an incoming webhook URL.",
-              "Webhook — POSTs every event as JSON to your own endpoint.",
+              "Webhook — signs and POSTs every event as JSON to a verified HTTPS endpoint.",
+              "RSS and Atom — public feeds, or revocable signed feed URLs for protected pages.",
             ],
           },
           {
             heading: "Adding subscribers",
             paragraphs: [
-              "Use the channel tabs to switch views. Add a subscriber directly (for Slack/Teams/Webhook, paste the webhook URL as the contact), or bulk-import a CSV list of emails/phone numbers.",
+              "Visitors verify email subscriptions with a one-time code. Administrators manage Slack, Teams, and generic webhook integrations separately and can bulk-import email addresses.",
               "Quarantine a subscriber to stop notifications without deleting them; Export CSV downloads the full list for a page.",
             ],
           },
@@ -212,13 +212,13 @@ export const HELP_CATEGORIES: HelpCategory[] = [
       },
       {
         slug: "embed",
-        title: "Status Embed",
+        title: "SignalHub Embed",
         summary: "A small script tag that shows an auto-appearing incident banner on your own website.",
         body: [
           {
             heading: "How it works",
             paragraphs: [
-              "Go to Status Embed, pick a page, and copy the generated <script> tag into your site. It stays invisible during normal operation and automatically shows a floating banner when there's an active incident or maintenance window.",
+              "Go to SignalHub Embed, pick a page, and copy the generated <script> tag into your site. It stays invisible during normal operation and automatically shows a floating banner when there's an active incident or maintenance window.",
               "A static status badge snippet is also provided if you'd rather show an always-visible 'All Systems Operational' link.",
             ],
           },
@@ -226,20 +226,20 @@ export const HELP_CATEGORIES: HelpCategory[] = [
       },
       {
         slug: "third-party",
-        title: "Third-Party Catalog",
-        summary: "Mirror a vendor's status (AWS, Stripe, GitHub, etc.) as a read-only component on your page.",
+        title: "Monitor Templates",
+        summary: "Start a real worker-backed check from a curated, editable monitor configuration.",
         body: [
           {
-            heading: "Why mirror a provider",
+            heading: "Why use a template",
             paragraphs: [
-              "If your service depends on a third party, add it as a component so customers see it in one place instead of having to check that vendor's own status page.",
-              "This build ships a static 50-provider catalog rather than live-polling each vendor's real API.",
+              "If your service depends on a provider with a stable public status endpoint, add its template to create a component and enabled availability monitor together.",
+              "Templates are deliberately curated. Providers without a stable check endpoint are omitted instead of pretending to monitor them.",
             ],
           },
           {
             heading: "Adding one",
             paragraphs: [
-              "From a page's Components section, check 'Mirror a third-party provider' and pick from the catalog. Update its status the same way as any component — manually, or via its automation webhook.",
+              "From a page's Components section, select an optional monitor template. Then use Monitors to customize its target, interval, assertions, thresholds, and automated actions.",
             ],
           },
         ],
@@ -260,14 +260,15 @@ export const HELP_CATEGORIES: HelpCategory[] = [
             heading: "Roles",
             paragraphs: [],
             list: [
-              "TENANT_ADMIN — full control of this organization: billing, team, org settings, and deleting the organization.",
-              "TENANT_USER — run day-to-day incidents, maintenance, and updates.",
+              "OWNER — ownership, identity policy, and every tenant administrative capability.",
+              "ADMIN — team, pages, integrations, and organization configuration.",
+              "RESPONDER — incidents, maintenance, monitors, metrics, and component status.",
             ],
           },
           {
             heading: "Inviting someone",
             paragraphs: [
-              "Go to Team → fill in name, email, role, and a temporary password → Invite Member. Only Tenant Admins can invite or remove members, and team size is capped by your plan (see Billing).",
+              "Go to Team, enter the member's name, email, role, and page scope, then create the invitation link. Copy the single-use URL when it appears; it expires after 48 hours and is never stored in plaintext. New identities choose a password when accepting, while existing password-backed identities confirm their current password. Owners and Admins can invite members; only an Owner can grant ownership, and the last enabled active Owner can never be removed or demoted.",
             ],
           },
         ],
@@ -293,41 +294,18 @@ export const HELP_CATEGORIES: HelpCategory[] = [
         ],
       },
       {
-        slug: "billing",
-        title: "Billing",
-        summary: "Plan limits, usage, and simulated invoices.",
-        body: [
-          {
-            heading: "Plans",
-            paragraphs: [],
-            list: [
-              "Free — 1 status page, 3 team members, 100 subscribers per page.",
-              "Pro ($29/mo) — 5 pages, 10 team members, 1000 subscribers, custom domains, remove branding.",
-              "Enterprise ($99/mo) — unlimited pages/members/subscribers, custom domains, remove branding.",
-            ],
-          },
-          {
-            heading: "Switching plans",
-            paragraphs: [
-              "Only Tenant Admins can switch plans. Payments are simulated in this build — switching succeeds instantly and records an invoice below; no card is charged.",
-              "Usage bars show how close you are to your current plan's limits for pages, team members, and subscribers.",
-            ],
-          },
-        ],
-      },
-      {
         slug: "settings",
         title: "Settings",
-        summary: "Organization name, billing email, and — for tenant admins — deleting the organization entirely.",
+        summary: "Organization name, contact email, and the platform-managed deletion process.",
         body: [
           {
             heading: "General settings",
-            paragraphs: ["Update your organization's display name and billing email. Only Tenant Admins can change these."],
+            paragraphs: ["Update your organization's display name and optional operational contact email. Owners and Admins can change these."],
           },
           {
             heading: "Deleting the organization",
             paragraphs: [
-              "Tenant Admin-only, and irreversible: removes every page, incident, subscriber, team member, API key, and invoice. You must type the organization's slug to confirm before it runs.",
+              "Contact your platform operator with the organization slug. A platform Owner must suspend the tenant, reauthenticate, and queue the retryable purge; the console preserves the request, job, and tombstone audit evidence.",
             ],
           },
         ],
@@ -353,12 +331,12 @@ export const HELP_CATEGORIES: HelpCategory[] = [
           {
             heading: "Custom domain",
             paragraphs: [
-              "Pro plan and above can point a domain like status.yourcompany.com at a page. Add a CNAME record at your DNS provider pointing to this app's domain, then enter the domain in page settings — the platform detects the incoming host and serves the right page automatically.",
+              "Any page can use a domain like signal.yourcompany.com. Add a CNAME record at your DNS provider pointing to this app's domain, then enter the domain in page settings — the proxy serves its root, history, incidents, access flow, and feeds.",
             ],
           },
           {
             heading: "Custom CSS",
-            paragraphs: ["Paste raw CSS to override anything the layout doesn't expose as a setting."],
+            paragraphs: ["Custom CSS is size-limited, scoped beneath the public page root, and rejects imports and external URLs to protect viewers."],
           },
         ],
       },
@@ -390,7 +368,7 @@ export const HELP_CATEGORIES: HelpCategory[] = [
             heading: "How scoping works",
             paragraphs: [
               "Create Access Groups, each with a set of visible components. Then create Access Users with an email/password, optionally assigned to a group. A user sees the union of their own assigned components plus their group's.",
-              "This mirrors Atlassian Statuspage's audience-specific pages — useful for enterprise customers who should each see a different slice of your systems.",
+              "Audience-specific pages are useful when customers should each see a different, explicitly assigned slice of your systems.",
             ],
           },
         ],

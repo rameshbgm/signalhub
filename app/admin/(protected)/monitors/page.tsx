@@ -1,9 +1,11 @@
 import { requireSession } from "@/lib/require-session";
 import { collections } from "@/lib/db";
 import { oid, toId } from "@/lib/mongo-utils";
-import { createMonitor, toggleMonitorEnabled, deleteMonitor, runMonitorNow } from "./actions";
+import { createMonitor, toggleMonitorEnabled, deleteMonitor, runMonitorNow, updateMonitor } from "./actions";
 import { PageSelect } from "@/components/admin/PageSelect";
 import { MonitorForm } from "@/components/admin/MonitorForm";
+import { HeartbeatTokenManager } from "@/components/admin/HeartbeatTokenManager";
+import { scopedPageFilter, sessionHasCapability } from "@/lib/admin-guard";
 
 function relativeTime(date: Date | null): string {
   if (!date) return "never";
@@ -15,76 +17,166 @@ function relativeTime(date: Date | null): string {
 }
 
 export default async function MonitorsPage({ searchParams }: { searchParams: Promise<{ pageId?: string }> }) {
-  const { org } = await requireSession();
+  const { session, org } = await requireSession();
   const { pageId: pageIdParam } = await searchParams;
-  const pages = (await collections.pages().find({ orgId: oid(org.id), isHub: false }).sort({ createdAt: 1 }).toArray()).map(toId);
+  const pages = (await collections.pages().find(scopedPageFilter(session, org.id, { isHub: false })).sort({ createdAt: 1 }).toArray()).map(toId);
   const pageId = pageIdParam && pages.some((p) => p.id === pageIdParam) ? pageIdParam : pages[0]?.id;
-  if (!pageId) return <p className="text-sm text-gray-400">Create a page first.</p>;
+  if (!pageId) return <p className="text-sm text-[var(--fg-dim)]">Create a page first.</p>;
 
   const monitorDocs = await collections.monitors().find({ pageId: oid(pageId) }).sort({ createdAt: -1 }).toArray();
   const monitors = monitorDocs.map(toId);
+  const checkRows = await Promise.all(
+    monitorDocs.map((monitor) =>
+      collections.monitorChecks().find({ monitorId: monitor._id }).sort({ checkedAt: -1 }).limit(10).toArray()
+    )
+  );
+  const checksByMonitor = new Map(
+    monitorDocs.map((monitor, index) => [monitor._id.toHexString(), checkRows[index]])
+  );
   const components = (await collections.components().find({ pageId: oid(pageId) }).toArray()).map(toId);
   const componentsById = new Map(components.map((c) => [c.id, c.name]));
+  const latestHeartbeat = await collections.workerHeartbeats().find().sort({ lastSeenAt: -1 }).limit(1).next();
+  // Server-render timestamp used only to classify a persisted heartbeat.
+  // eslint-disable-next-line react-hooks/purity
+  const renderedAt = Date.now();
+  const workerOnline = Boolean(
+    latestHeartbeat &&
+      latestHeartbeat.status === "READY" &&
+      latestHeartbeat.lastSeenAt > new Date(renderedAt - 30_000)
+  );
+  const canManage = sessionHasCapability(session, "monitor.manage");
 
   const boundCreate = createMonitor.bind(null, pageId);
 
   return (
     <div className="max-w-4xl space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold">Monitors</h1>
-        <div className="w-56">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <h1 className="font-mono text-xl font-semibold text-[var(--fg)]">Monitors</h1>
+        <div className="w-full sm:w-56">
           <PageSelect pages={pages.map((p) => ({ id: p.id, name: p.name }))} basePath="/admin/monitors" selected={pageId} />
         </div>
       </div>
 
-      <MonitorForm action={boundCreate} components={components.map((c) => ({ id: c.id, name: c.name }))} />
+      {!workerOnline && (
+        <div role="alert" className="border border-[var(--amber)]/40 bg-[var(--amber-soft)] p-3 text-sm text-[var(--amber)]">
+          The worker is offline or stale. Checks, scheduled transitions, and notification delivery are paused.
+        </div>
+      )}
+
+      {canManage ? (
+        <MonitorForm action={boundCreate} components={components.map((c) => ({ id: c.id, name: c.name }))} />
+      ) : (
+        <div className="border border-[var(--line)] bg-[var(--surface)] p-3 text-sm text-[var(--fg-soft)]">
+          Read-only monitor access. A responder or administrator can change checks.
+        </div>
+      )}
 
       <div className="space-y-2">
         {monitors.map((m) => {
-          const isDown = m.consecutiveFails >= m.failThreshold;
+          const isDown = m.isDown;
           const statusLabel = !m.enabled ? "disabled" : m.lastOk === null ? "pending" : isDown ? "down" : "up";
           const statusColor =
-            statusLabel === "up" ? "bg-green-100 text-green-700" : statusLabel === "down" ? "bg-red-100 text-red-700" : "bg-gray-100 text-gray-500";
+            statusLabel === "up"
+              ? "bg-[var(--green-soft)] text-[var(--green)]"
+              : statusLabel === "down"
+                ? "bg-[var(--red-soft)] text-[var(--red)]"
+                : "bg-[var(--surface-raised)] text-[var(--fg-soft)]";
 
           return (
-            <div key={m.id} className="bg-white border rounded-lg p-4 text-sm">
-              <div className="flex items-center justify-between">
+            <div key={m.id} className="border border-[var(--line)] bg-[var(--surface)] p-4 text-sm">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <span className="font-medium">{m.name}</span>
-                  <span className="text-xs text-gray-400 ml-2">
+                  <span className="font-medium text-[var(--fg)]">{m.name}</span>
+                  <span className="ml-2 text-xs text-[var(--fg-dim)]">
                     {m.type} · {m.target}
                     {m.port ? `:${m.port}` : ""}
                   </span>
-                  <span className={`text-xs rounded px-1.5 py-0.5 ml-2 ${statusColor}`}>{statusLabel}</span>
-                  {m.componentId && <span className="text-xs text-gray-400 ml-2">→ {componentsById.get(m.componentId) ?? "unknown component"}</span>}
+                  <span className={`ml-2 px-1.5 py-0.5 text-xs uppercase tracking-wide ${statusColor}`}>{statusLabel}</span>
+                  {m.componentId && (
+                    <span className="ml-2 text-xs text-[var(--fg-dim)]">→ {componentsById.get(m.componentId) ?? "unknown component"}</span>
+                  )}
                 </div>
-                <div className="flex gap-3">
+                {canManage && <div className="flex flex-wrap gap-3">
                   <form action={runMonitorNow.bind(null, m.id)}>
-                    <button className="text-xs text-blue-600 hover:underline">Check on next poll</button>
+                    <button className="border border-[var(--cyan)]/30 px-2.5 py-1 text-xs font-semibold text-[var(--cyan)] transition-colors hover:bg-[var(--cyan-soft)]">Check on next poll</button>
                   </form>
                   <form action={toggleMonitorEnabled.bind(null, m.id)}>
-                    <button className="text-xs text-blue-600 hover:underline">{m.enabled ? "Disable" : "Enable"}</button>
+                    <button className="border border-[var(--cyan)]/30 px-2.5 py-1 text-xs font-semibold text-[var(--cyan)] transition-colors hover:bg-[var(--cyan-soft)]">{m.enabled ? "Disable" : "Enable"}</button>
                   </form>
                   <form action={deleteMonitor.bind(null, m.id)}>
-                    <button className="text-xs text-red-600 hover:underline">Delete</button>
+                    <button className="border border-[var(--red)]/30 px-2.5 py-1 text-xs font-semibold text-[var(--red)] transition-colors hover:bg-[var(--red-soft)]">Delete</button>
                   </form>
-                </div>
+                </div>}
               </div>
-              <p className="text-xs text-gray-400 mt-2">
+              <p className="mt-2 text-xs text-[var(--fg-dim)]">
                 last checked {relativeTime(m.lastCheckedAt)}
                 {m.lastLatencyMs !== null && ` · ${m.lastLatencyMs}ms`}
                 {m.lastError && ` · ${m.lastError}`}
                 {` · every ${m.intervalSec}s`}
               </p>
+              {(m.groupName || m.tags?.length) && (
+                <p className="mt-1 text-xs text-[var(--fg-dim)]">
+                  {m.groupName && <span className="mr-2">Group: {m.groupName}</span>}
+                  {m.tags?.map((tag) => <span key={tag} className="mr-1 bg-[var(--surface-raised)] px-1.5 py-0.5">{tag}</span>)}
+                </p>
+              )}
+              {m.type === "HEARTBEAT" && canManage && <HeartbeatTokenManager monitorId={m.id} />}
+              {canManage && (
+                <details className="mt-3 border-t border-[var(--line)] pt-3">
+                  <summary className="cursor-pointer text-xs font-medium text-[var(--fg-soft)]">
+                    Edit monitor
+                  </summary>
+                  <form action={updateMonitor.bind(null, m.id)} className="mt-3 grid gap-2 sm:grid-cols-2">
+                    <input name="name" defaultValue={m.name} aria-label="Monitor name" className="border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-xs" required />
+                    <input name="target" defaultValue={m.target} aria-label="Monitor target" className="border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-xs" required />
+                    <select name="componentId" defaultValue={m.componentId ?? ""} aria-label="Linked component" className="border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-xs">
+                      <option value="">No linked component</option>
+                      {components.map((component) => <option key={component.id} value={component.id}>{component.name}</option>)}
+                    </select>
+                    <input name="groupName" defaultValue={m.groupName ?? ""} placeholder="Group" className="border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-xs" />
+                    <input name="intervalSec" type="number" min={10} max={86400} defaultValue={m.intervalSec} aria-label="Interval seconds" className="border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-xs" />
+                    <input name="timeoutMs" type="number" min={100} max={60000} defaultValue={m.timeoutMs} aria-label="Timeout milliseconds" className="border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-xs" />
+                    <input name="failThreshold" type="number" min={1} max={20} defaultValue={m.failThreshold} aria-label="Failure threshold" className="border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-xs" />
+                    <input name="recoverThreshold" type="number" min={1} max={20} defaultValue={m.recoverThreshold} aria-label="Recovery threshold" className="border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-xs" />
+                    <input name="tags" defaultValue={m.tags?.join(", ") ?? ""} placeholder="Tags, comma separated" className="border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-xs sm:col-span-2" />
+                    <button className="bg-[var(--cyan)] px-3 py-2 text-xs font-semibold text-[var(--on-cyan)] sm:col-span-2">Save monitor</button>
+                  </form>
+                </details>
+              )}
+              <details className="mt-3 border-t border-[var(--line)] pt-3">
+                <summary className="cursor-pointer text-xs font-medium text-[var(--fg-soft)]">
+                  Recent check history
+                </summary>
+                <div className="mt-2 overflow-x-auto">
+                  <table className="w-full min-w-[32rem] text-left text-xs">
+                    <thead className="text-[var(--fg-dim)]">
+                      <tr><th className="py-1">Checked</th><th>Result</th><th>Latency</th><th>Response</th></tr>
+                    </thead>
+                    <tbody>
+                      {(checksByMonitor.get(m.id) ?? []).map((check) => (
+                        <tr key={check._id.toHexString()} className="border-t border-[var(--line)]">
+                          <td className="py-1.5 font-mono">{new Date(check.checkedAt).toLocaleString()}</td>
+                          <td className={check.ok ? "text-[var(--green)]" : "text-[var(--red)]"}>{check.ok ? "Up" : "Down"}</td>
+                          <td>{check.latencyMs === null ? "—" : `${check.latencyMs} ms`}</td>
+                          <td className="max-w-64 truncate">{check.error ?? (check.statusCode ? `HTTP ${check.statusCode}` : "OK")}</td>
+                        </tr>
+                      ))}
+                      {!checksByMonitor.get(m.id)?.length && (
+                        <tr><td colSpan={4} className="py-2 text-[var(--fg-dim)]">No checks have run yet.</td></tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </details>
             </div>
           );
         })}
-        {monitors.length === 0 && <p className="text-sm text-gray-400">No monitors yet.</p>}
+        {monitors.length === 0 && <p className="text-sm text-[var(--fg-dim)]">No monitors yet.</p>}
       </div>
 
-      <p className="text-xs text-gray-400">
-        Checks run in the standalone <code className="bg-gray-100 px-1 rounded">monitor-service</code> Python process, which polls this database directly.
-        Start it with <code className="bg-gray-100 px-1 rounded">python main.py</code> in <code className="bg-gray-100 px-1 rounded">monitor-service/</code>.
+      <p className="text-xs text-[var(--fg-dim)]">
+        Checks run in the compiled TypeScript worker with Mongo-backed leases. Docker Compose supervises it separately from the web process,
+        so multiple worker replicas can safely share the queue.
       </p>
     </div>
   );

@@ -2,124 +2,114 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { ObjectId } from "mongodb";
+import { assertPageInOrg, requireCapability } from "@/lib/admin-guard";
 import { collections } from "@/lib/db";
-import { oid, toId } from "@/lib/mongo-utils";
-import { requireOrgSession, assertPageInOrg } from "@/lib/admin-guard";
-import { dispatchNotifications } from "@/lib/notify";
+import {
+  createMaintenance as createMaintenanceDomain,
+  deleteMaintenance as deleteMaintenanceDomain,
+  transitionMaintenance,
+} from "@/lib/domain/maintenance";
+import { oid } from "@/lib/mongo-utils";
+import { MAINTENANCE_STATUSES, type MaintenanceStatus } from "@/lib/status";
+import { writeSupportMutationAudit } from "@/lib/support-audit";
+import { writeActiveTenantAudit } from "@/lib/tenant-audit";
 
 async function pageSlug(pageId: string) {
   return (await collections.pages().findOne({ _id: oid(pageId) }))?.slug;
 }
 
 export async function createMaintenance(formData: FormData) {
-  const session = await requireOrgSession();
   const pageId = String(formData.get("pageId") ?? "");
+  const session = await requireCapability("incident.manage", pageId);
   await assertPageInOrg(pageId, session.orgId);
-
-  const name = String(formData.get("name") ?? "").trim();
-  const body = String(formData.get("body") ?? "");
-  const scheduledStart = new Date(String(formData.get("scheduledStart") ?? ""));
-  const scheduledEnd = new Date(String(formData.get("scheduledEnd") ?? ""));
-  const autoTransition = formData.get("autoTransition") === "on";
-  const notify = formData.get("notify") === "on";
-  const componentIds = formData.getAll("componentIds").map(String);
-
-  if (!name) throw new Error("Maintenance name is required");
-  if (isNaN(scheduledStart.getTime()) || isNaN(scheduledEnd.getTime())) throw new Error("Valid start/end times are required");
-
-  const incidentId = new ObjectId();
-  await collections.incidents().insertOne({
-    _id: incidentId,
-    pageId: oid(pageId),
-    name,
-    status: "INVESTIGATING",
-    impact: "NONE",
-    isMaintenance: true,
-    maintenanceStatus: "SCHEDULED",
-    scheduledStart,
-    scheduledEnd,
-    autoTransition,
-    notifySubscribers: true,
-    postmortemBody: null,
-    postmortemPublishedAt: null,
-    createdAt: new Date(),
-    resolvedAt: null,
-    backfilled: false,
+  const maintenance = await createMaintenanceDomain(session.orgId, {
+    pageId,
+    name: String(formData.get("name") ?? ""),
+    body: String(formData.get("body") ?? ""),
+    scheduledStart: new Date(String(formData.get("scheduledStart") ?? "")),
+    scheduledEnd: new Date(String(formData.get("scheduledEnd") ?? "")),
+    autoTransition: formData.get("autoTransition") === "on",
+    notify: formData.get("notify") === "on",
+    reminderMinutesBefore:
+      formData.get("sendReminder") === "on"
+        ? Number(formData.get("reminderMinutesBefore") ?? 60)
+        : null,
+    pageWide: formData.get("pageWide") === "on",
+    componentIds: formData.getAll("componentIds").map(String),
   });
-  if (componentIds.length) {
-    await collections.incidentComponents().insertMany(
-      componentIds.map((id) => ({ _id: new ObjectId(), incidentId, componentId: oid(id), newStatus: "UNDER_MAINTENANCE" }))
-    );
-  }
-  await collections.incidentUpdates().insertOne({
-    _id: new ObjectId(),
-    incidentId,
-    status: "INVESTIGATING",
-    body: body || `Scheduled maintenance: ${name}`,
-    createdAt: new Date(),
-    notified: false,
-  });
-
-  if (notify) {
-    await dispatchNotifications({
-      pageId,
-      subject: `[Scheduled Maintenance] ${name}`,
-      body: body || `Scheduled maintenance window: ${scheduledStart.toLocaleString()} - ${scheduledEnd.toLocaleString()}`,
-      eventType: "maintenance.scheduled",
-      componentIds,
-    });
-  }
-
-  await collections.auditLogs().insertOne({
-    _id: new ObjectId(),
-    orgId: oid(session.orgId),
+  await writeActiveTenantAudit(session.orgId, {
     actor: session.email,
     action: "CREATE_MAINTENANCE",
-    target: incidentId.toHexString(),
+    target: maintenance.id,
+    supportSessionId: session.supportSessionId ? oid(session.supportSessionId) : null,
     createdAt: new Date(),
   });
-
+  await writeSupportMutationAudit(session, {
+    action: "CREATE_MAINTENANCE",
+    targetType: "maintenance",
+    targetId: maintenance.id,
+    metadata: { pageId },
+    tenantAuditExists: true,
+  });
   revalidatePath("/admin/maintenance");
   revalidatePath(`/${await pageSlug(pageId)}`);
-  redirect(`/admin/incidents/${incidentId.toHexString()}`);
+  redirect(`/admin/incidents/${maintenance.id}`);
 }
 
 export async function setMaintenanceStatus(incidentId: string, formData: FormData) {
-  const session = await requireOrgSession();
-  const incidentDoc = await collections.incidents().findOne({ _id: oid(incidentId) });
-  if (!incidentDoc) throw new Error("Not found");
-  const incident = toId(incidentDoc);
-  await assertPageInOrg(incident.pageId, session.orgId);
-
-  const maintenanceStatus = String(formData.get("maintenanceStatus") ?? "SCHEDULED");
-  const body = String(formData.get("body") ?? "");
-
-  await collections.incidents().updateOne(
-    { _id: oid(incidentId) },
-    { $set: { maintenanceStatus, resolvedAt: maintenanceStatus === "COMPLETED" ? new Date() : null } }
-  );
-  await collections.incidentUpdates().insertOne({
-    _id: new ObjectId(),
-    incidentId: oid(incidentId),
-    status: maintenanceStatus,
+  const session = await requireCapability("incident.update");
+  const incident = await collections.incidents().findOne({ _id: oid(incidentId), isMaintenance: true });
+  if (!incident) throw new Error("Maintenance not found");
+  await assertPageInOrg(incident.pageId.toHexString(), session.orgId);
+  const status = String(formData.get("maintenanceStatus") ?? "") as MaintenanceStatus;
+  if (!MAINTENANCE_STATUSES.includes(status)) throw new Error("Invalid maintenance status");
+  const body = String(formData.get("body") ?? "").trim();
+  if (!body) throw new Error("A maintenance update message is required");
+  await transitionMaintenance({
+    incidentId,
+    status,
     body,
-    createdAt: new Date(),
-    notified: false,
+    notify: formData.get("notify") === "on",
   });
-
-  const components = await collections.incidentComponents().find({ incidentId: oid(incidentId) }).toArray();
-  if (maintenanceStatus === "IN_PROGRESS") {
-    for (const ic of components) {
-      await collections.components().updateOne({ _id: ic.componentId }, { $set: { status: ic.newStatus } });
-    }
-  }
-  if (maintenanceStatus === "COMPLETED") {
-    for (const ic of components) {
-      await collections.components().updateOne({ _id: ic.componentId }, { $set: { status: "OPERATIONAL" } });
-    }
-  }
-
+  await writeSupportMutationAudit(session, {
+    action: "UPDATE_MAINTENANCE",
+    targetType: "maintenance",
+    targetId: incidentId,
+    metadata: { pageId: incident.pageId.toHexString(), status },
+  });
   revalidatePath(`/admin/incidents/${incidentId}`);
-  revalidatePath(`/${await pageSlug(incident.pageId)}`);
+  revalidatePath(`/${await pageSlug(incident.pageId.toHexString())}`);
+}
+
+export async function deleteMaintenance(incidentId: string) {
+  const session = await requireCapability("incident.manage");
+  const incident = await collections.incidents().findOne({
+    _id: oid(incidentId),
+    isMaintenance: true,
+  });
+  if (!incident) throw new Error("Maintenance not found");
+  await assertPageInOrg(incident.pageId.toHexString(), session.orgId);
+  const slug = await pageSlug(incident.pageId.toHexString());
+  const deleted = await deleteMaintenanceDomain(session.orgId, incidentId);
+  if (!deleted) throw new Error("Maintenance not found");
+  await writeActiveTenantAudit(session.orgId, {
+    actor: session.email,
+    action: "DELETE_MAINTENANCE",
+    target: incidentId,
+    supportSessionId: session.supportSessionId
+      ? oid(session.supportSessionId)
+      : null,
+    createdAt: new Date(),
+  });
+  await writeSupportMutationAudit(session, {
+    action: "DELETE_MAINTENANCE",
+    targetType: "maintenance",
+    targetId: incidentId,
+    metadata: { pageId: incident.pageId.toHexString() },
+    tenantAuditExists: true,
+  });
+  revalidatePath("/admin/maintenance");
+  revalidatePath("/admin/incidents");
+  if (slug) revalidatePath(`/${slug}`);
+  redirect("/admin/maintenance");
 }

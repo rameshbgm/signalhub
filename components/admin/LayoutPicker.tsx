@@ -3,54 +3,72 @@
 import { useState } from "react";
 
 export function LayoutPicker({ defaultValue, brandColor }: { defaultValue: string; brandColor: string }) {
-  const [layout, setLayout] = useState(defaultValue === "COVER" ? "COVER" : "STANDARD");
+  const [layout, setLayout] = useState(["COVER", "MINIMAL"].includes(defaultValue) ? defaultValue : "STANDARD");
 
   return (
     <div className="sm:col-span-2">
-      <span className="text-xs text-gray-500 block mb-2">Page layout</span>
-      <div className="grid sm:grid-cols-2 gap-4">
+      <span className="mb-2 block text-xs text-[var(--fg-dim)]">Page layout</span>
+      <div className="grid gap-4 sm:grid-cols-3">
         <button
           type="button"
           onClick={() => setLayout("STANDARD")}
-          className={`text-left rounded-lg border-2 p-1 transition-colors ${layout === "STANDARD" ? "border-blue-600" : "border-transparent"}`}
+          className={`border p-1 text-left transition-colors ${layout === "STANDARD" ? "border-[var(--cyan)]" : "border-transparent"}`}
         >
-          <div className="rounded-md border border-gray-200 overflow-hidden bg-white">
-            <div className="flex items-center justify-between px-3 py-2 border-b border-gray-100">
+          <div className="overflow-hidden border border-[var(--line)] bg-white">
+            <div className="flex items-center justify-between border-b border-gray-100 px-3 py-2">
               <span className="text-[11px] font-semibold text-gray-800">ACME CO.</span>
-              <span className="text-[9px] rounded bg-blue-600 text-white px-1.5 py-0.5">SUBSCRIBE</span>
+              <span className="rounded bg-blue-600 px-1.5 py-0.5 text-[9px] text-white">SUBSCRIBE</span>
             </div>
             <div className="px-3 py-1.5" style={{ backgroundColor: brandColor }}>
-              <span className="text-[10px] text-white font-medium">All Systems Operational</span>
+              <span className="text-[10px] font-medium text-white">All Systems Operational</span>
             </div>
-            <div className="px-3 py-2 space-y-1">
-              <div className="h-1.5 bg-gray-100 rounded w-full" />
-              <div className="h-1.5 bg-gray-100 rounded w-2/3" />
+            <div className="space-y-1 px-3 py-2">
+              <div className="h-1.5 w-full rounded bg-gray-100" />
+              <div className="h-1.5 w-2/3 rounded bg-gray-100" />
             </div>
           </div>
-          <p className="text-center text-xs font-medium mt-2">Standard layout</p>
-          <p className="text-center text-[11px] text-gray-400">Small logo at the top.</p>
+          <p className="mt-2 text-center text-xs font-medium text-[var(--fg)]">Standard layout</p>
+          <p className="text-center text-[11px] text-[var(--fg-dim)]">Small logo at the top.</p>
         </button>
 
         <button
           type="button"
           onClick={() => setLayout("COVER")}
-          className={`text-left rounded-lg border-2 p-1 transition-colors ${layout === "COVER" ? "border-blue-600" : "border-transparent"}`}
+          className={`border p-1 text-left transition-colors ${layout === "COVER" ? "border-[var(--cyan)]" : "border-transparent"}`}
         >
-          <div className="rounded-md border border-gray-200 overflow-hidden bg-white">
-            <div className="h-12 bg-gray-900 flex items-center justify-between px-3">
-              <span className="text-[10px] text-white/90 font-medium">OFFICIAL STATUS</span>
-              <span className="text-[9px] rounded bg-blue-600 text-white px-1.5 py-0.5">SUBSCRIBE</span>
+          <div className="overflow-hidden border border-[var(--line)] bg-white">
+            <div className="flex h-12 items-center justify-between bg-gray-900 px-3">
+              <span className="text-[10px] font-medium text-white/90">OFFICIAL STATUS</span>
+              <span className="rounded bg-blue-600 px-1.5 py-0.5 text-[9px] text-white">SUBSCRIBE</span>
             </div>
             <div className="px-3 py-1.5" style={{ backgroundColor: brandColor }}>
-              <span className="text-[10px] text-white font-medium">All Systems Operational</span>
+              <span className="text-[10px] font-medium text-white">All Systems Operational</span>
             </div>
-            <div className="px-3 py-2 space-y-1">
-              <div className="h-1.5 bg-gray-100 rounded w-full" />
-              <div className="h-1.5 bg-gray-100 rounded w-2/3" />
+            <div className="space-y-1 px-3 py-2">
+              <div className="h-1.5 w-full rounded bg-gray-100" />
+              <div className="h-1.5 w-2/3 rounded bg-gray-100" />
             </div>
           </div>
-          <p className="text-center text-xs font-medium mt-2">Cover image</p>
-          <p className="text-center text-[11px] text-gray-400">Give your page some flair.</p>
+          <p className="mt-2 text-center text-xs font-medium text-[var(--fg)]">Cover image</p>
+          <p className="text-center text-[11px] text-[var(--fg-dim)]">Give your page some flair.</p>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setLayout("MINIMAL")}
+          className={`border p-1 text-left transition-colors ${layout === "MINIMAL" ? "border-[var(--cyan)]" : "border-transparent"}`}
+        >
+          <div className="overflow-hidden border border-[var(--line)] bg-white">
+            <div className="flex items-center justify-between border-b-2 px-3 py-1.5" style={{ borderColor: brandColor }}>
+              <span className="text-[10px] font-semibold text-gray-800">Acme Co.</span>
+            </div>
+            <div className="space-y-1 px-3 py-2">
+              <div className="h-1.5 w-full rounded bg-gray-100" />
+              <div className="h-1.5 w-2/3 rounded bg-gray-100" />
+            </div>
+          </div>
+          <p className="mt-2 text-center text-xs font-medium text-[var(--fg)]">Minimal</p>
+          <p className="text-center text-[11px] text-[var(--fg-dim)]">Compact, embed-friendly.</p>
         </button>
       </div>
       <input type="hidden" name="layout" value={layout} />

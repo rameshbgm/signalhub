@@ -1,0 +1,100 @@
+image:
+  repository: signalhub
+  tag: "1.0.0"
+  pullPolicy: IfNotPresent
+
+replicaCount: 2
+workerReplicaCount: 2
+
+serviceAccount:
+  create: true
+  name: ""
+
+service:
+  type: ClusterIP
+  port: 80
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: signalhub.at
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+config:
+  appUrl: https://signalhub.at
+  appDomain: signalhub.at
+  assetStorageDriver: s3
+  requireWorker: "true"
+  trustProxyHeaders: "true"
+  trustedProxyHops: "1"
+  logLevel: info
+  tenantSessionIdleSeconds: "28800"
+  tenantSessionAbsoluteSeconds: "604800"
+  platformSessionIdleSeconds: "3600"
+  platformSessionAbsoluteSeconds: "43200"
+  passwordMinLength: "14"
+  platformAdminAllowedCidrs: ""
+  otlpEndpoint: ""
+
+secrets:
+  # Production should set existingSecret and provision it outside Helm.
+  # An existing secret may also contain provider credentials and the optional
+  # keyring variables shown below.
+  existingSecret: ""
+  databaseUrl: ""
+  sessionSecret: ""
+  sessionSigningKeys: ""
+  sessionActiveKeyId: ""
+  encryptionKey: ""
+  encryptionKeys: ""
+  encryptionActiveKeyId: ""
+  metricsToken: ""
+  otlpHeaders: ""
+  s3Bucket: ""
+  s3Region: us-east-1
+  s3Endpoint: ""
+  s3AccessKeyId: ""
+  s3SecretAccessKey: ""
+
+web:
+  resources:
+    requests: { cpu: 200m, memory: 384Mi }
+    limits: { cpu: "2", memory: 1Gi }
+
+worker:
+  resources:
+    requests: { cpu: 250m, memory: 384Mi }
+    limits: { cpu: "2", memory: 1Gi }
+
+autoscaling:
+  enabled: false
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+networkPolicy:
+  enabled: true
+  ingressNamespaceSelector: {}
+  egressCidrs:
+    - 0.0.0.0/0
+
+podAnnotations: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}
+topologySpreadConstraints:
+  - maxSkew: 1
+    topologyKey: topology.kubernetes.io/zone
+    whenUnsatisfiable: ScheduleAnyway
+    labelSelector:
+      matchLabels:
+        app.kubernetes.io/name: signalhub
