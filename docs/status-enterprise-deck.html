@@ -524,7 +524,6 @@
 
     .status-examples {
       padding: clamp(74px, 9vw, 120px) 0;
-      overflow: hidden;
       background: #eef3ed;
     }
 
@@ -550,24 +549,23 @@
       line-height: 1.65;
     }
 
-    .status-stream {
-      display: flex;
-      width: max-content;
-      animation: marquee 58s linear infinite;
+    .status-tile-grid {
+      display: grid;
+      width: min(1240px, calc(100% - 40px));
+      margin: 0 auto;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
     }
-
-    .status-stream:hover { animation-play-state: paused; }
-    .status-stream-group { display: flex; gap: 12px; padding-right: 12px; }
 
     .status-page-link {
       display: grid;
-      min-width: 246px;
       grid-template-columns: 42px 1fr auto;
       gap: 13px;
       align-items: center;
-      padding: 16px;
+      min-width: 0;
+      padding: 14px;
       border: 1px solid var(--line);
-      border-radius: 18px;
+      border-radius: 16px;
       background: rgba(255,255,255,.78);
       color: var(--text);
       text-decoration: none;
@@ -1128,6 +1126,7 @@
       .bento-card:last-child { grid-column: span 12; }
       .compare-shell { overflow-x: auto; }
       .compare-row { min-width: 1140px; }
+      .status-tile-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
     }
 
     @media (max-width: 760px) {
@@ -1142,6 +1141,7 @@
       .hero-float.one { right: 3%; }
       .hero-float.two { left: 1%; }
       .status-examples-head { grid-template-columns: 1fr; gap: 18px; }
+      .status-tile-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .use-cases { grid-template-columns: 1fr; }
       .use-card:nth-child(2), .use-card:nth-child(2):hover { transform: none; }
       .compare-note { grid-template-columns: 1fr; }
@@ -1161,6 +1161,10 @@
       .guide-main { padding: 25px 20px 50px; }
       .closing footer { align-items: flex-start; gap: 12px; flex-direction: column; }
       .founder-card { padding: 25px; }
+    }
+
+    @media (max-width: 480px) {
+      .status-tile-grid { grid-template-columns: 1fr; }
     }
 
     @media (prefers-reduced-motion: reduce) {
@@ -1325,8 +1329,7 @@
         </div>
         <p>These live pages show why incident communication matters. Customers can confirm impact, follow recovery, and subscribe to updates without waiting for a support reply. Open any example to see the pattern in practice.</p>
       </div>
-      <div class="status-stream">
-        <div class="status-stream-group">
+      <div class="status-tile-grid">
           <a class="status-page-link" href="https://anthropic.statuspage.io/" target="_blank" rel="noreferrer"><span class="status-logo">AN</span><span><strong>Anthropic status</strong><small>anthropic.statuspage.io</small></span><span class="status-open">↗</span></a>
           <a class="status-page-link" href="https://anthropic.statuspage.io/" target="_blank" rel="noreferrer"><span class="status-logo">CL</span><span><strong>Claude services</strong><small>claude.ai · API · Claude Code</small></span><span class="status-open">↗</span></a>
           <a class="status-page-link" href="https://support.spotify.com/us/article/ongoing-issues/" target="_blank" rel="noreferrer"><span class="status-logo">SP</span><span><strong>Spotify issues</strong><small>Official ongoing issues</small></span><span class="status-open">↗</span></a>
@@ -1343,25 +1346,6 @@
           <a class="status-page-link" href="https://status.figma.com/" target="_blank" rel="noreferrer"><span class="status-logo">FI</span><span><strong>Figma status</strong><small>status.figma.com</small></span><span class="status-open">↗</span></a>
           <a class="status-page-link" href="https://discordstatus.com/" target="_blank" rel="noreferrer"><span class="status-logo">DI</span><span><strong>Discord status</strong><small>discordstatus.com</small></span><span class="status-open">↗</span></a>
           <a class="status-page-link" href="https://status.incident.io/" target="_blank" rel="noreferrer"><span class="status-logo">IO</span><span><strong>incident.io status</strong><small>status.incident.io</small></span><span class="status-open">↗</span></a>
-        </div>
-        <div class="status-stream-group" aria-hidden="true" inert>
-          <a class="status-page-link" href="https://anthropic.statuspage.io/" tabindex="-1"><span class="status-logo">AN</span><span><strong>Anthropic status</strong><small>anthropic.statuspage.io</small></span><span class="status-open">↗</span></a>
-          <a class="status-page-link" href="https://anthropic.statuspage.io/" tabindex="-1"><span class="status-logo">CL</span><span><strong>Claude services</strong><small>claude.ai · API · Claude Code</small></span><span class="status-open">↗</span></a>
-          <a class="status-page-link" href="https://support.spotify.com/us/article/ongoing-issues/" tabindex="-1"><span class="status-logo">SP</span><span><strong>Spotify issues</strong><small>Official ongoing issues</small></span><span class="status-open">↗</span></a>
-          <a class="status-page-link" href="https://www.githubstatus.com/" tabindex="-1"><span class="status-logo">GH</span><span><strong>GitHub status</strong><small>githubstatus.com</small></span><span class="status-open">↗</span></a>
-          <a class="status-page-link" href="https://www.cloudflarestatus.com/" tabindex="-1"><span class="status-logo">CF</span><span><strong>Cloudflare status</strong><small>cloudflarestatus.com</small></span><span class="status-open">↗</span></a>
-          <a class="status-page-link" href="https://slack-status.com/" tabindex="-1"><span class="status-logo">SL</span><span><strong>Slack status</strong><small>slack-status.com</small></span><span class="status-open">↗</span></a>
-          <a class="status-page-link" href="https://status.atlassian.com/" tabindex="-1"><span class="status-logo">AT</span><span><strong>Atlassian status</strong><small>status.atlassian.com</small></span><span class="status-open">↗</span></a>
-          <a class="status-page-link" href="https://status.openai.com/" tabindex="-1"><span class="status-logo">OA</span><span><strong>OpenAI status</strong><small>status.openai.com</small></span><span class="status-open">↗</span></a>
-          <a class="status-page-link" href="https://status.stripe.com/" tabindex="-1"><span class="status-logo">ST</span><span><strong>Stripe status</strong><small>status.stripe.com</small></span><span class="status-open">↗</span></a>
-          <a class="status-page-link" href="https://www.shopifystatus.com/" tabindex="-1"><span class="status-logo">SH</span><span><strong>Shopify status</strong><small>shopifystatus.com</small></span><span class="status-open">↗</span></a>
-          <a class="status-page-link" href="https://status.datadoghq.com/" tabindex="-1"><span class="status-logo">DD</span><span><strong>Datadog status</strong><small>status.datadoghq.com</small></span><span class="status-open">↗</span></a>
-          <a class="status-page-link" href="https://status.gitlab.com/" tabindex="-1"><span class="status-logo">GL</span><span><strong>GitLab status</strong><small>status.gitlab.com</small></span><span class="status-open">↗</span></a>
-          <a class="status-page-link" href="https://status.notion.so/" tabindex="-1"><span class="status-logo">NO</span><span><strong>Notion status</strong><small>status.notion.so</small></span><span class="status-open">↗</span></a>
-          <a class="status-page-link" href="https://status.figma.com/" tabindex="-1"><span class="status-logo">FI</span><span><strong>Figma status</strong><small>status.figma.com</small></span><span class="status-open">↗</span></a>
-          <a class="status-page-link" href="https://discordstatus.com/" tabindex="-1"><span class="status-logo">DI</span><span><strong>Discord status</strong><small>discordstatus.com</small></span><span class="status-open">↗</span></a>
-          <a class="status-page-link" href="https://status.incident.io/" tabindex="-1"><span class="status-logo">IO</span><span><strong>incident.io status</strong><small>status.incident.io</small></span><span class="status-open">↗</span></a>
-        </div>
       </div>
       <p class="status-verified">16 live examples · links verified 25 July 2026</p>
     </section>
