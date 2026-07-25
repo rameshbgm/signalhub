@@ -22,18 +22,17 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
+        env:
+          DATABASE_URL: mongodb://127.0.0.1:27017/signalhub-build
+          SESSION_SECRET: 012345678901234567890123456789012345678901234567
+          ENCRYPTION_KEY: 012345678901234567890123456789012345678901234567
       - run: npm audit --omit=dev --audit-level=high
 
   container:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/build-push-action@v6
-        with:
-          context: .
-          push: false
-          tags: signalhub:ci
+      - run: docker build --tag signalhub:ci .
 
   helm:
     runs-on: ubuntu-latest
