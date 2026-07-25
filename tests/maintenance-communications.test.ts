@@ -1,18 +1,11 @@
-import { pathToFileURL } from "node:url";
 import { describe, expect, it } from "vitest";
-import { tsImport } from "tsx/esm/api";
 
 process.env.DATABASE_URL ??= "mongodb://127.0.0.1:27017/status-unit-tests";
 
-const parentURL = pathToFileURL(import.meta.filename).href;
-const maintenance = (await tsImport(
-  "../lib/domain/maintenance.ts",
-  parentURL
-)) as typeof import("../lib/domain/maintenance");
-const communications = (await tsImport(
-  "../components/admin/IncidentCommunicationForms.tsx",
-  parentURL
-)) as typeof import("../components/admin/IncidentCommunicationForms");
+const maintenance = await import("../lib/domain/maintenance");
+const communications = await import(
+  "../components/admin/IncidentCommunicationForms"
+);
 
 describe("maintenance reminder eligibility", () => {
   const now = new Date("2026-07-25T04:00:00.000Z");

@@ -33,7 +33,7 @@ jobs:
         with:
           context: .
           push: false
-          tags: status:ci
+          tags: signalhub:ci
 
   helm:
     runs-on: ubuntu-latest
@@ -45,6 +45,9 @@ jobs:
 
   e2e:
     runs-on: ubuntu-latest
+    env:
+      SESSION_SECRET: 012345678901234567890123456789012345678901234567
+      ENCRYPTION_KEY: 012345678901234567890123456789012345678901234567
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -53,10 +56,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx playwright install --with-deps chromium
-      - run: |
-          SESSION_SECRET=012345678901234567890123456789012345678901234567 \
-          ENCRYPTION_KEY=012345678901234567890123456789012345678901234567 \
-          docker compose up -d --build
+      - run: docker compose up -d --build
       - run: |
           for attempt in $(seq 1 60); do
             if curl --fail --silent http://127.0.0.1:3301/api/health/ready >/dev/null; then exit 0; fi
