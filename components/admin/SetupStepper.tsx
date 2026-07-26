@@ -4,7 +4,6 @@ const STEPS = [
   { key: "components", label: "Add components" },
   { key: "logo", label: "Add your logo" },
   { key: "notifications", label: "Notifications" },
-  { key: "team", label: "Invite team" },
   { key: "incidents", label: "Incidents" },
 ];
 
@@ -17,7 +16,7 @@ export function SetupStepper({ pageId, current }: { pageId: string; current: str
         {STEPS.map((s, i) => (
           <div key={s.key} className="flex items-center">
             <Link
-              href={`/admin/pages/${pageId}/setup/${s.key}`}
+              href={`/organization/pages/${pageId}/setup/${s.key}`}
               className={`flex items-center gap-2 text-sm font-medium whitespace-nowrap ${
                 i === currentIndex ? "text-[var(--cyan)]" : i < currentIndex ? "text-[var(--fg)]" : "text-[var(--fg-dim)]"
               }`}
@@ -36,5 +35,3 @@ export function SetupStepper({ pageId, current }: { pageId: string; current: str
     </div>
   );
 }
-
-export const SETUP_STEPS = STEPS;

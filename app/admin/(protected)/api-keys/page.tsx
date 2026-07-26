@@ -69,7 +69,7 @@ export default async function ApiKeysPage({ searchParams }: { searchParams: Prom
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <h2 className="font-mono text-sm font-semibold text-[var(--fg)]">Outbound Webhooks</h2>
           <div className="w-full sm:w-56">
-            <PageSelect pages={pages.map((p) => ({ id: p.id, name: p.name }))} basePath="/admin/api-keys" selected={pageId} />
+            <PageSelect pages={pages.map((p) => ({ id: p.id, name: p.name }))} basePath="/organization/api-keys" selected={pageId} />
           </div>
         </div>
         <p className="text-sm text-[var(--fg-soft)]">

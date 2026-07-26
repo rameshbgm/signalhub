@@ -13,22 +13,23 @@ export async function POST(request: NextRequest) {
   try {
     const current = await getSession();
     if (!current) return apiError(401, "UNAUTHENTICATED", "Sign in before switching organizations");
-    if (current.supportSessionId) {
-      return apiError(403, "SUPPORT_SESSION_SCOPED", "Support sessions cannot switch organizations");
-    }
     const parsed = schema.safeParse(await request.json().catch(() => ({})));
     if (!parsed.success) return validationError(parsed.error);
 
-    const membership = await collections.memberships().findOne({
+    const authorityMembership = await collections.memberships().findOne({
+      _id: oid(current.membershipId),
       userId: oid(current.userId),
-      orgId: oid(parsed.data.orgId),
       status: "ACTIVE",
     });
+    if (!authorityMembership) return apiError(403, "MEMBERSHIP_NOT_FOUND", "Account authority is no longer active");
+    const membership = authorityMembership.role === "ADMIN"
+      ? authorityMembership
+      : await collections.memberships().findOne({ userId: oid(current.userId), orgId: oid(parsed.data.orgId), status: "ACTIVE" });
     if (!membership) return apiError(404, "MEMBERSHIP_NOT_FOUND", "Organization membership not found");
     const [user, organization] = await Promise.all([
       collections.users().findOne({ _id: membership.userId, disabled: { $ne: true } }),
       collections.organizations().findOne({
-        _id: membership.orgId,
+        _id: oid(parsed.data.orgId),
         suspended: { $ne: true },
         status: { $nin: ["PROVISIONING", "SUSPENDED", "DELETING"] },
       }),
@@ -36,9 +37,9 @@ export async function POST(request: NextRequest) {
     if (!user || !organization) return apiError(403, "ORGANIZATION_UNAVAILABLE", "Organization is unavailable");
 
     const authorized = await writeActiveTenantAudit(
-      membership.orgId,
+      organization._id,
       {
-        actor: user.email,
+        actor: user.username,
         action: "SWITCH_ORGANIZATION",
         target: organization.slug,
         createdAt: new Date(),
@@ -49,12 +50,7 @@ export async function POST(request: NextRequest) {
           { session: databaseSession }
         );
         const currentMembership = await collections.memberships().findOne(
-          {
-            _id: membership._id,
-            userId: user._id,
-            orgId: membership.orgId,
-            status: "ACTIVE",
-          },
+          { _id: membership._id, userId: user._id, status: "ACTIVE" },
           { session: databaseSession }
         );
         if (!currentUser || !currentMembership) {
@@ -70,14 +66,15 @@ export async function POST(request: NextRequest) {
     await createSession({
       userId: authorized.user._id.toHexString(),
       membershipId: authorized.membership._id.toHexString(),
-      orgId: authorized.membership.orgId.toHexString(),
+      orgId: organization._id.toHexString(),
+      username: authorized.user.username,
       email: authorized.user.email,
       name: authorized.user.name,
       role: authorized.membership.role,
     });
     return NextResponse.json({
       ok: true,
-      organizationId: authorized.membership.orgId.toHexString(),
+      organizationId: organization._id.toHexString(),
     });
   } catch (error) {
     return routeError(error);

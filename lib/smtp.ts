@@ -42,8 +42,3 @@ export async function verifySmtp() {
     };
   }
 }
-
-export function resetSmtpTransportForTests() {
-  transporter?.close();
-  transporter = null;
-}

@@ -96,7 +96,7 @@ export async function saveMonitorTemplate(templateId: string | null, formData: F
   } finally {
     await databaseSession.endSession();
   }
-  revalidatePath("/platform/templates");
+  revalidatePath("/organization/platform/templates");
 }
 
 export async function deleteMonitorTemplate(templateId: string, formData: FormData) {
@@ -134,5 +134,5 @@ export async function deleteMonitorTemplate(templateId: string, formData: FormDa
   } finally {
     await databaseSession.endSession();
   }
-  revalidatePath("/platform/templates");
+  revalidatePath("/organization/platform/templates");
 }

@@ -1,5 +1,7 @@
 "use client";
 
+import { fetchWithTimeout } from "@/lib/client-fetch";
+
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
@@ -20,13 +22,13 @@ export function LogoutButton({
     setError(null);
 
     try {
-      const response = await fetch("/api/auth/logout", { method: "POST" });
+      const response = await fetchWithTimeout("/api/auth/logout", { method: "POST" });
       if (!response.ok) {
         const body = await response.json().catch(() => ({}));
         setError(body.error?.message ?? body.error ?? "Unable to sign out");
         return;
       }
-      router.replace("/admin/login");
+      router.replace("/login");
       router.refresh();
     } catch {
       setError("Unable to sign out. Check your connection and try again.");

@@ -17,7 +17,7 @@ export async function GET(
   try {
     const { connection: slug } = await params;
     const connection = await findEnabledConnection(slug, "OIDC");
-    if (!connection) return apiError(404, "IDENTITY_CONNECTION_NOT_FOUND", "Identity connection not found");
+    if (!connection || connection.audience !== "ORGANIZATION") return apiError(404, "IDENTITY_CONNECTION_NOT_FOUND", "Identity connection not found");
     await consumeRateLimit("enterprise-oidc-start", requestIp(request), {
       limit: 20,
       windowMs: 15 * 60_000,
@@ -25,11 +25,10 @@ export async function GET(
     const config = oidcConnectionConfig(connection);
     const discovery = await getOidcDiscovery(config);
     const transaction = createOidcTransactionValues();
-    const requestedReturnTo = request.nextUrl.searchParams.get("returnTo") ??
-      (connection.audience === "PLATFORM" ? "/platform" : "/admin");
+    const requestedReturnTo = request.nextUrl.searchParams.get("returnTo") ?? "/organization";
     const returnTo = requestedReturnTo.startsWith("/") && !requestedReturnTo.startsWith("//")
       ? requestedReturnTo
-      : connection.audience === "PLATFORM" ? "/platform" : "/admin";
+      : "/organization";
     const signedTransaction = await signOidcTransaction({
       ...transaction,
       returnTo,

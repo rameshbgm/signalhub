@@ -167,6 +167,7 @@ export async function POST(
       userId: user._id.toHexString(),
       membershipId: membership._id.toHexString(),
       orgId: membership.orgId.toHexString(),
+      username: user.username,
       email: user.email,
       name: user.name,
       role: membership.role,

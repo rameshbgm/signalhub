@@ -30,7 +30,7 @@ export default async function NewIncidentPage({ searchParams }: { searchParams: 
       <div className="bg-[var(--surface)] border border-[var(--line)] p-4 sm:p-5 space-y-4">
         <label className="block text-sm">
           <span className="text-xs text-[var(--fg-dim)] block mb-1">Page</span>
-          <PageSelect pages={pages.map((p) => ({ id: p.id, name: p.name }))} basePath="/admin/incidents/new" selected={pageId} />
+          <PageSelect pages={pages.map((p) => ({ id: p.id, name: p.name }))} basePath="/organization/incidents/new" selected={pageId} />
         </label>
         {pageId && (
           <IncidentForm

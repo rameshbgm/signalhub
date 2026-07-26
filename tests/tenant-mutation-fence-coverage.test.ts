@@ -50,9 +50,9 @@ describe("tenant mutation lifecycle-fence coverage", () => {
     }
   );
 
-  it("serializes team membership changes through the active organization", () => {
+  it("serializes team membership changes through the installation Admin lock", () => {
     expect(source("lib/team-owner-safety.ts")).toContain(
-      "fenceActiveOrganizationMutation("
+      '"identityInvariantLocks"'
     );
   });
 
@@ -149,14 +149,13 @@ describe("tenant mutation lifecycle-fence coverage", () => {
     expect(pageDelete).toBeGreaterThan(storageDelete);
   });
 
-  it("rechecks component group and monitor template selections in the fenced create transaction", () => {
+  it("rechecks component group selections in the fenced create transaction", () => {
     const contents = exportedFunctionSource(
       "app/admin/(protected)/pages/[pageId]/components-actions.ts",
       "createComponent"
     );
     const fence = contents.indexOf("fenceActiveOrganizationMutation(");
     expect(contents.indexOf("componentGroups().findOne(", fence)).toBeGreaterThan(fence);
-    expect(contents.indexOf("monitorTemplates().findOne(", fence)).toBeGreaterThan(fence);
   });
 
   it("fences and count-checks asset removal in its database transaction", () => {

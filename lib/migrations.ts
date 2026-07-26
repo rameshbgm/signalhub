@@ -12,6 +12,8 @@ import { generateAutomationToken, generateWebhookSecret } from "@/lib/tokens";
 import { hashSecret } from "@/lib/secrets";
 import { encryptSecret } from "@/lib/encryption";
 import { DEFAULT_MONITOR_TEMPLATES } from "@/lib/default-monitor-templates";
+import { legacyPageDesign } from "@/lib/page-design";
+import { hashPassword } from "@/lib/auth";
 import {
   evaluateMigrationState,
   type MigrationInspection,
@@ -19,10 +21,8 @@ import {
 } from "@/lib/migration-state";
 
 export {
-  evaluateMigrationState,
   migrationIssueSummary,
   type MigrationInspection,
-  type MigrationManifestEntry,
 } from "@/lib/migration-state";
 
 type Migration = {
@@ -82,6 +82,36 @@ multi-connection-enterprise-identity-v1
 scoped-api-credentials-v1
 retention-and-export-jobs-v1
 argon2-progressive-password-upgrade-v1
+`;
+
+const statusPageBuilderSource = `
+status-page-design-v1
+status-page-drafts-and-versions-v1
+scheduled-page-announcements-v1
+`;
+
+const simplifiedIdentityRolesSource = `
+organization-owner-to-admin-v1
+single-platform-owner-v1
+retire-platform-invitations-v1
+`;
+
+const unifiedAdminIdentitySource = `
+destructive-username-identity-reset-v1
+platform-owner-merged-into-admin-v1
+single-console-global-admin-v1
+`;
+
+const retireCustomDomainsSource = `
+remove-custom-status-domain-data-v1
+`;
+
+const coverImageFramingSource = `
+responsive-cover-image-framing-v1
+`;
+
+const coverImageCropFrameSource = `
+direct-cover-image-crop-frame-v1
 `;
 
 async function productionFoundation(database: Db, session: ClientSession) {
@@ -220,10 +250,6 @@ async function productionFoundation(database: Db, session: ClientSession) {
       { session }
     );
   }
-  await database
-    .collection("pages")
-    .updateMany({ customDomain: "" }, { $set: { customDomain: null } }, { session });
-
   const apiKeys = await database.collection("apiKeys").find({}, { session }).toArray();
   for (const key of apiKeys) {
     if (typeof key.key !== "string" || !key.key) continue;
@@ -820,9 +846,286 @@ const migrations: Migration[] = [
       );
     },
   },
+  {
+    id: "007-status-page-builder",
+    description: "Add versioned status-page designs, drafts, versions, and announcements",
+    source: statusPageBuilderSource,
+    run: async (database, session) => {
+      const pages = await database.collection("pages").find({}, { session }).toArray();
+      const now = new Date();
+      for (const page of pages) {
+        if (page.publishedDesign && page.publishedDesignVersion) continue;
+        await database.collection("pages").updateOne(
+          { _id: page._id },
+          {
+            $set: {
+              publishedDesign: legacyPageDesign({
+                brandColor: typeof page.brandColor === "string" ? page.brandColor : null,
+                layout: typeof page.layout === "string" ? page.layout : null,
+                themePreset: typeof page.themePreset === "string" ? page.themePreset : null,
+                themeMode: typeof page.themeMode === "string" ? page.themeMode : null,
+                allowThemeOverride:
+                  typeof page.allowThemeOverride === "boolean"
+                    ? page.allowThemeOverride
+                    : null,
+              }),
+              publishedDesignVersion: 1,
+              designPublishedAt: now,
+            },
+          },
+          { session }
+        );
+      }
+    },
+  },
+  {
+    id: "008-simplified-identity-roles",
+    description: "Use organization Admin and one installation-wide Platform Owner",
+    source: simplifiedIdentityRolesSource,
+    run: async (database, session) => {
+      await database.collection("memberships").updateMany(
+        { role: "OWNER" },
+        { $set: { role: "ADMIN" } },
+        { session }
+      );
+      await database.collection("identityConnections").updateMany(
+        { audience: "ORGANIZATION", defaultRole: "OWNER" },
+        { $set: { defaultRole: "ADMIN" } },
+        { session }
+      );
+      const organizationConnections = await database
+        .collection("identityConnections")
+        .find({ audience: "ORGANIZATION", "roleMappings.role": "OWNER" }, { session })
+        .toArray();
+      for (const connection of organizationConnections) {
+        const roleMappings = Array.isArray(connection.roleMappings)
+          ? connection.roleMappings.map((mapping: Document) => ({
+              ...mapping,
+              role: mapping.role === "OWNER" ? "ADMIN" : mapping.role,
+            }))
+          : [];
+        await database.collection("identityConnections").updateOne(
+          { _id: connection._id },
+          { $set: { roleMappings } },
+          { session }
+        );
+      }
+
+      const platformAdmins = await database
+        .collection("platformAdmins")
+        .find({}, { session })
+        .sort({ createdAt: 1, _id: 1 })
+        .toArray();
+      if (platformAdmins.length > 1) {
+        throw new Error(
+          "Migration stopped: SignalHub now supports one Platform Owner. Remove all legacy platform administrator records except the account to retain, then retry."
+        );
+      }
+      if (platformAdmins[0]) {
+        await database.collection("platformAdmins").updateOne(
+          { _id: platformAdmins[0]._id },
+          {
+            $set: {
+              singletonKey: "platform-owner",
+              role: "PLATFORM_OWNER",
+              status: "ACTIVE",
+              updatedAt: new Date(),
+            },
+          },
+          { session }
+        );
+      }
+      await database.collection("identityConnections").updateMany(
+        { audience: "PLATFORM" },
+        {
+          $set: {
+            defaultRole: "PLATFORM_OWNER",
+            "roleMappings.$[].role": "PLATFORM_OWNER",
+          },
+        },
+        { session }
+      );
+      await database.collection("platformInvites").deleteMany({}, { session });
+    },
+  },
+  {
+    id: "009-unified-admin-identity",
+    description: "Replace platform identities with username-based installation Admins",
+    source: unifiedAdminIdentitySource,
+    run: async (database, session) => {
+      if (
+        process.env.NODE_ENV === "production" &&
+        process.env.CONFIRM_IDENTITY_RESET !== "true"
+      ) {
+        throw new Error(
+          "Migration 009 deletes all identities. Set CONFIRM_IDENTITY_RESET=true after taking a backup to continue."
+        );
+      }
+
+      const now = new Date();
+      let anchor = await database.collection("organizations").findOne(
+        {
+          suspended: { $ne: true },
+          status: { $nin: ["PROVISIONING", "SUSPENDED", "DELETING"] },
+        },
+        { sort: { createdAt: 1, _id: 1 }, session }
+      );
+      if (!anchor) {
+        const organizationId = new ObjectId();
+        anchor = {
+          _id: organizationId,
+          name: "Default Organization",
+          slug: "default",
+          contactEmail: null,
+          suspended: false,
+          status: "ACTIVE",
+          statusReason: null,
+          statusChangedAt: now,
+          statusChangedBy: null,
+          createdAt: now,
+          updatedAt: now,
+        };
+        await database.collection("organizations").insertOne(anchor, { session });
+      }
+
+      for (const collectionName of [
+        "authSessions",
+        "supportSessions",
+        "externalIdentities",
+        "scimTokens",
+        "scimGroups",
+        "samlRequests",
+        "memberships",
+        "users",
+        "platformInvites",
+        "platformAdmins",
+      ]) {
+        await database.collection(collectionName).deleteMany({}, { session });
+      }
+
+      const adminId = new ObjectId();
+      const membershipId = new ObjectId();
+      const passwordHash = await hashPassword("admin");
+      await database.collection("users").insertOne(
+        {
+          _id: adminId,
+          username: "admin",
+          canonicalUsername: "admin",
+          email: "",
+          canonicalEmail: "",
+          passwordHash,
+          name: "Administrator",
+          twoFactorEnabled: false,
+          oidcIssuer: null,
+          oidcSubject: null,
+          disabled: false,
+          mustChangePassword: true,
+          mustCompleteProfile: true,
+          sessionVersion: 1,
+          mfaRequired: false,
+          totpSecretCiphertext: null,
+          pendingTotpSecretCiphertext: null,
+          recoveryCodeHashes: [],
+          mfaEnrolledAt: null,
+          createdAt: now,
+          updatedAt: now,
+        },
+        { session }
+      );
+      await database.collection("memberships").insertOne(
+        {
+          _id: membershipId,
+          orgId: anchor._id,
+          userId: adminId,
+          role: "ADMIN",
+          status: "ACTIVE",
+          pageIds: null,
+          invitationExpiresAt: null,
+          invitationTokenHash: null,
+          activatedAt: now,
+          createdAt: now,
+        },
+        { session }
+      );
+
+      const connections = await database.collection("identityConnections").find({}, { session }).toArray();
+      for (const connection of connections) {
+        const wasPlatform = connection.audience === "PLATFORM";
+        const roleMappings = Array.isArray(connection.roleMappings)
+          ? connection.roleMappings.map((mapping: Document) => ({
+              ...mapping,
+              role: mapping.role === "PLATFORM_OWNER" ? "ADMIN" : mapping.role,
+            }))
+          : [];
+        await database.collection("identityConnections").updateOne(
+          { _id: connection._id },
+          {
+            $set: {
+              audience: "ORGANIZATION",
+              orgId: wasPlatform ? anchor._id : connection.orgId,
+              defaultRole: connection.defaultRole === "PLATFORM_OWNER" ? "ADMIN" : connection.defaultRole,
+              roleMappings,
+              createdBy: adminId,
+              updatedAt: now,
+            },
+          },
+          { session }
+        );
+      }
+    },
+  },
+  {
+    id: "010-retire-custom-domains",
+    description: "Remove retired custom status-page domain data",
+    source: retireCustomDomainsSource,
+    run: async (database, session) => {
+      await database.collection("pages").updateMany(
+        { customDomain: { $exists: true } },
+        { $unset: { customDomain: "" } },
+        { session }
+      );
+    },
+  },
+  {
+    id: "011-cover-image-framing",
+    description: "Add responsive cover-image framing defaults",
+    source: coverImageFramingSource,
+    run: async (database, session) => {
+      await database.collection("pages").updateMany(
+        {},
+        {
+          $set: {
+            coverImageFit: "CONTAIN",
+            coverImagePositionX: 50,
+            coverImagePositionY: 50,
+          },
+        },
+        { session }
+      );
+    },
+  },
+  {
+    id: "012-cover-image-crop-frame",
+    description: "Add direct cover-image crop frame fields",
+    source: coverImageCropFrameSource,
+    run: async (database, session) => {
+      await database.collection("pages").updateMany(
+        {},
+        {
+          $set: {
+            coverImageCropX: null,
+            coverImageCropY: null,
+            coverImageCropWidth: null,
+            coverImageCropHeight: null,
+          },
+        },
+        { session }
+      );
+    },
+  },
 ];
 
-export const MIGRATION_MANIFEST: readonly MigrationManifestEntry[] = migrations.map(
+const MIGRATION_MANIFEST: readonly MigrationManifestEntry[] = migrations.map(
   (migration) => ({
     id: migration.id,
     description: migration.description,

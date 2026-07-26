@@ -27,7 +27,7 @@ export default function PlatformError({
         >
           Reload current state
         </button>
-        <Link href="/platform" className="border border-[var(--line)] px-3 py-2 text-xs font-semibold">
+        <Link href="/organization/platform" className="border border-[var(--line)] px-3 py-2 text-xs font-semibold">
           Platform overview
         </Link>
       </div>

@@ -1,5 +1,7 @@
 "use client";
 
+import { fetchWithTimeout } from "@/lib/client-fetch";
+
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { CopyButton } from "@/components/CopyButton";
@@ -32,7 +34,7 @@ export function WebhookEndpointManager({
     setSecret(null);
 
     try {
-      const response = await fetch("/api/admin/webhook-endpoints", {
+      const response = await fetchWithTimeout("/api/admin/webhook-endpoints", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ pageId, url }),
@@ -65,7 +67,7 @@ export function WebhookEndpointManager({
     setSecret(null);
 
     try {
-      const response = await fetch(
+      const response = await fetchWithTimeout(
         action === "rotate"
           ? `/api/admin/webhook-endpoints/${id}/rotate`
           : `/api/admin/webhook-endpoints?id=${id}`,

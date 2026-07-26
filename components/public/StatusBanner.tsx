@@ -6,25 +6,40 @@ export function StatusBanner({
   updatedAt,
   locale = "en",
   timeZone = "UTC",
+  variant = "PANEL",
+  showLastUpdated = true,
+  description,
 }: {
   label: string;
   color: string;
   updatedAt?: Date | null;
   locale?: string;
   timeZone?: string;
+  variant?: "PANEL" | "SOLID" | "CENTERED" | "COMPACT";
+  showLastUpdated?: boolean;
+  description?: string | null;
 }) {
+  const operational = label === "All Systems Operational";
+  const solid = variant === "SOLID";
   return (
     <div
       role="status"
       aria-live="polite"
-      className="border px-5 py-5 sm:px-6 sm:py-6 flex items-center gap-4 bg-[var(--surface)] shadow-sm"
-      style={{ borderColor: color, color }}
+      className={`page-panel border flex items-center gap-4 ${
+        variant === "COMPACT" ? "px-4 py-3" : "px-5 py-5 sm:px-6 sm:py-6"
+      } ${variant === "CENTERED" ? "justify-center text-center" : ""}`}
+      style={{
+        borderColor: color,
+        color: solid ? "#ffffff" : color,
+        backgroundColor: solid ? color : "var(--surface)",
+      }}
     >
-      <BannerIcon color={color} operational={label === "All Systems Operational"} />
+      <BannerIcon color={solid ? "#ffffff" : color} operational={operational} />
       <div className="min-w-0">
         <p className="font-mono text-lg font-semibold sm:text-xl">{label}</p>
-        {updatedAt && (
-          <p className="mt-1 text-xs font-normal text-[var(--fg-dim)]">
+        {description && <p className={`mt-1 text-sm ${solid ? "text-white/85" : "text-[var(--fg-soft)]"}`}>{description}</p>}
+        {showLastUpdated && updatedAt && (
+          <p className={`mt-1 text-xs font-normal ${solid ? "text-white/75" : "text-[var(--fg-dim)]"}`}>
             Last activity{" "}
             {formatPageDate(updatedAt, {
               language: locale,

@@ -57,7 +57,7 @@ export default async function SetupComponentsPage({ params }: { params: Promise<
       <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center mt-12 pt-6 border-t border-[var(--line)]">
         <p className="text-xs text-[var(--fg-dim)]">Directions: Add at least one component to continue.</p>
         <Link
-          href={`/admin/pages/${pageId}/setup/logo`}
+          href={`/organization/pages/${pageId}/setup/logo`}
           className="bg-[var(--cyan)] text-[var(--on-cyan)] px-5 py-2.5 text-sm font-semibold font-mono text-center"
         >
           Next: Add your logo →

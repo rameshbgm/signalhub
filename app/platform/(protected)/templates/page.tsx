@@ -1,4 +1,5 @@
 import { collections } from "@/lib/db";
+import { FluentSelect } from "@/components/FluentSelect";
 import { requirePlatformCapability } from "@/lib/admin-guard";
 import { hasPlatformCapability } from "@/lib/platform-policy";
 import { deleteMonitorTemplate, saveMonitorTemplate } from "./actions";
@@ -94,12 +95,12 @@ function TemplateForm({
         Description
         <textarea name="description" defaultValue={template?.description} required maxLength={500} className="mt-1 min-h-20 w-full border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm font-normal" />
       </label>
-      <label className="text-xs font-semibold text-[var(--fg)]">
+      <div className="text-xs font-semibold text-[var(--fg)]">
         Type
-        <select name="type" defaultValue={template?.type ?? "HTTP"} className="mt-1 w-full border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm font-normal">
+        <FluentSelect aria-label="Type" name="type" defaultValue={template?.type ?? "HTTP"} className="mt-1 w-full border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm font-normal">
           {TYPES.map((type) => <option key={type}>{type}</option>)}
-        </select>
-      </label>
+        </FluentSelect>
+      </div>
       <Field label="Target (not used for heartbeat)" name="target" value={template?.target} />
       <Field label="Port (required for TCP)" name="port" type="number" value={template?.port?.toString()} min={1} max={65_535} />
       <Field label="Expected status range" name="expectedStatusRange" value={template?.expectedStatusRange ?? "200-299"} required pattern="[0-9]{3}-[0-9]{3}" />

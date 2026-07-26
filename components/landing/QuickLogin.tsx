@@ -1,35 +1,37 @@
 "use client";
 
+import { fetchWithTimeout } from "@/lib/client-fetch";
+
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 type QuickAccount = {
   key: string;
-  audience: "tenant" | "platform";
+  username: string;
   email: string;
   name: string;
   role: string;
   description: string;
 };
 
-export function QuickLogin({ audience }: { audience: QuickAccount["audience"] }) {
+export function QuickLogin() {
   const router = useRouter();
   const [accounts, setAccounts] = useState<QuickAccount[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch("/api/auth/dev-login", { cache: "no-store" })
+    fetchWithTimeout("/api/auth/dev-login", { cache: "no-store" })
       .then((response) => response.ok ? response.json() : { accounts: [] })
       .then((body) => {
         setAccounts(
           Array.isArray(body.accounts)
-            ? body.accounts.filter((account: QuickAccount) => account.audience === audience)
+            ? body.accounts
             : []
         );
       })
       .catch(() => setAccounts([]));
-  }, [audience]);
+  }, []);
 
   if (!accounts.length) return null;
 
@@ -37,7 +39,7 @@ export function QuickLogin({ audience }: { audience: QuickAccount["audience"] })
     setBusy(account.key);
     setError(null);
     try {
-      const response = await fetch("/api/auth/dev-login", {
+      const response = await fetchWithTimeout("/api/auth/dev-login", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ key: account.key }),
@@ -47,7 +49,7 @@ export function QuickLogin({ audience }: { audience: QuickAccount["audience"] })
         setError(body.error ?? "Quick login is unavailable");
         return;
       }
-      router.push(body.redirectTo ?? (audience === "platform" ? "/platform" : "/admin"));
+      router.push(body.redirectTo ?? "/organization");
       router.refresh();
     } catch {
       setError("Unable to reach the development login endpoint");

@@ -5,7 +5,7 @@ export type HelpArticle = {
   body: HelpSection[];
 };
 
-export type HelpSection = { heading: string; paragraphs: string[]; list?: string[] };
+export type HelpSection = { heading: string; paragraphs: string[]; list?: string[]; code?: string };
 
 export type HelpCategory = {
   slug: string;
@@ -47,7 +47,7 @@ export const HELP_CATEGORIES: HelpCategory[] = [
             heading: "Creating a page",
             paragraphs: [
               "Go to Pages → fill in a name, optional custom slug, and page type (Public, Private password-protected, or Audience-specific). Optionally mark it as a hub page, or attach it as a child of an existing hub.",
-              "New pages route straight into the 5-step setup wizard: Add components → Add your logo → Notifications → Invite team → Incidents.",
+              "New pages route straight into the 4-step setup wizard: Add components → Add your logo → Notifications → Incidents.",
             ],
           },
           {
@@ -63,9 +63,27 @@ export const HELP_CATEGORIES: HelpCategory[] = [
           {
             heading: "Managing a page",
             paragraphs: [
-              "Click Manage to edit branding (layout, logo, brand color, custom domain), components and component groups, and — for Audience pages — access groups and users.",
+              "Click Manage to edit branding (layout, logo, and brand color), components and component groups, and — for Audience pages — access groups and users.",
               "Click Build my page to re-enter the setup wizard at any time.",
             ],
+          },
+        ],
+      },
+      {
+        slug: "analytics",
+        title: "Analytics",
+        summary: "Understand status-page visits, subscriber activity, and public engagement without exposing visitor identities.",
+        body: [
+          {
+            heading: "Reading the dashboard",
+            paragraphs: [
+              "Use Analytics to compare page views, unique sessions, subscription events, and traffic over time. Select a page and date range before drawing conclusions from the totals.",
+              "Public analytics are operational signals rather than billing-grade measurements. Privacy controls, blocked scripts, and cached status responses can affect counts.",
+            ],
+          },
+          {
+            heading: "Using the data",
+            paragraphs: ["Watch for traffic spikes during incidents, verify that subscription calls to action are working, and compare engagement before and after a page redesign."],
           },
         ],
       },
@@ -77,7 +95,7 @@ export const HELP_CATEGORIES: HelpCategory[] = [
           {
             heading: "What's recorded",
             paragraphs: [
-              "Every meaningful admin action — creating or deleting a page, changing settings, inviting or removing a team member, starting a support session, or revoking an API key — writes one entry here with who did it and when.",
+              "Every meaningful admin action — creating or deleting a page, changing settings, creating or removing a user, switching organizations, or revoking an API key — writes one entry here with who did it and when.",
               "The log shows the 200 most recent entries, newest first. It cannot be edited or deleted from the UI.",
             ],
           },
@@ -113,6 +131,31 @@ export const HELP_CATEGORIES: HelpCategory[] = [
             paragraphs: [
               "Open an incident's detail page to post further updates, change its status, or (once Resolved) write and publish a postmortem.",
               "Affected component status is reconciled against every remaining incident, maintenance window, monitor, and manual override when an incident resolves.",
+            ],
+          },
+        ],
+      },
+      {
+        slug: "timeline-and-postmortems",
+        title: "Timeline and postmortems",
+        summary: "Edit public incident updates, maintain an accurate line-and-dot timeline, and publish a durable retrospective.",
+        body: [
+          {
+            heading: "Editing timeline entries",
+            paragraphs: [
+              "Open an incident and use the timeline editor to correct an update's public status or message. Editing historical content does not silently change the incident's current lifecycle state.",
+              "The public incident page renders updates chronologically with a vertical rail and status dots. Keep each entry concise, customer-facing, and specific about what changed.",
+            ],
+          },
+          {
+            heading: "Writing a postmortem",
+            paragraphs: [
+              "After resolution, document the impact, root cause, recovery, and preventive actions. Publish only when the content is ready for customers; drafts remain private to administrators.",
+            ],
+            list: [
+              "State customer impact before internal technical detail.",
+              "Use exact times and avoid unsupported certainty.",
+              "List owned follow-up actions and expected completion windows.",
             ],
           },
         ],
@@ -190,6 +233,31 @@ export const HELP_CATEGORIES: HelpCategory[] = [
         ],
       },
       {
+        slug: "destinations",
+        title: "Notifications and destinations",
+        summary: "Configure subscriber delivery, tested team destinations, and signed outbound webhooks for each page.",
+        body: [
+          {
+            heading: "Delivery readiness",
+            paragraphs: [
+              "The Destinations screen shows whether Email, SMS, RSS, and Atom are available. Email and SMS require both a configured provider and a healthy delivery worker; feeds remain available without the worker.",
+              "Only destination providers enabled by a platform administrator appear. Slack, Teams, and similar team destinations are tested before their credentials are stored.",
+            ],
+          },
+          {
+            heading: "Signed status-event webhooks",
+            paragraphs: [
+              "Register a verified HTTPS endpoint to receive incident, maintenance, and postmortem events. SignalHub signs deliveries with the endpoint secret and retries transient failures.",
+              "Copy a newly issued secret immediately, store it in a secret manager, verify signatures against the raw request body, and rotate the secret if it may have been exposed.",
+            ],
+          },
+          {
+            heading: "Troubleshooting",
+            paragraphs: ["If delivery is paused, check the worker status first, then the provider readiness message, destination verification state, and last recorded error."],
+          },
+        ],
+      },
+      {
         slug: "metrics",
         title: "Metrics",
         summary: "Time-series charts (response time, uptime %, or anything numeric) shown publicly on your status page.",
@@ -225,6 +293,33 @@ export const HELP_CATEGORIES: HelpCategory[] = [
         ],
       },
       {
+        slug: "monitors",
+        title: "Monitors",
+        summary: "Run HTTP, TCP, DNS, and heartbeat checks with thresholds, history, and optional component automation.",
+        body: [
+          {
+            heading: "Creating a check",
+            paragraphs: [
+              "Choose the page, monitor type, target, interval, timeout, and optional component. HTTP monitors can validate status and response behavior; TCP and DNS checks validate reachability; heartbeat monitors expect your system to call a generated URL.",
+              "Failure and recovery thresholds prevent one transient result from flipping public status. A monitor changes state only after the configured number of consecutive outcomes.",
+            ],
+          },
+          {
+            heading: "Worker health",
+            paragraphs: [
+              "Checks, automatic maintenance transitions, and queued notifications run in the worker process. If the Monitors screen reports a stale or offline worker, fix worker health before interpreting missing checks as service health.",
+            ],
+          },
+          {
+            heading: "Safe automation",
+            paragraphs: [
+              "Linking a component lets monitor state participate in effective component status. Incidents, maintenance, manual status, and other monitors are reconciled together, so recovery from one source does not incorrectly clear another active outage.",
+              "Use Check on next poll for validation, inspect recent check history and latency, then enable automated actions only after thresholds behave as expected.",
+            ],
+          },
+        ],
+      },
+      {
         slug: "third-party",
         title: "Monitor Templates",
         summary: "Start a real worker-backed check from a curated, editable monitor configuration.",
@@ -239,7 +334,7 @@ export const HELP_CATEGORIES: HelpCategory[] = [
           {
             heading: "Adding one",
             paragraphs: [
-              "From a page's Components section, select an optional monitor template. Then use Monitors to customize its target, interval, assertions, thresholds, and automated actions.",
+              "Create the component on its page, then use Monitors to configure its target, interval, assertions, thresholds, and automated actions.",
             ],
           },
         ],
@@ -253,22 +348,48 @@ export const HELP_CATEGORIES: HelpCategory[] = [
     articles: [
       {
         slug: "team",
-        title: "Team",
-        summary: "Invite teammates and control what they can do with roles.",
+        title: "Users and roles",
+        summary: "Create active organization users and control what they can do with roles.",
         body: [
           {
             heading: "Roles",
             paragraphs: [],
             list: [
-              "OWNER — ownership, identity policy, and every tenant administrative capability.",
-              "ADMIN — team, pages, integrations, and organization configuration.",
+              "OWNER — identity policy, ownership changes, and every organization administrative capability.",
+              "ADMIN — team, pages, integrations, and organization configuration without ownership transfer authority.",
               "RESPONDER — incidents, maintenance, monitors, metrics, and component status.",
             ],
           },
           {
-            heading: "Inviting someone",
+            heading: "Creating a user",
             paragraphs: [
-              "Go to Team, enter the member's name, email, role, and page scope, then create the invitation link. Copy the single-use URL when it appears; it expires after 48 hours and is never stored in plaintext. New identities choose a password when accepting, while existing password-backed identities confirm their current password. Owners and Admins can invite members; only an Owner can grant ownership, and the last enabled active Owner can never be removed or demoted.",
+              "Go to Users & Roles, enter the user's name, email, role, page scope, and a temporary password for a new local identity. The membership becomes active immediately and a new local user must change the temporary password at first sign-in. Existing password or SSO identities keep their current authentication. Owners and Admins can create users; only an Owner can grant ownership, and the last enabled active Owner can never be removed or demoted.",
+            ],
+          },
+        ],
+      },
+      {
+        slug: "security",
+        title: "Security",
+        summary: "Manage local password policy, MFA, SSO connections, SCIM provisioning, sessions, and organization access controls.",
+        body: [
+          {
+            heading: "Authentication policy",
+            paragraphs: [
+              "Use Security to review allowed sign-in methods and identity connections. Changes affect how organization members authenticate, so keep at least one tested administrator path available while configuring SSO.",
+              "New local users receive a temporary password and must change it at first sign-in. Existing SSO or password identities retain their configured authentication method.",
+            ],
+          },
+          {
+            heading: "SSO and SCIM",
+            paragraphs: [
+              "Configure OIDC or SAML with the callback and metadata values displayed by SignalHub, then test the connection before enforcing it. SCIM tokens are credentials: copy them once, store them securely, scope them to the intended connection, and rotate them after exposure.",
+            ],
+          },
+          {
+            heading: "Sessions and incident response",
+            paragraphs: [
+              "Review active sessions, revoke suspicious or stale sessions, rotate affected API and webhook secrets, and use the Audit Log to reconstruct administrative changes. Organization suspension immediately fences tenant mutations and automation.",
             ],
           },
         ],
@@ -318,9 +439,51 @@ export const HELP_CATEGORIES: HelpCategory[] = [
     icon: "▦",
     articles: [
       {
+        slug: "designer-and-saving",
+        title: "Designer, saving, and versions",
+        summary: "Build page layouts, preview templates and themes, save changes live, restore versions, and reset defaults.",
+        body: [
+          {
+            heading: "Workspace layout",
+            paragraphs: [
+              "The designer uses a two-pane workspace. Branding, page settings, block controls, theme, navigation, SEO, announcements, service groups, and versions live in collapsed sections in the scrolling main canvas. Opening a section automatically closes the previously open section.",
+              "The right preview rail stays visible and does not scroll with the editor. The rendered page scrolls inside its own bounded preview frame while the preview toolbar remains fixed. Use the surface and viewport controls to review status, history, incident, access, hub, and embed layouts at desktop, tablet, or mobile sizes.",
+            ],
+          },
+          {
+            heading: "Draft versus live",
+            paragraphs: [
+              "Designer changes stay only in the browser until you choose Save, Save composition, or Save all. Every explicit save persists the design and updates the public page immediately.",
+              "Saving an unchanged design does not increment its draft revision or create another live version.",
+            ],
+          },
+          {
+            heading: "Blocks and composition",
+            paragraphs: [
+              "The Add block library marks singleton blocks as Added and keeps reusable Rich text and Link cards available. New blocks enter the Primary zone and are selected for configuration.",
+              "Drag blocks within Full width, Primary, or Sidebar to reorder them, or drag across zones. You can also select a block and change its Zone from the inspector. Save the composition when the preview is correct.",
+            ],
+          },
+          {
+            heading: "Templates and theme presets",
+            paragraphs: [
+              "Choose a page template from the dropdown and inspect the full preview before using it. Layout templates preserve the current theme and SEO settings.",
+              "Theme presets are independent of layout. Preview Default or one of the curated color systems before applying it, then use the manual theme controls for typography, density, width, radius, shadow, and individual status colors.",
+            ],
+          },
+          {
+            heading: "Versions and reset",
+            paragraphs: [
+              "Each page retains its 30 newest saved design versions. When the next version is saved, the oldest version for that page is removed automatically. Restore loads a version into a reviewable local draft rather than immediately replacing the live page.",
+              "Reset to default first shows a warning. Confirmation loads the default layout, blocks, theme, header/footer, SEO, and uptime presentation locally; it does not delete services, groups, incidents, subscribers, status history, or uploaded assets. Nothing public changes until you save.",
+            ],
+          },
+        ],
+      },
+      {
         slug: "page-branding",
         title: "Branding & layout",
-        summary: "Logo, brand color, layout (standard vs cover image), custom domain, and custom CSS for one page.",
+        summary: "Logo, brand color, layout (standard vs cover image), and custom CSS for one page.",
         body: [
           {
             heading: "Layout picker",
@@ -329,14 +492,35 @@ export const HELP_CATEGORIES: HelpCategory[] = [
             ],
           },
           {
-            heading: "Custom domain",
+            heading: "Custom CSS",
+            paragraphs: ["Custom CSS is size-limited, scoped beneath the public page root, and rejects imports and external URLs to protect viewers."],
+          },
+        ],
+      },
+      {
+        slug: "public-page-content",
+        title: "Public page content",
+        summary: "Configure summaries, service directories, announcements, uptime presentation, footer links, and visitor-facing behavior.",
+        body: [
+          {
+            heading: "Service presentation",
             paragraphs: [
-              "Any page can use a domain like signal.yourcompany.com. Add a CNAME record at your DNS provider pointing to this app's domain, then enter the domain in page settings — the proxy serves its root, history, incidents, access flow, and feeds.",
+              "Keep the default flat rows for a simple page, or enable grouping when customers recognize product families, regions, or platforms. Optional summary cards and search are most useful on large directories.",
+              "Uptime defaults to the responsive thin-segment timeline. The designer also offers square, rounded, pill, and solid lines; responsive, compact, and block sizes; and optional dot or status icons.",
             ],
           },
           {
-            heading: "Custom CSS",
-            paragraphs: ["Custom CSS is size-limited, scoped beneath the public page root, and rejects imports and external URLs to protect viewers."],
+            heading: "Announcements and subscription",
+            paragraphs: [
+              "Announcements can be scheduled, prioritized, made dismissible, and shown across status, history, incident, and hub surfaces. Use them for notices that are not full incidents.",
+              "Subscription blocks can be placed in the main layout or sidebar. Actual delivery depends on the channels enabled under Destinations.",
+            ],
+          },
+          {
+            heading: "Footer links",
+            paragraphs: [
+              "Support, Terms of Service, and Privacy Policy belong in the footer. Support is shown only when a valid Support URL exists; absent links render nothing rather than empty placeholders.",
+            ],
           },
         ],
       },
@@ -349,6 +533,20 @@ export const HELP_CATEGORIES: HelpCategory[] = [
             heading: "Adding components",
             paragraphs: [
               "Components are the functioning pieces of your product that can go down — API, Website, Mobile App. Group related ones (e.g. by region) with Component Groups, which collapse together on the public page.",
+              "Use the drag handle to reorder components; numeric order fields are intentionally not used. In the designer, grouping is optional: the default remains a flat service list, while grouped pages can use sections, cards, or accordion dropdowns.",
+            ],
+          },
+          {
+            heading: "Changing status and adding notes",
+            paragraphs: [
+              "Select Operational, Degraded Performance, Partial Outage, Major Outage, or Under Maintenance. Add an optional public note before Update Status when customers need context.",
+              "Status notes are retained with uptime history. Affected uptime segments show date, status, duration, and related notes on hover; days without recorded information do not display an empty tooltip.",
+            ],
+          },
+          {
+            heading: "Public directory options",
+            paragraphs: [
+              "The Component status block controls summary counters, search, descriptions, grouping, service rows or pills, column count, uptime window, line style, segment size, and icons. Preview changes before saving because every save updates the public page.",
             ],
           },
           {
@@ -375,14 +573,174 @@ export const HELP_CATEGORIES: HelpCategory[] = [
       },
     ],
   },
+  {
+    slug: "developers",
+    label: "Developer guides",
+    icon: "</>",
+    articles: [
+      {
+        slug: "api-quickstart",
+        title: "Management API quickstart",
+        summary: "Authenticate with scoped API keys and automate incidents, component status, and metric points.",
+        body: [
+          {
+            heading: "Create and protect a key",
+            paragraphs: [
+              "Create an API key under API Keys, grant only the scopes and pages the integration needs, and copy the token when it is displayed. Store it in a secret manager; the full value cannot be recovered later.",
+              "Send the key as a Bearer token. A revoked or rotated key stops working immediately. Use /api/openapi as the machine-readable reference for available endpoints and schemas.",
+            ],
+            code: "curl -H 'Authorization: Bearer $SIGNALHUB_API_KEY' \\\n  'https://status.example.com/api/v1/manage/incidents?pageId=<page-id>'",
+          },
+          {
+            heading: "Error handling",
+            paragraphs: [
+              "API errors return a stable code and message. Treat 401 as an invalid credential, 404 as a missing or out-of-scope resource, 400 as invalid input, 429 as rate limiting, and retry 5xx responses with bounded exponential backoff.",
+            ],
+          },
+        ],
+      },
+      {
+        slug: "component-automation",
+        title: "Component status automation",
+        summary: "Update component health with a scoped API key or a per-component automation token.",
+        body: [
+          {
+            heading: "Per-component webhook",
+            paragraphs: [
+              "The automation token is embedded in the URL and acts as the credential. Use it for monitoring systems that can send a simple JSON POST but cannot manage Bearer headers. Rotate the token after exposure.",
+            ],
+            code: "curl -X POST 'https://status.example.com/api/v1/webhook-component/<token>' \\\n  -H 'Content-Type: application/json' \\\n  -d '{\"status\":\"MAJOR_OUTAGE\"}'",
+          },
+          {
+            heading: "Supported statuses",
+            paragraphs: [],
+            list: ["OPERATIONAL", "DEGRADED_PERFORMANCE", "PARTIAL_OUTAGE", "MAJOR_OUTAGE", "UNDER_MAINTENANCE"],
+          },
+          {
+            heading: "Management API alternative",
+            paragraphs: ["Use PATCH /api/v1/manage/components/<component-id> with a components.write API key when one integration manages multiple components."],
+            code: "curl -X PATCH 'https://status.example.com/api/v1/manage/components/<component-id>' \\\n  -H 'Authorization: Bearer $SIGNALHUB_API_KEY' \\\n  -H 'Content-Type: application/json' \\\n  -d '{\"status\":\"OPERATIONAL\"}'",
+          },
+        ],
+      },
+      {
+        slug: "public-status-api",
+        title: "Public status API and feeds",
+        summary: "Consume page health as JSON, RSS, Atom, badges, or embeds with the page's access rules enforced.",
+        body: [
+          {
+            heading: "JSON status",
+            paragraphs: [
+              "GET /api/v1/status/<slug> returns the public page summary, components, active incidents, and canonical URL. Public responses are CORS-enabled and briefly cached; protected pages enforce their configured access policy.",
+            ],
+            code: "curl 'https://status.example.com/api/v1/status/<slug>'",
+          },
+          {
+            heading: "Feeds and embeds",
+            paragraphs: [
+              "RSS and Atom are suitable for feed readers and automation. Protected pages use revocable signed feed URLs. The badge endpoint provides a compact status asset, while the embed script can place an incident banner on another site.",
+              "Do not expose protected feed tokens in public source code. Revoke and regenerate a token if it leaks.",
+            ],
+          },
+        ],
+      },
+      {
+        slug: "webhook-verification",
+        title: "Outbound webhook verification",
+        summary: "Verify HTTPS endpoints, validate HMAC signatures, handle retries safely, and rotate secrets.",
+        body: [
+          {
+            heading: "Receiver requirements",
+            paragraphs: [
+              "Use an HTTPS endpoint that can accept JSON quickly. Verify the signature using the raw request bytes before parsing, reject invalid signatures, and return a 2xx response only after the event is accepted for processing.",
+              "Make processing idempotent because retries can deliver the same logical event more than once. Queue slow downstream work instead of blocking the response.",
+            ],
+          },
+          {
+            heading: "Operational checklist",
+            paragraphs: [],
+            list: [
+              "Store the endpoint secret outside source control.",
+              "Log delivery identifiers without logging secrets or full subscriber data.",
+              "Accept secret overlap during a planned rotation when your receiver supports it.",
+              "Alert on sustained non-2xx delivery results rather than a single transient retry.",
+            ],
+          },
+        ],
+      },
+    ],
+  },
+  {
+    slug: "platform",
+    label: "Platform administration",
+    icon: "◆",
+    articles: [
+      {
+        slug: "platform-operations",
+        title: "Platform operations",
+        summary: "Monitor tenant state, worker readiness, queued work, and operational diagnostics across the installation.",
+        body: [
+          {
+            heading: "Operational surfaces",
+            paragraphs: [
+              "Platform Overview summarizes installation health. Organizations and Global Users provide tenant and identity lookup, while Operations exposes worker and queue diagnostics needed for monitors, notifications, scheduled maintenance, and background jobs.",
+              "Use the ready and live health endpoints for infrastructure probes. Treat a stale worker heartbeat as a service degradation even when the web application still responds.",
+            ],
+          },
+          {
+            heading: "Tenant lifecycle",
+            paragraphs: [
+              "Suspension fences tenant mutations and automation. Deletion is a reauthenticated, queued, retryable purge that retains request, job, tombstone, and audit evidence instead of performing an untracked inline delete.",
+            ],
+          },
+        ],
+      },
+      {
+        slug: "platform-identity",
+        title: "Platform identity and access",
+        summary: "Govern platform administrators, identity connections, organization switching, and support access.",
+        body: [
+          {
+            heading: "Administrative separation",
+            paragraphs: [
+              "Platform roles and organization roles are separate. Grant platform access only to operators who need cross-tenant administration, and use organization-scoped roles for normal status operations.",
+              "Identity configuration controls global SAML/OIDC connections and SCIM behavior. Test new connections before enforcing them and maintain a recoverable owner path.",
+            ],
+          },
+          {
+            heading: "Support sessions",
+            paragraphs: [
+              "Use support access only for an explicit customer support task. Actions remain attributed to the operator and support session in audit logs. End support access as soon as the task is complete.",
+            ],
+          },
+        ],
+      },
+      {
+        slug: "platform-configuration",
+        title: "Platform configuration and governance",
+        summary: "Configure providers, monitor templates, security defaults, and review platform-wide audit evidence.",
+        body: [
+          {
+            heading: "Configuration",
+            paragraphs: [
+              "Enable only notification and identity providers that are actually configured. Provider readiness in the organization console reflects these platform settings and the required runtime services.",
+              "Curated monitor templates should point to stable, documented targets. Exclude providers that cannot be checked truthfully rather than shipping a misleading template.",
+            ],
+          },
+          {
+            heading: "Audit and diagnostics",
+            paragraphs: [
+              "Use Platform Audit for cross-tenant administrative actions and exports. Diagnostics should help identify configuration or worker problems without exposing stored secrets.",
+            ],
+          },
+        ],
+      },
+    ],
+  },
 ];
 
 export function findHelpArticle(categorySlug: string, articleSlug: string) {
   const category = HELP_CATEGORIES.find((c) => c.slug === categorySlug);
   const article = category?.articles.find((a) => a.slug === articleSlug);
   return { category, article };
-}
-
-export function allHelpArticles() {
-  return HELP_CATEGORIES.flatMap((c) => c.articles.map((a) => ({ category: c, article: a })));
 }

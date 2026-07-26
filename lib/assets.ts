@@ -1,6 +1,6 @@
 import sharp from "sharp";
 
-export const ASSET_LIMITS = {
+const ASSET_LIMITS = {
   LOGO: 2 * 1024 * 1024,
   FAVICON: 512 * 1024,
   COVER: 5 * 1024 * 1024,

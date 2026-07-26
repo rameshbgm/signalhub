@@ -1,5 +1,7 @@
 "use client";
 
+import { fetchWithTimeout } from "@/lib/client-fetch";
+
 import { useState } from "react";
 import { CopyButton } from "@/components/CopyButton";
 
@@ -14,7 +16,7 @@ export function HeartbeatTokenManager({ monitorId }: { monitorId: string }) {
     setError(null);
 
     try {
-      const response = await fetch(`/api/admin/monitors/${monitorId}/rotate-heartbeat`, { method: "POST" });
+      const response = await fetchWithTimeout(`/api/admin/monitors/${monitorId}/rotate-heartbeat`, { method: "POST" });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
         setError(data.error?.message ?? "Token rotation failed");

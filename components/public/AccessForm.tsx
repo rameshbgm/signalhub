@@ -1,5 +1,7 @@
 "use client";
 
+import { fetchWithTimeout } from "@/lib/client-fetch";
+
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
@@ -15,7 +17,7 @@ export function AccessForm({ slug, type, returnTo }: { slug: string; type: "PRIV
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/v1/access/${slug}`, {
+      const res = await fetchWithTimeout(`/api/v1/access/${slug}`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ email, password }),

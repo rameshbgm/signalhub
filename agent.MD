@@ -37,7 +37,8 @@ The seed generates and prints fresh credentials for each run; do not add shared 
 - `lib` contains authentication, database, billing, notification, access
   control, and status-domain logic.
 - `scripts` contains database seed scripts.
-- `monitor-service` contains the companion Python monitoring service.
+- `worker` contains the TypeScript background runtime for monitoring,
+  notifications, exports, audit delivery, and platform jobs.
 
 ## Working guidelines
 

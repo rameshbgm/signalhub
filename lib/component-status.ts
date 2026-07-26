@@ -7,14 +7,14 @@ import {
 } from "@/lib/status";
 import { fenceActiveOrganizationMutation } from "@/lib/organization-mutation";
 
-export type ReconciliationSources = {
+type ReconciliationSources = {
   manualStatus: ComponentStatus;
   incidentStatuses: ComponentStatus[];
   maintenanceActive: boolean;
   monitorStatuses: ComponentStatus[];
 };
 
-export function calculateReconciledStatus(sources: ReconciliationSources) {
+function calculateReconciledStatus(sources: ReconciliationSources) {
   const candidates: ComponentStatus[] = [
     sources.manualStatus,
     ...sources.incidentStatuses,
@@ -32,7 +32,11 @@ export function calculateReconciledStatus(sources: ReconciliationSources) {
   };
 }
 
-async function reconcileInSession(componentId: ObjectId, session: ClientSession) {
+async function reconcileInSession(
+  componentId: ObjectId,
+  session: ClientSession,
+  eventContext?: { note?: string | null }
+) {
   const component = await collections.components().findOne({ _id: componentId }, { session });
   if (!component) return false;
   const page = await collections.pages().findOne(
@@ -103,6 +107,7 @@ async function reconcileInSession(componentId: ObjectId, session: ClientSession)
       startedAt: now,
       endedAt: null,
       isMaintenance: reconciled.isMaintenance,
+      note: eventContext?.note?.trim() || null,
     },
     { session }
   );
@@ -145,7 +150,7 @@ export async function reconcileComponents(
 export async function setComponentStatus(
   componentId: ObjectId,
   status: string,
-  _options?: { isMaintenance?: boolean }
+  options?: { isMaintenance?: boolean; note?: string | null }
 ) {
   if (!COMPONENT_STATUSES.includes(status as ComponentStatus)) {
     throw new Error("Invalid component status");
@@ -172,7 +177,21 @@ export async function setComponentStatus(
         { session }
       );
       if (!result.matchedCount) return;
-      changed = await reconcileInSession(componentId, session);
+      changed = await reconcileInSession(componentId, session, { note: options?.note });
+      const note = options?.note?.trim();
+      if (!changed && note) {
+        const openEvent = await collections.componentStatusEvents().findOne(
+          { componentId, endedAt: null },
+          { session, sort: { startedAt: -1 } }
+        );
+        if (openEvent) {
+          await collections.componentStatusEvents().updateOne(
+            { _id: openEvent._id, componentId },
+            { $set: { note: openEvent.note ? `${openEvent.note}\n${note}` : note } },
+            { session }
+          );
+        }
+      }
     });
     return changed;
   } finally {

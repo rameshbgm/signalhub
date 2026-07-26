@@ -1,5 +1,7 @@
 "use client";
 
+import { fetchWithTimeout } from "@/lib/client-fetch";
+
 import { useEffect, useState } from "react";
 import { CopyButton } from "@/components/CopyButton";
 import Link from "next/link";
@@ -25,18 +27,19 @@ export function SecurityManager({ enrollmentRequired }: { enrollmentRequired: bo
   const [recoveryCodes, setRecoveryCodes] = useState<string[]>([]);
   const [sessions, setSessions] = useState<Session[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [pendingAction, setPendingAction] = useState<string | null>(null);
 
   async function refresh() {
     const [mfaResponse, sessionResponse] = await Promise.all([
-      fetch("/api/auth/mfa"),
-      fetch("/api/auth/sessions"),
+      fetchWithTimeout("/api/auth/mfa"),
+      fetchWithTimeout("/api/auth/sessions"),
     ]);
     if (mfaResponse.ok) setMfa(await mfaResponse.json());
     if (sessionResponse.ok) setSessions((await sessionResponse.json()).sessions ?? []);
   }
 
   useEffect(() => {
-    void Promise.all([fetch("/api/auth/mfa"), fetch("/api/auth/sessions")])
+    void Promise.all([fetchWithTimeout("/api/auth/mfa"), fetchWithTimeout("/api/auth/sessions")])
       .then(async ([mfaResponse, sessionResponse]) => {
         if (mfaResponse.ok) setMfa(await mfaResponse.json());
         if (sessionResponse.ok) setSessions((await sessionResponse.json()).sessions ?? []);
@@ -44,37 +47,53 @@ export function SecurityManager({ enrollmentRequired }: { enrollmentRequired: bo
   }, []);
 
   async function mfaAction(action: "start" | "confirm") {
+    if (pendingAction) return;
+    setPendingAction(action);
     setError(null);
-    const response = await fetch("/api/auth/mfa", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ action, ...(action === "confirm" ? { code } : {}) }),
-    });
-    const body = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      setError(body.error?.message ?? "MFA operation failed");
-      return;
-    }
-    if (action === "start") {
-      setSecret(body.secret);
-      setUri(body.uri);
-    } else {
-      setRecoveryCodes(body.recoveryCodes ?? []);
-      setSecret(null);
-      setUri(null);
+    try {
+      const response = await fetchWithTimeout("/api/auth/mfa", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ action, ...(action === "confirm" ? { code } : {}) }),
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        setError(body.error?.message ?? "MFA operation failed");
+        return;
+      }
+      if (action === "start") {
+        setSecret(body.secret);
+        setUri(body.uri);
+      } else {
+        setRecoveryCodes(body.recoveryCodes ?? []);
+        setSecret(null);
+        setUri(null);
+      }
+    } catch {
+      setError("MFA operation timed out. Check your connection and try again.");
+    } finally {
+      setPendingAction(null);
     }
   }
 
   async function revoke(id: string) {
-    if (!window.confirm("Revoke this session immediately?")) return;
-    const response = await fetch(`/api/auth/sessions?id=${id}`, { method: "DELETE" });
-    if (!response.ok) {
-      const body = await response.json().catch(() => ({}));
-      setError(body.error?.message ?? "Session revocation failed");
-      return;
+    if (pendingAction || !window.confirm("Revoke this session immediately?")) return;
+    setPendingAction(`revoke:${id}`);
+    setError(null);
+    try {
+      const response = await fetchWithTimeout(`/api/auth/sessions?id=${id}`, { method: "DELETE" });
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        setError(body.error?.message ?? "Session revocation failed");
+        return;
+      }
+      if (sessions.find((session) => session.id === id)?.current) router.replace("/login");
+      else await refresh();
+    } catch {
+      setError("Session revocation timed out. Check your connection and try again.");
+    } finally {
+      setPendingAction(null);
     }
-    if (sessions.find((session) => session.id === id)?.current) router.replace("/admin/login");
-    else await refresh();
   }
 
   return (
@@ -85,7 +104,7 @@ export function SecurityManager({ enrollmentRequired }: { enrollmentRequired: bo
           {mfa?.enrolled ? `Enabled · ${mfa.recoveryCodesRemaining} recovery codes remain` : enrollmentRequired ? "Enrollment is required before administrative changes are allowed." : "Protect password sign-in with a time-based one-time code."}
         </p>
         {!mfa?.enrolled && !secret && (
-          <button onClick={() => void mfaAction("start")} className="mt-3 bg-[var(--cyan)] px-3 py-2 text-xs font-semibold text-[var(--on-cyan)]">Start enrollment</button>
+          <button disabled={Boolean(pendingAction)} onClick={() => void mfaAction("start")} className="mt-3 bg-[var(--cyan)] px-3 py-2 text-xs font-semibold text-[var(--on-cyan)] disabled:opacity-50">{pendingAction === "start" ? "Starting…" : "Start enrollment"}</button>
         )}
         {secret && (
           <div className="mt-3 space-y-3">
@@ -96,7 +115,7 @@ export function SecurityManager({ enrollmentRequired }: { enrollmentRequired: bo
             </div>
             <div className="flex gap-2">
               <input value={code} onChange={(event) => setCode(event.target.value.replace(/\D/g, "").slice(0, 6))} placeholder="6-digit code" className="border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm" />
-              <button disabled={code.length !== 6} onClick={() => void mfaAction("confirm")} className="bg-[var(--cyan)] px-3 py-2 text-xs font-semibold text-[var(--on-cyan)] disabled:opacity-50">Confirm</button>
+              <button disabled={code.length !== 6 || Boolean(pendingAction)} onClick={() => void mfaAction("confirm")} className="bg-[var(--cyan)] px-3 py-2 text-xs font-semibold text-[var(--on-cyan)] disabled:opacity-50">{pendingAction === "confirm" ? "Confirming…" : "Confirm"}</button>
             </div>
           </div>
         )}
@@ -104,7 +123,7 @@ export function SecurityManager({ enrollmentRequired }: { enrollmentRequired: bo
           <div className="mt-3 border border-[var(--amber)]/40 bg-[var(--amber-soft)] p-3 text-xs">
             <p className="font-semibold">Save these one-time recovery codes. You will be signed out after enrollment.</p>
             <div className="mt-2 grid grid-cols-2 gap-1 font-mono">{recoveryCodes.map((value) => <code key={value}>{value}</code>)}</div>
-            <Link href="/admin/login" className="mt-3 inline-block font-semibold text-[var(--cyan)]">Return to sign in</Link>
+            <Link href="/login" className="mt-3 inline-block font-semibold text-[var(--cyan)]">Return to sign in</Link>
           </div>
         )}
       </section>
@@ -118,7 +137,7 @@ export function SecurityManager({ enrollmentRequired }: { enrollmentRequired: bo
                 <p className="mt-1 text-[var(--fg-dim)]">{session.ipAddress ?? "IP unavailable"} · {new Date(session.lastSeenAt).toLocaleString()}</p>
                 <p className="mt-1 max-w-xl truncate text-[10px] text-[var(--fg-dim)]">{session.userAgent ?? "User agent unavailable"}</p>
               </div>
-              <button onClick={() => void revoke(session.id)} className="border border-[var(--red)]/40 px-2 py-1 font-semibold text-[var(--red)]">Revoke</button>
+              <button disabled={Boolean(pendingAction)} onClick={() => void revoke(session.id)} className="border border-[var(--red)]/40 px-2 py-1 font-semibold text-[var(--red)] disabled:opacity-50">{pendingAction === `revoke:${session.id}` ? "Revoking…" : "Revoke"}</button>
             </div>
           ))}
         </div>

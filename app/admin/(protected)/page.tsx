@@ -158,7 +158,7 @@ export default async function AdminDashboard() {
               {openIncidents.map((inc) => (
                 <Link
                   key={inc.id}
-                  href={`/admin/incidents/${inc.id}`}
+                  href={`/organization/incidents/${inc.id}`}
                   className="flex items-center justify-between border border-[var(--line)] bg-[var(--surface)] p-3.5 text-sm transition-colors hover:border-[var(--line-bright)]"
                 >
                   <span className="font-medium text-[var(--fg)]">{inc.name}</span>
@@ -202,13 +202,13 @@ export default async function AdminDashboard() {
                     </span>
                   </div>
                 </div>
-                <div className="flex gap-3 text-xs font-semibold shrink-0">
-                  <a href={publicPagePath(p)} target="_blank" rel="noreferrer" className="text-[var(--fg-soft)] hover:text-[var(--fg)]">
+                <div className="flex shrink-0 items-center gap-2 text-xs font-semibold">
+                  <a href={publicPagePath(p)} target="_blank" rel="noreferrer" className="inline-flex min-h-8 items-center justify-center border border-transparent px-2.5 py-1 text-[var(--fg-soft)] hover:border-[var(--line)] hover:text-[var(--fg)]">
                     View
                   </a>
                   {canConfigurePages && <Link
-                    href={`/admin/pages/${p.id}`}
-                    className="border border-[var(--cyan)]/30 px-2.5 py-1 text-xs font-semibold text-[var(--cyan)] transition-colors hover:bg-[var(--cyan-soft)]"
+                    href={`/organization/pages/${p.id}`}
+                    className="inline-flex min-h-8 items-center justify-center border border-[var(--cyan)]/30 px-2.5 py-1 text-xs font-semibold text-[var(--cyan)] transition-colors hover:bg-[var(--cyan-soft)]"
                   >
                     Manage
                   </Link>}

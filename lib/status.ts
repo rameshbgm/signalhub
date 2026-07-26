@@ -139,10 +139,17 @@ export type DailyUptimeBucket = {
   status: ComponentStatus;
   uptimePct: number | null;
   observedMs: number;
+  details: Array<{
+    status: ComponentStatus;
+    note: string | null;
+    startedAt: Date;
+    endedAt: Date;
+    durationMs: number;
+  }>;
 };
 
 export function computeDailyUptime(
-  events: { status: string; startedAt: Date; endedAt: Date | null; isMaintenance: boolean }[],
+  events: { status: string; startedAt: Date; endedAt: Date | null; isMaintenance: boolean; note?: string | null }[],
   days: number,
   now = new Date(),
   observationStart?: Date
@@ -168,21 +175,32 @@ export function computeDailyUptime(
         status: "OPERATIONAL",
         uptimePct: null,
         observedMs: 0,
+        details: [],
       });
       continue;
     }
 
     const outageIntervals: { start: number; end: number }[] = [];
+    const details: DailyUptimeBucket["details"] = [];
     let worst: ComponentStatus = "OPERATIONAL";
 
     for (const ev of events) {
-      if (ev.isMaintenance) continue;
       const evStart = ev.startedAt < effectiveDayStart ? effectiveDayStart : ev.startedAt;
       const evEnd = (ev.endedAt ?? now) > effectiveDayEnd ? effectiveDayEnd : ev.endedAt ?? now;
       if (evEnd <= evStart) continue;
-      if (ev.status === "OPERATIONAL") continue;
+      const eventStatus = isComponentStatus(ev.status) ? ev.status : "OPERATIONAL";
+      if (eventStatus !== "OPERATIONAL" || ev.note?.trim()) {
+        details.push({
+          status: eventStatus,
+          note: ev.note?.trim() || null,
+          startedAt: evStart,
+          endedAt: evEnd,
+          durationMs: evEnd.getTime() - evStart.getTime(),
+        });
+      }
+      if (ev.isMaintenance || eventStatus === "OPERATIONAL") continue;
       outageIntervals.push({ start: evStart.getTime(), end: evEnd.getTime() });
-      const s = ev.status as ComponentStatus;
+      const s = eventStatus;
       if (isComponentStatus(s) && SEVERITY_RANK[s] > SEVERITY_RANK[worst]) worst = s;
     }
 
@@ -211,6 +229,7 @@ export function computeDailyUptime(
       status: worst,
       uptimePct,
       observedMs,
+      details: details.sort((left, right) => left.startedAt.getTime() - right.startedAt.getTime()),
     });
   }
 

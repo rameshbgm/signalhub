@@ -1,7 +1,4 @@
-import { z } from "zod";
-
 export const MEMBERSHIP_ROLES = [
-  "OWNER",
   "ADMIN",
   "INCIDENT_MANAGER",
   "RESPONDER",
@@ -25,7 +22,6 @@ export const CAPABILITIES = [
 export type Capability = (typeof CAPABILITIES)[number];
 
 const ROLE_CAPABILITIES: Record<MembershipRole, ReadonlySet<Capability>> = {
-  OWNER: new Set(CAPABILITIES),
   ADMIN: new Set(CAPABILITIES),
   INCIDENT_MANAGER: new Set([
     "incident.manage",
@@ -48,18 +44,26 @@ export function canonicalizeEmail(email: string): string {
   return email.trim().normalize("NFKC").toLowerCase();
 }
 
-export const canonicalEmailSchema = z
-  .string()
-  .trim()
-  .email()
-  .transform(canonicalizeEmail);
+export function canonicalizeUsername(username: string): string {
+  return username.trim().normalize("NFKC").toLowerCase();
+}
+
+export function usernameError(username: string): string | null {
+  const canonical = canonicalizeUsername(username);
+  if (canonical.length < 3 || canonical.length > 64) {
+    return "User ID must contain between 3 and 64 characters";
+  }
+  if (!/^[a-z0-9._-]+$/.test(canonical)) {
+    return "User ID may contain only letters, numbers, dots, dashes, and underscores";
+  }
+  return null;
+}
 
 const ROLE_RANK: Record<MembershipRole, number> = {
   VIEWER: 0,
   RESPONDER: 1,
   INCIDENT_MANAGER: 2,
   ADMIN: 3,
-  OWNER: 4,
 };
 
 export function roleAtLeast(role: string, minimum: MembershipRole): role is MembershipRole {
@@ -73,30 +77,12 @@ export function hasCapability(role: string, capability: Capability) {
 }
 
 export function sessionHasCapability(
-  session: {
-    role: string;
-    supportActorEmail?: string;
-    supportMode?: "VIEW" | "OPERATE";
-    supportScopes?: string[];
-  },
+  session: { role: string },
   capability: Capability
 ) {
-  if (!hasCapability(session.role, capability)) return false;
-  if (!session.supportActorEmail) return true;
-  if (session.supportMode === "VIEW") {
-    return capability === "analytics.view" || capability === "audit.view";
-  }
-  return (
-    session.supportMode === "OPERATE" &&
-    Boolean(session.supportScopes?.includes(capability))
-  );
+  return hasCapability(session.role, capability);
 }
 
 export function roleCapabilities(role: MembershipRole) {
   return CAPABILITIES.filter((capability) => ROLE_CAPABILITIES[role].has(capability));
-}
-
-export function legacyRoleToMembership(role: string, isOldestAdmin: boolean): MembershipRole {
-  if (role === "TENANT_ADMIN") return isOldestAdmin ? "OWNER" : "ADMIN";
-  return "RESPONDER";
 }

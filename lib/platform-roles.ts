@@ -8,16 +8,14 @@ export type PlatformCapability =
   | "organizations.purge"
   | "users.read"
   | "users.disable"
-  | "support.view"
-  | "support.operate"
   | "operations.read"
   | "operations.retry"
   | "templates.read"
   | "templates.manage"
+  | "configuration.read"
+  | "configuration.manage"
   | "audit.read"
   | "audit.manage"
-  | "admins.read"
-  | "admins.manage"
   | "identity.read"
   | "identity.manage";
 
@@ -29,43 +27,24 @@ const ALL_CAPABILITIES: PlatformCapability[] = [
   "organizations.purge",
   "users.read",
   "users.disable",
-  "support.view",
-  "support.operate",
   "operations.read",
   "operations.retry",
   "templates.read",
   "templates.manage",
+  "configuration.read",
+  "configuration.manage",
   "audit.read",
   "audit.manage",
-  "admins.read",
-  "admins.manage",
   "identity.read",
   "identity.manage",
 ];
 
 const ROLE_CAPABILITIES: Record<PlatformRole, ReadonlySet<PlatformCapability>> = {
-  OWNER: new Set(ALL_CAPABILITIES),
-  OPERATOR: new Set(
-    ALL_CAPABILITIES.filter(
-      (capability) =>
-        capability !== "admins.manage" && capability !== "organizations.purge"
-    )
-  ),
-  AUDITOR: new Set([
-    "overview.read",
-    "organizations.read",
-    "users.read",
-    "support.view",
-    "operations.read",
-    "templates.read",
-    "audit.read",
-    "admins.read",
-    "identity.read",
-  ]),
+  ADMIN: new Set(ALL_CAPABILITIES),
 };
 
 export function normalizedPlatformRole(admin: Pick<PlatformAdminDoc, "role">): PlatformRole {
-  return admin.role ?? "OWNER";
+  return admin.role ?? "ADMIN";
 }
 
 export function platformAdminIsActive(

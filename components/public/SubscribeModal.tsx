@@ -1,5 +1,7 @@
 "use client";
 
+import { fetchWithTimeout } from "@/lib/client-fetch";
+
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { recordPublicEvent } from "@/components/public/PublicAnalytics";
 
@@ -32,7 +34,7 @@ export function SubscribeModal({
 
   useEffect(() => {
     if (!open) return;
-    void fetch("/api/v1/subscribe/capabilities", { cache: "no-store" })
+    void fetchWithTimeout("/api/v1/subscribe/capabilities", { cache: "no-store" })
       .then((response) => {
         if (!response.ok) throw new Error("Capability check failed");
         return response.json();
@@ -200,7 +202,7 @@ function ContactTab({
     setLoading(true);
     setMessage(null);
     try {
-      const response = await fetch(path, {
+      const response = await fetchWithTimeout(path, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(body),

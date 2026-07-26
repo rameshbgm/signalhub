@@ -246,17 +246,6 @@ export async function dispatchNotifications(event: NotifyEvent, session?: Client
   return jobs.length;
 }
 
-export async function enqueueDirectEmail(input: {
-  pageId: string;
-  contact: string;
-  subject: string;
-  body: string;
-  eventType: string;
-  eventId: string;
-}) {
-  return enqueueDirectNotification({ ...input, channel: "EMAIL" });
-}
-
 export async function enqueueDirectNotification(
   input: {
     pageId: string;

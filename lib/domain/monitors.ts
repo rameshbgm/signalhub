@@ -11,14 +11,13 @@ import {
 import { validateMonitorTarget } from "@/lib/monitor-target-validation";
 import { fenceActiveOrganizationMutation } from "@/lib/organization-mutation";
 
-export { MONITOR_TYPES };
-export const MONITOR_DOWN_STATUSES = [
+const MONITOR_DOWN_STATUSES = [
   "DEGRADED_PERFORMANCE",
   "PARTIAL_OUTAGE",
   "MAJOR_OUTAGE",
 ] as const;
 
-export const monitorInputSchema = z.object({
+const monitorInputSchema = z.object({
   name: z.string().trim().min(1).max(200),
   type: z.enum(MONITOR_TYPES),
   componentId: z.string().nullable(),

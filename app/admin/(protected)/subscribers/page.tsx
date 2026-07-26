@@ -1,4 +1,5 @@
 import { requireSession } from "@/lib/require-session";
+import { FluentSelect } from "@/components/FluentSelect";
 import { collections } from "@/lib/db";
 import { oid, toId } from "@/lib/mongo-utils";
 import { addSubscriber, importSubscribersCsv, toggleQuarantine, removeSubscriber, retryNotificationJob } from "./actions";
@@ -59,7 +60,7 @@ export default async function SubscribersPage({ searchParams }: { searchParams: 
           <p className="mt-0.5 text-sm text-[var(--fg-soft)]">{allForPage.length} subscribers</p>
         </div>
         <div className="w-full sm:w-56">
-          <PageSelect pages={pages.map((p) => ({ id: p.id, name: p.name }))} basePath="/admin/subscribers" selected={pageId} />
+          <PageSelect pages={pages.map((p) => ({ id: p.id, name: p.name }))} basePath="/organization/subscribers" selected={pageId} />
         </div>
       </div>
 
@@ -68,7 +69,7 @@ export default async function SubscribersPage({ searchParams }: { searchParams: 
         {CHANNELS.map((c) => (
           <a
             key={c.value}
-            href={`/admin/subscribers?pageId=${pageId}&channel=${c.value}`}
+            href={`/organization/subscribers?pageId=${pageId}&channel=${c.value}`}
             className={`-mb-px shrink-0 whitespace-nowrap border-b-2 px-3.5 py-2.5 text-sm font-medium transition-colors ${
               channel === c.value ? "border-[var(--cyan)] text-[var(--cyan)]" : "border-transparent text-[var(--fg-soft)] hover:text-[var(--fg)]"
             }`}
@@ -128,7 +129,7 @@ export default async function SubscribersPage({ searchParams }: { searchParams: 
       <div className="grid gap-4 sm:grid-cols-2">
         <form action={boundAdd} className="space-y-2 border border-[var(--line)] bg-[var(--surface)] p-4">
           <h2 className="font-mono text-sm font-semibold text-[var(--fg)]">Add Subscriber</h2>
-          <select
+          <FluentSelect
             name="channel"
             defaultValue={channel}
             className="w-full border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--fg)] outline-none focus:border-[var(--cyan)]"
@@ -138,7 +139,7 @@ export default async function SubscribersPage({ searchParams }: { searchParams: 
                 {c.label}
               </option>
             ))}
-          </select>
+          </FluentSelect>
           <input
             name="contact"
             placeholder={CONTACT_PLACEHOLDER[channel]}
@@ -153,12 +154,12 @@ export default async function SubscribersPage({ searchParams }: { searchParams: 
             <h2 className="font-mono text-sm font-semibold text-[var(--fg)]">Bulk Import (CSV)</h2>
             <HelpTip text="Paste comma or newline separated email addresses; administrator imports are treated as verified." />
           </div>
-          <select
+          <FluentSelect
             name="channel"
             className="w-full border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--fg)] outline-none focus:border-[var(--cyan)]"
           >
             <option value="EMAIL">Email</option>
-          </select>
+          </FluentSelect>
           <textarea
             name="csv"
             rows={3}
@@ -169,7 +170,7 @@ export default async function SubscribersPage({ searchParams }: { searchParams: 
             <button className="bg-[var(--surface-raised)] border border-[var(--line-bright)] px-4 py-2 text-sm font-medium text-[var(--fg)] transition-colors hover:border-[var(--cyan)]">
               Import
             </button>
-            <a href={`/admin/subscribers/export?pageId=${pageId}`} className="text-xs text-[var(--cyan)] hover:underline">
+            <a href={`/organization/subscribers/export?pageId=${pageId}`} className="text-xs text-[var(--cyan)] hover:underline">
               Export CSV
             </a>
           </div>

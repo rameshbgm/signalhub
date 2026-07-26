@@ -6,16 +6,20 @@ import { assertPageInOrg, requireCapability } from "@/lib/admin-guard";
 import { collections } from "@/lib/db";
 import {
   canonicalizeEmail,
+  canonicalizeUsername,
+  usernameError,
   MEMBERSHIP_ROLES,
   type MembershipRole,
 } from "@/lib/identity";
 import { oid } from "@/lib/mongo-utils";
 import { generateSecret } from "@/lib/secrets";
 import {
-  transitionRemovesActiveOwner,
-  withOrganizationOwnerInvariantTransaction,
+  transitionRemovesActiveAdmin,
+  withOrganizationAdminInvariantTransaction,
 } from "@/lib/team-owner-safety";
 import { publicAppUrl } from "@/lib/url";
+import { hashPassword } from "@/lib/auth";
+import { newPasswordError } from "@/lib/password-policy";
 
 const INVITATION_LIFETIME_MS = 48 * 60 * 60_000;
 
@@ -27,19 +31,24 @@ export type TeamInviteState = {
   reactivated?: boolean;
 };
 
+export type TeamMemberCreateState = {
+  ok: boolean;
+  error?: string;
+  memberName?: string;
+};
+
 async function requireCurrentTeamManager(
   membershipId: string,
   userId: string,
-  organizationId: ObjectId,
+  _organizationId: ObjectId,
   databaseSession: ClientSession
 ) {
   const actorMembership = await collections.memberships().findOne(
     {
       _id: oid(membershipId),
       userId: oid(userId),
-      orgId: organizationId,
       status: { $nin: ["REVOKED", "INVITED"] },
-      role: { $in: ["OWNER", "ADMIN"] },
+      role: { $in: ["ADMIN"] },
     },
     { session: databaseSession }
   );
@@ -49,16 +58,15 @@ async function requireCurrentTeamManager(
   return actorMembership;
 }
 
-async function countEnabledActiveOwners(
-  organizationId: ObjectId,
+async function countEnabledActiveAdmins(
+  _organizationId: ObjectId,
   databaseSession: ClientSession
 ) {
   const ownerMemberships = await collections
     .memberships()
     .find(
       {
-        orgId: organizationId,
-        role: "OWNER",
+        role: "ADMIN",
         status: { $nin: ["REVOKED", "INVITED"] },
       },
       {
@@ -75,6 +83,183 @@ async function countEnabledActiveOwners(
     },
     { session: databaseSession }
   );
+}
+
+export async function createMember(
+  _previousState: TeamMemberCreateState,
+  formData: FormData
+): Promise<TeamMemberCreateState> {
+  try {
+    const session = await requireCapability("team.manage");
+    const email = String(formData.get("email") ?? "").trim();
+    const canonicalEmail = canonicalizeEmail(email);
+    const username = String(formData.get("username") ?? "").trim();
+    const canonicalUsername = canonicalizeUsername(username);
+    const name = String(formData.get("name") ?? "").trim();
+    const password = String(formData.get("password") ?? "");
+    const role = String(formData.get("role") ?? "RESPONDER") as MembershipRole;
+    const pageIds = [...new Set(formData.getAll("pageIds").map(String).filter(Boolean))];
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(canonicalEmail)) {
+      throw new Error("Enter a valid email address");
+    }
+    const invalidUsername = usernameError(username);
+    if (invalidUsername) throw new Error(invalidUsername);
+    if (!name || name.length > 120) {
+      throw new Error("Enter a name containing at most 120 characters");
+    }
+    if (!MEMBERSHIP_ROLES.includes(role)) throw new Error("Invalid role");
+    if (role === "ADMIN" && session.role !== "ADMIN") {
+      throw new Error("Only an Admin can grant administration");
+    }
+    if (["INCIDENT_MANAGER", "RESPONDER", "VIEWER"].includes(role)) {
+      for (const pageId of pageIds) await assertPageInOrg(pageId, session.orgId);
+    }
+
+    const organizationId = oid(session.orgId);
+    const existingUser = await collections.users().findOne({ canonicalUsername });
+    if (existingUser?.disabled) {
+      throw new Error("This identity is disabled. A platform administrator must reactivate it first.");
+    }
+    const identityNeedsPassword = !existingUser?.passwordHash && !(existingUser?.oidcIssuer && existingUser?.oidcSubject);
+    let passwordHash: string | null = null;
+    if (identityNeedsPassword) {
+      const passwordError = newPasswordError(password, [name, username, email]);
+      if (passwordError) throw new Error(passwordError);
+      passwordHash = await hashPassword(password);
+    }
+
+    const now = new Date();
+    let memberName = name;
+    await withOrganizationAdminInvariantTransaction(session.orgId, async (databaseSession) => {
+      const actorMembership = await requireCurrentTeamManager(
+        session.membershipId,
+        session.userId,
+        organizationId,
+        databaseSession
+      );
+      if (role === "ADMIN" && actorMembership.role !== "ADMIN") {
+        throw new Error("Only an Admin can grant administration");
+      }
+
+      let user = await collections.users().findOne({ canonicalUsername }, { session: databaseSession });
+      if (!user) {
+        const userId = new ObjectId();
+        await collections.users().insertOne(
+          {
+            _id: userId,
+            username: canonicalUsername,
+            canonicalUsername,
+            email,
+            canonicalEmail,
+            passwordHash,
+            name,
+            twoFactorEnabled: false,
+            oidcIssuer: null,
+            oidcSubject: null,
+            disabled: false,
+            mustChangePassword: Boolean(passwordHash),
+            mustCompleteProfile: false,
+            sessionVersion: 1,
+            mfaRequired: false,
+            totpSecretCiphertext: null,
+            pendingTotpSecretCiphertext: null,
+            recoveryCodeHashes: [],
+            mfaEnrolledAt: null,
+            createdAt: now,
+            updatedAt: now,
+          },
+          { session: databaseSession }
+        );
+        user = await collections.users().findOne({ _id: userId }, { session: databaseSession });
+      } else if (!user.passwordHash && !(user.oidcIssuer && user.oidcSubject) && passwordHash) {
+        await collections.users().updateOne(
+          { _id: user._id, passwordHash: null },
+          { $set: { passwordHash, mustChangePassword: true, updatedAt: now } },
+          { session: databaseSession }
+        );
+      }
+      if (!user) throw new Error("User identity could not be created");
+      if (user.disabled) throw new Error("This identity is disabled across the platform");
+      memberName = user.name;
+
+      const scopedPageIds = ["ADMIN"].includes(role) || pageIds.length === 0
+        ? null
+        : pageIds.map(oid);
+      const existingMembership = await collections.memberships().findOne(
+        { userId: user._id, orgId: organizationId },
+        { session: databaseSession }
+      );
+      if (existingMembership && existingMembership.status !== "REVOKED") {
+        throw new Error("This user is already a member of the organization");
+      }
+
+      const membershipId = existingMembership?._id ?? new ObjectId();
+      if (existingMembership) {
+        await collections.memberships().updateOne(
+          { _id: existingMembership._id, orgId: organizationId, status: "REVOKED" },
+          {
+            $set: {
+              role,
+              status: "ACTIVE",
+              pageIds: scopedPageIds,
+              invitationExpiresAt: null,
+              invitationTokenHash: null,
+              activatedAt: now,
+            },
+          },
+          { session: databaseSession }
+        );
+      } else {
+        await collections.memberships().insertOne(
+          {
+            _id: membershipId,
+            orgId: organizationId,
+            userId: user._id,
+            role,
+            status: "ACTIVE",
+            pageIds: scopedPageIds,
+            invitationExpiresAt: null,
+            invitationTokenHash: null,
+            activatedAt: now,
+            createdAt: now,
+          },
+          { session: databaseSession }
+        );
+      }
+
+      await collections.auditLogs().insertOne(
+        {
+          _id: new ObjectId(),
+          orgId: organizationId,
+          actor: session.email,
+          action: existingMembership ? "REACTIVATE_MEMBER_DIRECT" : "CREATE_MEMBER_DIRECT",
+        target: user.username,
+          metadata: {
+            membershipId: membershipId.toHexString(),
+            role,
+            pageIds,
+            newIdentity: !existingUser,
+            username: user.username,
+            communicationEmail: user.email,
+            authentication: user.oidcIssuer ? "SSO" : "PASSWORD",
+          },
+          supportSessionId: session.supportSessionId ? oid(session.supportSessionId) : null,
+          createdAt: now,
+        },
+        { session: databaseSession }
+      );
+    });
+
+    revalidatePath("/organization/team");
+    revalidatePath("/organization/pages", "layout");
+    return { ok: true, memberName };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : "User could not be created",
+    };
+  }
 }
 
 export async function inviteMember(
@@ -97,8 +282,8 @@ export async function inviteMember(
       throw new Error("Enter a name containing at most 120 characters");
     }
     if (!MEMBERSHIP_ROLES.includes(role)) throw new Error("Invalid role");
-    if (role === "OWNER" && session.role !== "OWNER") {
-      throw new Error("Only an Owner can grant ownership");
+    if (role === "ADMIN" && session.role !== "ADMIN") {
+      throw new Error("Only an Admin can grant administration");
     }
     if (["INCIDENT_MANAGER", "RESPONDER", "VIEWER"].includes(role)) {
       for (const pageId of pageIds) await assertPageInOrg(pageId, session.orgId);
@@ -110,7 +295,7 @@ export async function inviteMember(
     const invitationExpiresAt = new Date(now.getTime() + INVITATION_LIFETIME_MS);
     const organizationId = oid(session.orgId);
     let inviteeName = name;
-    await withOrganizationOwnerInvariantTransaction(
+    await withOrganizationAdminInvariantTransaction(
       session.orgId,
       async (dbSession) => {
         const actorMembership = await requireCurrentTeamManager(
@@ -119,8 +304,8 @@ export async function inviteMember(
           organizationId,
           dbSession
         );
-        if (role === "OWNER" && actorMembership.role !== "OWNER") {
-          throw new Error("Only an Owner can grant ownership");
+        if (role === "ADMIN" && actorMembership.role !== "ADMIN") {
+          throw new Error("Only an Admin can grant administration");
         }
 
         let user = await collections.users().findOne(
@@ -153,6 +338,8 @@ export async function inviteMember(
           await collections.users().insertOne(
             {
               _id: userId,
+              username: `invited-${userId.toHexString()}`,
+              canonicalUsername: `invited-${userId.toHexString()}`,
               email,
               canonicalEmail,
               passwordHash: null,
@@ -183,7 +370,7 @@ export async function inviteMember(
             role,
             status: "INVITED",
             pageIds:
-              ["OWNER", "ADMIN"].includes(role) || pageIds.length === 0
+              ["ADMIN"].includes(role) || pageIds.length === 0
                 ? null
                 : pageIds.map(oid),
             invitationExpiresAt,
@@ -216,8 +403,8 @@ export async function inviteMember(
         );
       }
     );
-    revalidatePath("/admin/team");
-    revalidatePath("/admin/pages", "layout");
+    revalidatePath("/organization/team");
+    revalidatePath("/organization/pages", "layout");
     return {
       ok: true,
       inviteUrl: `${baseUrl}/invite/${invitation.token}`,
@@ -240,11 +427,11 @@ export async function updateMemberRole(membershipId: string, formData: FormData)
   const membershipObjectId = oid(membershipId);
   const organizationId = oid(session.orgId);
   const nextPageIds =
-    ["OWNER", "ADMIN"].includes(role) || pageIds.length === 0
+    ["ADMIN"].includes(role) || pageIds.length === 0
       ? null
       : pageIds.map(oid);
 
-  await withOrganizationOwnerInvariantTransaction(
+  await withOrganizationAdminInvariantTransaction(
     session.orgId,
     async (databaseSession) => {
       const actorMembership = await requireCurrentTeamManager(
@@ -263,26 +450,26 @@ export async function updateMemberRole(membershipId: string, formData: FormData)
       );
       if (!membership) throw new Error("Active membership not found");
       if (
-        (membership.role === "OWNER" || role === "OWNER") &&
-        actorMembership.role !== "OWNER"
+        (membership.role === "ADMIN" || role === "ADMIN") &&
+        actorMembership.role !== "ADMIN"
       ) {
-        throw new Error("Only an Owner can change ownership");
+        throw new Error("Only an Admin can change administration");
       }
       const user = await collections.users().findOne(
         { _id: membership.userId },
         { session: databaseSession }
       );
       if (
-        transitionRemovesActiveOwner(membership, { role }) &&
+        transitionRemovesActiveAdmin(membership, { role }) &&
         user &&
         !user.disabled
       ) {
-        const ownerCount = await countEnabledActiveOwners(
+        const ownerCount = await countEnabledActiveAdmins(
           organizationId,
           databaseSession
         );
         if (ownerCount <= 1) {
-          throw new Error("The last Owner cannot be demoted");
+          throw new Error("The last Admin cannot be demoted");
         }
       }
 
@@ -333,7 +520,7 @@ export async function updateMemberRole(membershipId: string, formData: FormData)
       );
     }
   );
-  revalidatePath("/admin/team");
+  revalidatePath("/organization/team");
 }
 
 export async function removeMember(membershipId: string) {
@@ -344,7 +531,7 @@ export async function removeMember(membershipId: string) {
   }
   const organizationId = oid(session.orgId);
 
-  await withOrganizationOwnerInvariantTransaction(
+  await withOrganizationAdminInvariantTransaction(
     session.orgId,
     async (databaseSession) => {
       const actorMembership = await requireCurrentTeamManager(
@@ -362,9 +549,9 @@ export async function removeMember(membershipId: string) {
         { session: databaseSession }
       );
       if (!membership) throw new Error("Membership not found");
-      if (membership.role === "OWNER") {
-        if (actorMembership.role !== "OWNER") {
-          throw new Error("Only an Owner can remove another Owner");
+      if (membership.role === "ADMIN") {
+        if (actorMembership.role !== "ADMIN") {
+          throw new Error("Only an Admin can remove another Admin");
         }
       }
 
@@ -373,16 +560,16 @@ export async function removeMember(membershipId: string) {
         { session: databaseSession }
       );
       if (
-        transitionRemovesActiveOwner(membership, { status: "REVOKED" }) &&
+        transitionRemovesActiveAdmin(membership, { status: "REVOKED" }) &&
         user &&
         !user.disabled
       ) {
-        const ownerCount = await countEnabledActiveOwners(
+        const ownerCount = await countEnabledActiveAdmins(
           organizationId,
           databaseSession
         );
         if (ownerCount <= 1) {
-          throw new Error("The last Owner cannot be removed");
+          throw new Error("The last Admin cannot be removed");
         }
       }
       const now = new Date();
@@ -427,7 +614,7 @@ export async function removeMember(membershipId: string) {
       );
     }
   );
-  revalidatePath("/admin/team");
+  revalidatePath("/organization/team");
 }
 
 export async function reactivateMember(
@@ -442,7 +629,7 @@ export async function reactivateMember(
     let inviteUrl: string | undefined;
     let inviteeName = "Member";
     let reactivated = false;
-    await withOrganizationOwnerInvariantTransaction(
+    await withOrganizationAdminInvariantTransaction(
       session.orgId,
       async (databaseSession) => {
         const actorMembership = await requireCurrentTeamManager(
@@ -463,10 +650,10 @@ export async function reactivateMember(
           throw new Error("Only a revoked membership can be reactivated");
         }
         if (
-          membership.role === "OWNER" &&
-          actorMembership.role !== "OWNER"
+          membership.role === "ADMIN" &&
+          actorMembership.role !== "ADMIN"
         ) {
-          throw new Error("Only an Owner can reactivate another Owner");
+          throw new Error("Only an Admin can reactivate another Admin");
         }
 
         const user = await collections.users().findOne(
@@ -606,7 +793,7 @@ export async function regenerateMemberInvite(
     const now = new Date();
     const invitationExpiresAt = new Date(now.getTime() + INVITATION_LIFETIME_MS);
     let inviteeName = "Member";
-    await withOrganizationOwnerInvariantTransaction(
+    await withOrganizationAdminInvariantTransaction(
       session.orgId,
       async (databaseSession) => {
         const actorMembership = await requireCurrentTeamManager(
@@ -627,11 +814,11 @@ export async function regenerateMemberInvite(
           throw new Error("Only a pending invitation can receive a new link");
         }
         if (
-          membership.role === "OWNER" &&
-          actorMembership.role !== "OWNER"
+          membership.role === "ADMIN" &&
+          actorMembership.role !== "ADMIN"
         ) {
           throw new Error(
-            "Only an Owner can replace a pending Owner invitation"
+            "Only an Admin can replace a pending Admin invitation"
           );
         }
 
@@ -687,8 +874,8 @@ export async function regenerateMemberInvite(
         );
       }
     );
-    revalidatePath("/admin/team");
-    revalidatePath("/admin/pages", "layout");
+    revalidatePath("/organization/team");
+    revalidatePath("/organization/pages", "layout");
     return {
       ok: true,
       inviteUrl: `${baseUrl}/invite/${invitation.token}`,

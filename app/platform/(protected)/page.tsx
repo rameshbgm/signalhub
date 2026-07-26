@@ -11,7 +11,6 @@ export default async function PlatformOverviewPage() {
   const [
     organizations,
     activeUsers,
-    activeSupport,
     queuedJobs,
     deadLetters,
     heartbeat,
@@ -20,10 +19,6 @@ export default async function PlatformOverviewPage() {
   ] = await Promise.all([
     collections.organizations().find({}, { projection: { status: 1, suspended: 1 } }).toArray(),
     collections.users().countDocuments({ disabled: { $ne: true } }),
-    collections.supportSessions().countDocuments({
-      revokedAt: null,
-      expiresAt: { $gt: new Date(now) },
-    }),
     collections.platformJobs().countDocuments({ status: { $in: ["QUEUED", "PROCESSING"] } }),
     collections.notificationJobs().countDocuments({ status: "DEAD_LETTER" }),
     collections.workerHeartbeats().find().sort({ lastSeenAt: -1 }).limit(1).next(),
@@ -48,25 +43,24 @@ export default async function PlatformOverviewPage() {
         <p className="font-mono text-xs uppercase tracking-widest text-[var(--cyan)]">Control plane</p>
         <h1 className="mt-2 font-mono text-3xl font-semibold text-[var(--fg)]">Platform overview</h1>
         <p className="mt-2 max-w-2xl text-sm text-[var(--fg-soft)]">
-          Live tenant, identity, support, queue, and runtime state. Counts come directly from the installation database.
+          Live organization, identity, queue, and runtime state. Counts come directly from the installation database.
         </p>
       </div>
 
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <OverviewCard label="Active organizations" value={activeOrganizations} href="/platform/orgs" />
-        <OverviewCard label="Suspended" value={suspendedOrganizations} href="/platform/orgs" tone={suspendedOrganizations ? "warning" : "normal"} />
-        <OverviewCard label="Active identities" value={activeUsers} href="/platform/users" />
-        <OverviewCard label="Live support sessions" value={activeSupport} href="/platform/support" />
-        <OverviewCard label="Platform jobs queued" value={queuedJobs} href="/platform/operations" tone={queuedJobs ? "warning" : "normal"} />
-        <OverviewCard label="Delivery dead letters" value={deadLetters} href="/platform/operations" tone={deadLetters ? "error" : "normal"} />
-        <OverviewCard label="Database" value={databaseOk ? "Reachable" : "Unavailable"} href="/platform/operations" tone={databaseOk ? "normal" : "error"} />
+        <OverviewCard label="Active organizations" value={activeOrganizations} href="/organization/platform/orgs" />
+        <OverviewCard label="Suspended" value={suspendedOrganizations} href="/organization/platform/orgs" tone={suspendedOrganizations ? "warning" : "normal"} />
+        <OverviewCard label="Active identities" value={activeUsers} href="/organization/platform/users" />
+        <OverviewCard label="Platform jobs queued" value={queuedJobs} href="/organization/platform/operations" tone={queuedJobs ? "warning" : "normal"} />
+        <OverviewCard label="Delivery dead letters" value={deadLetters} href="/organization/platform/operations" tone={deadLetters ? "error" : "normal"} />
+        <OverviewCard label="Database" value={databaseOk ? "Reachable" : "Unavailable"} href="/organization/platform/operations" tone={databaseOk ? "normal" : "error"} />
         <OverviewCard
           label={`Migrations (${migrationState.verifiedCount}/${migrationState.expectedCount})`}
           value={migrationState.current ? "Current" : "Required"}
-          href="/platform/operations"
+          href="/organization/platform/operations"
           tone={migrationState.current ? "normal" : "error"}
         />
-        <OverviewCard label="Worker" value={workerHealthy ? "Ready" : "Stale"} href="/platform/operations" tone={workerHealthy ? "normal" : "error"} />
+        <OverviewCard label="Worker" value={workerHealthy ? "Ready" : "Stale"} href="/organization/platform/operations" tone={workerHealthy ? "normal" : "error"} />
       </section>
 
       <section className="border border-[var(--line)] bg-[var(--surface)] p-5">
@@ -74,7 +68,7 @@ export default async function PlatformOverviewPage() {
         <div className="mt-4 grid gap-4 text-sm text-[var(--fg-soft)] md:grid-cols-3">
           <div>
             <p className="font-semibold text-[var(--fg)]">Safe actions</p>
-            <p className="mt-1">Tenant lifecycle, emergency user state, scoped support, template changes, and queue retries are audited.</p>
+            <p className="mt-1">Organization lifecycle, emergency user state, template changes, and queue retries are audited.</p>
           </div>
           <div>
             <p className="font-semibold text-[var(--fg)]">Read-only runtime</p>

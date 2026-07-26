@@ -180,7 +180,7 @@ async function deliver(job: WithId<NotificationJobDoc>) {
   throw new DeliveryError(`Unsupported notification channel ${job.channel}`, false);
 }
 
-export async function leaseNotificationJob(workerId: string) {
+async function leaseNotificationJob(workerId: string) {
   const now = new Date();
   return collections.notificationJobs().findOneAndUpdate(
     {

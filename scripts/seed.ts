@@ -73,7 +73,7 @@ async function main() {
   async function seedMember(
     email: string,
     name: string,
-    role: "OWNER" | "ADMIN" | "RESPONDER",
+    role: "ADMIN" | "RESPONDER",
     password: string
   ) {
     const canonicalEmail = canonicalizeEmail(email);
@@ -96,7 +96,7 @@ async function main() {
       { upsert: true }
     );
   }
-  await seedMember("admin@acme.test", "Ada Admin", "OWNER", adminPassword);
+  await seedMember("admin@acme.test", "Ada Admin", "ADMIN", adminPassword);
   await seedMember("editor@acme.test", "Eden Editor", "RESPONDER", responderPassword);
 
   console.log("Rotating the development sample API key...");
@@ -132,9 +132,12 @@ async function main() {
     aboutText: "Illustrative status and incident history for Acme sample products.",
     logoUrl: null,
     faviconUrl: null,
+    coverImageUrl: null,
+    coverImageFit: "CONTAIN",
+    coverImagePositionX: 50,
+    coverImagePositionY: 50,
     brandColor: "#0052CC",
     supportUrl: "https://acme.test/support",
-    customDomain: null,
     passwordHash: null,
     removeBranding: false,
     customCss: null,
@@ -153,9 +156,12 @@ async function main() {
     aboutText: "Status for Acme's public REST and GraphQL APIs.",
     logoUrl: null,
     faviconUrl: null,
+    coverImageUrl: null,
+    coverImageFit: "CONTAIN",
+    coverImagePositionX: 50,
+    coverImagePositionY: 50,
     brandColor: "#0052CC",
     supportUrl: "https://acme.test/support",
-    customDomain: null,
     passwordHash: null,
     removeBranding: false,
     customCss: null,
@@ -174,9 +180,12 @@ async function main() {
     aboutText: "Status for the Acme mobile and web application.",
     logoUrl: null,
     faviconUrl: null,
+    coverImageUrl: null,
+    coverImageFit: "CONTAIN",
+    coverImagePositionX: 50,
+    coverImagePositionY: 50,
     brandColor: "#0052CC",
     supportUrl: "https://acme.test/support",
-    customDomain: null,
     passwordHash: null,
     removeBranding: false,
     customCss: null,
@@ -196,9 +205,12 @@ async function main() {
     aboutText: "Employee-only status for internal systems.",
     logoUrl: null,
     faviconUrl: null,
+    coverImageUrl: null,
+    coverImageFit: "CONTAIN",
+    coverImagePositionX: 50,
+    coverImagePositionY: 50,
     brandColor: "#5E35B1",
     supportUrl: null,
-    customDomain: null,
     passwordHash: privatePagePasswordHash,
     removeBranding: false,
     customCss: null,
@@ -221,9 +233,12 @@ async function main() {
     aboutText: "A tailored status view for enterprise customers.",
     logoUrl: null,
     faviconUrl: null,
+    coverImageUrl: null,
+    coverImageFit: "CONTAIN",
+    coverImagePositionX: 50,
+    coverImagePositionY: 50,
     brandColor: "#00838F",
     supportUrl: null,
-    customDomain: null,
     passwordHash: null,
     removeBranding: false,
     customCss: null,

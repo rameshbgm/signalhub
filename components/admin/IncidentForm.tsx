@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { FluentSelect } from "@/components/FluentSelect";
 import { COMPONENT_STATUSES, COMPONENT_STATUS_LABEL, INCIDENT_STATUSES, INCIDENT_STATUS_LABEL, IMPACTS, IMPACT_LABEL } from "@/lib/status";
 import {
   communicationTemplateValues,
@@ -126,9 +127,10 @@ export function IncidentForm({
       </label>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <label className="block text-sm">
+        <div className="block text-sm">
           <span className="text-xs text-[var(--fg-dim)] block mb-1">Status</span>
-          <select
+          <FluentSelect
+            aria-label="Status"
             name="status"
             value={status}
             onChange={(e) => setStatus(e.target.value)}
@@ -139,11 +141,12 @@ export function IncidentForm({
                 {INCIDENT_STATUS_LABEL[s]}
               </option>
             ))}
-          </select>
-        </label>
-        <label className="block text-sm">
+          </FluentSelect>
+        </div>
+        <div className="block text-sm">
           <span className="text-xs text-[var(--fg-dim)] block mb-1">Impact</span>
-          <select
+          <FluentSelect
+            aria-label="Impact"
             name="impact"
             value={impact}
             onChange={(e) => setImpact(e.target.value)}
@@ -154,8 +157,8 @@ export function IncidentForm({
                 {IMPACT_LABEL[i]}
               </option>
             ))}
-          </select>
-        </label>
+          </FluentSelect>
+        </div>
       </div>
 
       <div>
@@ -177,7 +180,7 @@ export function IncidentForm({
               />
               <span className="flex-1 text-[var(--fg)]">{c.name}</span>
               {c.id in selected && (
-                <select
+                <FluentSelect
                   name={`componentStatus_${c.id}`}
                   value={selected[c.id]}
                   onChange={(e) => setSelected({ ...selected, [c.id]: e.target.value })}
@@ -188,7 +191,7 @@ export function IncidentForm({
                       {COMPONENT_STATUS_LABEL[s]}
                     </option>
                   ))}
-                </select>
+                </FluentSelect>
               )}
             </div>
           ))}

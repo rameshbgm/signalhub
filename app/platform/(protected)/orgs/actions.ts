@@ -1,27 +1,15 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 import { ObjectId } from "mongodb";
 import { collections, mongoClient } from "@/lib/db";
 import { oid } from "@/lib/mongo-utils";
 import {
   requirePlatformCapability,
 } from "@/lib/admin-guard";
-import { createSession } from "@/lib/auth";
-import { generateSecret } from "@/lib/secrets";
-import { publicAppUrl } from "@/lib/url";
-import { canonicalizeEmail, CAPABILITIES, type Capability } from "@/lib/identity";
 import { organizationStatus } from "@/lib/organization-state";
 import { organizationPurgeCanBeCancelled } from "@/lib/platform-job-policy";
-import { requirePlatformStepUp } from "@/lib/platform-admin-safety";
 import { writePlatformAudit } from "@/lib/platform-policy";
-
-const SUPPORT_SCOPES = new Set<Capability>([
-  "incident.manage",
-  "incident.update",
-  "monitor.manage",
-]);
 
 function slugify(input: string) {
   return input
@@ -41,7 +29,6 @@ function requiredReason(formData: FormData, minimum = 10) {
 export type CreateOrganizationState = {
   ok: boolean;
   error?: string;
-  inviteUrl?: string;
   organizationName?: string;
 };
 
@@ -53,104 +40,32 @@ export async function createOrganization(
     const actor = await requirePlatformCapability("organizations.create");
     const name = String(formData.get("name") ?? "").trim();
     const slug = slugify(String(formData.get("slug") ?? name));
-    const ownerName = String(formData.get("ownerName") ?? "").trim();
-    const ownerEmail = canonicalizeEmail(String(formData.get("ownerEmail") ?? ""));
     const reason = requiredReason(formData);
-    const baseUrl = publicAppUrl();
     if (!name || name.length > 120) throw new Error("Enter an organization name");
     if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug) || slug.length > 80) {
       throw new Error("Use a URL-safe organization slug");
     }
-    if (!ownerName || ownerName.length > 120) throw new Error("Enter the owner name");
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(ownerEmail)) {
-      throw new Error("Enter a valid owner email");
-    }
-    const invitation = generateSecret("org_invite_");
     const organizationId = new ObjectId();
-    const membershipId = new ObjectId();
     const now = new Date();
-    const expiresAt = new Date(now.getTime() + 48 * 60 * 60_000);
     const databaseSession = mongoClient.startSession();
     try {
       await databaseSession.withTransaction(async () => {
         if (await collections.organizations().findOne({ slug }, { session: databaseSession })) {
           throw new Error("That organization slug is already in use");
         }
-        let user = await collections.users().findOne(
-          { canonicalEmail: ownerEmail },
-          { session: databaseSession }
-        );
-        if (user?.disabled) throw new Error("The requested owner identity is disabled");
-        if (user && !user.passwordHash) {
-          throw new Error(
-            "The requested owner already has a passwordless identity. Ask them to sign in through their identity provider; an owner invitation cannot set a password on an existing identity."
-          );
-        }
-        if (!user) {
-          const userId = new ObjectId();
-          await collections.users().insertOne(
-            {
-              _id: userId,
-              email: ownerEmail,
-              canonicalEmail: ownerEmail,
-              passwordHash: null,
-              name: ownerName,
-              twoFactorEnabled: false,
-              oidcIssuer: null,
-              oidcSubject: null,
-              disabled: false,
-              mustChangePassword: false,
-              createdAt: now,
-              updatedAt: now,
-            },
-            { session: databaseSession }
-          );
-          user = await collections.users().findOne(
-            { _id: userId },
-            { session: databaseSession }
-          );
-        }
-        if (!user) throw new Error("Owner identity could not be created");
         await collections.organizations().insertOne(
           {
             _id: organizationId,
             name,
             slug,
-            contactEmail: ownerEmail,
+            contactEmail: actor.email || null,
             suspended: false,
-            status: "PROVISIONING",
-            statusReason: reason,
+            status: "ACTIVE",
+            statusReason: null,
             statusChangedAt: now,
             statusChangedBy: oid(actor.platformAdminId),
             createdAt: now,
             updatedAt: now,
-          },
-          { session: databaseSession }
-        );
-        await collections.memberships().insertOne(
-          {
-            _id: membershipId,
-            orgId: organizationId,
-            userId: user._id,
-            role: "OWNER",
-            status: "INVITED",
-            pageIds: null,
-            invitationExpiresAt: expiresAt,
-            invitationTokenHash: invitation.hash,
-            activatedAt: null,
-            createdAt: now,
-          },
-          { session: databaseSession }
-        );
-        await collections.organizations().updateOne(
-          { _id: organizationId, status: "PROVISIONING" },
-          {
-            $set: {
-              status: "ACTIVE",
-              statusReason: null,
-              statusChangedAt: now,
-              updatedAt: now,
-            },
           },
           { session: databaseSession }
         );
@@ -165,7 +80,7 @@ export async function createOrganization(
             targetId: organizationId.toHexString(),
             organizationId,
             reason,
-            metadata: { slug, ownerEmail, invitationExpiresAt: expiresAt },
+            metadata: { slug },
             createdAt: now,
           },
           { session: databaseSession }
@@ -174,12 +89,11 @@ export async function createOrganization(
     } finally {
       await databaseSession.endSession();
     }
-    revalidatePath("/platform");
-    revalidatePath("/platform/orgs");
+    revalidatePath("/organization/platform");
+    revalidatePath("/organization/platform/orgs");
     return {
       ok: true,
       organizationName: name,
-      inviteUrl: `${baseUrl}/invite/${invitation.token}`,
     };
   } catch (error) {
     return {
@@ -187,110 +101,6 @@ export async function createOrganization(
       error: error instanceof Error ? error.message : "Organization creation failed",
     };
   }
-}
-
-export async function startSupportSession(orgId: string, formData: FormData) {
-  const mode = String(formData.get("mode") ?? "VIEW") === "OPERATE" ? "OPERATE" : "VIEW";
-  const platformSession =
-    mode === "OPERATE"
-      ? await requirePlatformCapability("support.operate")
-      : await requirePlatformCapability("support.view");
-  const reason = requiredReason(formData);
-  const requestedScopes = formData
-    .getAll("scopes")
-    .map(String)
-    .filter((scope): scope is Capability => CAPABILITIES.includes(scope as Capability));
-  const scopes =
-    mode === "OPERATE"
-      ? [...new Set(requestedScopes.filter((scope) => SUPPORT_SCOPES.has(scope)))]
-      : [];
-  if (mode === "OPERATE" && scopes.length === 0) {
-    redirect("/platform/orgs?error=support-scope");
-  }
-  const orgDoc = await collections.organizations().findOne({ _id: oid(orgId) });
-  if (!orgDoc) redirect("/platform/orgs?error=organization-not-found");
-  if (organizationStatus(orgDoc) !== "ACTIVE") {
-    redirect("/platform/orgs?error=organization-suspended");
-  }
-
-  const supportId = new ObjectId();
-  const credential = generateSecret("support_");
-  const now = new Date();
-  const expiresAt = new Date(now.getTime() + 30 * 60_000);
-  const databaseSession = mongoClient.startSession();
-  try {
-    await databaseSession.withTransaction(async () => {
-      await collections.supportSessions().insertOne(
-        {
-          _id: supportId,
-          platformAdminId: oid(platformSession.platformAdminId),
-          orgId: orgDoc._id,
-          reason,
-          mode,
-          scopes,
-          tokenHash: credential.hash,
-          expiresAt,
-          revokedAt: null,
-          revokedBy: null,
-          revokedReason: null,
-          endedAt: null,
-          createdAt: now,
-        },
-        { session: databaseSession }
-      );
-      await collections.auditLogs().insertOne(
-        {
-          _id: new ObjectId(),
-          orgId: orgDoc._id,
-          actor: platformSession.email,
-          action: "SUPPORT_SESSION_STARTED",
-          target: orgDoc.slug,
-          metadata: { reason, mode, scopes, expiresAt },
-          supportSessionId: supportId,
-          createdAt: now,
-        },
-        { session: databaseSession }
-      );
-      await collections.platformAuditLogs().insertOne(
-        {
-          _id: new ObjectId(),
-          actorId: oid(platformSession.platformAdminId),
-          actorEmail: platformSession.email,
-          actorRole: platformSession.role,
-          action: "SUPPORT_SESSION_STARTED",
-          targetType: "supportSession",
-          targetId: supportId.toHexString(),
-          organizationId: orgDoc._id,
-          reason,
-          metadata: { mode, scopes, expiresAt },
-          createdAt: now,
-        },
-        { session: databaseSession }
-      );
-    });
-  } finally {
-    await databaseSession.endSession();
-  }
-
-  await createSession(
-    {
-      // Support authorization is derived from the durable support-session
-      // record, never from a borrowed customer identity.
-      userId: platformSession.platformAdminId,
-      membershipId: supportId.toHexString(),
-      orgId: orgDoc._id.toHexString(),
-      email: platformSession.email,
-      name: platformSession.name,
-      role: mode === "OPERATE" ? "ADMIN" : "VIEWER",
-      supportSessionId: supportId.toHexString(),
-      supportSessionToken: credential.token,
-      supportActorEmail: platformSession.email,
-      supportActorName: platformSession.name,
-      supportMode: mode,
-    },
-    { maxAgeSeconds: 30 * 60 }
-  );
-  redirect("/admin");
 }
 
 export async function suspendOrg(orgId: string, formData: FormData) {
@@ -319,18 +129,6 @@ export async function suspendOrg(orgId: string, formData: FormData) {
             statusChangedAt: now,
             statusChangedBy: oid(actor.platformAdminId),
             updatedAt: now,
-          },
-        },
-        { session: databaseSession }
-      );
-      await collections.supportSessions().updateMany(
-        { orgId: id, revokedAt: null },
-        {
-          $set: {
-            revokedAt: now,
-            endedAt: now,
-            revokedBy: oid(actor.platformAdminId),
-            revokedReason: "organization suspended",
           },
         },
         { session: databaseSession }
@@ -371,8 +169,8 @@ export async function suspendOrg(orgId: string, formData: FormData) {
   } finally {
     await databaseSession.endSession();
   }
-  revalidatePath("/platform");
-  revalidatePath("/platform/orgs");
+  revalidatePath("/organization/platform");
+  revalidatePath("/organization/platform/orgs");
 }
 
 export async function unsuspendOrg(orgId: string, formData: FormData) {
@@ -453,17 +251,12 @@ export async function unsuspendOrg(orgId: string, formData: FormData) {
   } finally {
     await databaseSession.endSession();
   }
-  revalidatePath("/platform");
-  revalidatePath("/platform/orgs");
+  revalidatePath("/organization/platform");
+  revalidatePath("/organization/platform/orgs");
 }
 
 export async function deleteOrgAsPlatform(orgId: string, formData: FormData) {
   const actor = await requirePlatformCapability("organizations.purge");
-  await requirePlatformStepUp(
-    actor.platformAdminId,
-    formData,
-    "organization purge"
-  );
   const organization = await collections.organizations().findOne({ _id: oid(orgId) });
   if (!organization) throw new Error("Organization not found");
   if (organizationStatus(organization) !== "SUSPENDED") {
@@ -552,9 +345,9 @@ export async function deleteOrgAsPlatform(orgId: string, formData: FormData) {
   } finally {
     await databaseSession.endSession();
   }
-  revalidatePath("/platform");
-  revalidatePath("/platform/orgs");
-  revalidatePath("/platform/operations");
+  revalidatePath("/organization/platform");
+  revalidatePath("/organization/platform/orgs");
+  revalidatePath("/organization/platform/operations");
 }
 
 export async function cancelOrganizationPurge(orgId: string, formData: FormData) {
@@ -648,9 +441,9 @@ export async function cancelOrganizationPurge(orgId: string, formData: FormData)
   } finally {
     await databaseSession.endSession();
   }
-  revalidatePath("/platform");
-  revalidatePath("/platform/orgs");
-  revalidatePath("/platform/operations");
+  revalidatePath("/organization/platform");
+  revalidatePath("/organization/platform/orgs");
+  revalidatePath("/organization/platform/operations");
 }
 
 export async function retryPlatformJob(jobId: string, formData: FormData) {
@@ -708,65 +501,5 @@ export async function retryPlatformJob(jobId: string, formData: FormData) {
   } finally {
     await databaseSession.endSession();
   }
-  revalidatePath("/platform/operations");
-}
-
-export async function revokeSupportSession(sessionId: string, formData: FormData) {
-  const actor = await requirePlatformCapability("support.operate");
-  const reason = requiredReason(formData);
-  const now = new Date();
-  const databaseSession = mongoClient.startSession();
-  try {
-    await databaseSession.withTransaction(async () => {
-      const support = await collections.supportSessions().findOne(
-        { _id: oid(sessionId) },
-        { session: databaseSession }
-      );
-      if (!support) throw new Error("Support session not found");
-      const changed = await collections.supportSessions().updateOne(
-        { _id: support._id, revokedAt: null, expiresAt: { $gt: now } },
-        {
-          $set: {
-            revokedAt: now,
-            endedAt: now,
-            revokedBy: oid(actor.platformAdminId),
-            revokedReason: reason,
-          },
-        },
-        { session: databaseSession }
-      );
-      if (!changed.modifiedCount) {
-        throw new Error("Support session already ended; reload and retry");
-      }
-      await collections.auditLogs().insertOne(
-        {
-          _id: new ObjectId(),
-          orgId: support.orgId,
-          actor: actor.email,
-          action: "SUPPORT_SESSION_REVOKED",
-          target: support._id.toHexString(),
-          metadata: { reason },
-          supportSessionId: support._id,
-          createdAt: now,
-        },
-        { session: databaseSession }
-      );
-      await writePlatformAudit(
-        {
-          actorId: oid(actor.platformAdminId),
-          actorEmail: actor.email,
-          actorRole: actor.role,
-          action: "SUPPORT_SESSION_REVOKED",
-          targetType: "supportSession",
-          targetId: support._id.toHexString(),
-          organizationId: support.orgId,
-          reason,
-        },
-        { session: databaseSession }
-      );
-    });
-  } finally {
-    await databaseSession.endSession();
-  }
-  revalidatePath("/platform/support");
+  revalidatePath("/organization/platform/operations");
 }

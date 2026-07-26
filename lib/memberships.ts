@@ -24,6 +24,7 @@ export async function getOrganizationMembers(orgId: string) {
             userId: user._id.toHexString(),
             orgId: membership.orgId.toHexString(),
             name: user.name,
+            username: user.username,
             email: user.email,
             role: membership.role,
             status: membership.status ?? "ACTIVE",
@@ -45,7 +46,10 @@ export async function getUserOrganizations(userId: string) {
     .find({ userId: oid(userId), status: "ACTIVE" })
     .sort({ createdAt: 1 })
     .toArray();
-  const organizations = memberships.length
+  const globalAdmin = memberships.some((membership) => membership.role === "ADMIN");
+  const organizations = globalAdmin
+    ? await collections.organizations().find({ suspended: { $ne: true }, status: { $nin: ["PROVISIONING", "SUSPENDED", "DELETING"] } }).sort({ createdAt: 1 }).toArray()
+    : memberships.length
     ? await collections
         .organizations()
         .find({
@@ -55,6 +59,14 @@ export async function getUserOrganizations(userId: string) {
         .toArray()
     : [];
   const byId = new Map(organizations.map((org) => [org._id.toHexString(), org]));
+  if (globalAdmin) {
+    return organizations.map((organization) => ({
+      id: organization._id.toHexString(),
+      name: organization.name,
+      slug: organization.slug,
+      role: "ADMIN" as const,
+    }));
+  }
   return memberships.flatMap((membership) => {
     const organization = byId.get(membership.orgId.toHexString());
     return organization

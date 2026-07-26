@@ -48,14 +48,11 @@ describe("authentication and management API lifecycle fencing", () => {
 
   it.each([
     "app/api/auth/logout/route.ts",
-    "app/api/auth/end-support/route.ts",
     "app/api/auth/platform-logout/route.ts",
-  ])("%s omits tenant audit safely when lifecycle cleanup already won", (path) => {
+  ])("%s uses the unified session logout", (path) => {
     const contents = source(path);
-    expect(contents).toContain("writeActiveTenantAudit(");
-    expect(contents).toContain(
-      "error instanceof OrganizationMutationBlockedError"
-    );
+    expect(contents).toContain("destroySession(");
+    expect(contents).not.toContain("supportSessions(");
   });
 
   it("fences API-key usage metadata in the same transaction", () => {

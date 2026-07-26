@@ -3,7 +3,7 @@ import { requireSession } from "@/lib/require-session";
 import { collections } from "@/lib/db";
 import { oid, toId } from "@/lib/mongo-utils";
 import { IMPACT_LABEL, type Impact } from "@/lib/status";
-import { postIncidentUpdate, deleteIncident, savePostmortem } from "../actions";
+import { editIncidentUpdate, postIncidentUpdate, deleteIncident, savePostmortem } from "../actions";
 import { deleteMaintenance, setMaintenanceStatus } from "../../maintenance/actions";
 import { HelpTip } from "@/components/HelpTip";
 import {
@@ -13,6 +13,7 @@ import {
 } from "@/components/admin/IncidentCommunicationForms";
 import { assertPageInOrg } from "@/lib/admin-guard";
 import { sessionHasCapability } from "@/lib/admin-guard";
+import { IncidentTimelineEditor } from "@/components/admin/IncidentTimelineEditor";
 
 export default async function IncidentDetailPage({ params }: { params: Promise<{ incidentId: string }> }) {
   const { incidentId } = await params;
@@ -72,15 +73,29 @@ export default async function IncidentDetailPage({ params }: { params: Promise<{
 
       <div className="bg-[var(--surface)] border border-[var(--line)] p-4 sm:p-5">
         <h2 className="font-mono font-semibold mb-3 text-sm text-[var(--fg)]">Timeline</h2>
-        <div className="space-y-3">
-          {incident.updates.map((u) => (
-            <div key={u.id} className="text-sm border-l-2 border-[var(--line)] pl-3">
-              <span className="font-medium text-[var(--fg)]">{u.status}</span>
-              <span className="text-xs text-[var(--fg-dim)] ml-2">{new Date(u.createdAt).toLocaleString()}</span>
-              <p className="text-[var(--fg-soft)] whitespace-pre-wrap">{u.body}</p>
-            </div>
-          ))}
-        </div>
+        {canUpdate && !incident.isMaintenance ? (
+          <IncidentTimelineEditor
+            updates={[...incident.updates].reverse().map((update) => ({
+              id: update.id,
+              status: update.status,
+              body: update.body,
+              createdAtLabel: new Date(update.createdAt).toLocaleString(),
+              editedAtLabel: update.editedAt ? new Date(update.editedAt).toLocaleString() : null,
+              notified: update.notified,
+            }))}
+            action={editIncidentUpdate.bind(null, incidentId)}
+          />
+        ) : (
+          <div className="space-y-3">
+            {incident.updates.map((update) => (
+              <div key={update.id} className="border-l-2 border-[var(--line)] pl-3 text-sm">
+                <span className="font-medium text-[var(--fg)]">{update.status}</span>
+                <span className="ml-2 text-xs text-[var(--fg-dim)]">{new Date(update.createdAt).toLocaleString()}</span>
+                <p className="whitespace-pre-wrap text-[var(--fg-soft)]">{update.body}</p>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {canUpdate && !incident.isMaintenance && incident.status !== "RESOLVED" && (

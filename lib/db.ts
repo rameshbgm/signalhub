@@ -1,4 +1,5 @@
 import { MongoClient, ObjectId, type Db } from "mongodb";
+import type { StatusPageDesign } from "@/lib/page-design";
 
 const globalForMongo = globalThis as unknown as { mongoClient?: MongoClient; mongoDb?: Db };
 
@@ -46,8 +47,8 @@ export interface OrganizationDoc {
   updatedAt?: Date;
 }
 
-/** Spans all tenants — never scoped to an orgId. Separate identity space from TeamMemberDoc. */
-export type PlatformRole = "OWNER" | "OPERATOR" | "AUDITOR";
+/** @deprecated Transitional shape for pre-009 data; no runtime identity uses it. */
+export type PlatformRole = "ADMIN";
 export type PlatformAdminStatus = "ACTIVE" | "DISABLED";
 
 export interface PlatformAdminDoc {
@@ -57,6 +58,8 @@ export interface PlatformAdminDoc {
   passwordHash: string;
   name: string;
   role?: PlatformRole;
+  /** Legacy singleton marker retained only so migration 009 can remove it. */
+  singletonKey?: "platform-owner";
   status?: PlatformAdminStatus;
   sessionVersion?: number;
   totpSecretCiphertext?: string | null;
@@ -72,6 +75,8 @@ export interface PlatformAdminDoc {
 
 export interface UserDoc {
   _id: ObjectId;
+  username: string;
+  canonicalUsername: string;
   email: string;
   canonicalEmail: string;
   passwordHash: string | null;
@@ -81,6 +86,7 @@ export interface UserDoc {
   oidcSubject?: string | null;
   disabled?: boolean;
   mustChangePassword?: boolean;
+  mustCompleteProfile?: boolean;
   sessionVersion?: number;
   mfaRequired?: boolean;
   totpSecretCiphertext?: string | null;
@@ -92,7 +98,6 @@ export interface UserDoc {
 }
 
 export type MembershipRole =
-  | "OWNER"
   | "ADMIN"
   | "INCIDENT_MANAGER"
   | "RESPONDER"
@@ -158,7 +163,7 @@ export interface PlatformAuditLogDoc {
   createdAt: Date;
 }
 
-export type PlatformJobStatus =
+type PlatformJobStatus =
   | "QUEUED"
   | "PROCESSING"
   | "SUCCEEDED"
@@ -254,8 +259,8 @@ export interface AuditLogDoc {
   createdAt: Date;
 }
 
-export type IdentityConnectionType = "OIDC" | "SAML";
-export type IdentityConnectionAudience = "ORGANIZATION" | "PLATFORM";
+type IdentityConnectionType = "OIDC" | "SAML";
+type IdentityConnectionAudience = "ORGANIZATION" | "PLATFORM";
 
 export interface IdentityRoleMapping {
   group: string;
@@ -435,12 +440,18 @@ export interface PageDoc {
   logoUrl: string | null;
   faviconUrl: string | null;
   coverImageUrl: string | null;
+  coverImageFit?: "COVER" | "CONTAIN";
+  coverImagePositionX?: number;
+  coverImagePositionY?: number;
+  coverImageCropX?: number | null;
+  coverImageCropY?: number | null;
+  coverImageCropWidth?: number | null;
+  coverImageCropHeight?: number | null;
   brandColor: string;
   layout: string; // STANDARD, COVER, MINIMAL
   supportUrl: string | null;
   termsUrl: string | null;
   privacyUrl: string | null;
-  customDomain: string | null;
   passwordHash: string | null;
   removeBranding: boolean;
   customCss: string | null;
@@ -448,7 +459,48 @@ export interface PageDoc {
   themeMode?: "SYSTEM" | "LIGHT" | "DARK";
   allowThemeOverride?: boolean;
   analyticsEnabled?: boolean;
+  publishedDesign?: StatusPageDesign;
+  publishedDesignVersion?: number;
+  designPublishedAt?: Date | null;
   createdAt: Date;
+}
+
+export interface PageDesignDraftDoc {
+  _id: ObjectId;
+  pageId: ObjectId;
+  revision: number;
+  basePublishedVersion: number;
+  design: StatusPageDesign;
+  updatedBy: ObjectId;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface PageDesignVersionDoc {
+  _id: ObjectId;
+  pageId: ObjectId;
+  version: number;
+  design: StatusPageDesign;
+  publishedBy: ObjectId;
+  publishedAt: Date;
+}
+
+export interface PageAnnouncementDoc {
+  _id: ObjectId;
+  pageId: ObjectId;
+  title: string;
+  body: string;
+  severity: "INFO" | "SUCCESS" | "WARNING" | "CRITICAL";
+  ctaLabel: string | null;
+  ctaUrl: string | null;
+  startsAt: Date;
+  endsAt: Date | null;
+  dismissible: boolean;
+  priority: number;
+  surfaces: Array<"STATUS" | "HISTORY" | "INCIDENT" | "ACCESS" | "HUB">;
+  createdBy: ObjectId;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 export interface PageAccessGroupDoc {
@@ -503,6 +555,7 @@ export interface ComponentStatusEventDoc {
   startedAt: Date;
   endedAt: Date | null;
   isMaintenance: boolean;
+  note?: string | null;
 }
 
 export interface IncidentDoc {
@@ -534,6 +587,8 @@ export interface IncidentUpdateDoc {
   body: string;
   createdAt: Date;
   notified: boolean;
+  editedAt?: Date | null;
+  editedBy?: ObjectId | null;
 }
 
 export interface IncidentComponentDoc {
@@ -706,6 +761,13 @@ export interface NotificationDestinationDoc {
   createdAt: Date;
 }
 
+export interface PlatformConfigurationDoc {
+  _id: "global";
+  enabledDestinationChannels: string[];
+  updatedBy: ObjectId;
+  updatedAt: Date;
+}
+
 export interface AnalyticsDailyDoc {
   _id: string;
   pageId: ObjectId;
@@ -757,7 +819,7 @@ export interface NotificationLogDoc {
   createdAt: Date;
 }
 
-export type NotificationJobStatus =
+type NotificationJobStatus =
   | "PENDING"
   | "PROCESSING"
   | "SENT"
@@ -874,6 +936,9 @@ export const collections = {
   apiKeys: () => db.collection<ApiKeyDoc>("apiKeys"),
   auditLogs: () => db.collection<AuditLogDoc>("auditLogs"),
   pages: () => db.collection<PageDoc>("pages"),
+  pageDesignDrafts: () => db.collection<PageDesignDraftDoc>("pageDesignDrafts"),
+  pageDesignVersions: () => db.collection<PageDesignVersionDoc>("pageDesignVersions"),
+  pageAnnouncements: () => db.collection<PageAnnouncementDoc>("pageAnnouncements"),
   pageAccessGroups: () => db.collection<PageAccessGroupDoc>("pageAccessGroups"),
   pageAccessUsers: () => db.collection<PageAccessUserDoc>("pageAccessUsers"),
   componentGroups: () => db.collection<ComponentGroupDoc>("componentGroups"),
@@ -901,5 +966,7 @@ export const collections = {
   assets: () => db.collection<AssetDoc>("assets"),
   notificationDestinations: () =>
     db.collection<NotificationDestinationDoc>("notificationDestinations"),
+  platformConfiguration: () =>
+    db.collection<PlatformConfigurationDoc>("platformConfiguration"),
   analyticsDaily: () => db.collection<AnalyticsDailyDoc>("analyticsDaily"),
 };

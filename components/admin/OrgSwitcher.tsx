@@ -1,5 +1,7 @@
 "use client";
 
+import { fetchWithTimeout } from "@/lib/client-fetch";
+
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -46,7 +48,7 @@ export function OrgSwitcher({
     setSwitchError(null);
 
     try {
-      const response = await fetch("/api/auth/switch-org", {
+      const response = await fetchWithTimeout("/api/auth/switch-org", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ orgId: nextOrgId }),
@@ -57,7 +59,7 @@ export function OrgSwitcher({
         return;
       }
       setOpen(false);
-      router.push("/admin");
+      router.push("/organization");
       router.refresh();
     } catch {
       setSwitchError("Unable to switch organizations. Check your connection and try again.");
@@ -116,7 +118,7 @@ export function OrgSwitcher({
             pages.map((p) => (
               <Link
                 key={p.id}
-                href={`/admin/pages/${p.id}`}
+                href={`/organization/pages/${p.id}`}
                 onClick={() => setOpen(false)}
                 className="flex items-center gap-2 px-3 py-1.5 text-sm text-[var(--fg)] hover:bg-[var(--hover-overlay)]"
               >
@@ -131,7 +133,7 @@ export function OrgSwitcher({
           {pages.length === 0 && <p className="px-3 py-1.5 text-xs text-[var(--fg-dim)]">No pages yet</p>}
           <div className="mt-1 border-t border-[var(--line)] pt-1">
             <Link
-              href="/admin/pages"
+              href="/organization/pages"
               onClick={() => setOpen(false)}
               className="block px-3 py-1.5 text-sm font-semibold text-[var(--cyan)] hover:bg-[var(--hover-overlay)]"
             >

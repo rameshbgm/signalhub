@@ -64,7 +64,7 @@ async function leaseMonitor(monitor: WithId<MonitorDoc>, workerId: string, now: 
   );
 }
 
-export async function leaseDueMonitors(workerId: string, limit = 20) {
+async function leaseDueMonitors(workerId: string, limit = 20) {
   const now = new Date();
   const candidates = await collections
     .monitors()

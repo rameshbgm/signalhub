@@ -82,17 +82,22 @@
 /* Public pages own their palette. This prevents the admin theme and custom
    status-page theme from leaking into each other. */
 .status-theme {
-  --bg: #f5f7fb;
-  --surface: #ffffff;
+  --bg: var(--design-bg, #f5f7fb);
+  --surface: var(--design-surface, #ffffff);
   --surface-raised: #f8fafc;
   --line: #d9e0ea;
   --line-bright: #aeb9c8;
-  --fg: #132033;
-  --fg-soft: #526174;
+  --fg: var(--design-fg, #132033);
+  --fg-soft: var(--design-fg-soft, #526174);
   --fg-dim: #7d8999;
   --cyan: var(--page-brand, #0f8ca8);
   --cyan-soft: color-mix(in srgb, var(--page-brand, #0f8ca8) 12%, transparent);
   --on-cyan: #ffffff;
+  --status-operational: #16a34a;
+  --status-degraded: #eab308;
+  --status-partial: #f97316;
+  --status-major: #dc2626;
+  --status-maintenance: #3b82f6;
   color-scheme: light;
 }
 
@@ -120,13 +125,13 @@
 
 .status-theme[data-theme-mode="DARK"],
 :root.dark .status-theme[data-theme-mode="SYSTEM"] {
-  --bg: #090d13;
-  --surface: #111720;
+  --bg: var(--design-dark-bg, #090d13);
+  --surface: var(--design-dark-surface, #111720);
   --surface-raised: #18202b;
   --line: #273241;
   --line-bright: #425066;
-  --fg: #edf3f8;
-  --fg-soft: #a2adba;
+  --fg: var(--design-dark-fg, #edf3f8);
+  --fg-soft: var(--design-dark-fg-soft, #a2adba);
   --fg-dim: #707c8c;
   --cyan: var(--page-brand, #22c5df);
   --cyan-soft: color-mix(in srgb, var(--page-brand, #22c5df) 16%, transparent);
@@ -134,9 +139,276 @@
   color-scheme: dark;
 }
 
+.status-theme[data-radius="NONE"] { --page-radius: 0; }
+.status-theme[data-radius="SMALL"] { --page-radius: 0.25rem; }
+.status-theme[data-radius="MEDIUM"] { --page-radius: 0.65rem; }
+.status-theme[data-radius="LARGE"] { --page-radius: 1rem; }
+.status-theme[data-shadow="NONE"] { --page-shadow: none; }
+.status-theme[data-shadow="SUBTLE"] { --page-shadow: 0 8px 24px rgba(15, 23, 42, 0.06); }
+.status-theme[data-shadow="ELEVATED"] { --page-shadow: 0 18px 50px rgba(15, 23, 42, 0.14); }
+.status-theme[data-density="COMPACT"] { --page-block-gap: 1rem; --page-block-padding: 1rem; }
+.status-theme[data-density="COMFORTABLE"] { --page-block-gap: 1.5rem; --page-block-padding: 1.25rem; }
+.status-theme[data-density="SPACIOUS"] { --page-block-gap: 2.25rem; --page-block-padding: 1.75rem; }
+.status-theme[data-typography="HUMANIST"] { font-family: ui-rounded, "Avenir Next", system-ui, sans-serif; }
+.status-theme[data-typography="GEOMETRIC"] { font-family: "Trebuchet MS", "Avenir Next", system-ui, sans-serif; }
+.status-theme[data-typography="MONO"] { font-family: var(--font-mono-family); }
+.status-theme .page-panel {
+  border-radius: var(--page-radius, 0.65rem);
+  box-shadow: var(--page-shadow, none);
+}
+
 body {
   font-family: var(--font-body-family);
   transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+/* Console-wide resilience: grid/flex descendants may contain long domains,
+   IDs, and integration names, so they must be allowed to shrink on phones. */
+.app-console-main :where(.grid, form) > * {
+  min-width: 0;
+}
+
+.app-console-main :where(input, textarea, pre, code) {
+  max-width: 100%;
+}
+
+.app-console-main :where(h1, h2, h3, p, a, code) {
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 639px) {
+  .app-console-main :where(input:not([type="checkbox"]):not([type="radio"]), textarea) {
+    font-size: 1rem;
+  }
+}
+
+/* Every button gets a short click lock. Mutation/submit actions additionally
+   show an accessible progress spinner until React completes them or the hard
+   timeout releases the control. */
+button[data-button-guard-locked="true"] {
+  pointer-events: none;
+}
+
+button[data-button-busy="interaction"] {
+  cursor: wait;
+  opacity: 0.72;
+}
+
+button[data-button-busy="loading"],
+button[data-button-busy="saving"] {
+  position: relative;
+  cursor: wait;
+  color: transparent !important;
+}
+
+button[data-button-busy="loading"] > *,
+button[data-button-busy="saving"] > * {
+  visibility: hidden !important;
+}
+
+button[data-button-busy="loading"]::after,
+button[data-button-busy="saving"]::after {
+  position: absolute;
+  inset: 50% auto auto 50%;
+  width: 1rem;
+  height: 1rem;
+  border: 2px solid color-mix(in srgb, var(--button-busy-color) 30%, transparent);
+  border-top-color: var(--button-busy-color);
+  border-radius: 9999px;
+  content: "";
+  transform: translate(-50%, -50%);
+  animation: button-busy-spin 700ms linear infinite;
+}
+
+.button-timeout-message {
+  position: fixed;
+  z-index: 3000;
+  right: 1rem;
+  bottom: 1rem;
+  max-width: min(24rem, calc(100vw - 2rem));
+  border: 1px solid color-mix(in srgb, var(--red) 45%, var(--line));
+  background: var(--surface-raised);
+  color: var(--fg);
+  box-shadow: 0 14px 35px rgba(15, 23, 42, 0.2);
+  font-size: 0.875rem;
+}
+
+.button-timeout-message:not(:empty) {
+  padding: 0.75rem 1rem;
+}
+
+@keyframes button-busy-spin {
+  to {
+    transform: translate(-50%, -50%) rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  button[data-button-busy="loading"]::after,
+  button[data-button-busy="saving"]::after {
+    animation-duration: 1.5s;
+  }
+}
+
+/* Shared console dropdown. The listbox is rendered into document.body and its
+   trigger/content-aware dimensions are measured by FluentSelect. */
+.app-fluent-select {
+  position: relative;
+  display: inline-flex;
+  min-width: 0 !important;
+  max-width: 100%;
+  color: var(--fg) !important;
+  vertical-align: middle;
+}
+
+.app-fluent-select__button.fui-Button {
+  justify-content: space-between;
+  min-height: 2.625rem;
+  min-width: 0;
+  width: 100%;
+  border: 1px solid var(--line) !important;
+  border-radius: 0 !important;
+  background: var(--bg) !important;
+  color: var(--fg) !important;
+  font-family: var(--font-body-family) !important;
+  font-size: 1rem !important;
+  font-weight: 400;
+  line-height: 1.4;
+  transition:
+    border-color 140ms ease,
+    box-shadow 140ms ease,
+    background-color 140ms ease;
+}
+
+.app-fluent-select__button.fui-Button:not(:disabled):hover {
+  border-color: var(--line-bright) !important;
+  background: var(--surface-raised) !important;
+}
+
+.app-fluent-select__button.fui-Button:focus-visible,
+.app-fluent-select[data-open="true"] .app-fluent-select__button {
+  border-color: var(--cyan) !important;
+  box-shadow: 0 0 0 2px var(--cyan-soft);
+}
+
+.app-fluent-select__value {
+  min-width: 0;
+  overflow: hidden;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: inherit;
+  font: inherit;
+}
+
+.app-fluent-select__chevron {
+  flex: 0 0 auto;
+  color: var(--fg-soft);
+  transition: transform 160ms ease, color 140ms ease;
+}
+
+.app-fluent-select[data-open="true"] .app-fluent-select__chevron {
+  color: var(--cyan);
+  transform: rotate(180deg);
+}
+
+.app-fluent-select:has(.app-fluent-select__button:disabled) {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.app-fluent-select__listbox {
+  position: fixed !important;
+  z-index: 2000;
+  box-sizing: border-box;
+  min-width: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border: 1px solid var(--line) !important;
+  border-radius: 0.375rem !important;
+  background: var(--surface) !important;
+  color: var(--fg) !important;
+  font-family: var(--font-body-family) !important;
+  font-size: 1rem !important;
+  box-shadow: 0 14px 35px rgba(15, 23, 42, 0.16) !important;
+  padding: 0.25rem !important;
+}
+
+.app-fluent-select__listbox .fui-Option {
+  min-height: 2.5rem;
+  height: auto;
+  border-radius: 0.25rem;
+  color: var(--fg) !important;
+  font-family: var(--font-body-family) !important;
+  font-size: 1rem !important;
+  font-weight: 400;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+  padding-block: 0.55rem;
+  white-space: normal;
+  transition: background-color 100ms ease, color 100ms ease;
+}
+
+.app-fluent-select__listbox .fui-Option:hover,
+.app-fluent-select__listbox .fui-Option[data-activedescendant] {
+  background: var(--surface-raised) !important;
+}
+
+.app-fluent-select__listbox .fui-Option[aria-selected="true"] {
+  background: var(--cyan-soft) !important;
+  color: var(--fg) !important;
+  font-weight: 600;
+}
+
+.app-fluent-select__listbox .fui-Option__checkIcon {
+  color: var(--cyan) !important;
+}
+
+@media (max-width: 639px) {
+  .app-fluent-select__button.fui-Button {
+    min-height: 2.75rem;
+  }
+
+  .app-fluent-select__listbox .fui-Option {
+    min-height: 2.75rem;
+    padding-block: 0.65rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-fluent-select,
+  .app-fluent-select__button,
+  .app-fluent-select__chevron,
+  .app-fluent-select__listbox .fui-Option {
+    transition: none;
+  }
+}
+
+/* Keep native selects visually aligned with the rest of the console form
+   controls. The option popup remains platform-native for accessibility. */
+select:not([multiple]) {
+  appearance: none;
+  border-radius: 0;
+  padding-right: 2.5rem !important;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%238a93a1' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-position: right 0.75rem center;
+  background-repeat: no-repeat;
+  background-size: 1rem;
+}
+
+select:not([multiple]):focus-visible {
+  border-color: var(--cyan);
+  outline: none;
+}
+
+select:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+select option {
+  background: var(--surface);
+  color: var(--fg);
 }
 
 .font-mono {
@@ -149,87 +421,10 @@ body {
   }
 }
 
-/* ---------- scroll reveal ---------- */
-
-.reveal {
-  opacity: 0;
-  transform: translateY(28px);
-  transition:
-    opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1),
-    transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
-  transition-delay: var(--reveal-delay, 0ms);
-  will-change: opacity, transform;
-}
-.reveal.revealed {
-  opacity: 1;
-  transform: none;
-}
-
 @media (prefers-reduced-motion: reduce) {
-  .reveal {
-    opacity: 1;
-    transform: none;
-    transition: none;
-  }
-  .float-a,
-  .float-b,
-  .float-c,
-  .ticker-track,
   .pulse-dot::after {
     animation: none !important;
   }
-}
-
-/* ---------- 3D hero ---------- */
-
-.scene {
-  perspective: 1400px;
-}
-.scene-inner {
-  transform-style: preserve-3d;
-  transform: rotateX(var(--tilt-x, 0deg)) rotateY(var(--tilt-y, 0deg));
-  transition: transform 0.25s ease-out;
-}
-.card-3d {
-  transform-style: preserve-3d;
-  backface-visibility: hidden;
-}
-
-@keyframes float-a {
-  0%,
-  100% {
-    transform: translateZ(60px) translateY(0);
-  }
-  50% {
-    transform: translateZ(60px) translateY(-10px);
-  }
-}
-@keyframes float-b {
-  0%,
-  100% {
-    transform: translateZ(20px) rotateZ(-4deg) translate(0, 0);
-  }
-  50% {
-    transform: translateZ(20px) rotateZ(-4deg) translate(-6px, -14px);
-  }
-}
-@keyframes float-c {
-  0%,
-  100% {
-    transform: translateZ(110px) rotateZ(3deg) translate(0, 0);
-  }
-  50% {
-    transform: translateZ(110px) rotateZ(3deg) translate(8px, 10px);
-  }
-}
-.float-a {
-  animation: float-a 7s ease-in-out infinite;
-}
-.float-b {
-  animation: float-b 9s ease-in-out infinite;
-}
-.float-c {
-  animation: float-c 8s ease-in-out infinite;
 }
 
 /* ---------- pulsing live dot ---------- */
@@ -254,22 +449,6 @@ body {
   100% {
     transform: scale(2.6);
     opacity: 0;
-  }
-}
-
-/* ---------- uptime ticker marquee ---------- */
-
-.ticker-track {
-  display: flex;
-  width: max-content;
-  animation: ticker 42s linear infinite;
-}
-@keyframes ticker {
-  from {
-    transform: translateX(0);
-  }
-  to {
-    transform: translateX(-50%);
   }
 }
 

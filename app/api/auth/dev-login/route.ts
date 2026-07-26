@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createPlatformSession, createSession } from "@/lib/auth";
+import { createSession } from "@/lib/auth";
 import { collections } from "@/lib/db";
 import {
   DEVELOPMENT_ACCOUNTS,
@@ -20,9 +20,9 @@ function available(request: NextRequest) {
 export async function GET(request: NextRequest) {
   if (!available(request)) return new NextResponse(null, { status: 404 });
   return NextResponse.json({
-    accounts: DEVELOPMENT_ACCOUNTS.map(({ key, audience, email, name, role, description }) => ({
+    accounts: DEVELOPMENT_ACCOUNTS.map(({ key, username, email, name, role, description }) => ({
       key,
-      audience,
+      username,
       email,
       name,
       role,
@@ -39,9 +39,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Unknown development account" }, { status: 400 });
   }
 
-  if (account.audience === "tenant") {
-    const user = await collections.users().findOne({
-      canonicalEmail: account.email,
+  const user = await collections.users().findOne({
+      canonicalUsername: account.username,
       disabled: { $ne: true },
     });
     if (!user) {
@@ -69,11 +68,12 @@ export async function POST(request: NextRequest) {
     if (!organization) {
       return NextResponse.json({ error: "Development organization is unavailable." }, { status: 409 });
     }
-    await createSession(
+  await createSession(
       {
         userId: user._id.toHexString(),
         membershipId: membership._id.toHexString(),
         orgId: membership.orgId.toHexString(),
+        username: user.username,
         email: user.email,
         name: user.name,
         role: membership.role,
@@ -85,34 +85,5 @@ export async function POST(request: NextRequest) {
         userAgent: request.headers.get("user-agent"),
       }
     );
-    return NextResponse.json({ ok: true, redirectTo: "/admin" });
-  }
-
-  const platformAdmin = await collections.platformAdmins().findOne({
-    canonicalEmail: account.email,
-    role: account.role,
-    status: "ACTIVE",
-  });
-  if (!platformAdmin) {
-    return NextResponse.json(
-      { error: "Development platform accounts are not seeded. Run npm run db:seed-roles." },
-      { status: 409 }
-    );
-  }
-  await createPlatformSession(
-    {
-      platformAdminId: platformAdmin._id.toHexString(),
-      email: platformAdmin.email,
-      name: platformAdmin.name,
-      role: account.role,
-      sessionVersion: platformAdmin.sessionVersion ?? 1,
-      mfaVerified: true,
-    },
-    {
-      authMethod: "PASSWORD",
-      ipAddress: requestIp(request),
-      userAgent: request.headers.get("user-agent"),
-    }
-  );
-  return NextResponse.json({ ok: true, redirectTo: "/platform" });
+  return NextResponse.json({ ok: true, redirectTo: "/organization" });
 }

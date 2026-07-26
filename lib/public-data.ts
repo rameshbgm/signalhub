@@ -3,24 +3,6 @@ import { collections } from "@/lib/db";
 import { isValidOid, oid, toId } from "@/lib/mongo-utils";
 import { overallBanner, type ComponentStatus } from "@/lib/status";
 
-export async function getPageBySlug(slug: string) {
-  const pageDoc = await collections.pages().findOne({ slug });
-  if (!pageDoc) return null;
-
-  const [hubChildrenDocs, hubParentDoc] = await Promise.all([
-    pageDoc.isHub
-      ? collections.pages().find({ hubParentId: pageDoc._id }).sort({ createdAt: 1 }).toArray()
-      : Promise.resolve([]),
-    pageDoc.hubParentId ? collections.pages().findOne({ _id: pageDoc.hubParentId }) : Promise.resolve(null),
-  ]);
-
-  return {
-    ...toId(pageDoc),
-    hubChildren: hubChildrenDocs.map(toId),
-    hubParent: hubParentDoc ? toId(hubParentDoc) : null,
-  };
-}
-
 export async function getComponentsForPage(pageId: string, visibleIds: string[] | null) {
   const pid = oid(pageId);
   const safeVisibleIds = visibleIds?.filter(isValidOid) ?? null;

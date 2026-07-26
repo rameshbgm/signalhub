@@ -64,7 +64,7 @@ export async function createMonitor(pageId: string, formData: FormData) {
     targetId: monitor.id,
     metadata: { pageId, type: rawInput.type },
   });
-  revalidatePath("/admin/monitors");
+  revalidatePath("/organization/monitors");
 }
 
 export async function toggleMonitorEnabled(monitorId: string) {
@@ -102,7 +102,7 @@ export async function toggleMonitorEnabled(monitorId: string) {
     targetId: monitorId,
     metadata: { pageId },
   });
-  revalidatePath("/admin/monitors");
+  revalidatePath("/organization/monitors");
 }
 
 export async function deleteMonitor(monitorId: string) {
@@ -118,7 +118,7 @@ export async function deleteMonitor(monitorId: string) {
     targetId: monitorId,
     metadata: { pageId },
   });
-  revalidatePath("/admin/monitors");
+  revalidatePath("/organization/monitors");
 }
 
 export async function runMonitorNow(monitorId: string) {
@@ -154,7 +154,7 @@ export async function runMonitorNow(monitorId: string) {
     targetId: monitorId,
     metadata: { pageId },
   });
-  revalidatePath("/admin/monitors");
+  revalidatePath("/organization/monitors");
 }
 
 export async function updateMonitor(monitorId: string, formData: FormData) {
@@ -254,5 +254,5 @@ export async function updateMonitor(monitorId: string, formData: FormData) {
     targetId: monitorId,
     metadata: { pageId },
   });
-  revalidatePath("/admin/monitors");
+  revalidatePath("/organization/monitors");
 }

@@ -1,13 +1,10 @@
 import { requireSession } from "@/lib/require-session";
+import { FluentSelect } from "@/components/FluentSelect";
 import {
   removeMember,
   updateMemberRole,
 } from "./actions";
-import {
-  TeamInviteForm,
-  TeamInviteRenewForm,
-  TeamMemberReactivationForm,
-} from "@/components/admin/TeamInviteForm";
+import { TeamMemberCreateForm } from "@/components/admin/TeamMemberCreateForm";
 import { getOrganizationMembers } from "@/lib/memberships";
 import { collections } from "@/lib/db";
 import { oid, toId } from "@/lib/mongo-utils";
@@ -16,25 +13,22 @@ import { requireCapability } from "@/lib/admin-guard";
 
 export default async function TeamPage() {
   const { org } = await requireSession();
-  const session = await requireCapability("team.manage");
+  await requireCapability("team.manage");
   const [members, pages] = await Promise.all([
     getOrganizationMembers(org.id),
-    collections.pages().find({ orgId: oid(org.id), isHub: false }).sort({ name: 1 }).toArray().then((docs) => docs.map(toId)),
+    collections.pages().find({ orgId: oid(org.id) }).sort({ name: 1 }).toArray().then((docs) => docs.map(toId)),
   ]);
 
   return (
     <div className="max-w-5xl space-y-8">
       <div>
-        <h1 className="font-mono text-2xl font-semibold tracking-tight text-[var(--fg)]">Team</h1>
+        <h1 className="font-mono text-2xl font-semibold tracking-tight text-[var(--fg)]">Users and roles</h1>
         <p className="mt-1 text-sm text-[var(--fg-soft)]">
-          Grant an explicit operational role and optionally limit access to selected pages.
+          Create active organization users, assign an operational role, and optionally limit access to selected pages.
         </p>
       </div>
 
-      <TeamInviteForm
-        pages={pages}
-        canGrantOwnership={session.role === "OWNER"}
-      />
+      <TeamMemberCreateForm pages={pages} />
 
       <div className="divide-y divide-[var(--line)] border border-[var(--line)] bg-[var(--surface)]">
         {members.map((m) => (
@@ -61,12 +55,11 @@ export default async function TeamPage() {
                     {m.status}
                   </span>
                 </div>
-                <span className="text-xs text-[var(--fg-dim)]">{m.email}</span>
+                <span className="text-xs text-[var(--fg-dim)]">{m.username} · {m.email}</span>
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              {m.status !== "REVOKED" &&
-                (session.role === "OWNER" || m.role !== "OWNER") && (
+              {m.status !== "REVOKED" && (
                 <details className="relative">
                   <summary className="cursor-pointer border border-[var(--line)] px-2.5 py-1 text-xs">
                     Edit access
@@ -75,18 +68,16 @@ export default async function TeamPage() {
                     action={updateMemberRole.bind(null, m.id)}
                     className="absolute right-0 z-20 mt-1 w-72 space-y-3 border border-[var(--line)] bg-[var(--surface)] p-3 shadow-xl"
                   >
-                    <label className="block text-xs text-[var(--fg-soft)]">
+                    <div className="block text-xs text-[var(--fg-soft)]">
                       Role
-                      <select name="role" defaultValue={m.role} className="mt-1 w-full border border-[var(--line)] bg-[var(--bg)] px-2 py-1.5 text-xs text-[var(--fg)]">
-                        {MEMBERSHIP_ROLES.filter(
-                          (role) => session.role === "OWNER" || role !== "OWNER"
-                        ).map((role) => (
+                      <FluentSelect aria-label="Role" name="role" defaultValue={m.role} className="mt-1 w-full border border-[var(--line)] bg-[var(--bg)] px-2 py-1.5 text-xs text-[var(--fg)]">
+                        {MEMBERSHIP_ROLES.map((role) => (
                           <option key={role} value={role}>
                             {role.replaceAll("_", " ")}
                           </option>
                         ))}
-                      </select>
-                    </label>
+                      </FluentSelect>
+                    </div>
                     <fieldset className="border border-[var(--line)] p-2">
                       <legend className="px-1 text-[10px] text-[var(--fg-dim)]">
                         Page scope (empty means all)
@@ -111,11 +102,8 @@ export default async function TeamPage() {
                   </form>
                 </details>
               )}
-              {m.status === "INVITED" && (
-                <TeamInviteRenewForm membershipId={m.id} />
-              )}
               {m.status === "REVOKED" ? (
-                <TeamMemberReactivationForm membershipId={m.id} />
+                <span className="text-xs text-[var(--fg-dim)]">Create this email again to reactivate</span>
               ) : <form action={removeMember.bind(null, m.id)}>
                 <button className="border border-[var(--red)]/30 px-2.5 py-1 text-xs font-semibold text-[var(--red)] transition-colors hover:bg-[var(--red-soft)]">Remove</button>
               </form>}

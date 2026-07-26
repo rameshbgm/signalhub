@@ -103,6 +103,9 @@ export async function deletePageCascade(
     await collections.assets().deleteMany({ pageId: id }, { session });
     await collections.notificationDestinations().deleteMany({ pageId: id }, { session });
     await collections.analyticsDaily().deleteMany({ pageId: id }, { session });
+    await collections.pageDesignDrafts().deleteMany({ pageId: id }, { session });
+    await collections.pageDesignVersions().deleteMany({ pageId: id }, { session });
+    await collections.pageAnnouncements().deleteMany({ pageId: id }, { session });
 
     const removed = await collections.pages().deleteOne(
       { _id: page._id, orgId: page.orgId },
@@ -403,6 +406,21 @@ async function deleteOrganizationDataPass(
   changes += mutationCount(
     await collections
       .analyticsDaily()
+      .deleteMany({ pageId: { $in: pageIds } }, { session })
+  );
+  changes += mutationCount(
+    await collections
+      .pageDesignDrafts()
+      .deleteMany({ pageId: { $in: pageIds } }, { session })
+  );
+  changes += mutationCount(
+    await collections
+      .pageDesignVersions()
+      .deleteMany({ pageId: { $in: pageIds } }, { session })
+  );
+  changes += mutationCount(
+    await collections
+      .pageAnnouncements()
       .deleteMany({ pageId: { $in: pageIds } }, { session })
   );
   changes += mutationCount(

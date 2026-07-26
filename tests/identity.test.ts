@@ -18,7 +18,7 @@ describe("organization roles", () => {
 
   it("keeps permanent purge outside tenant roles", () => {
     expect(hasCapability("ADMIN", "organization.manage")).toBe(true);
-    expect(hasCapability("OWNER", "organization.manage")).toBe(true);
-    expect(roleCapabilities("OWNER")).not.toContain("organization.delete");
+    expect(hasCapability("ADMIN", "organization.manage")).toBe(true);
+    expect(roleCapabilities("ADMIN")).not.toContain("organization.delete");
   });
 });

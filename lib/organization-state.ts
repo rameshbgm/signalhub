@@ -12,9 +12,3 @@ export function organizationIsActive(
 ): boolean {
   return organizationStatus(organization) === "ACTIVE";
 }
-
-export function organizationIsFrozen(
-  organization: Pick<OrganizationDoc, "status" | "suspended">
-): boolean {
-  return !organizationIsActive(organization);
-}

@@ -10,7 +10,7 @@ import {
 } from "@/lib/status";
 import { formatPageDate, pageDateKey } from "@/lib/page-locale";
 
-export type IncidentUpdateRow = { id: string; status: string; body: string; createdAt: Date };
+type IncidentUpdateRow = { id: string; status: string; body: string; createdAt: Date };
 export type IncidentRow = {
   id: string;
   name: string;
@@ -40,6 +40,26 @@ function fmt(d: Date, locale: string, timeZone: string) {
   });
 }
 
+function exactTimestamp(d: Date, locale: string, timeZone: string) {
+  return formatPageDate(d, {
+    language: locale,
+    timeZone,
+    dateStyle: "medium",
+    timeStyle: "long",
+  });
+}
+
+function relativeTimestamp(d: Date) {
+  const seconds = Math.max(0, Math.floor((Date.now() - d.getTime()) / 1_000));
+  if (seconds < 60) return seconds === 1 ? "1 second ago" : `${seconds} seconds ago`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return minutes === 1 ? "1 minute ago" : `${minutes} minutes ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return hours === 1 ? "1 hour ago" : `${hours} hours ago`;
+  const days = Math.floor(hours / 24);
+  return days === 1 ? "1 day ago" : `${days} days ago`;
+}
+
 export function IncidentCard({
   incident,
   pageSlug,
@@ -59,6 +79,16 @@ export function IncidentCard({
   const label = incident.isMaintenance
     ? MAINTENANCE_STATUS_LABEL[(incident.maintenanceStatus as MaintenanceStatus) ?? "SCHEDULED"]
     : INCIDENT_STATUS_LABEL[incident.status as IncidentStatus];
+  const detailedTimeline = !linkPermalink;
+  const decoratedUpdates = incident.updates.map((update, index) => ({
+    ...update,
+    displayStatus:
+      !incident.isMaintenance && index > 0 && incident.updates[index - 1]?.status === update.status
+        ? "Updated"
+        : incident.isMaintenance
+          ? label
+          : INCIDENT_STATUS_LABEL[update.status as IncidentStatus],
+  }));
 
   return (
     <div className="border border-[var(--line)] border-l-2 bg-[var(--surface)] p-5" style={{ borderLeftColor: color }}>
@@ -89,15 +119,44 @@ export function IncidentCard({
           Window: {fmt(incident.scheduledStart, locale, timeZone)} — {incident.scheduledEnd ? fmt(incident.scheduledEnd, locale, timeZone) : "TBD"}
         </p>
       )}
-      <div className="mt-4 space-y-4 border-l-2 border-[var(--line)] pl-4">
-        {incident.updates.map((u) => (
-          <div key={u.id} className="text-sm">
-            <span className="font-medium text-[var(--fg)]">{incident.isMaintenance ? label : INCIDENT_STATUS_LABEL[u.status as IncidentStatus]}</span>
-            <span className="text-[var(--fg-dim)] font-mono text-xs ml-2">{fmt(u.createdAt, locale, timeZone)}</span>
-            <p className="text-[var(--fg-soft)] mt-1 whitespace-pre-wrap leading-relaxed">{u.body}</p>
-          </div>
-        ))}
-      </div>
+      {detailedTimeline ? (
+        <section className="mt-8" data-incident-timeline="detailed">
+          <h2 className="mb-6 text-2xl font-semibold tracking-tight text-[var(--fg)]">Timeline</h2>
+          <ol className="relative">
+            {[...decoratedUpdates].reverse().map((update, index, updates) => (
+              <li key={update.id} className={`relative grid grid-cols-[2.5rem_minmax(0,1fr)] gap-3 ${index < updates.length - 1 ? "pb-10" : ""}`}>
+                {index < updates.length - 1 && (
+                  <span aria-hidden="true" className="absolute bottom-0 left-[0.95rem] top-8 w-px bg-[var(--line)]" />
+                )}
+                <span
+                  aria-hidden="true"
+                  className={`relative z-10 mt-1.5 h-8 w-8 rounded-full border-4 border-[var(--surface)] ${index === 0 ? "bg-[var(--page-brand)]" : "bg-[var(--line)]"}`}
+                />
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                    <h3 className="text-lg font-semibold text-[var(--fg)]">{update.displayStatus}</h3>
+                    <span className="text-sm text-[var(--fg-soft)]">{relativeTimestamp(update.createdAt)}</span>
+                  </div>
+                  <time className="mt-1 block text-sm text-[var(--fg)]" dateTime={update.createdAt.toISOString()}>
+                    {exactTimestamp(update.createdAt, locale, timeZone)}
+                  </time>
+                  <p className="mt-2 whitespace-pre-wrap text-sm leading-7 text-[var(--fg)]">{update.body}</p>
+                </div>
+              </li>
+            ))}
+          </ol>
+        </section>
+      ) : (
+        <div className="mt-4 space-y-4 border-l-2 border-[var(--line)] pl-4">
+          {decoratedUpdates.map((update) => (
+            <div key={update.id} className="text-sm">
+              <span className="font-medium text-[var(--fg)]">{update.displayStatus}</span>
+              <span className="ml-2 font-mono text-xs text-[var(--fg-dim)]">{fmt(update.createdAt, locale, timeZone)}</span>
+              <p className="mt-1 whitespace-pre-wrap leading-relaxed text-[var(--fg-soft)]">{update.body}</p>
+            </div>
+          ))}
+        </div>
+      )}
       {incident.postmortemPublishedAt && incident.postmortemBody && (
         <Link
           href={`${incidentBasePath}/incidents/${incident.id}`}
@@ -129,6 +188,8 @@ export function PastIncidentsByDay({
     const d = new Date(now);
     d.setDate(d.getDate() - i);
     const key = pageDateKey(d, timeZone);
+    const incidentsForDate = incidents.filter((incident) => pageDateKey(incident.createdAt, timeZone) === key);
+    if (incidentsForDate.length === 0) continue;
     buckets.push({
       date: key,
       label: formatPageDate(d, {
@@ -138,7 +199,7 @@ export function PastIncidentsByDay({
         month: "short",
         day: "numeric",
       }),
-      incidents: incidents.filter((inc) => pageDateKey(inc.createdAt, timeZone) === key),
+      incidents: incidentsForDate,
     });
   }
 
@@ -147,21 +208,17 @@ export function PastIncidentsByDay({
       {buckets.map((b) => (
         <div key={b.date}>
           <h4 className="text-sm font-mono font-semibold text-[var(--fg-soft)] mb-2.5">{b.label}</h4>
-          {b.incidents.length === 0 ? (
-            <p className="text-sm text-[var(--fg-dim)]">No incidents reported.</p>
-          ) : (
-            <div className="space-y-3">
-              {b.incidents.map((inc) => (
-                <IncidentCard
-                  key={inc.id}
-                  incident={inc}
-                  pageSlug={pageSlug}
-                  locale={locale}
-                  timeZone={timeZone}
-                />
-              ))}
-            </div>
-          )}
+          <div className="space-y-3">
+            {b.incidents.map((inc) => (
+              <IncidentCard
+                key={inc.id}
+                incident={inc}
+                pageSlug={pageSlug}
+                locale={locale}
+                timeZone={timeZone}
+              />
+            ))}
+          </div>
         </div>
       ))}
     </div>

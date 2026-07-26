@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { collections } from "@/lib/db";
-import { canonicalizeEmail } from "@/lib/identity";
+import { canonicalizeUsername, usernameError } from "@/lib/identity";
 import { oid } from "@/lib/mongo-utils";
 import {
   authenticateScim,
@@ -28,6 +28,7 @@ async function resource(connectionId: string, identityId: string) {
   return scimUserResource({
     id: identity._id.toHexString(),
     externalId: identity.subject,
+    username: user.username,
     email: user.email,
     name: user.name,
     active: !user.disabled && membership?.status === "ACTIVE",
@@ -84,14 +85,14 @@ export async function PATCH(
   }
   const user = await collections.users().findOne({ _id: identity.userId });
   if (!user) return scimError(404, "User not found");
-  if (userName && !canonicalizeEmail(userName).includes("@")) {
-    return scimError(400, "userName must be an email address", "invalidValue");
+  if (userName && usernameError(canonicalizeUsername(userName))) {
+    return scimError(400, usernameError(canonicalizeUsername(userName))!, "invalidValue");
   }
   await collections.users().updateOne(
     { _id: user._id },
     {
       $set: {
-        ...(userName ? { email: userName, canonicalEmail: canonicalizeEmail(userName) } : {}),
+        ...(userName ? { username: canonicalizeUsername(userName), canonicalUsername: canonicalizeUsername(userName) } : {}),
         ...(displayName ? { name: displayName } : {}),
         ...(active === true ? { disabled: false } : {}),
         updatedAt: new Date(),
@@ -104,7 +105,8 @@ export async function PATCH(
     await provisionScimUser({
       connection,
       externalId: identity.subject,
-      userName: userName ?? user.email,
+      userName: userName ?? user.username,
+      email: user.email,
       displayName: displayName ?? user.name,
       active: true,
     });

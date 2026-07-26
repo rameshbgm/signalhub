@@ -9,12 +9,9 @@ export async function GET(request: NextRequest) {
       limit: 60,
       windowMs: 15 * 60_000,
     });
-    const audience = request.nextUrl.searchParams.get("audience") === "platform"
-      ? "PLATFORM"
-      : "ORGANIZATION";
     const connections = await collections
       .identityConnections()
-      .find({ enabled: true, audience }, { projection: { name: 1, slug: 1, type: 1 } })
+      .find({ enabled: true, audience: "ORGANIZATION" }, { projection: { name: 1, slug: 1, type: 1 } })
       .sort({ name: 1 })
       .toArray();
     return NextResponse.json({

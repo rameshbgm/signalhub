@@ -6,7 +6,7 @@ import {
   getAuthorizedHubChildren,
   getPublicSurfaceSummary,
 } from "@/lib/public-surface";
-import { overallBanner } from "@/lib/status";
+import { COMPONENT_STATUS_COLOR, overallBanner } from "@/lib/status";
 
 export async function GET(
   request: NextRequest,
@@ -44,7 +44,7 @@ export async function GET(
     if (statuses.length) {
       const banner = overallBanner(statuses);
       label = banner.label;
-      color = banner.color;
+      color = COMPONENT_STATUS_COLOR[banner.status];
     }
   } else {
     const summary = await getPublicSurfaceSummary(
@@ -53,7 +53,7 @@ export async function GET(
     );
     if (summary.banner) {
       label = summary.banner.label;
-      color = summary.banner.color;
+      color = COMPONENT_STATUS_COLOR[summary.banner.status];
     }
   }
 

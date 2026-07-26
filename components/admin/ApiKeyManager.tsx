@@ -1,5 +1,7 @@
 "use client";
 
+import { fetchWithTimeout } from "@/lib/client-fetch";
+
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { CopyButton } from "@/components/CopyButton";
@@ -33,7 +35,7 @@ export function ApiKeyCreator({ pages }: { pages: Array<{ id: string; name: stri
     setError(null);
 
     try {
-      const response = await fetch("/api/admin/api-keys", {
+      const response = await fetchWithTimeout("/api/admin/api-keys", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
@@ -173,7 +175,7 @@ export function ApiKeyActions({ id }: { id: string }) {
     setError(null);
 
     try {
-      const response = await fetch(
+      const response = await fetchWithTimeout(
         kind === "rotate" ? `/api/admin/api-keys/${id}/rotate` : `/api/admin/api-keys?id=${id}`,
         { method: kind === "rotate" ? "POST" : "DELETE" }
       );

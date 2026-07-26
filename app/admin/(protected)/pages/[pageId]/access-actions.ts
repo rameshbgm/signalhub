@@ -54,7 +54,7 @@ export async function createAccessGroup(pageId: string, formData: FormData) {
       componentIds: JSON.stringify(componentIds),
     }, { session: databaseSession });
   });
-  revalidatePath(`/admin/pages/${pageId}`);
+  revalidatePath(`/organization/pages/${pageId}`);
 }
 
 export async function deleteAccessGroup(pageId: string, groupId: string) {
@@ -90,7 +90,7 @@ export async function deleteAccessGroup(pageId: string, groupId: string) {
     );
     if (!removed.deletedCount) throw new Error("Audience group changed; reload and retry");
   });
-  revalidatePath(`/admin/pages/${pageId}`);
+  revalidatePath(`/organization/pages/${pageId}`);
 }
 
 export async function createAccessUser(pageId: string, formData: FormData) {
@@ -147,7 +147,7 @@ export async function createAccessUser(pageId: string, formData: FormData) {
       createdAt: new Date(),
     }, { session: databaseSession });
   });
-  revalidatePath(`/admin/pages/${pageId}`);
+  revalidatePath(`/organization/pages/${pageId}`);
 }
 
 export async function deleteAccessUser(pageId: string, userId: string) {
@@ -170,5 +170,5 @@ export async function deleteAccessUser(pageId: string, userId: string) {
     );
     if (!removed.deletedCount) throw new Error("Audience user not found");
   });
-  revalidatePath(`/admin/pages/${pageId}`);
+  revalidatePath(`/organization/pages/${pageId}`);
 }

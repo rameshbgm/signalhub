@@ -1,4 +1,5 @@
 import { collections } from "@/lib/db";
+import { FluentSelect } from "@/components/FluentSelect";
 import { requirePlatformCapability } from "@/lib/admin-guard";
 import Link from "next/link";
 import { hasPlatformCapability } from "@/lib/platform-policy";
@@ -78,7 +79,7 @@ export default async function PlatformAuditPage({
           aria-label="Search audit"
           className="border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-xs"
         />
-        <select
+        <FluentSelect
           name="action"
           defaultValue={action}
           aria-label="Filter by action"
@@ -86,7 +87,7 @@ export default async function PlatformAuditPage({
         >
           <option value="">All actions</option>
           {actions.sort().map((value) => <option key={value} value={value}>{value}</option>)}
-        </select>
+        </FluentSelect>
         <button className="border border-[var(--cyan)]/40 px-4 py-2 text-xs font-semibold text-[var(--cyan)]">Filter</button>
       </form>
 
@@ -102,10 +103,10 @@ export default async function PlatformAuditPage({
             <input name="name" placeholder="Sink name" required className="border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-xs" />
             <input name="url" type="url" placeholder="https://siem.example/events" required className="border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-xs" />
             <input name="secret" type="password" minLength={32} placeholder="HMAC signing secret (32+ characters)" required className="border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-xs" />
-            <select name="orgId" className="border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-xs">
+            <FluentSelect name="orgId" className="border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-xs">
               <option value="">Platform audit</option>
               {sinkOrganizations.map((org) => <option key={org._id.toHexString()} value={org._id.toHexString()}>{org.name}</option>)}
-            </select>
+            </FluentSelect>
             <button className="bg-[var(--cyan)] px-3 py-2 text-xs font-semibold text-[var(--on-cyan)] sm:col-span-2">Add sink</button>
           </PlatformActionForm>
         )}

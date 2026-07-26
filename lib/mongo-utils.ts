@@ -16,10 +16,6 @@ export function isValidOid(id: string): boolean {
   return ObjectId.isValid(id);
 }
 
-export function tryOid(id: string): ObjectId | null {
-  return ObjectId.isValid(id) ? new ObjectId(id) : null;
-}
-
 type StringifyObjectIds<T> = {
   [K in keyof T]: T[K] extends ObjectId
     ? string

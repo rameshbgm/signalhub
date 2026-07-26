@@ -1,43 +1,26 @@
-import type { MembershipRole, PlatformRole } from "@/lib/db";
+import type { MembershipRole } from "@/lib/db";
 
-export type DevelopmentAccount =
-  | {
-      key: string;
-      audience: "tenant";
-      email: string;
-      name: string;
-      role: MembershipRole;
-      description: string;
-    }
-  | {
-      key: string;
-      audience: "platform";
-      email: string;
-      name: string;
-      role: PlatformRole;
-      description: string;
-    };
+export type DevelopmentAccount = {
+  key: string;
+  username: string;
+  email: string;
+  name: string;
+  role: MembershipRole;
+  description: string;
+};
 
 export const DEVELOPMENT_ACCOUNTS: readonly DevelopmentAccount[] = [
   {
-    key: "tenant-owner",
-    audience: "tenant",
-    email: "tenant-owner@acme.test",
-    name: "Olivia Owner",
-    role: "OWNER",
-    description: "All organization and status-page capabilities",
-  },
-  {
     key: "tenant-admin",
-    audience: "tenant",
-    email: "tenant-admin@acme.test",
-    name: "Amir Admin",
+    username: "admin",
+    email: "admin@status.test",
+    name: "SignalHub Admin",
     role: "ADMIN",
-    description: "Full administration without owner-only safeguards",
+    description: "All organization and installation capabilities",
   },
   {
     key: "tenant-incident-manager",
-    audience: "tenant",
+    username: "incident-manager",
     email: "incident-manager@acme.test",
     name: "Imani Incident Manager",
     role: "INCIDENT_MANAGER",
@@ -45,7 +28,7 @@ export const DEVELOPMENT_ACCOUNTS: readonly DevelopmentAccount[] = [
   },
   {
     key: "tenant-responder",
-    audience: "tenant",
+    username: "responder",
     email: "responder@acme.test",
     name: "Riley Responder",
     role: "RESPONDER",
@@ -53,35 +36,11 @@ export const DEVELOPMENT_ACCOUNTS: readonly DevelopmentAccount[] = [
   },
   {
     key: "tenant-viewer",
-    audience: "tenant",
+    username: "viewer",
     email: "viewer@acme.test",
     name: "Vera Viewer",
     role: "VIEWER",
     description: "Read-only analytics and audit access",
-  },
-  {
-    key: "platform-owner",
-    audience: "platform",
-    email: "platform-owner@signal.test",
-    name: "Parker Platform Owner",
-    role: "OWNER",
-    description: "All platform and identity capabilities",
-  },
-  {
-    key: "platform-operator",
-    audience: "platform",
-    email: "platform-operator@signal.test",
-    name: "Opal Platform Operator",
-    role: "OPERATOR",
-    description: "Operations without owner purge or admin management",
-  },
-  {
-    key: "platform-auditor",
-    audience: "platform",
-    email: "platform-auditor@signal.test",
-    name: "Avery Platform Auditor",
-    role: "AUDITOR",
-    description: "Read-only platform oversight",
   },
 ] as const;
 

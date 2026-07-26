@@ -1,4 +1,5 @@
 import { requirePlatformCapability } from "@/lib/admin-guard";
+import { FluentSelect } from "@/components/FluentSelect";
 import { collections } from "@/lib/db";
 import { hasPlatformCapability } from "@/lib/platform-policy";
 import { PlatformActionForm } from "@/components/platform/PlatformActionForm";
@@ -13,7 +14,7 @@ export default async function IdentityPage() {
   const session = await requirePlatformCapability("identity.read");
   const canManage = hasPlatformCapability(session.role, "identity.manage");
   const [connections, organizations] = await Promise.all([
-    collections.identityConnections().find({}).sort({ createdAt: -1 }).toArray(),
+    collections.identityConnections().find({ audience: "ORGANIZATION" }).sort({ createdAt: -1 }).toArray(),
     collections.organizations().find({ status: "ACTIVE" }).sort({ name: 1 }).toArray(),
   ]);
   const orgNames = new Map(organizations.map((org) => [org._id.toHexString(), org.name]));
@@ -23,7 +24,7 @@ export default async function IdentityPage() {
       <div>
         <h1 className="font-mono text-xl font-semibold">Enterprise identity</h1>
         <p className="mt-1 text-sm text-[var(--fg-soft)]">
-          Platform-managed OIDC and SAML connections with SCIM provisioning into fixed roles and page scopes.
+          Organization OIDC and SAML connections with SCIM provisioning into fixed roles and page scopes.
         </p>
       </div>
 
@@ -40,24 +41,20 @@ export default async function IdentityPage() {
           >
             <input name="name" placeholder="Connection name" required className="border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm" />
             <input name="slug" placeholder="Stable slug" required pattern="[a-z0-9-]+" className="border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm" />
-            <select name="type" className="border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm">
+            <FluentSelect name="type" className="border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm">
               <option value="OIDC">OpenID Connect</option>
               <option value="SAML">SAML 2.0</option>
-            </select>
-            <select name="audience" className="border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm">
-              <option value="ORGANIZATION">Organization</option>
-              <option value="PLATFORM">Platform administrators</option>
-            </select>
-            <select name="orgId" className="border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm">
-              <option value="">No organization (platform audience)</option>
+            </FluentSelect>
+            <FluentSelect name="orgId" className="border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm">
+              <option value="">Choose organization</option>
               {organizations.map((org) => <option key={org._id.toHexString()} value={org._id.toHexString()}>{org.name}</option>)}
-            </select>
-            <select name="defaultRole" defaultValue="VIEWER" className="border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm">
+            </FluentSelect>
+            <FluentSelect name="defaultRole" defaultValue="VIEWER" className="border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm">
               <option value="VIEWER">Default: Viewer</option>
               <option value="RESPONDER">Default: Responder</option>
               <option value="INCIDENT_MANAGER">Default: Incident manager</option>
               <option value="ADMIN">Default: Admin</option>
-            </select>
+            </FluentSelect>
             <input name="issuer" placeholder="OIDC issuer or SAML SP entity ID" required className="border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm" />
             <input name="clientId" placeholder="OIDC client ID (OIDC only)" className="border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm" />
             <input name="clientSecret" type="password" placeholder="OIDC client secret (OIDC only)" className="border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm" />
@@ -94,7 +91,7 @@ export default async function IdentityPage() {
                   </span>
                 </div>
                 <p className="mt-1 text-xs text-[var(--fg-dim)]">
-                  {connection.audience === "PLATFORM" ? "Platform administrators" : orgNames.get(connection.orgId?.toHexString() ?? "") ?? "Unknown organization"}
+                  {orgNames.get(connection.orgId?.toHexString() ?? "") ?? "Unknown organization"}
                   {" · "}{connection.slug}
                 </p>
                 <code className="mt-2 block break-all text-[10px] text-[var(--fg-soft)]">
@@ -120,7 +117,7 @@ export default async function IdentityPage() {
                 </div>
               )}
             </div>
-            {canManage && connection.audience === "ORGANIZATION" && (
+            {canManage && (
               <div className="mt-3 border-t border-[var(--line)] pt-3">
                 <p className="mb-2 text-xs text-[var(--fg-dim)]">
                   SCIM base URL: <code>/api/scim/v2/{connection.slug}</code>

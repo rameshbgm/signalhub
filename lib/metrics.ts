@@ -3,7 +3,7 @@ import { collections } from "@/lib/db";
 
 const globalMetrics = globalThis as unknown as { statusRegistry?: Registry };
 
-export function metricsRegistry() {
+function metricsRegistry() {
   if (globalMetrics.statusRegistry) return globalMetrics.statusRegistry;
   const registry = new Registry();
   collectDefaultMetrics({ register: registry, prefix: "status_" });

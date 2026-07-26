@@ -8,15 +8,14 @@ import { withTransaction } from "@/lib/cascade";
 import { fenceActiveOrganizationMutation } from "@/lib/organization-mutation";
 import {
   validatedBrandColor,
-  validatedExternalUrl,
   validatedLayout,
 } from "@/lib/page-validation";
+import { pageDesignFor } from "@/lib/page-design";
 
 export async function saveSetupBranding(pageId: string, formData: FormData) {
   const session = await requireCapability("page.configure", pageId);
   await assertPageInOrg(pageId, session.orgId);
 
-  const rawLogoUrl = String(formData.get("logoUrl") ?? "").trim();
   const themePreset = String(formData.get("themePreset") ?? "SIGNAL");
   const themeMode = String(formData.get("themeMode") ?? "SYSTEM");
   if (!["SIGNAL", "CALM", "CONTRAST"].includes(themePreset)) throw new Error("Invalid theme preset");
@@ -28,16 +27,23 @@ export async function saveSetupBranding(pageId: string, formData: FormData) {
       { session: databaseSession }
     );
     if (!page) throw new Error("Page not found in your organization");
+    const brandColor = validatedBrandColor(String(formData.get("brandColor") ?? "#0052CC"));
+    const design = pageDesignFor(page);
+    design.theme.palette.brand = brandColor;
+    design.theme.palette.accent = brandColor;
+    design.theme.mode = themeMode as "SYSTEM" | "LIGHT" | "DARK";
+    design.theme.allowVisitorMode = formData.get("allowThemeOverride") === "on";
     const changed = await collections.pages().updateOne(
       { _id: page._id, orgId: page.orgId },
       {
         $set: {
-          logoUrl: rawLogoUrl ? validatedExternalUrl(rawLogoUrl, { label: "Logo URL" }) : null,
-          brandColor: validatedBrandColor(String(formData.get("brandColor") ?? "#0052CC")),
+          brandColor,
           layout: validatedLayout(String(formData.get("layout") ?? "STANDARD")),
           themePreset,
           themeMode: themeMode as "SYSTEM" | "LIGHT" | "DARK",
           allowThemeOverride: formData.get("allowThemeOverride") === "on",
+          publishedDesign: design,
+          designPublishedAt: new Date(),
         },
       },
       { session: databaseSession }
@@ -47,11 +53,11 @@ export async function saveSetupBranding(pageId: string, formData: FormData) {
     }
   });
 
-  redirect(`/admin/pages/${pageId}/setup/notifications`);
+  redirect(`/organization/pages/${pageId}/setup/notifications`);
 }
 
 export async function completeSetup(pageId: string) {
   const session = await requireCapability("page.configure", pageId);
   await assertPageInOrg(pageId, session.orgId);
-  redirect(`/admin/pages/${pageId}`);
+  redirect(`/organization/pages/${pageId}`);
 }

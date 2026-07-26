@@ -1,4 +1,4 @@
-export function normalizedLocale(language?: string | null) {
+function normalizedLocale(language?: string | null) {
   const candidate = language?.trim() || "en";
   try {
     return Intl.DateTimeFormat.supportedLocalesOf([candidate])[0] ?? "en";
@@ -7,7 +7,7 @@ export function normalizedLocale(language?: string | null) {
   }
 }
 
-export function normalizedTimeZone(timeZone?: string | null) {
+function normalizedTimeZone(timeZone?: string | null) {
   const candidate = timeZone?.trim() || "UTC";
   try {
     new Intl.DateTimeFormat("en", { timeZone: candidate }).format();

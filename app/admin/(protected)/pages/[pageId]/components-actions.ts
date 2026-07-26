@@ -15,11 +15,6 @@ import { setComponentStatus } from "@/lib/component-status";
 import { generateAutomationToken } from "@/lib/tokens";
 import { withTransaction } from "@/lib/cascade";
 import { COMPONENT_STATUSES, type ComponentStatus } from "@/lib/status";
-import {
-  createPreparedMonitor,
-  prepareMonitorInput,
-  type MonitorInput,
-} from "@/lib/domain/monitors";
 import { fenceActiveOrganizationMutation } from "@/lib/organization-mutation";
 
 export async function createGroup(pageId: string, formData: FormData) {
@@ -47,7 +42,7 @@ export async function createGroup(pageId: string, formData: FormData) {
       collapsed: false,
     }, { session: databaseSession });
   });
-  revalidatePath(`/admin/pages/${pageId}`);
+  revalidatePath(`/organization/pages/${pageId}`);
 }
 
 export async function deleteGroup(pageId: string, groupId: string) {
@@ -74,55 +69,19 @@ export async function deleteGroup(pageId: string, groupId: string) {
       .deleteOne({ _id: group._id, pageId: page._id }, { session: dbSession });
     if (!removed.deletedCount) throw new Error("Component group changed; reload and retry");
   });
-  revalidatePath(`/admin/pages/${pageId}`);
+  revalidatePath(`/organization/pages/${pageId}`);
 }
 
 export async function createComponent(pageId: string, formData: FormData) {
   const session = await requireCapability("page.configure", pageId);
   await assertPageInOrg(pageId, session.orgId);
-  const templateId = String(formData.get("monitorTemplateId") ?? "");
-  const template = templateId
-    ? await collections.monitorTemplates().findOne({ _id: oid(templateId), enabled: true })
-    : null;
-  if (templateId && !template) throw new Error("Monitor template not found");
   const groupId = String(formData.get("groupId") ?? "");
   if (groupId) await assertGroupInPage(groupId, pageId);
-  const name = String(formData.get("name") ?? template?.name ?? "").trim();
+  const name = String(formData.get("name") ?? "").trim();
   if (!name) throw new Error("Component name is required");
   const automationToken = generateAutomationToken();
   const componentId = new ObjectId();
   const now = new Date();
-  const preparedMonitor = template
-    ? await prepareMonitorInput({
-        name: `${template.name} availability`,
-        type: template.type as MonitorInput["type"],
-        componentId: componentId.toHexString(),
-        target: template.target,
-        port: template.port,
-        method: "GET",
-        requestBody: null,
-        requestHeaders: "{}",
-        expectedStatusRange: template.expectedStatusRange,
-        keywordMatch: template.keywordMatch,
-        keywordAbsent: null,
-        sslWarnDays: template.type === "TLS" ? 30 : null,
-        authType: "NONE",
-        authUsername: null,
-        authSecret: null,
-        authHeaderName: null,
-        verifyTls: true,
-        intervalSec: 60,
-        timeoutMs: 10_000,
-        failThreshold: 3,
-        recoverThreshold: 2,
-        downStatus: "MAJOR_OUTAGE",
-        actionFlipStatus: true,
-        actionRecordMetric: template.type !== "HEARTBEAT",
-        actionAutoIncident: true,
-        actionNotify: true,
-      })
-    : null;
-
   await withTransaction(async (dbSession) => {
     await fenceActiveOrganizationMutation(session.orgId, dbSession);
     const currentPage = await collections.pages().findOne(
@@ -137,13 +96,6 @@ export async function createComponent(pageId: string, formData: FormData) {
       );
       if (!currentGroup) throw new Error("Component group not found on this page");
     }
-    if (templateId) {
-      const currentTemplate = await collections.monitorTemplates().findOne(
-        { _id: oid(templateId), enabled: true },
-        { session: dbSession }
-      );
-      if (!currentTemplate) throw new Error("Monitor template is no longer available");
-    }
     const count = await collections.components().countDocuments(
       { pageId: currentPage._id },
       { session: dbSession }
@@ -153,14 +105,14 @@ export async function createComponent(pageId: string, formData: FormData) {
       pageId: oid(pageId),
       groupId: groupId ? oid(groupId) : null,
       name,
-      description: String(formData.get("description") ?? template?.description ?? ""),
+      description: String(formData.get("description") ?? ""),
       status: "OPERATIONAL",
       order: count,
       visible: true,
       showUptime: true,
       manualStatus: "OPERATIONAL",
-      isThirdParty: Boolean(template),
-      thirdPartyProvider: template?.name ?? null,
+      isThirdParty: false,
+      thirdPartyProvider: null,
       automationTokenHash: automationToken.hash,
       automationTokenPrefix: automationToken.prefix,
       automationTokenLastFour: automationToken.lastFour,
@@ -174,27 +126,21 @@ export async function createComponent(pageId: string, formData: FormData) {
       endedAt: null,
       isMaintenance: false,
     }, { session: dbSession });
-    if (preparedMonitor) {
-      await createPreparedMonitor(
-        session.orgId,
-        pageId,
-        preparedMonitor,
-        dbSession
-      );
-    }
   });
-  revalidatePath(`/admin/pages/${pageId}`);
+  revalidatePath(`/organization/pages/${pageId}`);
 }
 
 export async function updateComponentStatus(pageId: string, componentId: string, formData: FormData) {
   const session = await requireCapability("component.update", pageId);
   await assertPageInOrg(pageId, session.orgId);
   const status = String(formData.get("status") ?? "OPERATIONAL");
+  const note = String(formData.get("note") ?? "").trim();
   if (!COMPONENT_STATUSES.includes(status as ComponentStatus)) throw new Error("Invalid component status");
+  if (note.length > 1_000) throw new Error("Status notes must be 1,000 characters or fewer");
   await assertComponentInPage(componentId, pageId);
 
-  await setComponentStatus(oid(componentId), status);
-  revalidatePath(`/admin/pages/${pageId}`);
+  await setComponentStatus(oid(componentId), status, { note: note || null });
+  revalidatePath(`/organization/pages/${pageId}`);
   const pageDoc = await collections.pages().findOne({ _id: oid(pageId) });
   revalidatePath(`/${pageDoc?.slug}`);
 }
@@ -227,7 +173,6 @@ export async function updateComponentDetails(pageId: string, componentId: string
         $set: {
           name,
           description: String(formData.get("description") ?? ""),
-          order: Number(formData.get("order") ?? 0),
           visible: formData.get("visible") === "on",
           showUptime: formData.get("showUptime") === "on",
           groupId: groupId ? oid(groupId) : null,
@@ -237,7 +182,40 @@ export async function updateComponentDetails(pageId: string, componentId: string
     );
     if (!changed.matchedCount) throw new Error("Component not found on this page");
   });
-  revalidatePath(`/admin/pages/${pageId}`);
+  revalidatePath(`/organization/pages/${pageId}`);
+}
+
+export async function reorderComponentOrder(pageId: string, orderedIds: string[]) {
+  const session = await requireCapability("page.configure", pageId);
+  await assertPageInOrg(pageId, session.orgId);
+  if (new Set(orderedIds).size !== orderedIds.length) throw new Error("Duplicate component ordering entry");
+  await withTransaction(async (databaseSession) => {
+    await fenceActiveOrganizationMutation(session.orgId, databaseSession);
+    const page = await collections.pages().findOne(
+      { _id: oid(pageId), orgId: oid(session.orgId) },
+      { session: databaseSession }
+    );
+    if (!page) throw new Error("Page not found in your organization");
+    const components = await collections.components().find(
+      { pageId: page._id },
+      { session: databaseSession }
+    ).toArray();
+    const currentIds = new Set(components.map((component) => component._id.toHexString()));
+    if (currentIds.size !== orderedIds.length || orderedIds.some((id) => !currentIds.has(id))) {
+      throw new Error("Components changed; reload before reordering");
+    }
+    for (const [order, id] of orderedIds.entries()) {
+      await collections.components().updateOne(
+        { _id: oid(id), pageId: page._id },
+        { $set: { order } },
+        { session: databaseSession }
+      );
+    }
+  });
+  const page = await collections.pages().findOne({ _id: oid(pageId), orgId: oid(session.orgId) });
+  revalidatePath(`/organization/pages/${pageId}`);
+  if (page) revalidatePath(`/${page.slug}`, "layout");
+  return { ok: true } as const;
 }
 
 export async function deleteComponent(pageId: string, componentId: string) {
@@ -245,5 +223,5 @@ export async function deleteComponent(pageId: string, componentId: string) {
   await assertPageInOrg(pageId, session.orgId);
   await assertComponentInPage(componentId, pageId);
   await deleteComponentCascade(componentId, session.orgId, pageId);
-  revalidatePath(`/admin/pages/${pageId}`);
+  revalidatePath(`/organization/pages/${pageId}`);
 }

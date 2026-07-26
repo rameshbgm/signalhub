@@ -51,9 +51,9 @@ export async function createMaintenance(formData: FormData) {
     metadata: { pageId },
     tenantAuditExists: true,
   });
-  revalidatePath("/admin/maintenance");
+  revalidatePath("/organization/maintenance");
   revalidatePath(`/${await pageSlug(pageId)}`);
-  redirect(`/admin/incidents/${maintenance.id}`);
+  redirect(`/organization/incidents/${maintenance.id}`);
 }
 
 export async function setMaintenanceStatus(incidentId: string, formData: FormData) {
@@ -77,7 +77,7 @@ export async function setMaintenanceStatus(incidentId: string, formData: FormDat
     targetId: incidentId,
     metadata: { pageId: incident.pageId.toHexString(), status },
   });
-  revalidatePath(`/admin/incidents/${incidentId}`);
+  revalidatePath(`/organization/incidents/${incidentId}`);
   revalidatePath(`/${await pageSlug(incident.pageId.toHexString())}`);
 }
 
@@ -108,8 +108,8 @@ export async function deleteMaintenance(incidentId: string) {
     metadata: { pageId: incident.pageId.toHexString() },
     tenantAuditExists: true,
   });
-  revalidatePath("/admin/maintenance");
-  revalidatePath("/admin/incidents");
+  revalidatePath("/organization/maintenance");
+  revalidatePath("/organization/incidents");
   if (slug) revalidatePath(`/${slug}`);
-  redirect("/admin/maintenance");
+  redirect("/organization/maintenance");
 }

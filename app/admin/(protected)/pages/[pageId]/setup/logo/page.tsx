@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { FluentSelect } from "@/components/FluentSelect";
 import { collections } from "@/lib/db";
 import { oid, toId } from "@/lib/mongo-utils";
 import { SetupStepper } from "@/components/admin/SetupStepper";
@@ -20,37 +21,33 @@ export default async function SetupLogoPage({ params }: { params: Promise<{ page
       <SetupStepper pageId={pageId} current="logo" />
       <h1 className="font-mono text-2xl font-semibold text-[var(--fg)]">Add your logo</h1>
       <p className="mt-3 text-sm text-[var(--fg-soft)] leading-relaxed max-w-lg">
-        Your logo and brand color appear on your public status page and in every notification email. Pick a layout, drop in a
-        logo URL, and choose the color that matches your brand.
+        Your logo and brand color appear on your public status page and in every notification email. Pick a layout, upload your
+        brand assets, and choose the color that matches your brand.
       </p>
 
       <form action={boundSave} className="mt-8 space-y-6">
         <LayoutPicker defaultValue={page.layout ?? "STANDARD"} brandColor={page.brandColor} />
         <div className="grid sm:grid-cols-2 gap-4">
           <label className="block text-sm">
-            <span className="text-xs text-[var(--fg-dim)] block mb-1">Logo URL</span>
-            <input name="logoUrl" defaultValue={page.logoUrl ?? ""} placeholder="https://.../logo.png" className="w-full border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--fg)] placeholder:text-[var(--fg-dim)] focus:border-[var(--cyan)] focus:outline-none" />
-          </label>
-          <label className="block text-sm">
             <span className="text-xs text-[var(--fg-dim)] block mb-1">Brand color</span>
             <input name="brandColor" type="color" defaultValue={page.brandColor} className="h-9 w-20 border border-[var(--line)] bg-[var(--bg)]" />
           </label>
-          <label className="block text-sm">
+          <div className="block text-sm">
             <span className="text-xs text-[var(--fg-dim)] block mb-1">Theme preset</span>
-            <select name="themePreset" defaultValue={page.themePreset ?? "SIGNAL"} className="w-full border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm">
+            <FluentSelect aria-label="Theme preset" name="themePreset" defaultValue={page.themePreset ?? "SIGNAL"} className="w-full border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm">
               <option value="SIGNAL">Signal</option>
               <option value="CALM">Calm</option>
               <option value="CONTRAST">High contrast</option>
-            </select>
-          </label>
-          <label className="block text-sm">
+            </FluentSelect>
+          </div>
+          <div className="block text-sm">
             <span className="text-xs text-[var(--fg-dim)] block mb-1">Color mode</span>
-            <select name="themeMode" defaultValue={page.themeMode ?? "SYSTEM"} className="w-full border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm">
+            <FluentSelect aria-label="Color mode" name="themeMode" defaultValue={page.themeMode ?? "SYSTEM"} className="w-full border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm">
               <option value="SYSTEM">Follow visitor system</option>
               <option value="LIGHT">Always light</option>
               <option value="DARK">Always dark</option>
-            </select>
-          </label>
+            </FluentSelect>
+          </div>
           <label className="flex items-center gap-2 text-sm text-[var(--fg-soft)] sm:col-span-2">
             <input type="checkbox" name="allowThemeOverride" defaultChecked={page.allowThemeOverride ?? true} />
             Let visitors switch light and dark mode
@@ -74,11 +71,11 @@ export default async function SetupLogoPage({ params }: { params: Promise<{ page
         </div>
 
         <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center pt-6 border-t border-[var(--line)]">
-          <Link href={`/admin/pages/${pageId}/setup/components`} className="text-sm text-[var(--fg-soft)] hover:text-[var(--fg)]">
+          <Link href={`/organization/pages/${pageId}/setup/components`} className="text-sm text-[var(--fg-soft)] hover:text-[var(--fg)]">
             ← Back
           </Link>
           <div className="flex gap-3 items-center">
-            <Link href={`/admin/pages/${pageId}/setup/notifications`} className="text-sm text-[var(--fg-soft)] hover:text-[var(--fg)] self-center">
+            <Link href={`/organization/pages/${pageId}/setup/notifications`} className="text-sm text-[var(--fg-soft)] hover:text-[var(--fg)] self-center">
               Skip
             </Link>
             <button className="bg-[var(--cyan)] text-[var(--on-cyan)] px-5 py-2.5 text-sm font-semibold font-mono">Next: Notifications →</button>

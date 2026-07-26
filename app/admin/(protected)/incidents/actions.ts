@@ -8,6 +8,7 @@ import {
   addIncidentUpdate,
   createIncident as createIncidentDomain,
   deleteIncident as deleteIncidentDomain,
+  incidentUpdateEditInputSchema,
 } from "@/lib/domain/incidents";
 import { dispatchNotifications } from "@/lib/notify";
 import { oid, toId } from "@/lib/mongo-utils";
@@ -16,6 +17,7 @@ import { writeSupportMutationAudit } from "@/lib/support-audit";
 import { withTransaction } from "@/lib/cascade";
 import { fenceActiveOrganizationMutation } from "@/lib/organization-mutation";
 import { writeActiveTenantAudit } from "@/lib/tenant-audit";
+import { reconcileComponents } from "@/lib/component-status";
 
 async function pageSlug(pageId: string) {
   return (await collections.pages().findOne({ _id: oid(pageId) }))?.slug;
@@ -56,9 +58,9 @@ export async function createIncident(formData: FormData) {
     metadata: { pageId },
     tenantAuditExists: true,
   });
-  revalidatePath("/admin/incidents");
+  revalidatePath("/organization/incidents");
   revalidatePath(`/${await pageSlug(pageId)}`);
-  redirect(`/admin/incidents/${incident.id}`);
+  redirect(`/organization/incidents/${incident.id}`);
 }
 
 export async function postIncidentUpdate(incidentId: string, formData: FormData) {
@@ -86,8 +88,104 @@ export async function postIncidentUpdate(incidentId: string, formData: FormData)
     metadata: { pageId: incident.pageId },
     tenantAuditExists: true,
   });
-  revalidatePath(`/admin/incidents/${incidentId}`);
+  revalidatePath(`/organization/incidents/${incidentId}`);
   revalidatePath(`/${await pageSlug(incident.pageId)}`);
+}
+
+export async function editIncidentUpdate(
+  incidentId: string,
+  updateId: string,
+  formData: FormData
+) {
+  const session = await requireCapability("incident.update");
+  const input = incidentUpdateEditInputSchema.parse({
+    status: String(formData.get("status") ?? ""),
+    body: String(formData.get("body") ?? ""),
+  });
+  const result = await withTransaction(async (databaseSession) => {
+    await fenceActiveOrganizationMutation(session.orgId, databaseSession);
+    const incident = await collections.incidents().findOne(
+      { _id: oid(incidentId), isMaintenance: false },
+      { session: databaseSession }
+    );
+    const page = incident
+      ? await collections.pages().findOne(
+          { _id: incident.pageId, orgId: oid(session.orgId) },
+          { session: databaseSession }
+        )
+      : null;
+    if (!incident || !page) throw new Error("Incident not found in your organization");
+
+    const update = await collections.incidentUpdates().findOne(
+      { _id: oid(updateId), incidentId: incident._id },
+      { session: databaseSession }
+    );
+    if (!update) throw new Error("Timeline update not found");
+    const newest = await collections.incidentUpdates().findOne(
+      { incidentId: incident._id },
+      { session: databaseSession, sort: { createdAt: -1, _id: -1 } }
+    );
+    const changed = await collections.incidentUpdates().updateOne(
+      { _id: update._id, incidentId: incident._id },
+      {
+        $set: {
+          status: input.status,
+          body: input.body,
+          editedAt: new Date(),
+          editedBy: oid(session.userId),
+        },
+      },
+      { session: databaseSession }
+    );
+    if (!changed.matchedCount) throw new Error("Timeline update changed; reload and retry");
+
+    if (newest?._id.equals(update._id)) {
+      const changedIncident = await collections.incidents().updateOne(
+        { _id: incident._id, pageId: page._id, isMaintenance: false },
+        {
+          $set: {
+            status: input.status,
+            resolvedAt: input.status === "RESOLVED" ? incident.resolvedAt ?? new Date() : null,
+          },
+        },
+        { session: databaseSession }
+      );
+      if (!changedIncident.matchedCount) throw new Error("Incident changed; reload and retry");
+      const links = await collections.incidentComponents()
+        .find({ incidentId: incident._id }, { session: databaseSession })
+        .toArray();
+      await reconcileComponents(links.map((link) => link.componentId), databaseSession);
+    }
+
+    return {
+      pageId: page._id.toHexString(),
+      slug: page.slug,
+      hubParentId: page.hubParentId?.toHexString() ?? null,
+    };
+  });
+
+  await writeActiveTenantAudit(session.orgId, {
+    actor: session.email,
+    action: "EDIT_INCIDENT_UPDATE",
+    target: incidentId,
+    metadata: { updateId, pageId: result.pageId },
+    supportSessionId: session.supportSessionId ? oid(session.supportSessionId) : null,
+    createdAt: new Date(),
+  });
+  await writeSupportMutationAudit(session, {
+    action: "EDIT_INCIDENT_UPDATE",
+    targetType: "incident_update",
+    targetId: updateId,
+    metadata: { incidentId, pageId: result.pageId },
+    tenantAuditExists: true,
+  });
+
+  revalidatePath(`/organization/incidents/${incidentId}`);
+  revalidatePath(`/${result.slug}`, "layout");
+  if (result.hubParentId) {
+    const hub = await collections.pages().findOne({ _id: oid(result.hubParentId) });
+    if (hub) revalidatePath(`/hub/${hub.slug}`, "layout");
+  }
 }
 
 export async function deleteIncident(incidentId: string) {
@@ -111,8 +209,8 @@ export async function deleteIncident(incidentId: string) {
     metadata: { pageId: incidentDoc.pageId.toHexString() },
     tenantAuditExists: true,
   });
-  revalidatePath("/admin/incidents");
-  redirect("/admin/incidents");
+  revalidatePath("/organization/incidents");
+  redirect("/organization/incidents");
 }
 
 export async function savePostmortem(incidentId: string, formData: FormData) {
@@ -199,6 +297,6 @@ export async function savePostmortem(incidentId: string, formData: FormData) {
     targetId: incidentId,
     metadata: { pageId: incident.pageId, notified: publish && notify },
   });
-  revalidatePath(`/admin/incidents/${incidentId}`);
+  revalidatePath(`/organization/incidents/${incidentId}`);
   revalidatePath(`/${await pageSlug(incident.pageId)}`);
 }

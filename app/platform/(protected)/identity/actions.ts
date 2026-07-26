@@ -13,7 +13,7 @@ import { writePlatformAudit } from "@/lib/platform-policy";
 
 const mappingSchema = z.array(z.object({
   group: z.string().trim().min(1).max(255),
-  role: z.enum(["OWNER", "ADMIN", "INCIDENT_MANAGER", "RESPONDER", "VIEWER", "OPERATOR", "AUDITOR"]),
+  role: z.enum(["ADMIN", "INCIDENT_MANAGER", "RESPONDER", "VIEWER"]),
   pageIds: z.array(z.string().regex(/^[a-f\d]{24}$/i)).optional(),
 })).max(100);
 
@@ -26,22 +26,15 @@ export async function createIdentityConnection(formData: FormData) {
   const name = String(formData.get("name") ?? "").trim();
   const connectionSlug = slug(String(formData.get("slug") ?? name));
   const type = String(formData.get("type") ?? "");
-  const audience = String(formData.get("audience") ?? "");
   const orgIdValue = String(formData.get("orgId") ?? "").trim();
   if (!name || name.length > 120 || !connectionSlug) throw new Error("Enter a valid connection name and slug");
   if (!["OIDC", "SAML"].includes(type)) throw new Error("Choose OIDC or SAML");
-  if (!["ORGANIZATION", "PLATFORM"].includes(audience)) throw new Error("Choose a connection audience");
-  const orgId = audience === "ORGANIZATION" ? oid(orgIdValue) : null;
-  if (orgId && !(await collections.organizations().findOne({ _id: orgId }))) {
+  if (!orgIdValue) throw new Error("Choose an organization");
+  const orgId = oid(orgIdValue);
+  if (!(await collections.organizations().findOne({ _id: orgId, status: "ACTIVE" }))) {
     throw new Error("Organization not found");
   }
   const parsedMappings = mappingSchema.parse(JSON.parse(String(formData.get("roleMappings") ?? "[]")));
-  if (audience === "ORGANIZATION" && parsedMappings.some((mapping) => ["OPERATOR", "AUDITOR"].includes(mapping.role))) {
-    throw new Error("Organization connections may only map tenant roles");
-  }
-  if (audience === "PLATFORM" && parsedMappings.some((mapping) => !["OWNER", "OPERATOR", "AUDITOR"].includes(mapping.role))) {
-    throw new Error("Platform connections may only map platform roles");
-  }
   const pageIds = parsedMappings.flatMap((mapping) => mapping.pageIds ?? []);
   if (orgId && pageIds.length) {
     const pageCount = await collections.pages().countDocuments({
@@ -74,9 +67,6 @@ export async function createIdentityConnection(formData: FormData) {
   if (Object.values(config).some((value) => value === "")) throw new Error("Complete all required provider fields");
   const acceptedAcrValues = String(formData.get("acceptedAcrValues") ?? "").split(",").map((value) => value.trim()).filter(Boolean);
   const acceptedAmrValues = String(formData.get("acceptedAmrValues") ?? "").split(",").map((value) => value.trim()).filter(Boolean);
-  if (audience === "PLATFORM" && !acceptedAcrValues.length && !acceptedAmrValues.length) {
-    throw new Error("Platform SSO must require at least one accepted acr or amr MFA value");
-  }
   const now = new Date();
   const id = new ObjectId();
   await collections.identityConnections().insertOne({
@@ -84,17 +74,15 @@ export async function createIdentityConnection(formData: FormData) {
     name,
     slug: connectionSlug,
     type: type as "OIDC" | "SAML",
-    audience: audience as "ORGANIZATION" | "PLATFORM",
+    audience: "ORGANIZATION",
     orgId,
     enabled: true,
     configCiphertext: encryptSecret(JSON.stringify(config)),
     roleMappings: mappings,
-    defaultRole: audience === "ORGANIZATION"
-      ? (String(formData.get("defaultRole") ?? "VIEWER") as "VIEWER")
-      : null,
+    defaultRole: String(formData.get("defaultRole") ?? "VIEWER") as "VIEWER",
     acceptedAcrValues,
     acceptedAmrValues,
-    allowJitProvisioning: audience === "ORGANIZATION" && formData.get("allowJitProvisioning") === "on",
+    allowJitProvisioning: formData.get("allowJitProvisioning") === "on",
     lastTestedAt: null,
     lastTestOk: null,
     lastError: null,
@@ -110,9 +98,9 @@ export async function createIdentityConnection(formData: FormData) {
     targetType: "identityConnection",
     targetId: id.toHexString(),
     organizationId: orgId,
-    metadata: { name, slug: connectionSlug, type, audience },
+    metadata: { name, slug: connectionSlug, type, audience: "ORGANIZATION" },
   });
-  revalidatePath("/platform/identity");
+  revalidatePath("/organization/platform/identity");
 }
 
 export async function setIdentityConnectionEnabled(id: string, formData: FormData) {
@@ -139,7 +127,7 @@ export async function setIdentityConnectionEnabled(id: string, formData: FormDat
     targetId: connection._id.toHexString(),
     organizationId: connection.orgId,
   });
-  revalidatePath("/platform/identity");
+  revalidatePath("/organization/platform/identity");
 }
 
 export async function testIdentityConnection(id: string) {
@@ -177,6 +165,6 @@ export async function testIdentityConnection(id: string) {
     organizationId: connection.orgId,
     metadata: { success: !error },
   });
-  revalidatePath("/platform/identity");
+  revalidatePath("/organization/platform/identity");
   if (error) throw new Error(error);
 }

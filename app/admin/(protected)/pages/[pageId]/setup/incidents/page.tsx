@@ -48,14 +48,14 @@ export default async function SetupIncidentsPage({ params }: { params: Promise<{
         <div className="border border-[var(--line)] bg-[var(--surface)] p-5">
           <p className="text-sm font-semibold text-[var(--fg)]">Declare your first incident</p>
           <p className="text-xs text-[var(--fg-dim)] mt-1.5">Practice the flow — you can delete it after.</p>
-          <Link href={`/admin/incidents/new?pageId=${pageId}`} className="text-sm text-[var(--cyan)] hover:underline">
+          <Link href={`/organization/incidents/new?pageId=${pageId}`} className="text-sm text-[var(--cyan)] hover:underline">
             Declare Incident →
           </Link>
         </div>
       </div>
 
       <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center mt-12 pt-6 border-t border-[var(--line)]">
-        <Link href={`/admin/pages/${pageId}/setup/team`} className="text-sm text-[var(--fg-soft)] hover:text-[var(--fg)]">
+        <Link href={`/organization/pages/${pageId}/setup/notifications`} className="text-sm text-[var(--fg-soft)] hover:text-[var(--fg)]">
           ← Back
         </Link>
         <form action={boundComplete}>

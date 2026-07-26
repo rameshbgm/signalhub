@@ -26,7 +26,7 @@ export default async function IncidentsListPage() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
         <h1 className="font-mono text-xl font-semibold text-[var(--fg)]">Incidents</h1>
         {canDeclare && <Link
-          href="/admin/incidents/new"
+          href="/organization/incidents/new"
           className="bg-[var(--cyan)] text-[var(--on-cyan)] px-4 py-2 text-sm font-mono font-semibold text-center"
         >
           Declare Incident
@@ -36,7 +36,7 @@ export default async function IncidentsListPage() {
         {incidents.map((inc) => (
           <Link
             key={inc.id}
-            href={`/admin/incidents/${inc.id}`}
+            href={`/organization/incidents/${inc.id}`}
             className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border border-[var(--line)] bg-[var(--surface)] p-3 text-sm hover:border-[var(--line-bright)]"
           >
             <div>

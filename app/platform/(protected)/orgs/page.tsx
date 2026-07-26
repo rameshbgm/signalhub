@@ -1,6 +1,5 @@
 import { collections, db } from "@/lib/db";
 import {
-  startSupportSession,
   suspendOrg,
   unsuspendOrg,
   deleteOrgAsPlatform,
@@ -20,13 +19,7 @@ import { organizationStatus } from "@/lib/organization-state";
 import { PlatformActionForm } from "@/components/platform/PlatformActionForm";
 import { PlatformSubmitButton } from "@/components/platform/PlatformSubmitButton";
 import { organizationPurgeCanBeCancelled } from "@/lib/platform-job-policy";
-
-const ERROR_MESSAGES: Record<string, string> = {
-  "support-reason": "Enter a specific support reason containing at least 10 characters.",
-  "support-scope": "Choose at least one approved operation for an operate session.",
-  "organization-not-found": "That organization no longer exists.",
-  "organization-suspended": "Only active organizations can be opened for support.",
-};
+import { SwitchOrganizationButton } from "@/components/platform/SwitchOrganizationButton";
 
 export default async function PlatformOrgsPage({
   searchParams,
@@ -35,7 +28,6 @@ export default async function PlatformOrgsPage({
 }) {
   const actor = await requirePlatformCapability("organizations.read");
   const query = (await searchParams).q?.trim() ?? "";
-  const errorCode = (await searchParams).error;
   // eslint-disable-next-line react-hooks/purity
   const renderedAt = Date.now();
   const databaseOk = await db
@@ -99,8 +91,6 @@ export default async function PlatformOrgsPage({
   const canCreate = hasPlatformCapability(actor.role, "organizations.create");
   const canSuspend = hasPlatformCapability(actor.role, "organizations.suspend");
   const canPurge = hasPlatformCapability(actor.role, "organizations.purge");
-  const canViewSupport = hasPlatformCapability(actor.role, "support.view");
-  const canOperateSupport = hasPlatformCapability(actor.role, "support.operate");
 
   return (
     <div className="max-w-6xl space-y-8">
@@ -113,7 +103,7 @@ export default async function PlatformOrgsPage({
             Organizations
           </h1>
           <p className="mt-1 text-sm text-[var(--fg-soft)]">
-            Provision, inspect, support, freeze, and queue tenant purges with durable audit records.
+            Provision, open, freeze, and queue tenant purges with durable audit records.
           </p>
         </div>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -149,11 +139,6 @@ export default async function PlatformOrgsPage({
           />
           <HealthCard label="OIDC" state="neutral" detail={oidcConfigured() ? "configured" : "optional · disabled"} />
           <HealthCard
-            label="Public signup"
-            state="neutral"
-            detail={process.env.ALLOW_PUBLIC_SIGNUP === "true" ? "enabled" : "disabled"}
-          />
-          <HealthCard
             label="Delivery queue"
             state={deadLetters === 0 ? "ok" : "error"}
             detail={`${queuedDeliveries} queued · ${deadLetters} dead-letter`}
@@ -173,7 +158,7 @@ export default async function PlatformOrgsPage({
               Provision organization
             </h2>
             <p className="mt-1 text-xs text-[var(--fg-soft)]">
-              Creates an active tenant and a single-use owner invitation valid for 48 hours.
+              Creates an active tenant. Admins can open it immediately and add users from Users &amp; Roles.
             </p>
           </div>
           <CreateOrganizationForm />
@@ -200,12 +185,6 @@ export default async function PlatformOrgsPage({
             <button className="border border-[var(--line)] px-3 py-2 text-xs font-semibold">Search</button>
           </form>
         </div>
-
-        {errorCode && ERROR_MESSAGES[errorCode] && (
-          <div role="alert" className="border border-[var(--amber)]/40 bg-[var(--amber-soft)] p-3 text-sm text-[var(--amber)]">
-            {ERROR_MESSAGES[errorCode]}
-          </div>
-        )}
 
         <div className="space-y-3">
           {orgDocs.map((organization) => {
@@ -234,65 +213,14 @@ export default async function PlatformOrgsPage({
                       </p>
                     )}
                   </div>
-                  <p className="text-xs text-[var(--fg-dim)]">
-                    Created {organization.createdAt.toLocaleDateString()}
-                  </p>
+                  <div className="flex flex-col items-end gap-2">
+                    <p className="text-xs text-[var(--fg-dim)]">Created {organization.createdAt.toLocaleDateString()}</p>
+                    {status === "ACTIVE" && <SwitchOrganizationButton organizationId={id} />}
+                  </div>
                 </div>
 
                 <div className="mt-4 grid gap-3 lg:grid-cols-2">
-                  {canViewSupport && status === "ACTIVE" && (
-                    <div className="border border-[var(--line)] bg-[var(--bg)] p-3">
-                      <p className="text-xs font-semibold text-[var(--fg)]">Audited support access</p>
-                      <form action={startSupportSession.bind(null, id)} className="mt-2 flex flex-wrap gap-2">
-                        <input type="hidden" name="mode" value="VIEW" />
-                        <input
-                          name="reason"
-                          minLength={10}
-                          required
-                          placeholder="Ticket / reason"
-                          aria-label={`View-session reason for ${organization.name}`}
-                          className="min-w-44 flex-1 border border-[var(--line)] bg-[var(--surface)] px-2 py-1.5 text-xs"
-                        />
-                        <PlatformSubmitButton pendingLabel="Opening…" className="border border-[var(--cyan)]/40 px-3 py-1.5 text-xs font-semibold text-[var(--cyan)]">
-                          Open view-only
-                        </PlatformSubmitButton>
-                      </form>
-                      {canOperateSupport && (
-                        <details className="mt-3">
-                          <summary className="cursor-pointer text-xs font-semibold text-[var(--amber)]">
-                            Request scoped operate session
-                          </summary>
-                          <form action={startSupportSession.bind(null, id)} className="mt-2 space-y-2">
-                            <input type="hidden" name="mode" value="OPERATE" />
-                            <input
-                              name="reason"
-                              minLength={10}
-                              required
-                              placeholder="Ticket / reason"
-                              className="w-full border border-[var(--line)] bg-[var(--surface)] px-2 py-1.5 text-xs"
-                            />
-                            <div className="grid grid-cols-2 gap-1 text-[11px] text-[var(--fg-soft)]">
-                              {[
-                                ["incident.manage", "Manage incidents"],
-                                ["incident.update", "Post updates"],
-                                ["monitor.manage", "Manage monitors"],
-                              ].map(([value, label]) => (
-                                <label key={value} className="flex items-center gap-1.5">
-                                  <input type="checkbox" name="scopes" value={value} />
-                                  {label}
-                                </label>
-                              ))}
-                            </div>
-                            <PlatformSubmitButton pendingLabel="Opening…" className="border border-[var(--amber)]/40 px-3 py-1.5 text-xs font-semibold text-[var(--amber)]">
-                              Start 30-minute operate session
-                            </PlatformSubmitButton>
-                          </form>
-                        </details>
-                      )}
-                    </div>
-                  )}
-
-                  <div className="border border-[var(--line)] bg-[var(--bg)] p-3">
+                  <div className="border border-[var(--line)] bg-[var(--bg)] p-3 lg:col-span-2">
                     <p className="text-xs font-semibold text-[var(--fg)]">Lifecycle</p>
                     {status === "ACTIVE" && canSuspend && (
                       <PlatformActionForm
@@ -351,26 +279,6 @@ export default async function PlatformOrgsPage({
                             placeholder="Purge reason / ticket"
                             className="w-full border border-[var(--red)]/30 bg-[var(--surface)] px-2 py-1.5 text-xs"
                           />
-                          <div className="grid gap-2 sm:grid-cols-2">
-                            <input
-                              name="currentPassword"
-                              type="password"
-                              autoComplete="current-password"
-                              required
-                              placeholder="Your current password"
-                              className="min-w-0 border border-[var(--red)]/30 bg-[var(--surface)] px-2 py-1.5 text-xs"
-                            />
-                            <input
-                              name="currentTotpCode"
-                              inputMode="numeric"
-                              autoComplete="one-time-code"
-                              pattern="[0-9]{6}"
-                              maxLength={6}
-                              required
-                              placeholder="Current 6-digit code"
-                              className="min-w-0 border border-[var(--red)]/30 bg-[var(--surface)] px-2 py-1.5 font-mono text-xs"
-                            />
-                          </div>
                           <div className="flex gap-2">
                             <input
                               name="confirmation"

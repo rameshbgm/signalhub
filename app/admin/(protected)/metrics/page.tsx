@@ -1,4 +1,5 @@
 import { requireSession } from "@/lib/require-session";
+import { FluentSelect } from "@/components/FluentSelect";
 import { collections } from "@/lib/db";
 import { oid, toId } from "@/lib/mongo-utils";
 import {
@@ -41,7 +42,7 @@ export default async function MetricsPage({ searchParams }: { searchParams: Prom
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="font-mono text-xl font-semibold text-[var(--fg)]">Metrics</h1>
         <div className="w-full sm:w-56">
-          <PageSelect pages={pages.map((p) => ({ id: p.id, name: p.name }))} basePath="/admin/metrics" selected={pageId} />
+          <PageSelect pages={pages.map((p) => ({ id: p.id, name: p.name }))} basePath="/organization/metrics" selected={pageId} />
         </div>
       </div>
 
@@ -62,7 +63,7 @@ export default async function MetricsPage({ searchParams }: { searchParams: Prom
           placeholder="Description (optional)"
           className="border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--fg)] outline-none placeholder:text-[var(--fg-dim)] focus:border-[var(--cyan)] sm:col-span-2"
         />
-        <select
+        <FluentSelect
           name="componentId"
           className="border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--fg)] outline-none focus:border-[var(--cyan)]"
         >
@@ -72,7 +73,7 @@ export default async function MetricsPage({ searchParams }: { searchParams: Prom
               {c.name}
             </option>
           ))}
-        </select>
+        </FluentSelect>
         <label className="flex items-center gap-3 border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--fg-soft)]">
           Decimal places
           <input

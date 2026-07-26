@@ -32,12 +32,12 @@ export async function updateOrgSettings(formData: FormData) {
       createdAt: new Date(),
     }, { session: databaseSession });
   });
-  revalidatePath("/admin/settings");
+  revalidatePath("/organization/settings");
 }
 
 export async function updateOrgRetention(formData: FormData) {
   const session = await requireCapability("organization.manage");
-  if (session.role !== "OWNER") throw new Error("Only an organization Owner can change retention");
+  if (session.role !== "ADMIN") throw new Error("Only an organization Admin can change retention");
   const values = Object.fromEntries(
     Object.entries(RETENTION_BOUNDS).map(([key, bounds]) => {
       const value = Number(formData.get(key));
@@ -73,12 +73,12 @@ export async function updateOrgRetention(formData: FormData) {
     metadata: values,
     createdAt: now,
   });
-  revalidatePath("/admin/settings");
+  revalidatePath("/organization/settings");
 }
 
 export async function requestOrgExport() {
   const session = await requireCapability("organization.manage");
-  if (session.role !== "OWNER") throw new Error("Only an organization Owner can request an export");
+  if (session.role !== "ADMIN") throw new Error("Only an organization Admin can request an export");
   const now = new Date();
   const active = await collections.dataExportJobs().findOne({
     orgId: oid(session.orgId),
@@ -110,5 +110,5 @@ export async function requestOrgExport() {
     target: id.toHexString(),
     createdAt: now,
   });
-  revalidatePath("/admin/settings");
+  revalidatePath("/organization/settings");
 }

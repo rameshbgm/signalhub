@@ -12,13 +12,13 @@ export async function GET(
   try {
     const { connection: slug } = await params;
     const connection = await findEnabledConnection(slug, "SAML");
-    if (!connection) return apiError(404, "IDENTITY_CONNECTION_NOT_FOUND", "Identity connection not found");
+    if (!connection || connection.audience !== "ORGANIZATION") return apiError(404, "IDENTITY_CONNECTION_NOT_FOUND", "Identity connection not found");
     await consumeRateLimit("saml-start", requestIp(request), { limit: 20, windowMs: 15 * 60_000 });
     const returnToParam = request.nextUrl.searchParams.get("returnTo");
     const returnTo =
       returnToParam?.startsWith("/") && !returnToParam.startsWith("//")
         ? returnToParam
-        : connection.audience === "PLATFORM" ? "/platform" : "/admin";
+        : "/organization";
     const transaction = createOidcTransactionValues();
     const relayState = await signOidcTransaction({
       ...transaction,

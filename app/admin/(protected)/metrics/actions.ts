@@ -50,7 +50,7 @@ export async function createMetric(pageId: string, formData: FormData) {
       decimals,
     }, { session: databaseSession });
   });
-  revalidatePath("/admin/metrics");
+  revalidatePath("/organization/metrics");
 }
 
 export async function pushMetricPoint(metricId: string, formData: FormData) {
@@ -73,7 +73,7 @@ export async function pushMetricPoint(metricId: string, formData: FormData) {
       { session: databaseSession }
     );
   });
-  revalidatePath("/admin/metrics");
+  revalidatePath("/organization/metrics");
 }
 
 export async function toggleMetricVisible(metricId: string) {
@@ -101,7 +101,7 @@ export async function toggleMetricVisible(metricId: string) {
     );
     if (!changed.matchedCount) throw new Error("Metric state changed; reload and retry");
   });
-  revalidatePath("/admin/metrics");
+  revalidatePath("/organization/metrics");
 }
 
 export async function deleteMetric(metricId: string) {
@@ -111,7 +111,7 @@ export async function deleteMetric(metricId: string) {
   const session = await requireCapability("monitor.manage", metric.pageId);
   await assertPageInOrg(metric.pageId, session.orgId);
   await deleteMetricCascade(metricId, session.orgId, metric.pageId);
-  revalidatePath("/admin/metrics");
+  revalidatePath("/organization/metrics");
 }
 
 export async function updateMetricDecimals(metricId: string, formData: FormData) {
@@ -140,7 +140,7 @@ export async function updateMetricDecimals(metricId: string, formData: FormData)
     );
     if (!changed.matchedCount) throw new Error("Metric state changed; reload and retry");
   });
-  revalidatePath("/admin/metrics");
+  revalidatePath("/organization/metrics");
   const page = await collections.pages().findOne({ _id: metricDoc.pageId });
   if (page) revalidatePath(`/${page.slug}`);
 }

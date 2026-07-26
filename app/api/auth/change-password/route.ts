@@ -12,6 +12,7 @@ import { newPasswordError } from "@/lib/password-policy";
 const schema = z.object({
   currentPassword: z.string().min(1).max(1024),
   newPassword: z.string().min(1).max(1024),
+  email: z.string().email(),
 });
 
 export async function POST(request: NextRequest) {
@@ -27,7 +28,8 @@ export async function POST(request: NextRequest) {
     ) {
       return apiError(400, "INVALID_CURRENT_PASSWORD", "The temporary password is incorrect");
     }
-    const passwordError = newPasswordError(parsed.data.newPassword, [user.name, user.email]);
+    const email = parsed.data.email.trim().toLowerCase();
+    const passwordError = newPasswordError(parsed.data.newPassword, [user.name, user.username, email]);
     if (passwordError) return apiError(400, "PASSWORD_POLICY_FAILED", passwordError);
     if (await verifyPassword(parsed.data.newPassword, user.passwordHash)) {
       return apiError(400, "PASSWORD_REUSED", "Choose a different password");
@@ -66,7 +68,10 @@ export async function POST(request: NextRequest) {
           {
             $set: {
               passwordHash,
+              email,
+              canonicalEmail: email,
               mustChangePassword: false,
+              mustCompleteProfile: false,
               updatedAt: now,
             },
           },
@@ -98,9 +103,10 @@ export async function POST(request: NextRequest) {
           {
             _id: new ObjectId(),
             orgId: membership.orgId,
-            actor: user.email,
-            action: "PASSWORD_CHANGED",
+            actor: user.username,
+            action: "INITIAL_ACCOUNT_SETUP_COMPLETED",
             target: user._id.toHexString(),
+            metadata: { communicationEmail: email },
             createdAt: now,
           },
           { session: databaseSession }

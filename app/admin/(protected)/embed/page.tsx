@@ -43,7 +43,7 @@ export default async function EmbedPage({ searchParams }: { searchParams: Promis
       </p>
 
       <div className="w-full sm:w-56">
-        <PageSelect pages={pages.map((p) => ({ id: p.id, name: p.name }))} basePath="/admin/embed" selected={pageId} />
+        <PageSelect pages={pages.map((p) => ({ id: p.id, name: p.name }))} basePath="/organization/embed" selected={pageId} />
       </div>
 
       {page && (

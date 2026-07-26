@@ -11,20 +11,25 @@ import { IncidentCard, PastIncidentsByDay } from "@/components/public/IncidentTi
 import { MetricChart } from "@/components/public/MetricChart";
 import Link from "next/link";
 import { scopeCustomCss } from "@/lib/custom-css";
-import { publicBasePath } from "@/lib/public-path";
-import type { CSSProperties } from "react";
+import { publicPagePath } from "@/lib/public-path";
 import { PublicAnalytics } from "@/components/public/PublicAnalytics";
 import type { Metadata } from "next";
+import { pageDesignFor, type PageDesignBlock } from "@/lib/page-design";
+import { PageDesignShell, contentWidthClass } from "@/components/public/PageDesignShell";
+import { AnnouncementList } from "@/components/public/AnnouncementList";
+import { publicFaviconMetadata } from "@/lib/public-favicon";
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params;
   const page = await collections.pages().findOne({ slug });
   if (!page) return {};
+  const design = pageDesignFor(page);
   return {
-    title: `${page.name} — ${page.headline || "Service status"}`,
-    description: page.aboutText || `Current availability and incident history for ${page.name}.`,
-    icons: page.faviconUrl ? { icon: page.faviconUrl } : undefined,
-    robots: page.type === "PUBLIC" ? undefined : { index: false, follow: false },
+    title: design.seo.title || `${page.name} — ${page.headline || "Service status"}`,
+    description: design.seo.description || page.aboutText || `Current availability and incident history for ${page.name}.`,
+    openGraph: design.seo.socialImageUrl ? { images: [design.seo.socialImageUrl] } : undefined,
+    ...publicFaviconMetadata(page.faviconUrl),
+    robots: page.type === "PUBLIC" && !design.seo.noIndex ? undefined : { index: false, follow: false },
   };
 }
 
@@ -34,7 +39,8 @@ export default async function PublicStatusPage({ params }: { params: Promise<{ s
   if (!pageDoc) notFound();
   const hubParentDoc = pageDoc.hubParentId ? await collections.pages().findOne({ _id: pageDoc.hubParentId }) : null;
   const page = { ...toId(pageDoc), hubParent: hubParentDoc ? toId(hubParentDoc) : null };
-  const basePath = await publicBasePath(page);
+  const design = pageDesignFor(pageDoc);
+  const basePath = publicPagePath(page);
 
   const access = await checkPageAccess(page);
   if (!access.ok) {
@@ -50,6 +56,25 @@ export default async function PublicStatusPage({ params }: { params: Promise<{ s
   const upcomingMaintenance = incidents.filter((i) => i.isMaintenance && i.maintenanceStatus === "SCHEDULED");
 
   const metrics = await getMetricsForPage(page.id, access.visibleComponentIds);
+  const now = new Date();
+  const announcementDocs = await collections.pageAnnouncements()
+    .find({
+      pageId: pageDoc._id,
+      startsAt: { $lte: now },
+      $or: [{ endsAt: null }, { endsAt: { $gt: now } }],
+      surfaces: "STATUS",
+    })
+    .sort({ priority: -1, startsAt: -1 })
+    .toArray();
+  const announcements = announcementDocs.map((announcement) => ({
+    id: announcement._id.toHexString(),
+    title: announcement.title,
+    body: announcement.body,
+    severity: announcement.severity,
+    ctaLabel: announcement.ctaLabel,
+    ctaUrl: announcement.ctaUrl,
+    dismissible: announcement.dismissible,
+  }));
   const scopedCss = scopeCustomCss(page.customCss, page.id);
   const incidentPageSlug = basePath ? page.slug : "";
 
@@ -62,16 +87,113 @@ export default async function PublicStatusPage({ params }: { params: Promise<{ s
     ? new Date(Math.max(...activityDates.map((date) => date.getTime())))
     : page.createdAt;
 
+  function renderBlock(block: PageDesignBlock) {
+    if (block.hidden) return null;
+    switch (block.type) {
+      case "OVERALL_STATUS":
+        return (
+          <StatusBanner
+            label={banner.label}
+            color={banner.color}
+            updatedAt={lastActivity}
+            locale={page.language}
+            timeZone={page.timezone}
+            variant={block.settings.style}
+            showLastUpdated={block.settings.showLastUpdated}
+            description={block.settings.showDescription ? page.aboutText : null}
+          />
+        );
+      case "ANNOUNCEMENTS":
+        return <AnnouncementList pageId={page.id} announcements={announcements} maxItems={block.settings.maxItems} />;
+      case "RICH_TEXT":
+        return (
+          <article className={`page-panel border border-[var(--line)] bg-[var(--surface)] p-[var(--page-block-padding)] ${block.settings.align === "CENTER" ? "text-center" : ""}`}>
+            {block.settings.heading && <h2 className="text-xl font-semibold">{block.settings.heading}</h2>}
+            {block.settings.body && <p className="mt-2 whitespace-pre-wrap text-sm leading-7 text-[var(--fg-soft)]">{block.settings.body}</p>}
+          </article>
+        );
+      case "COMPONENT_STATUS":
+        return <ComponentList groups={groups} ungrouped={ungrouped} settings={block.settings} nowIso={now.toISOString()} />;
+      case "ACTIVE_INCIDENTS":
+        return activeIncidents.length ? (
+          <section>
+            <h2 className="mb-3 text-lg font-semibold">{block.settings.heading}</h2>
+            <div className="space-y-3">
+              {activeIncidents.map((incident) => <IncidentCard key={incident.id} incident={incident} pageSlug={incidentPageSlug} locale={page.language} timeZone={page.timezone} />)}
+            </div>
+          </section>
+        ) : null;
+      case "SCHEDULED_MAINTENANCE":
+        return upcomingMaintenance.length || activeMaintenance.length ? (
+          <section>
+            <h2 className="mb-3 text-lg font-semibold">{block.settings.heading}</h2>
+            <div className="space-y-3">
+              {[...activeMaintenance, ...upcomingMaintenance].map((incident) => <IncidentCard key={incident.id} incident={incident} pageSlug={incidentPageSlug} locale={page.language} timeZone={page.timezone} />)}
+            </div>
+          </section>
+        ) : null;
+      case "METRICS":
+        return metrics.length ? (
+          <section>
+            <h2 className="mb-3 text-lg font-semibold">{block.settings.heading}</h2>
+            <div className={`grid gap-4 ${block.settings.columns === 2 ? "sm:grid-cols-2" : ""}`}>
+              {metrics.map((metric) => (
+                <MetricChart
+                  key={metric.id}
+                  name={metric.name}
+                  suffix={metric.suffix}
+                  decimals={metric.decimals ?? 0}
+                  locale={page.language}
+                  timeZone={page.timezone}
+                  color={design.theme.palette.brand}
+                  points={metric.points.map((point) => ({ timestamp: point.timestamp.toISOString(), value: point.value }))}
+                />
+              ))}
+            </div>
+          </section>
+        ) : null;
+      case "HISTORY_PREVIEW":
+        return (
+          <section>
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+              <h2 className="text-lg font-semibold">{block.settings.heading}</h2>
+              <Link href={`${basePath}/history`} className="text-sm underline" style={{ color: "var(--page-brand)" }}>Incident history</Link>
+            </div>
+            <PastIncidentsByDay incidents={past} pageSlug={incidentPageSlug} days={block.settings.days} locale={page.language} timeZone={page.timezone} />
+          </section>
+        );
+      case "SUBSCRIBE":
+        return (
+          <section className={block.settings.style === "PANEL" ? "page-panel border border-[var(--line)] bg-[var(--surface)] p-[var(--page-block-padding)]" : ""}>
+            {block.settings.style !== "BUTTON" && <h2 className="mb-3 font-semibold">{block.settings.heading}</h2>}
+            <SubscribeModal
+              pageSlug={page.slug}
+              brandColor={design.theme.palette.brand}
+              feedsEnabled={page.type === "PUBLIC"}
+              feedBasePath={basePath ? undefined : "/feed"}
+              components={allComponentsFlat.map((component) => ({ id: component.id, name: component.name }))}
+            />
+          </section>
+        );
+      case "LINK_CARDS":
+        return block.settings.links.length ? (
+          <div className="grid gap-3 sm:grid-cols-2">
+            {block.settings.links.map((link) => (
+              <a key={link.url} href={link.url} className="page-panel border border-[var(--line)] bg-[var(--surface)] p-4 transition-transform hover:-translate-y-0.5">
+                <strong>{link.label}</strong>
+                {link.description && <p className="mt-1 text-sm text-[var(--fg-soft)]">{link.description}</p>}
+              </a>
+            ))}
+          </div>
+        ) : null;
+      default:
+        return null;
+    }
+  }
+
+  const statusSurface = design.surfaces.status;
   return (
-    <div
-      className="status-theme min-h-screen flex flex-col bg-[var(--bg)] text-[var(--fg)]"
-      data-status-page={page.id}
-      data-theme-preset={page.themePreset ?? "SIGNAL"}
-      data-theme-mode={page.themeMode ?? "SYSTEM"}
-      lang={page.language}
-      style={{ "--page-brand": page.brandColor } as CSSProperties}
-    >
-      {scopedCss && <style>{scopedCss}</style>}
+    <PageDesignShell pageId={page.id} publishedVersion={page.publishedDesignVersion} design={design} customCss={scopedCss} language={page.language}>
       {page.analyticsEnabled && <PublicAnalytics pageSlug={page.slug} />}
       <PublicHeader
         name={page.name}
@@ -80,92 +202,50 @@ export default async function PublicStatusPage({ params }: { params: Promise<{ s
         hubSlug={page.hubParent?.slug ?? (page.isHub ? page.slug : null)}
         layout={page.layout}
         coverImageUrl={page.coverImageUrl}
+        coverImageFit={page.coverImageFit}
+        coverImagePositionX={page.coverImagePositionX}
+        coverImagePositionY={page.coverImagePositionY}
+        coverImageCropX={page.coverImageCropX}
+        coverImageCropY={page.coverImageCropY}
+        coverImageCropWidth={page.coverImageCropWidth}
+        coverImageCropHeight={page.coverImageCropHeight}
         brandColor={page.brandColor}
         allowThemeOverride={page.allowThemeOverride ?? true}
         themeMode={page.themeMode ?? "SYSTEM"}
-      />
-      <main className="max-w-5xl mx-auto px-4 py-8 sm:py-12 flex-1 w-full">
-        <section className="mb-6">
-          <div className="mb-4 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-            <div>
-              <p className="font-mono text-xs uppercase tracking-[0.18em] text-[var(--fg-dim)]">Live service health</p>
-              <h1 className="mt-2 text-2xl font-semibold tracking-tight text-[var(--fg)] sm:text-3xl">{page.headline || "Service Status"}</h1>
-              {page.aboutText && <p className="mt-2 max-w-2xl text-sm leading-relaxed text-[var(--fg-soft)]">{page.aboutText}</p>}
-            </div>
+        design={design}
+        subscribeSlot={
           <SubscribeModal
             pageSlug={page.slug}
-            brandColor={page.brandColor}
+            brandColor={design.theme.palette.brand}
             feedsEnabled={page.type === "PUBLIC"}
             feedBasePath={basePath ? undefined : "/feed"}
-            components={allComponentsFlat.map((c) => ({ id: c.id, name: c.name }))}
+            components={allComponentsFlat.map((component) => ({ id: component.id, name: component.name }))}
           />
+        }
+      />
+      <main className={`${contentWidthClass(design)} mx-auto w-full flex-1 px-4 py-8 sm:py-12`}>
+        <section className="mb-8">
+          <div>
+              <p className="font-mono text-xs uppercase tracking-[0.18em] text-[var(--fg-dim)]">Live service health</p>
+              <h1 className="mt-2 text-2xl font-semibold tracking-tight text-[var(--fg)] sm:text-3xl">{page.headline || "Service Status"}</h1>
+              {page.aboutText && !statusSurface.full.some((block) => block.type === "OVERALL_STATUS" && !block.hidden && block.settings.showDescription) && (
+                <p className="mt-2 max-w-2xl text-sm leading-relaxed text-[var(--fg-soft)]">{page.aboutText}</p>
+              )}
           </div>
-          <StatusBanner
-            label={banner.label}
-            color={banner.color}
-            updatedAt={lastActivity}
-            locale={page.language}
-            timeZone={page.timezone}
-          />
         </section>
-
-        {(activeIncidents.length > 0 || activeMaintenance.length > 0) && (
-          <section className="mt-6 space-y-3">
-            {activeIncidents.map((inc) => (
-              <IncidentCard key={inc.id} incident={inc} pageSlug={incidentPageSlug} locale={page.language} timeZone={page.timezone} />
-            ))}
-            {activeMaintenance.map((inc) => (
-              <IncidentCard key={inc.id} incident={inc} pageSlug={incidentPageSlug} locale={page.language} timeZone={page.timezone} />
-            ))}
-          </section>
-        )}
-
-        <section className="mt-6">
-          <ComponentList groups={groups} ungrouped={ungrouped} />
-        </section>
-
-        {metrics.length > 0 && (
-          <section className="mt-8">
-            <h2 className="text-lg font-mono font-semibold mb-3 text-[var(--fg)]">System Metrics</h2>
-            <div className="grid sm:grid-cols-2 gap-4">
-              {metrics.map((m) => (
-                <MetricChart
-                  key={m.id}
-                  name={m.name}
-                  suffix={m.suffix}
-                  decimals={m.decimals ?? 0}
-                  locale={page.language}
-                  timeZone={page.timezone}
-                  color={page.brandColor}
-                  points={m.points.map((p) => ({ timestamp: p.timestamp.toISOString(), value: p.value }))}
-                />
-              ))}
-            </div>
-          </section>
-        )}
-
-        {upcomingMaintenance.length > 0 && (
-          <section className="mt-8">
-            <h2 className="text-lg font-mono font-semibold mb-3 text-[var(--fg)]">Scheduled Maintenance</h2>
-            <div className="space-y-3">
-              {upcomingMaintenance.map((inc) => (
-                <IncidentCard key={inc.id} incident={inc} pageSlug={incidentPageSlug} locale={page.language} timeZone={page.timezone} />
-              ))}
-            </div>
-          </section>
-        )}
-
-        <section className="mt-10">
-          <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
-            <h2 className="text-lg font-mono font-semibold text-[var(--fg)]">Past Incidents</h2>
-            <Link href={`${basePath}/history`} className="text-sm text-[var(--cyan)] underline">
-              Incident History
-            </Link>
+        <div className="space-y-[var(--page-block-gap)]">
+          {statusSurface.full.map((block) => <div key={block.id} data-page-block={block.type}>{renderBlock(block)}</div>)}
+        </div>
+        <div className={`mt-[var(--page-block-gap)] grid gap-[var(--page-block-gap)] ${statusSurface.sidebar.some((block) => !block.hidden) ? "lg:grid-cols-[minmax(0,2fr)_minmax(16rem,1fr)]" : ""}`}>
+          <div className="space-y-[var(--page-block-gap)]">
+            {statusSurface.primary.map((block) => <div key={block.id} data-page-block={block.type}>{renderBlock(block)}</div>)}
           </div>
-          <PastIncidentsByDay incidents={past} pageSlug={incidentPageSlug} days={14} locale={page.language} timeZone={page.timezone} />
-        </section>
+          <aside className="space-y-[var(--page-block-gap)]">
+            {statusSurface.sidebar.map((block) => <div key={block.id} data-page-block={block.type}>{renderBlock(block)}</div>)}
+          </aside>
+          </div>
       </main>
-      <PublicFooter removeBranding={page.removeBranding} termsUrl={page.termsUrl} privacyUrl={page.privacyUrl} />
-    </div>
+      <PublicFooter removeBranding={page.removeBranding} termsUrl={page.termsUrl} privacyUrl={page.privacyUrl} supportUrl={page.supportUrl} design={design} />
+    </PageDesignShell>
   );
 }

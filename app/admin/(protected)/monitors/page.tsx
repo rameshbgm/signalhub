@@ -1,4 +1,5 @@
 import { requireSession } from "@/lib/require-session";
+import { FluentSelect } from "@/components/FluentSelect";
 import { collections } from "@/lib/db";
 import { oid, toId } from "@/lib/mongo-utils";
 import { createMonitor, toggleMonitorEnabled, deleteMonitor, runMonitorNow, updateMonitor } from "./actions";
@@ -53,7 +54,7 @@ export default async function MonitorsPage({ searchParams }: { searchParams: Pro
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="font-mono text-xl font-semibold text-[var(--fg)]">Monitors</h1>
         <div className="w-full sm:w-56">
-          <PageSelect pages={pages.map((p) => ({ id: p.id, name: p.name }))} basePath="/admin/monitors" selected={pageId} />
+          <PageSelect pages={pages.map((p) => ({ id: p.id, name: p.name }))} basePath="/organization/monitors" selected={pageId} />
         </div>
       </div>
 
@@ -129,10 +130,10 @@ export default async function MonitorsPage({ searchParams }: { searchParams: Pro
                   <form action={updateMonitor.bind(null, m.id)} className="mt-3 grid gap-2 sm:grid-cols-2">
                     <input name="name" defaultValue={m.name} aria-label="Monitor name" className="border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-xs" required />
                     <input name="target" defaultValue={m.target} aria-label="Monitor target" className="border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-xs" required />
-                    <select name="componentId" defaultValue={m.componentId ?? ""} aria-label="Linked component" className="border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-xs">
+                    <FluentSelect name="componentId" defaultValue={m.componentId ?? ""} aria-label="Linked component" className="border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-xs">
                       <option value="">No linked component</option>
                       {components.map((component) => <option key={component.id} value={component.id}>{component.name}</option>)}
-                    </select>
+                    </FluentSelect>
                     <input name="groupName" defaultValue={m.groupName ?? ""} placeholder="Group" className="border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-xs" />
                     <input name="intervalSec" type="number" min={10} max={86400} defaultValue={m.intervalSec} aria-label="Interval seconds" className="border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-xs" />
                     <input name="timeoutMs" type="number" min={100} max={60000} defaultValue={m.timeoutMs} aria-label="Timeout milliseconds" className="border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-xs" />

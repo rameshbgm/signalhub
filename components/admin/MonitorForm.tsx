@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { FluentSelect } from "@/components/FluentSelect";
 import { COMPONENT_STATUSES, COMPONENT_STATUS_LABEL, type ComponentStatus } from "@/lib/status";
 import { HelpTip } from "@/components/HelpTip";
 
@@ -27,13 +28,13 @@ export function MonitorForm({
     <form action={action} className="space-y-4 border border-[var(--line)] bg-[var(--surface)] p-4 text-sm">
       <div className="grid gap-3 sm:grid-cols-2">
         <input name="name" placeholder="Monitor name" className={`${inputClass} w-full`} required />
-        <select name="type" value={type} onChange={(e) => setType(e.target.value as typeof type)} className={`${inputClass} w-full`}>
+        <FluentSelect name="type" value={type} onChange={(e) => setType(e.target.value as typeof type)} className={`${inputClass} w-full`}>
           {MONITOR_TYPES.map((t) => (
             <option key={t} value={t}>
               {t}
             </option>
           ))}
-        </select>
+        </FluentSelect>
 
         {type !== "HEARTBEAT" && <input
           name="target"
@@ -45,25 +46,25 @@ export function MonitorForm({
 
         {type === "TCP" && <input name="port" type="number" placeholder="Port" className={`${inputClass} w-full`} required />}
 
-        <select name="componentId" className={`${inputClass} w-full`}>
+        <FluentSelect name="componentId" className={`${inputClass} w-full`}>
           <option value="">Not tied to a component</option>
           {components.map((c) => (
             <option key={c.id} value={c.id}>
               {c.name}
             </option>
           ))}
-        </select>
+        </FluentSelect>
       </div>
 
       {isHttpLike && (
         <fieldset className="space-y-2 border border-[var(--line)] p-3">
           <legend className="px-1 font-mono text-xs uppercase tracking-wide text-[var(--fg-dim)]">HTTP request</legend>
           <div className="grid gap-2 sm:grid-cols-3">
-            <select name="method" defaultValue="GET" className={`${inputClassXs} w-full`}>
+            <FluentSelect name="method" defaultValue="GET" className={`${inputClassXs} w-full`}>
               <option value="GET">GET</option>
               <option value="POST">POST</option>
               <option value="HEAD">HEAD</option>
-            </select>
+            </FluentSelect>
             <input name="expectedStatusRange" defaultValue="200-299" placeholder="Expected status (e.g. 200-299)" className={`${inputClassXs} w-full`} />
             <input name="timeoutMs" type="number" defaultValue={10000} placeholder="Timeout (ms)" className={`${inputClassXs} w-full`} />
           </div>
@@ -95,9 +96,9 @@ export function MonitorForm({
         <fieldset className="border border-[var(--line)] p-3">
           <legend className="px-1 font-mono text-xs uppercase tracking-wide text-[var(--fg-dim)]">DNS assertion</legend>
           <div className="grid gap-2 sm:grid-cols-2">
-            <select name="dnsRecordType" defaultValue="A" className={`${inputClassXs} w-full`}>
+            <FluentSelect name="dnsRecordType" defaultValue="A" className={`${inputClassXs} w-full`}>
               {["A", "AAAA", "CNAME", "MX", "TXT", "NS"].map((record) => <option key={record} value={record}>{record}</option>)}
-            </select>
+            </FluentSelect>
             <input name="dnsExpectedValue" placeholder="Expected value (optional)" className={`${inputClassXs} w-full`} />
           </div>
         </fieldset>
@@ -114,12 +115,12 @@ export function MonitorForm({
         <fieldset className="space-y-2 border border-[var(--line)] p-3">
           <legend className="px-1 font-mono text-xs uppercase tracking-wide text-[var(--fg-dim)]">Security / authentication</legend>
           <div className="grid gap-2 sm:grid-cols-2">
-            <select name="authType" value={authType} onChange={(e) => setAuthType(e.target.value)} className={`${inputClassXs} w-full`}>
+            <FluentSelect name="authType" value={authType} onChange={(e) => setAuthType(e.target.value)} className={`${inputClassXs} w-full`}>
               <option value="NONE">No authentication</option>
               <option value="BASIC">Basic auth</option>
               <option value="BEARER">Bearer token</option>
               <option value="HEADER">Custom header</option>
-            </select>
+            </FluentSelect>
             <label className="flex items-center gap-2 text-xs text-[var(--fg-soft)]">
               <input name="verifyTls" type="checkbox" defaultChecked /> Verify TLS certificate
             </label>
@@ -157,13 +158,13 @@ export function MonitorForm({
             <HelpTip text="Number of consecutive successful checks required before the monitor is marked recovered." />
           </div>
         </div>
-        <select name="downStatus" defaultValue="MAJOR_OUTAGE" className={`${inputClassXs} w-full`}>
+        <FluentSelect name="downStatus" defaultValue="MAJOR_OUTAGE" className={`${inputClassXs} w-full`}>
           {COMPONENT_STATUSES.filter((s: ComponentStatus) => s !== "OPERATIONAL" && s !== "UNDER_MAINTENANCE").map((s) => (
             <option key={s} value={s}>
               On failure, set component to: {COMPONENT_STATUS_LABEL[s]}
             </option>
           ))}
-        </select>
+        </FluentSelect>
       </fieldset>
 
       <div className="grid gap-2 sm:grid-cols-2">

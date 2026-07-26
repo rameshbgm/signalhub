@@ -7,7 +7,7 @@ const database = vi.hoisted(() => {
     membershipFindOne: vi.fn(),
     membershipFind: vi.fn(),
     membershipCountDocuments: vi.fn(),
-    ownerMembershipToArray: vi.fn(),
+    adminMembershipToArray: vi.fn(),
     membershipInsertOne: vi.fn(),
     membershipUpdateOne: vi.fn(),
     userFindOne: vi.fn(),
@@ -22,7 +22,7 @@ const database = vi.hoisted(() => {
 
 const external = vi.hoisted(() => ({
   revalidatePath: vi.fn(),
-  transitionRemovesActiveOwner: vi.fn(),
+  transitionRemovesActiveAdmin: vi.fn(),
 }));
 
 vi.mock("next/cache", () => ({
@@ -48,16 +48,15 @@ vi.mock("@/lib/admin-guard", () => ({
     orgId: "000000000000000000000001",
     membershipId: "000000000000000000000099",
     userId: "000000000000000000000098",
-    email: "owner@example.test",
-    role: "OWNER",
+    email: "admin@example.test",
+    role: "ADMIN",
     supportSessionId: null,
   })),
-  requireOrgOwner: vi.fn(),
 }));
 
 vi.mock("@/lib/identity", () => ({
   canonicalizeEmail: (email: string) => email.trim().toLowerCase(),
-  MEMBERSHIP_ROLES: ["OWNER", "ADMIN", "INCIDENT_MANAGER", "RESPONDER", "VIEWER"],
+  MEMBERSHIP_ROLES: ["ADMIN", "INCIDENT_MANAGER", "RESPONDER", "VIEWER"],
 }));
 
 vi.mock("@/lib/mongo-utils", async () => {
@@ -68,8 +67,8 @@ vi.mock("@/lib/mongo-utils", async () => {
 });
 
 vi.mock("@/lib/team-owner-safety", () => ({
-  transitionRemovesActiveOwner: external.transitionRemovesActiveOwner,
-  withOrganizationOwnerInvariantTransaction: vi.fn(
+  transitionRemovesActiveAdmin: external.transitionRemovesActiveAdmin,
+  withOrganizationAdminInvariantTransaction: vi.fn(
     async (
       _organizationId: string,
       work: (session: Record<string, never>) => Promise<unknown>
@@ -152,6 +151,8 @@ function user(overrides: Partial<UserDoc> = {}): UserDoc {
     createdAt: new Date("2026-01-01T00:00:00.000Z"),
     updatedAt: new Date("2026-01-01T00:00:00.000Z"),
     ...overrides,
+    username: overrides.username ?? "member",
+    canonicalUsername: overrides.canonicalUsername ?? overrides.username ?? "member",
   };
 }
 
@@ -160,7 +161,7 @@ function actorMembership(): MembershipDoc {
     ...membership("ACTIVE"),
     _id: actorMembershipId,
     userId: actorUserId,
-    role: "OWNER",
+    role: "ADMIN",
   };
 }
 
@@ -170,11 +171,11 @@ describe("tenant identity-safe membership recovery", () => {
     database.withTransaction.mockImplementation(
       async (callback: () => Promise<unknown>) => callback()
     );
-    external.transitionRemovesActiveOwner.mockReturnValue(false);
+    external.transitionRemovesActiveAdmin.mockReturnValue(false);
     database.membershipFind.mockReturnValue({
-      toArray: database.ownerMembershipToArray,
+      toArray: database.adminMembershipToArray,
     });
-    database.ownerMembershipToArray.mockResolvedValue([]);
+    database.adminMembershipToArray.mockResolvedValue([]);
     database.membershipCountDocuments.mockResolvedValue(1);
     database.userCountDocuments.mockResolvedValue(0);
     database.membershipUpdateOne.mockResolvedValue({
@@ -352,7 +353,7 @@ describe("tenant identity-safe membership recovery", () => {
     expect(database.auditInsertOne).toHaveBeenCalledWith(
       expect.objectContaining({
         orgId,
-        actor: "owner@example.test",
+        actor: "admin@example.test",
         action: "REISSUE_MEMBER_INVITATION",
         target: "member@example.test",
         metadata: expect.objectContaining({
@@ -364,7 +365,7 @@ describe("tenant identity-safe membership recovery", () => {
     );
     expect(database.withTransaction).toHaveBeenCalledOnce();
     expect(database.endSession).toHaveBeenCalledOnce();
-    expect(external.revalidatePath).toHaveBeenCalledWith("/admin/team");
+    expect(external.revalidatePath).toHaveBeenCalledWith("/organization/team");
   });
 
   it("does not turn an active membership back into a pending invitation", async () => {
@@ -387,27 +388,27 @@ describe("tenant identity-safe membership recovery", () => {
     expect(database.auditInsertOne).not.toHaveBeenCalled();
   });
 
-  it("does not rely on disabled identities when protecting the last active Owner", async () => {
-    const target = { ...membership("ACTIVE"), role: "OWNER" as const };
-    const disabledOwnerUserId = new ObjectId("000000000000000000000004");
+  it("does not rely on disabled identities when protecting the last active Admin", async () => {
+    const target = { ...membership("ACTIVE"), role: "ADMIN" as const };
+    const disabledAdminUserId = new ObjectId("000000000000000000000004");
     database.membershipFindOne
       .mockResolvedValueOnce(actorMembership())
       .mockResolvedValueOnce(target);
     database.userFindOne.mockResolvedValue(user());
-    external.transitionRemovesActiveOwner.mockReturnValue(true);
-    database.ownerMembershipToArray.mockResolvedValue([
+    external.transitionRemovesActiveAdmin.mockReturnValue(true);
+    database.adminMembershipToArray.mockResolvedValue([
       target,
-      { ...target, userId: disabledOwnerUserId },
+      { ...target, userId: disabledAdminUserId },
     ]);
     database.userCountDocuments.mockResolvedValue(1);
 
     await expect(removeMember(membershipId.toHexString())).rejects.toThrow(
-      "The last Owner cannot be removed"
+      "The last Admin cannot be removed"
     );
 
     expect(database.userCountDocuments).toHaveBeenCalledWith(
       {
-        _id: { $in: [userId, disabledOwnerUserId] },
+        _id: { $in: [userId, disabledAdminUserId] },
         disabled: { $ne: true },
       },
       expect.objectContaining({ session: expect.anything() })
@@ -415,13 +416,13 @@ describe("tenant identity-safe membership recovery", () => {
     expect(database.membershipUpdateOne).not.toHaveBeenCalled();
   });
 
-  it("allows cleanup of an already-disabled Owner membership", async () => {
-    const target = { ...membership("ACTIVE"), role: "OWNER" as const };
+  it("allows cleanup of an already-disabled Admin membership", async () => {
+    const target = { ...membership("ACTIVE"), role: "ADMIN" as const };
     database.membershipFindOne
       .mockResolvedValueOnce(actorMembership())
       .mockResolvedValueOnce(target);
     database.userFindOne.mockResolvedValue(user({ disabled: true }));
-    external.transitionRemovesActiveOwner.mockReturnValue(true);
+    external.transitionRemovesActiveAdmin.mockReturnValue(true);
 
     await removeMember(membershipId.toHexString());
 

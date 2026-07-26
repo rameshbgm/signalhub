@@ -70,7 +70,6 @@ spec:
             readOnlyRootFilesystem: true
           env:
             - { name: NEXT_PUBLIC_APP_URL, value: {{ .Values.config.appUrl | quote }} }
-            - { name: NEXT_PUBLIC_APP_DOMAIN, value: {{ .Values.config.appDomain | quote }} }
             - { name: ASSET_STORAGE_DRIVER, value: {{ .Values.config.assetStorageDriver | quote }} }
             - { name: REQUIRE_WORKER, value: {{ .Values.config.requireWorker | quote }} }
             - { name: TRUST_PROXY_HEADERS, value: {{ .Values.config.trustProxyHeaders | quote }} }

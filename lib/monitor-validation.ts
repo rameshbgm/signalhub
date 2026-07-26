@@ -8,7 +8,7 @@ export const MONITOR_TYPES = [
   "HEARTBEAT",
 ] as const;
 
-export type MonitorType = (typeof MONITOR_TYPES)[number];
+type MonitorType = (typeof MONITOR_TYPES)[number];
 
 export type MonitorConfiguration = {
   type: MonitorType;

@@ -1,4 +1,5 @@
 import { requireSession } from "@/lib/require-session";
+import { FluentSelect } from "@/components/FluentSelect";
 import { collections } from "@/lib/db";
 import { oid, toId } from "@/lib/mongo-utils";
 import { INCIDENT_STATUSES, INCIDENT_STATUS_LABEL, IMPACTS, IMPACT_LABEL } from "@/lib/status";
@@ -45,7 +46,7 @@ export default async function TemplatesPage({ searchParams }: { searchParams: Pr
           <p className="mt-1 text-sm text-[var(--fg-soft)]">Reusable, previewable messages for the full incident lifecycle.</p>
         </div>
         <div className="w-full sm:w-56">
-          <PageSelect pages={pages.map((p) => ({ id: p.id, name: p.name }))} basePath="/admin/templates" selected={pageId} />
+          <PageSelect pages={pages.map((p) => ({ id: p.id, name: p.name }))} basePath="/organization/templates" selected={pageId} />
         </div>
       </div>
 
@@ -85,35 +86,35 @@ export default async function TemplatesPage({ searchParams }: { searchParams: Pr
             className="w-full bg-[var(--bg)] border border-[var(--line)] px-3 py-2 text-sm text-[var(--fg)] placeholder:text-[var(--fg-dim)] focus:border-[var(--cyan)] focus:outline-none"
           />
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <select name="kind" className="bg-[var(--bg)] border border-[var(--line)] px-3 py-2 text-sm text-[var(--fg)]">
+            <FluentSelect name="kind" className="bg-[var(--bg)] border border-[var(--line)] px-3 py-2 text-sm text-[var(--fg)]">
               <option value="INCIDENT">New incident</option>
               <option value="UPDATE">Incident update</option>
               <option value="RESOLUTION">Resolution</option>
               <option value="MAINTENANCE">Maintenance</option>
               <option value="POSTMORTEM">Postmortem</option>
-            </select>
-            <select name="groupId" className="bg-[var(--bg)] border border-[var(--line)] px-3 py-2 text-sm text-[var(--fg)] focus:border-[var(--cyan)] focus:outline-none">
+            </FluentSelect>
+            <FluentSelect name="groupId" className="bg-[var(--bg)] border border-[var(--line)] px-3 py-2 text-sm text-[var(--fg)] focus:border-[var(--cyan)] focus:outline-none">
               <option value="">No group</option>
               {groups.map((g) => (
                 <option key={g.id} value={g.id}>
                   {g.name}
                 </option>
               ))}
-            </select>
-            <select name="defaultStatus" className="bg-[var(--bg)] border border-[var(--line)] px-3 py-2 text-sm text-[var(--fg)] focus:border-[var(--cyan)] focus:outline-none">
+            </FluentSelect>
+            <FluentSelect name="defaultStatus" className="bg-[var(--bg)] border border-[var(--line)] px-3 py-2 text-sm text-[var(--fg)] focus:border-[var(--cyan)] focus:outline-none">
               {INCIDENT_STATUSES.map((s) => (
                 <option key={s} value={s}>
                   {INCIDENT_STATUS_LABEL[s]}
                 </option>
               ))}
-            </select>
-            <select name="defaultImpact" className="bg-[var(--bg)] border border-[var(--line)] px-3 py-2 text-sm text-[var(--fg)] focus:border-[var(--cyan)] focus:outline-none">
+            </FluentSelect>
+            <FluentSelect name="defaultImpact" className="bg-[var(--bg)] border border-[var(--line)] px-3 py-2 text-sm text-[var(--fg)] focus:border-[var(--cyan)] focus:outline-none">
               {IMPACTS.map((i) => (
                 <option key={i} value={i}>
                   {IMPACT_LABEL[i]}
                 </option>
               ))}
-            </select>
+            </FluentSelect>
           </div>
           <label className="flex items-center gap-2 text-sm text-[var(--fg-soft)]">
             <input type="checkbox" name="notifyByDefault" defaultChecked /> Notify subscribers by default
@@ -149,9 +150,9 @@ export default async function TemplatesPage({ searchParams }: { searchParams: Pr
                 <input name="title" defaultValue={t.title} className="w-full border border-[var(--line)] bg-[var(--bg)] px-3 py-2" required />
                 <textarea name="body" defaultValue={t.body} rows={4} className="w-full border border-[var(--line)] bg-[var(--bg)] px-3 py-2" required />
                 <div className="flex flex-wrap gap-3">
-                  <select name="kind" defaultValue={t.kind ?? "INCIDENT"} className="border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-xs">
+                  <FluentSelect name="kind" defaultValue={t.kind ?? "INCIDENT"} className="border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-xs">
                     <option value="INCIDENT">New incident</option><option value="UPDATE">Incident update</option><option value="RESOLUTION">Resolution</option><option value="MAINTENANCE">Maintenance</option><option value="POSTMORTEM">Postmortem</option>
-                  </select>
+                  </FluentSelect>
                   <label className="flex items-center gap-2 text-xs"><input type="checkbox" name="notifyByDefault" defaultChecked={t.notifyByDefault ?? true} /> Notify by default</label>
                   <button className="bg-[var(--cyan)] px-3 py-2 text-xs font-semibold text-[var(--on-cyan)]">Save changes</button>
                 </div>

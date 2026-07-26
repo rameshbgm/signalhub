@@ -1,5 +1,7 @@
 "use client";
 
+import { fetchWithTimeout } from "@/lib/client-fetch";
+
 import { useState } from "react";
 import { CopyButton } from "@/components/CopyButton";
 
@@ -13,7 +15,7 @@ export function ScimTokenManager({ connectionId }: { connectionId: string }) {
     setPending(true);
     setError(null);
     try {
-      const response = await fetch(`/api/platform/identity-connections/${connectionId}/scim-token`, {
+      const response = await fetchWithTimeout(`/api/platform/identity-connections/${connectionId}/scim-token`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({}),

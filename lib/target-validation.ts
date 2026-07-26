@@ -39,7 +39,7 @@ export function isPrivateAddress(address: string) {
   return false;
 }
 
-export async function assertPublicHostname(hostname: string) {
+async function assertPublicHostname(hostname: string) {
   const normalized = hostname.toLowerCase().replace(/\.$/, "");
   if (normalized === "localhost" || normalized.endsWith(".localhost") || normalized.endsWith(".local")) {
     throw new Error("Private or local network targets are not allowed");

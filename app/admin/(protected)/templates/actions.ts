@@ -38,7 +38,7 @@ export async function createTemplateGroup(pageId: string, formData: FormData) {
       name,
     }, { session: databaseSession });
   });
-  revalidatePath("/admin/templates");
+  revalidatePath("/organization/templates");
 }
 
 export async function createTemplate(pageId: string, formData: FormData) {
@@ -104,7 +104,7 @@ export async function createTemplate(pageId: string, formData: FormData) {
       createdAt: new Date(),
     }, { session: databaseSession });
   });
-  revalidatePath("/admin/templates");
+  revalidatePath("/organization/templates");
 }
 
 export async function deleteTemplate(templateId: string) {
@@ -132,7 +132,7 @@ export async function deleteTemplate(templateId: string) {
     );
     if (!changed.matchedCount) throw new Error("Template state changed; reload and retry");
   });
-  revalidatePath("/admin/templates");
+  revalidatePath("/organization/templates");
 }
 
 export async function duplicateTemplate(templateId: string) {
@@ -162,7 +162,7 @@ export async function duplicateTemplate(templateId: string) {
       updatedAt: new Date(),
     }, { session: databaseSession });
   });
-  revalidatePath("/admin/templates");
+  revalidatePath("/organization/templates");
 }
 
 export async function updateTemplate(templateId: string, formData: FormData) {
@@ -203,5 +203,5 @@ export async function updateTemplate(templateId: string, formData: FormData) {
     );
     if (!changed.matchedCount) throw new Error("Template state changed; reload and retry");
   });
-  revalidatePath("/admin/templates");
+  revalidatePath("/organization/templates");
 }

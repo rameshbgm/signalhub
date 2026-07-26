@@ -10,7 +10,7 @@ import {
 
 export type AssetStorageDriver = "LOCAL" | "S3";
 
-export interface AssetStorage {
+interface AssetStorage {
   readonly driver: AssetStorageDriver;
   put(key: string, bytes: Buffer, contentType: string): Promise<void>;
   get(key: string): Promise<Buffer>;
@@ -129,8 +129,4 @@ export function assetStorageForDriver(driver: unknown) {
 
 export function newAssetKey(pageId: string, extension: string) {
   return `${pageId}/${randomUUID()}.${extension}`;
-}
-
-export function resetAssetStorageForTests() {
-  cachedStorages.clear();
 }

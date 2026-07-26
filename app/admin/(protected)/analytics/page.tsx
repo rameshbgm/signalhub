@@ -32,7 +32,7 @@ export default async function AnalyticsPage({
           <p className="mt-1 text-sm text-[var(--fg-soft)]">Cookie-free, aggregate activity stored on your infrastructure.</p>
         </div>
         <div className="w-60">
-          <PageSelect pages={pages.map((page) => ({ id: page._id.toHexString(), name: page.name }))} selected={selected._id.toHexString()} basePath="/admin/analytics" />
+          <PageSelect pages={pages.map((page) => ({ id: page._id.toHexString(), name: page.name }))} selected={selected._id.toHexString()} basePath="/organization/analytics" />
         </div>
       </div>
       <div className="grid gap-3 sm:grid-cols-4">

@@ -1,5 +1,7 @@
 "use client";
 
+import { fetchWithTimeout } from "@/lib/client-fetch";
+
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
@@ -28,7 +30,7 @@ export function InviteAcceptanceForm({
     setError(null);
 
     try {
-      const response = await fetch(`/api/auth/accept-invite/${encodeURIComponent(token)}`, {
+      const response = await fetchWithTimeout(`/api/auth/accept-invite/${encodeURIComponent(token)}`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ password }),
@@ -38,7 +40,7 @@ export function InviteAcceptanceForm({
         setError(body.error?.message ?? "Invitation could not be accepted");
         return;
       }
-      router.push("/admin");
+      router.push("/organization");
       router.refresh();
     } catch {
       setError("Unable to accept the invitation. Check your connection and try again.");

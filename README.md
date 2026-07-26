@@ -43,7 +43,6 @@ The public project landing page is [signalhub.at](https://signalhub.at).
 
 - Public, private, and audience-scoped status pages.
 - Hub pages and child pages for portfolios or business units.
-- Custom domains with public page, history, incident, access, and feed routing.
 - Component groups, localized page settings, branding assets, custom CSS,
   embeds, badges, RSS, and Atom.
 - Incident history, postmortems, scheduled maintenance, and public system
@@ -206,7 +205,6 @@ Set the generated values independently:
 SESSION_SECRET=<first-random-value>
 ENCRYPTION_KEY=<second-random-value>
 NEXT_PUBLIC_APP_URL=https://signalhub.at
-NEXT_PUBLIC_APP_DOMAIN=signalhub.at
 ALLOW_PUBLIC_SIGNUP=false
 REQUIRE_WORKER=true
 ```
@@ -281,7 +279,7 @@ The canonical variable list is [`.env.example`](.env.example).
 
 | Area | Important variables |
 | --- | --- |
-| Core | `DATABASE_URL`, `SESSION_SECRET`, `ENCRYPTION_KEY`, `NEXT_PUBLIC_APP_URL`, `NEXT_PUBLIC_APP_DOMAIN` |
+| Core | `DATABASE_URL`, `SESSION_SECRET`, `ENCRYPTION_KEY`, `NEXT_PUBLIC_APP_URL` |
 | Key rotation | `SESSION_SIGNING_KEYS`, `SESSION_ACTIVE_KEY_ID`, `ENCRYPTION_KEYS`, `ENCRYPTION_ACTIVE_KEY_ID` |
 | Authentication | `PASSWORD_MIN_LENGTH`, `ARGON2_*`, tenant/platform session timeouts |
 | Network trust | `TRUST_PROXY_HEADERS`, `TRUSTED_PROXY_HOPS`, `PLATFORM_ADMIN_ALLOWED_CIDRS` |

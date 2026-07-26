@@ -1,5 +1,7 @@
 "use client";
 
+import { fetchWithTimeout } from "@/lib/client-fetch";
+
 import { useEffect } from "react";
 
 export function recordPublicEvent(
@@ -15,7 +17,7 @@ export function recordPublicEvent(
     );
     return;
   }
-  void fetch("/api/v1/analytics/event", {
+  void fetchWithTimeout("/api/v1/analytics/event", {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: payload,

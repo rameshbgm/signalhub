@@ -47,7 +47,7 @@ export async function createAuditSink(formData: FormData) {
     organizationId: orgId,
     metadata: { name, host: url.host },
   });
-  revalidatePath("/platform/audit");
+  revalidatePath("/organization/platform/audit");
 }
 
 export async function setAuditSinkEnabled(id: string, formData: FormData) {
@@ -68,5 +68,5 @@ export async function setAuditSinkEnabled(id: string, formData: FormData) {
     targetId: sink._id.toHexString(),
     organizationId: sink.orgId,
   });
-  revalidatePath("/platform/audit");
+  revalidatePath("/organization/platform/audit");
 }

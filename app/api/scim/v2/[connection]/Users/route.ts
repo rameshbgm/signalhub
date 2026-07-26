@@ -9,11 +9,12 @@ import {
   scimUserResource,
 } from "@/lib/scim";
 import { collections } from "@/lib/db";
-import { canonicalizeEmail } from "@/lib/identity";
+import { canonicalizeUsername } from "@/lib/identity";
 
 const userSchema = z.object({
   externalId: z.string().trim().max(255).optional(),
-  userName: z.string().email(),
+  userName: z.string().trim().min(3).max(64),
+  emails: z.array(z.object({ value: z.string().email(), primary: z.boolean().optional() })).min(1),
   active: z.boolean().default(true),
   displayName: z.string().trim().max(255).optional(),
   name: z.object({ formatted: z.string().trim().max(255).optional() }).optional(),
@@ -30,12 +31,15 @@ export async function GET(
   const filter = request.nextUrl.searchParams.get("filter");
   const match = filter?.match(/^userName\s+eq\s+"([^"]+)"$/i);
   if (filter && !match) return scimError(400, "Only the userName eq filter is supported", "invalidFilter");
+  const matchedUser = match
+    ? await collections.users().findOne({ canonicalUsername: canonicalizeUsername(match[1]) })
+    : null;
   const identities = await collections
     .externalIdentities()
     .find({
       connectionId: connection._id,
       userId: { $ne: null },
-      ...(match ? { canonicalEmail: canonicalizeEmail(match[1]) } : {}),
+      ...(match ? { userId: matchedUser?._id ?? null } : {}),
     })
     .sort({ createdAt: 1 })
     .skip(skip)
@@ -44,7 +48,7 @@ export async function GET(
   const totalResults = await collections.externalIdentities().countDocuments({
     connectionId: connection._id,
     userId: { $ne: null },
-    ...(match ? { canonicalEmail: canonicalizeEmail(match[1]) } : {}),
+    ...(match ? { userId: matchedUser?._id ?? null } : {}),
   });
   const userIds = identities.flatMap((identity) => identity.userId ? [identity.userId] : []);
   const [users, memberships] = await Promise.all([
@@ -61,6 +65,7 @@ export async function GET(
     return [scimUserResource({
       id: identity._id.toHexString(),
       externalId: identity.subject,
+      username: user.username,
       email: user.email,
       name: user.name,
       active: !user.disabled && membership?.status === "ACTIVE",
@@ -81,25 +86,26 @@ export async function POST(
   if (!connection) return scimError(401, "A valid SCIM bearer token is required");
   const parsed = userSchema.safeParse(await request.json().catch(() => ({})));
   if (!parsed.success) return scimError(400, parsed.error.issues[0]?.message ?? "Invalid user", "invalidValue");
-  const existing = await collections.externalIdentities().findOne({
-    connectionId: connection._id,
-    $or: [
-      { canonicalEmail: canonicalizeEmail(parsed.data.userName) },
-      ...(parsed.data.externalId ? [{ subject: parsed.data.externalId }] : []),
-    ],
-  });
+  const existingUser = await collections.users().findOne({ canonicalUsername: canonicalizeUsername(parsed.data.userName) });
+  const existing = parsed.data.externalId
+    ? await collections.externalIdentities().findOne({ connectionId: connection._id, subject: parsed.data.externalId })
+    : existingUser
+      ? await collections.externalIdentities().findOne({ connectionId: connection._id, userId: existingUser._id })
+      : null;
   if (existing) return scimError(409, "User already exists", "uniqueness");
   try {
     const result = await provisionScimUser({
       connection,
       externalId: parsed.data.externalId,
       userName: parsed.data.userName,
+      email: parsed.data.emails.find((email) => email.primary)?.value ?? parsed.data.emails[0].value,
       displayName: parsed.data.displayName ?? parsed.data.name?.formatted,
       active: parsed.data.active,
     });
     const resource = scimUserResource({
       id: result.identity._id.toHexString(),
       externalId: result.identity.subject,
+      username: result.user.username,
       email: result.user.email,
       name: result.user.name,
       active: result.active,

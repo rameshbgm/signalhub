@@ -10,13 +10,12 @@ import Link from "next/link";
 export default async function OrgSettingsPage() {
   const { session, org } = await requireSession();
   await requireCapability("organization.manage");
-  const isAdmin = session.role === "OWNER" || session.role === "ADMIN";
-  const isOwner = session.role === "OWNER";
+  const isAdmin = session.role === "ADMIN";
   const retention = await effectiveRetention(oid(org.id));
-  const exports = isOwner
+  const exports = isAdmin
     ? await collections.dataExportJobs().find({ orgId: oid(org.id) }).sort({ createdAt: -1 }).limit(10).toArray()
     : [];
-  const identityConnections = isOwner
+  const identityConnections = isAdmin
     ? await collections.identityConnections().find({
         orgId: oid(org.id),
         audience: "ORGANIZATION",
@@ -62,11 +61,11 @@ export default async function OrgSettingsPage() {
             />
           </label>
           {isAdmin && <button className="bg-[var(--cyan)] px-4 py-2 text-sm font-medium text-[var(--on-cyan)]">Save</button>}
-          {!isAdmin && <p className="text-xs text-[var(--fg-dim)]">Only Owners and Admins can change organization settings.</p>}
+          {!isAdmin && <p className="text-xs text-[var(--fg-dim)]">Only Admins and Admins can change organization settings.</p>}
         </form>
       </section>
 
-      {isOwner && (
+      {isAdmin && (
         <section className="border border-[var(--line)] bg-[var(--surface)] p-5">
           <h2 className="font-mono text-sm font-semibold">Data retention</h2>
           <p className="mt-1 text-xs text-[var(--fg-dim)]">
@@ -93,7 +92,7 @@ export default async function OrgSettingsPage() {
         </section>
       )}
 
-      {isOwner && (
+      {isAdmin && (
         <section className="border border-[var(--line)] bg-[var(--surface)] p-5">
           <h2 className="font-mono text-sm font-semibold">Enterprise identity assignments</h2>
           <p className="mt-1 text-xs text-[var(--fg-dim)]">
@@ -119,7 +118,7 @@ export default async function OrgSettingsPage() {
         </section>
       )}
 
-      {isOwner && (
+      {isAdmin && (
         <section className="border border-[var(--line)] bg-[var(--surface)] p-5">
           <h2 className="font-mono text-sm font-semibold">Organization data export</h2>
           <p className="mt-1 text-xs text-[var(--fg-dim)]">
@@ -144,13 +143,13 @@ export default async function OrgSettingsPage() {
         </section>
       )}
 
-      {isOwner && (
+      {isAdmin && (
         <section className="border border-[var(--red)]/40 bg-[var(--surface)] p-5">
           <h2 className="mb-2 font-mono text-sm font-semibold text-[var(--red)]">
             Organization deletion
           </h2>
           <p className="text-xs leading-5 text-[var(--fg-soft)]">
-            Permanent deletion is handled by a platform Owner using the audited
+            Permanent deletion is handled by a platform Admin using the audited
             suspend, review, and queued-purge workflow. Contact your platform
             operator and include organization slug{" "}
             <code className="bg-[var(--bg)] px-1 text-[var(--fg)]">

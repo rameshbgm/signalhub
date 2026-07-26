@@ -19,7 +19,7 @@ export default async function HelpArticlePage({ params }: { params: Promise<{ ca
   return (
     <div className="max-w-3xl">
       <nav className="mb-4 text-xs text-[var(--fg-dim)]">
-        <Link href="/admin/help" className="hover:text-[var(--fg)]">
+        <Link href="/organization/help" className="hover:text-[var(--fg)]">
           Help Center
         </Link>
         <span className="mx-1.5">/</span>
@@ -45,24 +45,29 @@ export default async function HelpArticlePage({ params }: { params: Promise<{ ca
                 ))}
               </ul>
             )}
+            {section.code && (
+              <pre className="mt-3 overflow-x-auto border border-[var(--line)] bg-[var(--bg)] p-4 text-xs leading-relaxed text-[var(--fg-soft)]">
+                <code>{section.code}</code>
+              </pre>
+            )}
           </div>
         ))}
       </div>
 
       <div className="mt-12 flex items-center justify-between border-t border-[var(--line)] pt-6 text-sm">
         {prev ? (
-          <Link href={`/admin/help/${category.slug}/${prev.slug}`} className="text-[var(--cyan)] hover:underline">
+          <Link href={`/organization/help/${category.slug}/${prev.slug}`} className="text-[var(--cyan)] hover:underline">
             ← {prev.title}
           </Link>
         ) : (
           <span />
         )}
         {next ? (
-          <Link href={`/admin/help/${category.slug}/${next.slug}`} className="text-[var(--cyan)] hover:underline">
+          <Link href={`/organization/help/${category.slug}/${next.slug}`} className="text-[var(--cyan)] hover:underline">
             {next.title} →
           </Link>
         ) : (
-          <Link href="/admin/help" className="text-[var(--cyan)] hover:underline">
+          <Link href="/organization/help" className="text-[var(--cyan)] hover:underline">
             Back to Help Center
           </Link>
         )}

@@ -59,6 +59,26 @@ describe("status domain helpers", () => {
     expect(weightedUptime(days)).toBeCloseTo((4 / 6) * 100, 2);
   });
 
+  it("includes public status notes in their matching uptime-day details", () => {
+    const now = new Date("2026-01-03T12:00:00.000Z");
+    const [day] = computeDailyUptime([
+      {
+        status: "PARTIAL_OUTAGE",
+        startedAt: new Date("2026-01-03T06:00:00.000Z"),
+        endedAt: new Date("2026-01-03T08:30:00.000Z"),
+        isMaintenance: false,
+        note: "Elevated API errors",
+      },
+    ], 1, now);
+
+    expect(day.details).toHaveLength(1);
+    expect(day.details[0]).toMatchObject({
+      status: "PARTIAL_OUTAGE",
+      note: "Elevated API errors",
+      durationMs: 2.5 * 60 * 60 * 1000,
+    });
+  });
+
   it("derives page health from components, incidents, maintenance, and monitors", () => {
     expect(
       pageHealthStatus({

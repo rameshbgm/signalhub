@@ -118,10 +118,6 @@ async function rotateEncryption() {
     { collection: "auditSinks", fields: ["secretCiphertext"] },
     { collection: "monitors", fields: ["authSecret"] },
     {
-      collection: "platformAdmins",
-      fields: ["totpSecretCiphertext", "pendingTotpSecretCiphertext"],
-    },
-    {
       collection: "users",
       fields: ["totpSecretCiphertext", "pendingTotpSecretCiphertext"],
     },

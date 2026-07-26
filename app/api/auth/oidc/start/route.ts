@@ -17,10 +17,10 @@ export async function GET(request: NextRequest) {
 
     const discovery = await getOidcDiscovery();
     const transaction = createOidcTransactionValues();
-    const requestedReturnTo = request.nextUrl.searchParams.get("returnTo") ?? "/admin";
+    const requestedReturnTo = request.nextUrl.searchParams.get("returnTo") ?? "/organization";
     const returnTo = requestedReturnTo.startsWith("/") && !requestedReturnTo.startsWith("//")
       ? requestedReturnTo
-      : "/admin";
+      : "/organization";
     const signedTransaction = await signOidcTransaction({ ...transaction, returnTo });
     const authorizationUrl = new URL(discovery.authorization_endpoint);
     authorizationUrl.search = new URLSearchParams({

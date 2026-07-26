@@ -10,7 +10,7 @@ export default async function OrgSuspendedPage() {
   // restricted route performs only the minimum live identity checks needed to
   // let an already-signed-in member understand the suspension and sign out.
   const session = await getSession();
-  if (!session) redirect("/admin/login");
+  if (!session) redirect("/login");
   const [membership, user, organization] = await Promise.all([
     collections.memberships().findOne({
       _id: oid(session.membershipId),
@@ -21,8 +21,8 @@ export default async function OrgSuspendedPage() {
     collections.users().findOne({ _id: oid(session.userId), disabled: { $ne: true } }),
     collections.organizations().findOne({ _id: oid(session.orgId) }),
   ]);
-  if (!membership || !user || !organization) redirect("/admin/login");
-  if (organizationStatus(organization) !== "SUSPENDED") redirect("/admin");
+  if (!membership || !user || !organization) redirect("/login");
+  if (organizationStatus(organization) !== "SUSPENDED") redirect("/organization");
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-[var(--bg)] p-4">

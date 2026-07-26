@@ -10,6 +10,18 @@ function isMissingIndexOrCollection(error: unknown) {
 }
 
 export async function ensureIndexes() {
+  // Email is profile/contact data, not an authentication identifier. Older
+  // installations enforced uniqueness because login previously used email.
+  try {
+    await collections.users().dropIndex("canonicalEmail_1");
+  } catch (error) {
+    if (!isMissingIndexOrCollection(error)) throw error;
+  }
+  try {
+    await collections.externalIdentities().dropIndex("connectionId_1_canonicalEmail_1");
+  } catch (error) {
+    if (!isMissingIndexOrCollection(error)) throw error;
+  }
   // Legacy installations indexed the plaintext automation token uniquely.
   // Modern documents store only automationTokenHash; retaining the old index
   // rejects every new component that correctly omits the plaintext field.
@@ -36,14 +48,17 @@ export async function ensureIndexes() {
   } catch (error) {
     if (!isMissingIndexOrCollection(error)) throw error;
   }
+  // Custom status-page domains were retired. Remove their legacy uniqueness
+  // index when upgrading an existing installation.
+  try {
+    await collections.pages().dropIndex("customDomain_1");
+  } catch (error) {
+    if (!isMissingIndexOrCollection(error)) throw error;
+  }
 
   await Promise.all([
     collections.organizations().createIndex({ slug: 1 }, { unique: true }),
     collections.organizations().createIndex({ status: 1, createdAt: -1 }),
-    collections.platformAdmins().createIndex({ canonicalEmail: 1 }, { unique: true }),
-    collections.platformAdmins().createIndex({ status: 1, role: 1 }),
-    collections.platformInvites().createIndex({ tokenHash: 1 }, { unique: true }),
-    collections.platformInvites().createIndex({ canonicalEmail: 1, createdAt: -1 }),
     collections.platformAuditLogs().createIndex({ createdAt: -1 }),
     collections.platformAuditLogs().createIndex({ organizationId: 1, createdAt: -1 }),
     collections.platformAuditLogs().createIndex({ actorId: 1, createdAt: -1 }),
@@ -51,7 +66,8 @@ export async function ensureIndexes() {
     collections.platformJobs().createIndex({ organizationId: 1, createdAt: -1 }),
     collections.organizationTombstones().createIndex({ organizationId: 1 }, { unique: true }),
     collections.organizationTombstones().createIndex({ slug: 1, purgedAt: -1 }),
-    collections.users().createIndex({ canonicalEmail: 1 }, { unique: true }),
+    collections.users().createIndex({ canonicalUsername: 1 }, { unique: true }),
+    collections.users().createIndex({ canonicalEmail: 1 }, { name: "users_contact_email" }),
     collections
       .users()
       .createIndex(
@@ -72,12 +88,8 @@ export async function ensureIndexes() {
         partialFilterExpression: { invitationTokenHash: { $type: "string" } },
       }
     ),
-    collections.supportSessions().createIndex({ tokenHash: 1 }, { unique: true }),
-    collections.supportSessions().createIndex({ expiresAt: 1 }),
-    collections.supportSessions().createIndex({ orgId: 1, createdAt: -1 }),
     collections.authSessions().createIndex({ tokenHash: 1 }, { unique: true }),
     collections.authSessions().createIndex({ userId: 1, revokedAt: 1, lastSeenAt: -1 }),
-    collections.authSessions().createIndex({ platformAdminId: 1, revokedAt: 1, lastSeenAt: -1 }),
     collections.authSessions().createIndex({ absoluteExpiresAt: 1 }, { expireAfterSeconds: 0 }),
     collections.identityConnections().createIndex({ slug: 1 }, { unique: true }),
     collections.identityConnections().createIndex({ audience: 1, orgId: 1, enabled: 1 }),
@@ -85,10 +97,7 @@ export async function ensureIndexes() {
       { connectionId: 1, subject: 1 },
       { unique: true }
     ),
-    collections.externalIdentities().createIndex(
-      { connectionId: 1, canonicalEmail: 1 },
-      { unique: true }
-    ),
+    collections.externalIdentities().createIndex({ connectionId: 1, userId: 1 }),
     collections.scimTokens().createIndex({ tokenHash: 1 }, { unique: true }),
     collections.scimTokens().createIndex({ connectionId: 1, revokedAt: 1 }),
     collections.scimGroups().createIndex(
@@ -117,9 +126,9 @@ export async function ensureIndexes() {
     collections.apiKeys().createIndex({ keyHash: 1 }, { unique: true }),
     collections.apiKeys().createIndex({ orgId: 1, revokedAt: 1, expiresAt: 1 }),
     collections.pages().createIndex({ slug: 1 }, { unique: true }),
-    collections
-      .pages()
-      .createIndex({ customDomain: 1 }, { unique: true, partialFilterExpression: { customDomain: { $type: "string" } } }),
+    collections.pageDesignDrafts().createIndex({ pageId: 1 }, { unique: true }),
+    collections.pageDesignVersions().createIndex({ pageId: 1, version: -1 }, { unique: true }),
+    collections.pageAnnouncements().createIndex({ pageId: 1, startsAt: 1, endsAt: 1 }),
     collections.pageAccessUsers().createIndex({ pageId: 1, email: 1 }, { unique: true }),
     collections
       .components()
@@ -171,6 +180,7 @@ export async function ensureIndexes() {
     collections.assets().createIndex({ pageId: 1, kind: 1, deletedAt: 1 }),
     collections.assets().createIndex({ storageKey: 1 }, { unique: true }),
     collections.notificationDestinations().createIndex({ pageId: 1, channel: 1 }),
+    collections.platformConfiguration().createIndex({ updatedAt: -1 }),
     collections.analyticsDaily().createIndex({ pageId: 1, date: -1 }),
     collections.analyticsDaily().createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
   ]);

@@ -1,7 +1,7 @@
 import { ObjectId } from "mongodb";
 import { NextRequest, NextResponse } from "next/server";
 import { collections, type IdentityConnectionDoc } from "@/lib/db";
-import { canonicalizeEmail } from "@/lib/identity";
+import { canonicalizeEmail, canonicalizeUsername, usernameError } from "@/lib/identity";
 import { mappedTenantAccess } from "@/lib/identity-connections";
 import { hashSecret } from "@/lib/secrets";
 
@@ -89,6 +89,7 @@ export function scimList(resources: unknown[], totalResults: number, startIndex:
 export function scimUserResource(input: {
   id: string;
   externalId?: string | null;
+  username: string;
   email: string;
   name: string;
   active: boolean;
@@ -100,7 +101,7 @@ export function scimUserResource(input: {
     schemas: [SCIM_USER_SCHEMA],
     id: input.id,
     externalId: input.externalId ?? undefined,
-    userName: input.email,
+    userName: input.username,
     active: input.active,
     displayName: input.name,
     name: { formatted: input.name },
@@ -118,22 +119,28 @@ export async function provisionScimUser(input: {
   connection: IdentityConnectionDoc;
   externalId?: string | null;
   userName: string;
+  email: string;
   displayName?: string | null;
   active?: boolean;
 }) {
   if (!input.connection.orgId) throw new Error("SCIM connection has no organization");
-  const canonicalEmail = canonicalizeEmail(input.userName);
-  if (!canonicalEmail.includes("@")) throw new Error("userName must be an email address");
+  const canonicalUsername = canonicalizeUsername(input.userName);
+  const invalidUsername = usernameError(canonicalUsername);
+  if (invalidUsername) throw new Error(invalidUsername);
+  const canonicalEmail = canonicalizeEmail(input.email);
+  if (!canonicalEmail.includes("@")) throw new Error("A primary communication email is required");
   const now = new Date();
-  let user = await collections.users().findOne({ canonicalEmail });
+  let user = await collections.users().findOne({ canonicalUsername });
   if (!user) {
     const userId = new ObjectId();
     await collections.users().insertOne({
       _id: userId,
-      email: input.userName.trim(),
+      username: canonicalUsername,
+      canonicalUsername,
+      email: input.email.trim(),
       canonicalEmail,
       passwordHash: null,
-      name: input.displayName?.trim() || input.userName.trim(),
+      name: input.displayName?.trim() || canonicalUsername,
       twoFactorEnabled: false,
       disabled: input.active === false,
       mustChangePassword: false,
@@ -149,7 +156,19 @@ export async function provisionScimUser(input: {
     user = await collections.users().findOne({ _id: userId });
   }
   if (!user) throw new Error("Unable to provision user");
-  const subject = input.externalId?.trim() || canonicalEmail;
+  await collections.users().updateOne(
+    { _id: user._id },
+    { $set: {
+      email: input.email.trim(),
+      canonicalEmail,
+      ...(input.displayName?.trim() ? { name: input.displayName.trim() } : {}),
+      ...(input.active === true ? { disabled: false } : {}),
+      updatedAt: now,
+    } }
+  );
+  user = await collections.users().findOne({ _id: user._id });
+  if (!user) throw new Error("Unable to update provisioned user");
+  const subject = input.externalId?.trim() || canonicalUsername;
   const identity = await collections.externalIdentities().findOneAndUpdate(
     { connectionId: input.connection._id, subject },
     {
@@ -172,10 +191,10 @@ export async function provisionScimUser(input: {
   if (!identity) throw new Error("Unable to create external identity");
   const mapped = mappedTenantAccess(input.connection, identity.groups);
   const role = mapped?.role ??
-    (["OWNER", "ADMIN", "INCIDENT_MANAGER", "RESPONDER", "VIEWER"].includes(
+    (["ADMIN", "INCIDENT_MANAGER", "RESPONDER", "VIEWER"].includes(
       String(input.connection.defaultRole)
     )
-      ? input.connection.defaultRole as "OWNER" | "ADMIN" | "INCIDENT_MANAGER" | "RESPONDER" | "VIEWER"
+      ? input.connection.defaultRole as "ADMIN" | "INCIDENT_MANAGER" | "RESPONDER" | "VIEWER"
       : "VIEWER");
   await collections.memberships().updateOne(
     { orgId: input.connection.orgId, userId: user._id },

@@ -21,7 +21,7 @@ export default async function MaintenanceListPage() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
         <h1 className="font-mono text-xl font-semibold text-[var(--fg)]">Scheduled Maintenance</h1>
         {canSchedule && <Link
-          href="/admin/maintenance/new"
+          href="/organization/maintenance/new"
           className="bg-[var(--cyan)] text-[var(--on-cyan)] px-4 py-2 text-sm font-mono font-semibold text-center"
         >
           Schedule Maintenance
@@ -31,7 +31,7 @@ export default async function MaintenanceListPage() {
         {maintenance.map((m) => (
           <Link
             key={m.id}
-            href={`/admin/incidents/${m.id}`}
+            href={`/organization/incidents/${m.id}`}
             className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border border-[var(--line)] bg-[var(--surface)] p-3 text-sm hover:border-[var(--line-bright)]"
           >
             <div>

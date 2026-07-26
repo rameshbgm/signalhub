@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { collections } from "@/lib/db";
 import { authorizePublicSurface } from "@/lib/feed-access";
 import { absolutePublicPageUrl } from "@/lib/public-url";
+import { pageDesignFor } from "@/lib/page-design";
 
 export async function GET(
   request: NextRequest,
@@ -12,6 +13,7 @@ export async function GET(
   if (!page) return new NextResponse("", { status: 404 });
   const access = await authorizePublicSurface(request, page);
   if (!access.ok) return new NextResponse("", { status: 404 });
+  const design = pageDesignFor(page);
 
   const baseUrl = (process.env.NEXT_PUBLIC_APP_URL ?? request.nextUrl.origin).replace(/\/$/, "");
   const token = request.nextUrl.searchParams.get("token") ?? request.nextUrl.searchParams.get("feed_token");
@@ -21,7 +23,7 @@ export async function GET(
 (function () {
   var STATUS_URL = ${JSON.stringify(statusUrl.toString())};
   var PAGE_URL = ${JSON.stringify(absolutePublicPageUrl(request, page))};
-  var BRAND_COLOR = ${JSON.stringify(page.brandColor)};
+  var BRAND_COLOR = ${JSON.stringify(design.theme.palette.brand)};
   function text(node, value) { node.appendChild(document.createTextNode(value)); }
   function render(data) {
     var active = [].concat(data.active_incidents || [], data.active_maintenance || []);

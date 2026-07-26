@@ -27,7 +27,6 @@ ingress:
 
 config:
   appUrl: https://signalhub.at
-  appDomain: signalhub.at
   assetStorageDriver: s3
   requireWorker: "true"
   trustProxyHeaders: "true"

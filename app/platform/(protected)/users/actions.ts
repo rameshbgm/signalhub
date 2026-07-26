@@ -2,9 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import { oid } from "@/lib/mongo-utils";
-import { collections, mongoClient } from "@/lib/db";
+import { collections } from "@/lib/db";
 import { requirePlatformCapability } from "@/lib/admin-guard";
 import { writePlatformAudit } from "@/lib/platform-policy";
+import { withOrganizationAdminInvariantTransaction } from "@/lib/team-owner-safety";
 
 function reasonFrom(formData: FormData) {
   const reason = String(formData.get("reason") ?? "").trim();
@@ -16,9 +17,7 @@ function reasonFrom(formData: FormData) {
 export async function disableUser(userId: string, formData: FormData) {
   const actor = await requirePlatformCapability("users.disable");
   const reason = reasonFrom(formData);
-  const databaseSession = mongoClient.startSession();
-  try {
-    await databaseSession.withTransaction(async () => {
+  await withOrganizationAdminInvariantTransaction("global", async (databaseSession) => {
       const user = await collections.users().findOne(
         { _id: oid(userId) },
         { session: databaseSession }
@@ -26,6 +25,18 @@ export async function disableUser(userId: string, formData: FormData) {
       if (!user) throw new Error("User not found");
       if (user.disabled) {
         throw new Error("User is already disabled; reload and retry");
+      }
+      const adminMemberships = await collections.memberships().find(
+        { role: "ADMIN", status: "ACTIVE" },
+        { session: databaseSession, projection: { userId: 1 } }
+      ).toArray();
+      const activeAdminIds = [...new Map(adminMemberships.map((membership) => [membership.userId.toHexString(), membership.userId])).values()];
+      if (activeAdminIds.some((id) => id.equals(user._id))) {
+        const otherActiveAdmins = await collections.users().countDocuments(
+          { _id: { $in: activeAdminIds.filter((id) => !id.equals(user._id)) }, disabled: { $ne: true } },
+          { session: databaseSession }
+        );
+        if (otherActiveAdmins === 0) throw new Error("The last active Admin cannot be disabled");
       }
       const now = new Date();
       const changed = await collections.users().updateOne(
@@ -54,19 +65,14 @@ export async function disableUser(userId: string, formData: FormData) {
         },
         { session: databaseSession }
       );
-    });
-  } finally {
-    await databaseSession.endSession();
-  }
-  revalidatePath("/platform/users");
+  });
+  revalidatePath("/organization/platform/users");
 }
 
 export async function reactivateUser(userId: string, formData: FormData) {
   const actor = await requirePlatformCapability("users.disable");
   const reason = reasonFrom(formData);
-  const databaseSession = mongoClient.startSession();
-  try {
-    await databaseSession.withTransaction(async () => {
+  await withOrganizationAdminInvariantTransaction("global", async (databaseSession) => {
       const user = await collections.users().findOne(
         { _id: oid(userId) },
         { session: databaseSession }
@@ -97,9 +103,6 @@ export async function reactivateUser(userId: string, formData: FormData) {
         },
         { session: databaseSession }
       );
-    });
-  } finally {
-    await databaseSession.endSession();
-  }
-  revalidatePath("/platform/users");
+  });
+  revalidatePath("/organization/platform/users");
 }

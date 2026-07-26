@@ -9,7 +9,7 @@ import {
 } from "@/lib/auth";
 import { apiError, routeError, validationError } from "@/lib/api-response";
 import { collections } from "@/lib/db";
-import { canonicalizeEmail } from "@/lib/identity";
+import { canonicalizeUsername } from "@/lib/identity";
 import { oid } from "@/lib/mongo-utils";
 import { consumeRateLimit, RateLimitError, requestIp } from "@/lib/rate-limit";
 import { writeActiveTenantAudit } from "@/lib/tenant-audit";
@@ -17,9 +17,9 @@ import { decryptSecret } from "@/lib/encryption";
 import { hashRecoveryCode, verifyTotp } from "@/lib/totp";
 
 const schema = z.object({
-  email: z.string().email(),
+  username: z.string().trim().min(3).max(64),
   password: z.string().min(1).max(1024),
-  orgId: z.string().optional(),
+  orgId: z.string().regex(/^[a-f\d]{24}$/i).optional(),
   code: z.string().trim().optional(),
   recoveryCode: z.string().trim().optional(),
 });
@@ -29,15 +29,15 @@ export async function POST(request: NextRequest) {
     const parsed = schema.safeParse(await request.json().catch(() => ({})));
     if (!parsed.success) return validationError(parsed.error);
 
-    const canonicalEmail = canonicalizeEmail(parsed.data.email);
+    const canonicalUsername = canonicalizeUsername(parsed.data.username);
     await Promise.all([
       consumeRateLimit("login-ip", requestIp(request), { limit: 20, windowMs: 15 * 60_000 }),
-      consumeRateLimit("login-account", canonicalEmail, { limit: 8, windowMs: 15 * 60_000 }),
+      consumeRateLimit("login-account", canonicalUsername, { limit: 8, windowMs: 15 * 60_000 }),
     ]);
 
-    const user = await collections.users().findOne({ canonicalEmail });
+    const user = await collections.users().findOne({ canonicalUsername });
     if (!user?.passwordHash || user.disabled || !(await verifyPassword(parsed.data.password, user.passwordHash))) {
-      return apiError(401, "INVALID_CREDENTIALS", "Invalid email or password");
+      return apiError(401, "INVALID_CREDENTIALS", "Invalid User ID or password");
     }
     let mfaVerified = !user.mfaRequired;
     if (user.totpSecretCiphertext) {
@@ -74,7 +74,6 @@ export async function POST(request: NextRequest) {
       .find({
         userId: user._id,
         status: "ACTIVE",
-        ...(requestedOrgId ? { orgId: requestedOrgId } : {}),
       })
       .sort({ createdAt: 1 })
       .toArray();
@@ -82,23 +81,27 @@ export async function POST(request: NextRequest) {
       return apiError(403, "NO_MEMBERSHIP", "This account does not belong to an organization");
     }
 
+    const globalAdminMembership = memberships.find((item) => item.role === "ADMIN");
     const organizations = await collections
       .organizations()
       .find({
-        _id: { $in: memberships.map((membership) => membership.orgId) },
+        ...(globalAdminMembership ? {} : { _id: { $in: memberships.map((membership) => membership.orgId) } }),
         suspended: { $ne: true },
         status: { $nin: ["PROVISIONING", "SUSPENDED", "DELETING"] },
       })
       .toArray();
     const allowedOrgIds = new Set(organizations.map((organization) => organization._id.toHexString()));
-    const membership = memberships.find((item) => allowedOrgIds.has(item.orgId.toHexString()));
-    if (!membership) {
+    const targetOrganization = requestedOrgId
+      ? organizations.find((organization) => organization._id.equals(requestedOrgId))
+      : organizations.find((organization) => globalAdminMembership?.orgId.equals(organization._id)) ?? organizations[0];
+    const membership = globalAdminMembership ?? memberships.find((item) => targetOrganization && item.orgId.equals(targetOrganization._id));
+    if (!membership || !targetOrganization || (!globalAdminMembership && !allowedOrgIds.has(targetOrganization._id.toHexString()))) {
       return apiError(403, "ORGANIZATION_SUSPENDED", "No active organization is available for this account");
     }
     const authorized = await writeActiveTenantAudit(
-      membership.orgId,
+      targetOrganization._id,
       {
-        actor: user.email,
+        actor: user.username,
         action: "LOGIN",
         target: "session",
         metadata: { method: "password" },
@@ -108,7 +111,7 @@ export async function POST(request: NextRequest) {
         const currentUser = await collections.users().findOne(
           {
             _id: user._id,
-            canonicalEmail,
+            canonicalUsername,
             passwordHash: user.passwordHash,
             disabled: { $ne: true },
           },
@@ -118,7 +121,6 @@ export async function POST(request: NextRequest) {
           {
             _id: membership._id,
             userId: user._id,
-            orgId: membership.orgId,
             status: "ACTIVE",
           },
           { session: databaseSession }
@@ -143,7 +145,8 @@ export async function POST(request: NextRequest) {
     await createSession({
       userId: authorized.user._id.toHexString(),
       membershipId: authorized.membership._id.toHexString(),
-      orgId: authorized.membership.orgId.toHexString(),
+      orgId: targetOrganization._id.toHexString(),
+      username: authorized.user.username,
       email: authorized.user.email,
       name: authorized.user.name,
       role: authorized.membership.role,
@@ -156,12 +159,13 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       ok: true,
-      organizationId: authorized.membership.orgId.toHexString(),
+      organizationId: targetOrganization._id.toHexString(),
       organizations: organizations.map((organization) => ({
         id: organization._id.toHexString(),
         name: organization.name,
       })),
       mustChangePassword: Boolean(authorized.user.mustChangePassword),
+      mustCompleteProfile: Boolean(authorized.user.mustCompleteProfile),
       mfaEnrollmentRequired: Boolean(authorized.user.mfaRequired && !authorized.user.totpSecretCiphertext),
     });
   } catch (error) {

@@ -58,7 +58,7 @@ export async function addSubscriber(pageId: string, formData: FormData) {
       { upsert: true, session: databaseSession }
     );
   });
-  revalidatePath("/admin/subscribers");
+  revalidatePath("/organization/subscribers");
 }
 
 export async function importSubscribersCsv(pageId: string, formData: FormData) {
@@ -106,7 +106,7 @@ export async function importSubscribersCsv(pageId: string, formData: FormData) {
         );
     }
   });
-  revalidatePath("/admin/subscribers");
+  revalidatePath("/organization/subscribers");
 }
 
 export async function toggleQuarantine(subscriberId: string) {
@@ -134,7 +134,7 @@ export async function toggleQuarantine(subscriberId: string) {
     );
     if (!changed.matchedCount) throw new Error("Subscriber state changed; reload and retry");
   });
-  revalidatePath("/admin/subscribers");
+  revalidatePath("/organization/subscribers");
 }
 
 export async function removeSubscriber(subscriberId: string) {
@@ -156,7 +156,7 @@ export async function removeSubscriber(subscriberId: string) {
     );
     if (!removed.deletedCount) throw new Error("Subscriber not found");
   });
-  revalidatePath("/admin/subscribers");
+  revalidatePath("/organization/subscribers");
 }
 
 export async function retryNotificationJob(jobId: string) {
@@ -199,5 +199,5 @@ export async function retryNotificationJob(jobId: string) {
     );
     if (!changed.matchedCount) throw new Error("Delivery job state changed; reload and retry");
   });
-  revalidatePath("/admin/subscribers");
+  revalidatePath("/organization/subscribers");
 }

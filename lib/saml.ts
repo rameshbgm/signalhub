@@ -34,7 +34,7 @@ class MongoSamlCache implements CacheProvider {
   }
 }
 
-export function samlCallbackUrl(origin: string, slug: string) {
+function samlCallbackUrl(origin: string, slug: string) {
   const base = (process.env.NEXT_PUBLIC_APP_URL || origin).replace(/\/$/, "");
   return `${base}/api/auth/saml/${encodeURIComponent(slug)}/acs`;
 }

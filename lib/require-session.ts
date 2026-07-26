@@ -7,13 +7,13 @@ import { organizationStatus } from "@/lib/organization-state";
 
 export async function requireSession() {
   const session = await getSession();
-  if (!session) redirect("/admin/login");
+  if (!session) redirect("/login");
   const orgDoc = await collections.organizations().findOne({ _id: oid(session.orgId) });
-  if (!orgDoc) redirect("/admin/login");
+  if (!orgDoc) redirect("/login");
   // Route an existing signed-in member to the restricted explanation page
   // before the normal live guard rejects all suspended-organization access.
-  if (organizationStatus(orgDoc) === "SUSPENDED") redirect("/admin/suspended");
+  if (organizationStatus(orgDoc) === "SUSPENDED") redirect("/organization/suspended");
   const orgSession = await requireOrgSession().catch(() => null);
-  if (!orgSession) redirect("/admin/login");
+  if (!orgSession) redirect("/login");
   return { session: orgSession, org: toId(orgDoc) };
 }

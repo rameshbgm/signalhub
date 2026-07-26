@@ -14,6 +14,7 @@ import { isValidOid, oid } from "@/lib/mongo-utils";
 import { validateHttpTarget } from "@/lib/target-validation";
 import { withTransaction } from "@/lib/cascade";
 import { fenceActiveOrganizationMutation } from "@/lib/organization-mutation";
+import { enabledDestinationChannels } from "@/lib/platform-configuration";
 
 const schema = z.object({
   pageId: z.string(),
@@ -60,6 +61,10 @@ export async function POST(request: NextRequest) {
     const parsed = schema.safeParse(await request.json().catch(() => ({})));
     if (!parsed.success) return validationError(parsed.error);
     const session = await requireCapability("integration.manage", parsed.data.pageId);
+    const enabledChannels = await enabledDestinationChannels();
+    if (!enabledChannels.includes(parsed.data.channel)) {
+      return apiError(403, "DESTINATION_DISABLED", "This notification provider is disabled by the platform administrator");
+    }
     const page = await collections.pages().findOne({
       _id: oid(parsed.data.pageId),
       orgId: oid(session.orgId),

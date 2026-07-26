@@ -1,5 +1,6 @@
 import { ObjectId } from "mongodb";
 import { NextRequest, NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import {
   assetStorage,
   assetStorageForDriver,
@@ -14,6 +15,11 @@ import {
   fenceActiveOrganizationMutation,
   OrganizationMutationBlockedError,
 } from "@/lib/organization-mutation";
+import {
+  DEFAULT_COVER_IMAGE_SETTINGS,
+  normalizedCoverImageCrop,
+  normalizedCoverImageSettings,
+} from "@/lib/cover-image";
 
 const PAGE_FIELD: Record<AssetKind, "logoUrl" | "faviconUrl" | "coverImageUrl"> = {
   LOGO: "logoUrl",
@@ -99,7 +105,22 @@ export async function POST(
           );
           const updatedPage = await collections.pages().updateOne(
             { _id: currentPage._id, orgId: currentPage.orgId },
-            { $set: { [PAGE_FIELD[kind]]: publicUrl } },
+            {
+              $set: {
+                [PAGE_FIELD[kind]]: publicUrl,
+                ...(kind === "COVER"
+                  ? {
+                      coverImageFit: DEFAULT_COVER_IMAGE_SETTINGS.fit,
+                      coverImagePositionX: DEFAULT_COVER_IMAGE_SETTINGS.positionX,
+                      coverImagePositionY: DEFAULT_COVER_IMAGE_SETTINGS.positionY,
+                      coverImageCropX: null,
+                      coverImageCropY: null,
+                      coverImageCropWidth: null,
+                      coverImageCropHeight: null,
+                    }
+                  : {}),
+              },
+            },
             { session: databaseSession }
           );
           if (updatedPage.matchedCount !== 1) {
@@ -129,6 +150,8 @@ export async function POST(
       await storage.delete(storageKey);
       throw error;
     }
+    revalidatePath(`/organization/pages/${pageId}`);
+    revalidatePath(page.isHub ? `/hub/${page.slug}` : `/${page.slug}`, "layout");
     return NextResponse.json({
       ok: true,
       asset: {
@@ -136,6 +159,7 @@ export async function POST(
         url: publicUrl,
         width: normalized.width,
         height: normalized.height,
+        ...(kind === "COVER" ? { cover: DEFAULT_COVER_IMAGE_SETTINGS } : {}),
       },
     });
   } catch (error) {
@@ -148,6 +172,89 @@ export async function POST(
         "ORGANIZATION_NOT_ACTIVE",
         "The organization is no longer active; the uploaded asset was not saved"
       );
+    }
+    return routeError(error);
+  }
+}
+
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ pageId: string }> }
+) {
+  try {
+    const { pageId } = await params;
+    const session = await requireCapability("page.configure", pageId);
+    const page = await collections.pages().findOne({
+      _id: oid(pageId),
+      orgId: oid(session.orgId),
+    });
+    if (!page) return apiError(404, "PAGE_NOT_FOUND", "Page not found");
+    if (!page.coverImageUrl) {
+      return apiError(409, "COVER_IMAGE_REQUIRED", "Upload a cover image before adjusting it");
+    }
+    const body = await request.json().catch(() => null);
+    if (!body || typeof body !== "object") {
+      return apiError(400, "INVALID_COVER_SETTINGS", "Cover image settings are required");
+    }
+    const fit = "fit" in body ? String(body.fit).toUpperCase() : "";
+    if (fit !== "COVER" && fit !== "CONTAIN") {
+      return apiError(400, "INVALID_COVER_FIT", "Choose fill frame or show full image");
+    }
+    const settings = normalizedCoverImageSettings({
+      fit,
+      positionX: "positionX" in body ? Number(body.positionX) : undefined,
+      positionY: "positionY" in body ? Number(body.positionY) : undefined,
+    });
+    const crop = normalizedCoverImageCrop({
+      cropX: "cropX" in body ? Number(body.cropX) : undefined,
+      cropY: "cropY" in body ? Number(body.cropY) : undefined,
+      cropWidth: "cropWidth" in body ? Number(body.cropWidth) : undefined,
+      cropHeight: "cropHeight" in body ? Number(body.cropHeight) : undefined,
+    });
+    if (settings.fit === "COVER" && !crop) {
+      return apiError(400, "INVALID_COVER_CROP", "Drag a crop frame over the image before saving");
+    }
+    const databaseSession = mongoClient.startSession();
+    try {
+      await databaseSession.withTransaction(async () => {
+        await fenceActiveOrganizationMutation(session.orgId, databaseSession);
+        const changed = await collections.pages().updateOne(
+          { _id: page._id, orgId: page.orgId, coverImageUrl: { $ne: null } },
+          {
+            $set: {
+              coverImageFit: settings.fit,
+              coverImagePositionX: settings.positionX,
+              coverImagePositionY: settings.positionY,
+              coverImageCropX: crop?.x ?? null,
+              coverImageCropY: crop?.y ?? null,
+              coverImageCropWidth: crop?.width ?? null,
+              coverImageCropHeight: crop?.height ?? null,
+            },
+          },
+          { session: databaseSession }
+        );
+        if (!changed.matchedCount) {
+          throw new Error("The cover image changed; reload and try again");
+        }
+      });
+    } finally {
+      await databaseSession.endSession();
+    }
+    revalidatePath(`/organization/pages/${pageId}`);
+    revalidatePath(page.isHub ? `/hub/${page.slug}` : `/${page.slug}`, "layout");
+    return NextResponse.json({
+      ok: true,
+      cover: {
+        ...settings,
+        cropX: crop?.x ?? null,
+        cropY: crop?.y ?? null,
+        cropWidth: crop?.width ?? null,
+        cropHeight: crop?.height ?? null,
+      },
+    });
+  } catch (error) {
+    if (error instanceof OrganizationMutationBlockedError) {
+      return apiError(409, "ORGANIZATION_NOT_ACTIVE", "The organization is no longer active");
     }
     return routeError(error);
   }
@@ -214,6 +321,8 @@ export async function DELETE(
     } finally {
       await databaseSession.endSession();
     }
+    revalidatePath(`/organization/pages/${pageId}`);
+    revalidatePath(page.isHub ? `/hub/${page.slug}` : `/${page.slug}`, "layout");
     return NextResponse.json({ ok: true });
   } catch (error) {
     return routeError(error);

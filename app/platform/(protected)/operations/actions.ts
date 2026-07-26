@@ -65,7 +65,7 @@ export async function retryNotificationDelivery(jobId: string, formData: FormDat
   } finally {
     await databaseSession.endSession();
   }
-  revalidatePath("/platform/operations");
+  revalidatePath("/organization/platform/operations");
 }
 
 export async function updatePlatformRetention(formData: FormData) {
@@ -97,5 +97,5 @@ export async function updatePlatformRetention(formData: FormData) {
     targetId: "platform-default",
     metadata: values,
   });
-  revalidatePath("/platform/operations");
+  revalidatePath("/organization/platform/operations");
 }

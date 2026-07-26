@@ -1,9 +1,6 @@
-import { randomBytes } from "node:crypto";
-import { ObjectId } from "mongodb";
 import { NextRequest, NextResponse } from "next/server";
 import { createSession } from "@/lib/auth";
-import { collections, mongoClient } from "@/lib/db";
-import { canonicalizeEmail } from "@/lib/identity";
+import { collections } from "@/lib/db";
 import {
   exchangeAndVerifyOidcCode,
   OIDC_TRANSACTION_COOKIE,
@@ -13,18 +10,8 @@ import {
 } from "@/lib/oidc";
 import { writeActiveTenantAudit } from "@/lib/tenant-audit";
 
-function slugify(input: string) {
-  return (
-    input
-      .toLowerCase()
-      .trim()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/(^-|-$)/g, "") || "organization"
-  );
-}
-
 function loginError(request: NextRequest, code: string) {
-  const url = new URL("/admin/login", request.nextUrl.origin);
+  const url = new URL("/login", request.nextUrl.origin);
   url.searchParams.set("error", code);
   const response = NextResponse.redirect(url);
   response.cookies.delete(OIDC_TRANSACTION_COOKIE);
@@ -50,116 +37,17 @@ export async function GET(request: NextRequest) {
       redirectUri: oidcRedirectUri(request.nextUrl.origin),
     });
 
-    const canonicalEmail = canonicalizeEmail(identity.email);
-    let user =
-      (await collections.users().findOne({
-        oidcIssuer: identity.issuer,
-        oidcSubject: identity.subject,
-      })) ?? (await collections.users().findOne({ canonicalEmail }));
-
-    if (user && user.oidcSubject && (user.oidcSubject !== identity.subject || user.oidcIssuer !== identity.issuer)) {
-      return loginError(request, "oidc_identity_conflict");
-    }
-    if (!user) {
-      if (process.env.ALLOW_PUBLIC_SIGNUP !== "true") return loginError(request, "oidc_no_membership");
-      const userId = new ObjectId();
-      const now = new Date();
-      await collections.users().insertOne({
-        _id: userId,
-        email: identity.email,
-        canonicalEmail,
-        passwordHash: null,
-        name: identity.name,
-        twoFactorEnabled: false,
-        oidcIssuer: identity.issuer,
-        oidcSubject: identity.subject,
-        disabled: false,
-        createdAt: now,
-        updatedAt: now,
-      });
-      user = await collections.users().findOne({ _id: userId });
-    } else if (!user.oidcSubject) {
-      await collections.users().updateOne(
-        { _id: user._id, oidcSubject: { $in: [null, undefined] } },
-        {
-          $set: {
-            oidcIssuer: identity.issuer,
-            oidcSubject: identity.subject,
-            email: identity.email,
-            canonicalEmail,
-            updatedAt: new Date(),
-          },
-        }
-      );
-      user = await collections.users().findOne({ _id: user._id });
-    }
+    const user = await collections.users().findOne({
+      oidcIssuer: identity.issuer,
+      oidcSubject: identity.subject,
+    });
     if (!user || user.disabled) return loginError(request, "oidc_account_disabled");
 
-    let memberships = await collections
+    const memberships = await collections
       .memberships()
       .find({ userId: user._id, status: "ACTIVE" })
       .sort({ createdAt: 1 })
       .toArray();
-    if (!memberships.length && process.env.ALLOW_PUBLIC_SIGNUP === "true") {
-      let slug = slugify(identity.name);
-      if (await collections.organizations().findOne({ slug })) {
-        slug = `${slug}-${randomBytes(3).toString("hex")}`;
-      }
-      const orgId = new ObjectId();
-      const membershipId = new ObjectId();
-      const now = new Date();
-      const dbSession = mongoClient.startSession();
-      try {
-        await dbSession.withTransaction(async () => {
-          await collections.organizations().insertOne(
-            {
-              _id: orgId,
-              name: `${identity.name}'s organization`,
-              slug,
-              contactEmail: canonicalEmail,
-              suspended: false,
-              status: "ACTIVE",
-              statusReason: null,
-              statusChangedAt: now,
-              statusChangedBy: null,
-              createdAt: now,
-              updatedAt: now,
-            },
-            { session: dbSession }
-          );
-          await collections.memberships().insertOne(
-            {
-              _id: membershipId,
-              orgId,
-              userId: user!._id,
-              role: "OWNER",
-              status: "ACTIVE",
-              pageIds: null,
-              invitationExpiresAt: null,
-              invitationTokenHash: null,
-              activatedAt: now,
-              createdAt: now,
-            },
-            { session: dbSession }
-          );
-          await collections.auditLogs().insertOne(
-            {
-              _id: new ObjectId(),
-              orgId,
-              actor: identity.email,
-              action: "SIGNUP",
-              target: slug,
-              metadata: { method: "oidc", issuer: identity.issuer },
-              createdAt: now,
-            },
-            { session: dbSession }
-          );
-        });
-      } finally {
-        await dbSession.endSession();
-      }
-      memberships = (await collections.memberships().find({ _id: membershipId }).toArray());
-    }
     if (!memberships.length) return loginError(request, "oidc_no_membership");
 
     const activeOrganizations = await collections
@@ -212,6 +100,7 @@ export async function GET(request: NextRequest) {
       userId: authorized.user._id.toHexString(),
       membershipId: authorized.membership._id.toHexString(),
       orgId: authorized.membership.orgId.toHexString(),
+      username: authorized.user.username,
       email: authorized.user.email,
       name: authorized.user.name,
       role: authorized.membership.role,

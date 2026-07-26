@@ -7,16 +7,18 @@ import {
   COMPONENT_STATUSES,
   IMPACTS,
   INCIDENT_STATUSES,
-  type ComponentStatus,
-  type Impact,
-  type IncidentStatus,
 } from "@/lib/status";
 import { reconcileComponents } from "@/lib/component-status";
 import { fenceActiveOrganizationMutation } from "@/lib/organization-mutation";
+import { incidentUpdateInputSchema } from "@/lib/incident-update-validation";
+export {
+  incidentUpdateEditInputSchema,
+  incidentUpdateInputSchema,
+} from "@/lib/incident-update-validation";
 
 const objectIdString = z.string().refine(ObjectId.isValid, "Malformed identifier");
 
-export const incidentComponentInputSchema = z.object({
+const incidentComponentInputSchema = z.object({
   componentId: objectIdString,
   status: z.enum(COMPONENT_STATUSES),
 });
@@ -48,12 +50,6 @@ export const createIncidentInputSchema = z
   });
 
 export type CreateIncidentInput = z.input<typeof createIncidentInputSchema>;
-
-export const incidentUpdateInputSchema = z.object({
-  status: z.enum(INCIDENT_STATUSES),
-  body: z.string().trim().min(1).max(20_000),
-  notify: z.boolean().default(true),
-});
 
 async function validatePageAndComponents(input: {
   pageId: string;
@@ -260,9 +256,3 @@ export async function deleteIncident(orgId: string, incidentId: string) {
   }
   return true;
 }
-
-export const incidentDomainTypes: {
-  componentStatus: ComponentStatus | null;
-  incidentStatus: IncidentStatus | null;
-  impact: Impact | null;
-} = { componentStatus: null, incidentStatus: null, impact: null };

@@ -4,7 +4,7 @@ import { decryptSecret } from "@/lib/encryption";
 import { canonicalizeEmail } from "@/lib/identity";
 import type { OidcConnectionConfig } from "@/lib/oidc";
 
-export type SamlConnectionConfig = {
+type SamlConnectionConfig = {
   entryPoint: string;
   issuer: string;
   idpCertificate: string;
@@ -58,7 +58,7 @@ export function mappedTenantAccess(connection: IdentityConnectionDoc, groups: st
   const normalizedGroups = new Set(groups.map((group) => group.trim().toLowerCase()));
   const mappings = connection.roleMappings.filter(
     (mapping) =>
-      ["OWNER", "ADMIN", "INCIDENT_MANAGER", "RESPONDER", "VIEWER"].includes(mapping.role) &&
+      ["ADMIN", "INCIDENT_MANAGER", "RESPONDER", "VIEWER"].includes(mapping.role) &&
       normalizedGroups.has(mapping.group.trim().toLowerCase())
   );
   const roleOrder: MembershipRole[] = [
@@ -66,7 +66,6 @@ export function mappedTenantAccess(connection: IdentityConnectionDoc, groups: st
     "RESPONDER",
     "INCIDENT_MANAGER",
     "ADMIN",
-    "OWNER",
   ];
   const mappedRoles = mappings.map((mapping) => mapping.role as MembershipRole);
   const defaultRole =
@@ -104,13 +103,15 @@ export async function upsertExternalUser(input: {
   });
   let user = existingIdentity?.userId
     ? await collections.users().findOne({ _id: existingIdentity.userId })
-    : await collections.users().findOne({ canonicalEmail });
+    : null;
   if (!user && !input.connection.allowJitProvisioning) return null;
   const now = new Date();
   if (!user) {
     const userId = new ObjectId();
     await collections.users().insertOne({
       _id: userId,
+      username: `sso-${userId.toHexString()}`,
+      canonicalUsername: `sso-${userId.toHexString()}`,
       email: input.email,
       canonicalEmail,
       passwordHash: null,

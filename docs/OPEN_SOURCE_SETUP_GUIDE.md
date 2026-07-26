@@ -124,7 +124,6 @@ At minimum, set:
 SESSION_SECRET=<independent-random-value>
 ENCRYPTION_KEY=<independent-random-value>
 NEXT_PUBLIC_APP_URL=https://signalhub.at
-NEXT_PUBLIC_APP_DOMAIN=signalhub.at
 ALLOW_PUBLIC_SIGNUP=false
 STATUS_PORT=3301
 REQUIRE_WORKER=true
@@ -196,7 +195,6 @@ Set:
 
 ```dotenv
 NEXT_PUBLIC_APP_URL=https://signalhub.at
-NEXT_PUBLIC_APP_DOMAIN=signalhub.at
 TRUST_PROXY_HEADERS=true
 TRUSTED_PROXY_HOPS=1
 ```
@@ -260,7 +258,6 @@ workerReplicaCount: 2
 
 config:
   appUrl: https://signalhub.at
-  appDomain: signalhub.at
   assetStorageDriver: s3
   requireWorker: "true"
   trustProxyHeaders: "true"
@@ -331,7 +328,6 @@ egress controls.
 | `SESSION_SIGNING_KEYS` | JSON signing-key ring | Use stable key IDs and overlap old/new keys during rotation |
 | `ENCRYPTION_KEYS` | JSON encryption-key ring | Rotate records with `signalhubctl` before retiring old keys |
 | `NEXT_PUBLIC_APP_URL` | Canonical external origin | HTTPS URL |
-| `NEXT_PUBLIC_APP_DOMAIN` | Canonical host | Hostname only |
 | `ALLOW_PUBLIC_SIGNUP` | Public organization creation | Keep `false` unless intentionally offering self-registration |
 
 ### Authentication and network policy
@@ -651,7 +647,7 @@ curl -fsS https://signalhub.at/api/health/ready
 - Tenant and platform role boundaries match policy.
 - Incident creation, updates, resolution, postmortem, and notifications work.
 - HTTP/TCP/DNS/SSL/heartbeat monitors update components as intended.
-- Public, private, audience, custom-domain, feed, embed, badge, and API surfaces
+- Public, private, audience, feed, embed, badge, and API surfaces
   behave correctly.
 - Metrics and traces arrive at the approved observability backend.
 - Audit exports, chain verification, and SIEM delivery succeed.

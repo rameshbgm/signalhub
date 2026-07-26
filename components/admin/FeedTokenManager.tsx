@@ -1,5 +1,7 @@
 "use client";
 
+import { fetchWithTimeout } from "@/lib/client-fetch";
+
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { CopyButton } from "@/components/CopyButton";
@@ -41,7 +43,7 @@ export function FeedTokenManager({
     setSecret(null);
 
     try {
-      const response = await fetch("/api/admin/feed-tokens", {
+      const response = await fetchWithTimeout("/api/admin/feed-tokens", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
@@ -74,7 +76,7 @@ export function FeedTokenManager({
     setError(null);
 
     try {
-      const response = await fetch(`/api/admin/feed-tokens?id=${id}`, { method: "DELETE" });
+      const response = await fetchWithTimeout(`/api/admin/feed-tokens?id=${id}`, { method: "DELETE" });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
         setError(data.error?.message ?? "Feed token revocation failed");

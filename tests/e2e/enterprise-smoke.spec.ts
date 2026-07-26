@@ -13,12 +13,9 @@ test("health and OpenAPI endpoints describe a ready product surface", async ({ r
   expect(document.paths["/api/scim/v2/{connection}/Users"]).toBeTruthy();
 });
 
-test("tenant and platform login surfaces expose working authentication controls", async ({ page }) => {
-  await page.goto("/admin/login");
+test("the unified login surface exposes working authentication controls", async ({ page }) => {
+  await page.goto("/login");
   await expect(page.getByRole("heading", { name: "Welcome back" })).toBeVisible();
+  await expect(page.getByPlaceholder("User ID")).toBeVisible();
   await expect(page.getByRole("button", { name: "Sign in" })).toBeEnabled();
-
-  await page.goto("/platform/login");
-  await expect(page.getByRole("heading", { name: "Platform admin" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Continue" })).toBeEnabled();
 });
