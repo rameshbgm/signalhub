@@ -853,7 +853,7 @@ function BrandingPanel({
             </div>
           ))}
         </div>
-        <Link href={`/organization/pages/${page.id}/setup/logo`} className="inline-flex text-xs font-semibold text-[var(--cyan)] hover:underline">Manage uploaded images</Link>
+        <Link href={`/organization/pages/${page.id}#branding`} className="inline-flex text-xs font-semibold text-[var(--cyan)] hover:underline">Manage uploaded images</Link>
       </div>
       <SectionSaveButton onClick={onSave}>Save branding and settings</SectionSaveButton>
     </section>

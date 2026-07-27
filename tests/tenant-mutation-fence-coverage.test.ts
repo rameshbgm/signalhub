@@ -3,7 +3,6 @@ import { describe, expect, it } from "vitest";
 
 const transactionFencedSources = [
   "app/admin/(protected)/pages/actions.ts",
-  "app/admin/(protected)/pages/[pageId]/setup/actions.ts",
   "app/admin/(protected)/pages/[pageId]/components-actions.ts",
   "app/admin/(protected)/pages/[pageId]/access-actions.ts",
   "app/admin/(protected)/metrics/actions.ts",
@@ -82,7 +81,6 @@ describe("tenant mutation lifecycle-fence coverage", () => {
   });
 
   it.each([
-    ["app/admin/(protected)/pages/[pageId]/setup/actions.ts", "saveSetupBranding"],
     ["app/admin/(protected)/pages/[pageId]/components-actions.ts", "deleteGroup"],
     ["app/admin/(protected)/pages/[pageId]/components-actions.ts", "updateComponentDetails"],
     ["app/admin/(protected)/pages/[pageId]/access-actions.ts", "deleteAccessGroup"],

@@ -77,3 +77,18 @@ test.describe("SignalHub landing page", () => {
     expect(overflow).toBeLessThanOrEqual(1);
   });
 });
+
+test("application content is not obscured by tooltip portals", async ({ page }) => {
+  await page.goto("/");
+
+  const heading = page.getByRole("heading", { level: 1, name: "Stop renting your status page." });
+  await expect(heading).toBeVisible();
+  await expect.poll(() => heading.evaluate((element) => {
+    const bounds = element.getBoundingClientRect();
+    const paintedElement = document.elementFromPoint(
+      bounds.left + bounds.width / 2,
+      bounds.top + bounds.height / 2,
+    );
+    return paintedElement === element || element.contains(paintedElement);
+  })).toBe(true);
+});

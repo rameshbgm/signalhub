@@ -206,6 +206,7 @@ export async function reorderPageComponents(
   }
 ) {
   const { session, page } = await authorizedPage(pageId);
+  if (page.isHub) throw new Error("Components belong to child status pages, not hubs");
   const groupIds = new Set(payload.groups.map((group) => group.id));
   if (groupIds.size !== payload.groups.length) throw new Error("Duplicate group ordering entry");
   if (new Set(payload.components.map((component) => component.id)).size !== payload.components.length) {

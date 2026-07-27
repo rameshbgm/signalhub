@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { FluentSelect } from "@/components/FluentSelect";
 import { FluentTextarea } from "@/components/FluentTextarea";
@@ -5,7 +6,14 @@ import { requireSession } from "@/lib/require-session";
 import { collections } from "@/lib/db";
 import { oid, toId } from "@/lib/mongo-utils";
 import { COMPONENT_STATUSES, COMPONENT_STATUS_LABEL } from "@/lib/status";
-import { updatePageSettings, deletePage, setPagePublicVisibility } from "../actions";
+import {
+  attachChildPage,
+  deletePage,
+  detachChildPage,
+  finishPageSetup,
+  setPagePublicVisibility,
+  updatePageSettings,
+} from "../actions";
 import { createGroup, deleteGroup, createComponent, updateComponentStatus, deleteComponent } from "./components-actions";
 import { createAccessGroup, deleteAccessGroup, createAccessUser, deleteAccessUser } from "./access-actions";
 import { LayoutPicker } from "@/components/admin/LayoutPicker";
@@ -18,6 +26,8 @@ import { PlatformSubmitButton } from "@/components/platform/PlatformSubmitButton
 import { publicPagePath } from "@/lib/public-path";
 import { assertPageInOrg, requireCapability } from "@/lib/admin-guard";
 import { ComponentOrderList } from "@/components/admin/ComponentOrderList";
+import { PageNotificationsSection } from "@/components/admin/PageNotificationsSection";
+import { activePageFilter } from "@/lib/page-lifecycle";
 
 export default async function PageDetail({ params }: { params: Promise<{ pageId: string }> }) {
   const { pageId } = await params;
@@ -27,12 +37,15 @@ export default async function PageDetail({ params }: { params: Promise<{ pageId:
   const pageDoc = await collections.pages().findOne({ _id: oid(pageId), orgId: oid(org.id) });
   if (!pageDoc) notFound();
   const page = toId(pageDoc);
+  const isDraft = page.setupCompletedAt === null;
 
-  const [groupDocs, ungroupedDocs] = await Promise.all([
-    collections.componentGroups().find({ pageId: oid(pageId) }).sort({ order: 1 }).toArray(),
-    collections.components().find({ pageId: oid(pageId), groupId: null }).sort({ order: 1 }).toArray(),
-  ]);
-  const allComponentDocs = await collections.components().find({ pageId: oid(pageId) }).sort({ order: 1 }).toArray();
+  const [groupDocs, ungroupedDocs, allComponentDocs] = page.isHub
+    ? [[], [], []]
+    : await Promise.all([
+        collections.componentGroups().find({ pageId: oid(pageId) }).sort({ order: 1 }).toArray(),
+        collections.components().find({ pageId: oid(pageId), groupId: null }).sort({ order: 1 }).toArray(),
+        collections.components().find({ pageId: oid(pageId) }).sort({ order: 1 }).toArray(),
+      ]);
   const componentsByGroup = new Map<string, typeof allComponentDocs>();
   for (const c of allComponentDocs) {
     if (!c.groupId) continue;
@@ -49,7 +62,26 @@ export default async function PageDetail({ params }: { params: Promise<{ pageId:
   const allComponents = [...groups.flatMap((g) => g.components), ...ungrouped];
   const editableComponents = [...groups.flatMap((g) => g.components.map((c) => ({ ...c, groupName: g.name }))), ...ungrouped.map((c) => ({ ...c, groupName: "—" }))];
 
+  const [childPages, availableChildPages, parentHub] = await Promise.all([
+    page.isHub
+      ? collections.pages().find(activePageFilter({ orgId: oid(org.id), hubParentId: oid(pageId), isHub: false })).sort({ createdAt: 1 }).toArray()
+      : Promise.resolve([]),
+    page.isHub
+      ? collections.pages().find(activePageFilter({
+          orgId: oid(org.id),
+          isHub: false,
+          $or: [{ hubParentId: null }, { hubParentId: oid(pageId) }],
+        })).sort({ createdAt: 1 }).toArray()
+      : Promise.resolve([]),
+    pageDoc.hubParentId
+      ? collections.pages().findOne(activePageFilter({ _id: pageDoc.hubParentId, orgId: oid(org.id), isHub: true }))
+      : Promise.resolve(null),
+  ]);
+
   const { accessGroups, accessUsers } = page.type === "AUDIENCE" ? await loadAudienceAccess(pageId) : { accessGroups: [], accessUsers: [] };
+  const canFinishSetup = page.isHub
+    ? childPages.some((child) => child.publicVisible !== false)
+    : allComponents.some((component) => component.visible);
 
   const boundUpdatePage = updatePageSettings.bind(null, pageId);
   const boundDeletePage = deletePage.bind(null, pageId);
@@ -59,9 +91,31 @@ export default async function PageDetail({ params }: { params: Promise<{ pageId:
   const boundCreateComponent = createComponent.bind(null, pageId);
   const boundCreateAccessGroup = createAccessGroup.bind(null, pageId);
   const boundCreateAccessUser = createAccessUser.bind(null, pageId);
+  const boundFinishSetup = finishPageSetup.bind(null, pageId);
+  const boundAttachChild = attachChildPage.bind(null, pageId);
 
   return (
     <div className="mx-auto w-[86%] space-y-8">
+      {isDraft && (
+        <aside className="border border-[var(--cyan)]/30 bg-[var(--cyan-soft)] p-4 sm:p-5">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <p className="font-mono text-xs font-semibold uppercase tracking-wider text-[var(--cyan)]">Creation draft</p>
+              <h2 className="mt-1 font-mono text-lg font-semibold text-[var(--fg)]">Complete your {page.isHub ? "hub" : "status page"}</h2>
+              <p className="mt-1 max-w-2xl text-sm text-[var(--fg-soft)]">
+                Everything needed for launch is on this screen. Save each section as you work; the public URL stays unavailable until you finish and publish.
+              </p>
+            </div>
+            <Link href="/organization/pages" className="shrink-0 text-sm font-semibold text-[var(--cyan)] hover:underline">Save and exit</Link>
+          </div>
+        </aside>
+      )}
+      {parentHub && (
+        <aside className="flex flex-col gap-2 border border-[var(--line)] bg-[var(--surface)] p-4 text-sm sm:flex-row sm:items-center sm:justify-between">
+          <span className="text-[var(--fg-soft)]">This status page belongs to the <strong className="text-[var(--fg)]">{parentHub.name}</strong> hub.</span>
+          <Link href={`/organization/pages/${parentHub._id.toHexString()}`} className="font-semibold text-[var(--cyan)] hover:underline">Return to hub setup →</Link>
+        </aside>
+      )}
       <form id="page-settings-form" action={boundUpdatePage} className="contents">
       <div className="sticky top-14 z-30 flex flex-col gap-2 border-b border-[var(--line)] bg-[var(--bg)] py-4 sm:flex-row sm:items-center sm:justify-between lg:top-0">
         <h1 className="font-mono text-xl font-semibold text-[var(--fg)]">{page.name}</h1>
@@ -75,17 +129,17 @@ export default async function PageDetail({ params }: { params: Promise<{ pageId:
           >
             Save all settings
           </PlatformSubmitButton>
-          {page.publicVisible !== false ? (
+          {!isDraft && page.publicVisible !== false ? (
             <a href={publicPagePath(page)} target="_blank" rel="noreferrer" className="text-sm text-[var(--cyan)] hover:underline">
               View public page →
             </a>
           ) : (
-            <span className="border border-[var(--amber)]/40 bg-[var(--amber-soft)] px-2 py-1 font-mono text-xs text-[var(--amber)]">Hidden from public</span>
+            <span className="border border-[var(--amber)]/40 bg-[var(--amber-soft)] px-2 py-1 font-mono text-xs text-[var(--amber)]">{isDraft ? "Draft · not public" : "Hidden from public"}</span>
           )}
         </div>
       </div>
 
-      <section className="bg-[var(--surface)] border border-[var(--line)] p-4 sm:p-5">
+      <section id="branding" className="bg-[var(--surface)] border border-[var(--line)] p-4 sm:p-5">
         <h2 className="font-mono font-semibold mb-4 text-[var(--fg)]">Branding & Settings</h2>
         <div className="grid sm:grid-cols-2 gap-4">
           <LayoutPicker defaultValue={page.layout ?? "STANDARD"} brandColor={page.brandColor} />
@@ -173,24 +227,31 @@ export default async function PageDetail({ params }: { params: Promise<{ pageId:
 
       <section className="flex flex-col gap-4 border border-[var(--line)] bg-[var(--surface)] p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
         <div>
-          <h2 className="font-mono font-semibold text-[var(--fg)]">Public visibility</h2>
+          <h2 className="font-mono font-semibold text-[var(--fg)]">{isDraft ? "Review & publish" : "Public visibility"}</h2>
           <p className="mt-1 max-w-2xl text-sm text-[var(--fg-soft)]">
-            {page.publicVisible === false
+            {isDraft
+              ? page.isHub
+                ? "Publish becomes available after this hub has at least one published child status page."
+                : "Publish becomes available after this page has at least one visible component."
+              : page.publicVisible === false
               ? "This page is hidden from visitors. Assigned incident managers and responders can still manage it after signing in."
               : "This page is available on its public URL. Hide it without interrupting signed-in operational work."}
           </p>
         </div>
-        <form action={page.publicVisible === false ? boundShowPage : boundHidePage}>
+        <form action={isDraft ? boundFinishSetup : page.publicVisible === false ? boundShowPage : boundHidePage}>
           <PlatformSubmitButton
-            pendingLabel={page.publicVisible === false ? "Publishing…" : "Hiding…"}
-            confirmMessage={page.publicVisible === false ? undefined : `Hide ${page.name} from the public? Signed-in operators will retain access.`}
-            className="shrink-0 border border-[var(--cyan)]/40 px-4 py-2 text-sm font-semibold text-[var(--cyan)] hover:bg-[var(--cyan-soft)]"
+            disabled={isDraft && !canFinishSetup}
+            pendingLabel={isDraft || page.publicVisible === false ? "Publishing…" : "Hiding…"}
+            confirmMessage={!isDraft && page.publicVisible !== false ? `Hide ${page.name} from the public? Signed-in operators will retain access.` : undefined}
+            className="shrink-0 border border-[var(--cyan)]/40 px-4 py-2 text-sm font-semibold text-[var(--cyan)] hover:bg-[var(--cyan-soft)] disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {page.publicVisible === false ? "Publish publicly" : "Hide from public"}
+            {isDraft ? "Finish & publish" : page.publicVisible === false ? "Publish publicly" : "Hide from public"}
           </PlatformSubmitButton>
         </form>
       </section>
 
+      {!page.isHub ? (
+      <>
       <section className="bg-[var(--surface)] border border-[var(--line)] p-4 sm:p-5">
         <h2 className="font-mono font-semibold mb-4 text-[var(--fg)]">Component Groups</h2>
         <form action={boundCreateGroup} className="flex flex-col gap-2 mb-4 sm:flex-row">
@@ -308,12 +369,56 @@ export default async function PageDetail({ params }: { params: Promise<{ pageId:
           )}
         </ComponentOrderList>
       </section>
+      </>
+      ) : (
+        <section className="border border-[var(--line)] bg-[var(--surface)] p-4 sm:p-5">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <h2 className="font-mono font-semibold text-[var(--fg)]">Child status pages</h2>
+              <p className="mt-1 max-w-2xl text-sm text-[var(--fg-dim)]">A hub summarizes separate status pages. Components belong to those child pages and are never added directly to the hub.</p>
+            </div>
+            <Link href={`/organization/pages/new?hubParentId=${pageId}`} className="shrink-0 bg-[var(--cyan)] px-4 py-2 text-sm font-semibold text-[var(--on-cyan)]">Create child status page</Link>
+          </div>
+
+          {availableChildPages.some((candidate) => !candidate.hubParentId) && (
+            <form action={boundAttachChild} className="mt-5 flex flex-col gap-2 border-t border-[var(--line)] pt-5 sm:flex-row">
+              <FluentSelect aria-label="Existing status page" name="childPageId" className="flex-1 border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--fg)]">
+                <option value="">Attach an existing unassigned status page</option>
+                {availableChildPages.filter((candidate) => !candidate.hubParentId).map((candidate) => (
+                  <option key={candidate._id.toHexString()} value={candidate._id.toHexString()}>{candidate.name}</option>
+                ))}
+              </FluentSelect>
+              <button className="border border-[var(--line-bright)] bg-[var(--surface-raised)] px-4 py-2 text-sm font-semibold text-[var(--fg)]">Attach page</button>
+            </form>
+          )}
+
+          <div className="mt-5 space-y-2">
+            {childPages.map((child) => (
+              <article key={child._id.toHexString()} className="flex flex-col gap-3 border border-[var(--line)] bg-[var(--bg)] p-3 text-sm sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="font-semibold text-[var(--fg)]">{child.name}</p>
+                  <p className="mt-0.5 text-xs text-[var(--fg-dim)]">/{child.slug} · {child.setupCompletedAt === null ? "Draft" : child.publicVisible === false ? "Hidden" : "Published"}</p>
+                </div>
+                <div className="flex gap-2">
+                  <Link href={`/organization/pages/${child._id.toHexString()}`} className="border border-[var(--cyan)]/30 px-3 py-1.5 text-xs font-semibold text-[var(--cyan)]">Manage</Link>
+                  <form action={detachChildPage.bind(null, pageId, child._id.toHexString())}>
+                    <button className="border border-[var(--red)]/30 px-3 py-1.5 text-xs font-semibold text-[var(--red)]">Detach</button>
+                  </form>
+                </div>
+              </article>
+            ))}
+            {childPages.length === 0 && <p className="border border-dashed border-[var(--line-bright)] p-5 text-center text-sm text-[var(--fg-dim)]">No child status pages yet. Create one here or attach an existing unassigned page.</p>}
+          </div>
+        </section>
+      )}
 
       {page.type === "AUDIENCE" && (
         <section className="bg-[var(--surface)] border border-[var(--line)] p-4 sm:p-5">
           <h2 className="font-mono font-semibold mb-4 text-[var(--fg)]">Audience Access</h2>
           <p className="text-xs text-[var(--fg-dim)] mb-4">
-            Each visitor logs in and sees only the components assigned to their user or group. Assign components below.
+            {page.isHub
+              ? "Each visitor logs in to the hub. Child pages continue to enforce their own access rules independently."
+              : "Each visitor logs in and sees only the components assigned to their user or group. Assign components below."}
           </p>
 
           <h3 className="text-sm font-semibold mb-2 text-[var(--fg)]">Access Groups</h3>
@@ -375,6 +480,19 @@ export default async function PageDetail({ params }: { params: Promise<{ pageId:
         </section>
       )}
 
+      <PageNotificationsSection pageId={pageId} />
+
+      <section className="flex flex-col gap-4 border border-[var(--line)] bg-[var(--surface)] p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
+        <div>
+          <h2 className="font-mono font-semibold text-[var(--fg)]">Incident readiness</h2>
+          <p className="mt-1 text-sm text-[var(--fg-dim)]">Incidents and maintenance are ongoing operations, so they stay in the organization workflow after page setup.</p>
+        </div>
+        <div className="flex gap-2">
+          <Link href="/organization/incidents" className="border border-[var(--cyan)]/30 px-3 py-2 text-sm font-semibold text-[var(--cyan)]">Incidents</Link>
+          <Link href="/organization/maintenance" className="border border-[var(--cyan)]/30 px-3 py-2 text-sm font-semibold text-[var(--cyan)]">Maintenance</Link>
+        </div>
+      </section>
+
       <section className="bg-[var(--surface)] border border-[var(--red)]/30 p-4 sm:p-5">
         <h2 className="font-mono font-semibold mb-2 text-[var(--red)]">Danger Zone</h2>
         <form action={boundDeletePage} className="flex items-center gap-2">
@@ -383,7 +501,7 @@ export default async function PageDetail({ params }: { params: Promise<{ pageId:
             confirmMessage={`Delete ${page.name}? This page will become unavailable to everyone. An administrator can restore it from Deleted Pages.`}
             className="border border-[var(--red)]/40 px-3 py-1.5 text-sm font-semibold text-[var(--red)] hover:bg-[var(--red-soft)]"
           >
-            Delete this page
+            {isDraft ? "Delete this draft" : "Delete this page"}
           </PlatformSubmitButton>
           <HelpTip text="Soft-deletes this page and makes it inaccessible. Administrators can restore it from Deleted Pages." />
         </form>

@@ -35,22 +35,25 @@ export async function createPage(formData: FormData) {
   const name = String(formData.get("name") ?? "").trim();
   let slug = slugify(String(formData.get("slug") ?? "") || name);
   const type = String(formData.get("type") ?? "PUBLIC");
-  const isHub = formData.get("isHub") === "on";
+  const kind = String(formData.get("kind") ?? "STATUS");
+  if (!["STATUS", "HUB"].includes(kind)) throw new Error("Invalid page kind");
+  const isHub = kind === "HUB";
   const hubParentId = String(formData.get("hubParentId") ?? "");
   const password = String(formData.get("password") ?? "");
   if (password && password.length < 12) throw new Error("Page passwords must contain at least 12 characters");
 
   if (!name || !slug) throw new Error("Name is required");
   if (!["PUBLIC", "PRIVATE", "AUDIENCE"].includes(type)) throw new Error("Invalid page type");
+  if (isHub && hubParentId) throw new Error("A hub cannot belong to another hub");
   if (type === "PRIVATE" && password.length < 12) {
     throw new Error("Private pages require a password of at least 12 characters");
   }
   if (hubParentId) {
-    const parent = await collections.pages().findOne({
+    const parent = await collections.pages().findOne(activePageFilter({
       _id: oid(hubParentId),
       orgId: oid(session.orgId),
       isHub: true,
-    });
+    }));
     if (!parent) throw new Error("Hub parent not found in your organization");
   }
 
@@ -100,7 +103,8 @@ export async function createPage(formData: FormData) {
       publishedDesign: initialDesign,
       publishedDesignVersion: 1,
       designPublishedAt: new Date(),
-      publicVisible: true,
+      publicVisible: false,
+      setupCompletedAt: null,
       deletedAt: null,
       deletedBy: null,
       createdAt: new Date(),
@@ -118,7 +122,123 @@ export async function createPage(formData: FormData) {
   });
 
   revalidatePath("/organization/pages");
-  redirect(`/organization/pages/${_id.toHexString()}/setup/components`);
+  redirect(`/organization/pages/${_id.toHexString()}`);
+}
+
+export async function finishPageSetup(pageId: string) {
+  const session = await requireCapability("page.configure", pageId);
+  await assertPageInOrg(pageId, session.orgId);
+  let publicPath = "";
+  await withTransaction(async (databaseSession) => {
+    await fenceActiveOrganizationMutation(session.orgId, databaseSession);
+    const page = await collections.pages().findOne(
+      activePageFilter({ _id: oid(pageId), orgId: oid(session.orgId) }),
+      { session: databaseSession }
+    );
+    if (!page) throw new Error("Page not found in your organization");
+    if (page.setupCompletedAt !== null) throw new Error("Page setup is already complete");
+
+    if (page.isHub) {
+      const childCount = await collections.pages().countDocuments(
+        activePageFilter({
+          orgId: page.orgId,
+          hubParentId: page._id,
+          isHub: false,
+          publicVisible: { $ne: false },
+        }),
+        { session: databaseSession }
+      );
+      if (!childCount) throw new Error("Add and publish at least one child status page before publishing this hub");
+    } else {
+      const componentCount = await collections.components().countDocuments(
+        { pageId: page._id, visible: true },
+        { session: databaseSession }
+      );
+      if (!componentCount) throw new Error("Add at least one visible component before publishing this status page");
+    }
+
+    const now = new Date();
+    const changed = await collections.pages().updateOne(
+      { _id: page._id, orgId: page.orgId, setupCompletedAt: null },
+      { $set: { setupCompletedAt: now, publicVisible: true } },
+      { session: databaseSession }
+    );
+    if (!changed.matchedCount) throw new Error("Page setup changed; reload and try again");
+    publicPath = page.isHub ? `/hub/${page.slug}` : `/${page.slug}`;
+    await collections.auditLogs().insertOne({
+      _id: new ObjectId(),
+      orgId: page.orgId,
+      actor: session.email,
+      action: "COMPLETE_PAGE_SETUP",
+      target: pageId,
+      metadata: { changes: [
+        { field: "setupCompletedAt", before: null, after: now.toISOString() },
+        { field: "publicVisible", before: false, after: true },
+      ] },
+      supportSessionId: session.supportSessionId ? oid(session.supportSessionId) : null,
+      createdAt: now,
+    }, { session: databaseSession });
+  });
+  revalidatePath("/organization/pages");
+  revalidatePath(`/organization/pages/${pageId}`);
+  if (publicPath) revalidatePath(publicPath, "layout");
+  redirect(`/organization/pages/${pageId}`);
+}
+
+export async function attachChildPage(hubId: string, formData: FormData) {
+  const session = await requireCapability("page.configure", hubId);
+  const childId = String(formData.get("childPageId") ?? "");
+  if (!childId) throw new Error("Choose a child status page");
+  let hubPublicPath = "";
+  await withTransaction(async (databaseSession) => {
+    await fenceActiveOrganizationMutation(session.orgId, databaseSession);
+    const hub = await collections.pages().findOne(
+      activePageFilter({ _id: oid(hubId), orgId: oid(session.orgId), isHub: true }),
+      { session: databaseSession }
+    );
+    if (!hub) throw new Error("Hub not found in your organization");
+    hubPublicPath = `/hub/${hub.slug}`;
+    const child = await collections.pages().findOne(
+      activePageFilter({
+        _id: oid(childId),
+        orgId: hub.orgId,
+        isHub: false,
+        $or: [{ hubParentId: null }, { hubParentId: hub._id }],
+      }),
+      { session: databaseSession }
+    );
+    if (!child) throw new Error("Status page is unavailable or already belongs to another hub");
+    const changed = await collections.pages().updateOne(
+      { _id: child._id, orgId: hub.orgId },
+      { $set: { hubParentId: hub._id } },
+      { session: databaseSession }
+    );
+    if (!changed.matchedCount) throw new Error("Status page changed; reload and try again");
+  });
+  revalidatePath(`/organization/pages/${hubId}`);
+  if (hubPublicPath) revalidatePath(hubPublicPath, "layout");
+}
+
+export async function detachChildPage(hubId: string, childId: string) {
+  const session = await requireCapability("page.configure", hubId);
+  let hubPublicPath = "";
+  await withTransaction(async (databaseSession) => {
+    await fenceActiveOrganizationMutation(session.orgId, databaseSession);
+    const hub = await collections.pages().findOne(
+      activePageFilter({ _id: oid(hubId), orgId: oid(session.orgId), isHub: true }),
+      { session: databaseSession }
+    );
+    if (!hub) throw new Error("Hub not found in your organization");
+    hubPublicPath = `/hub/${hub.slug}`;
+    const changed = await collections.pages().updateOne(
+      activePageFilter({ _id: oid(childId), orgId: hub.orgId, isHub: false, hubParentId: hub._id }),
+      { $set: { hubParentId: null } },
+      { session: databaseSession }
+    );
+    if (!changed.matchedCount) throw new Error("Child status page not found on this hub");
+  });
+  revalidatePath(`/organization/pages/${hubId}`);
+  if (hubPublicPath) revalidatePath(hubPublicPath, "layout");
 }
 
 export async function updatePageSettings(pageId: string, formData: FormData) {
@@ -327,6 +447,9 @@ export async function setPagePublicVisibility(pageId: string, visible: boolean) 
       { session: databaseSession }
     );
     if (!page) throw new Error("Page not found");
+    if (visible && page.setupCompletedAt === null) {
+      throw new Error("Finish page setup before publishing it");
+    }
     publicPath = page.isHub ? `/hub/${page.slug}` : `/${page.slug}`;
     await collections.pages().updateOne(
       { _id: page._id, orgId: page.orgId },

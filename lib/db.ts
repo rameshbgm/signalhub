@@ -464,6 +464,8 @@ export interface PageDoc {
   designPublishedAt?: Date | null;
   /** Missing on legacy records means visible. */
   publicVisible?: boolean;
+  /** Null marks a resumable creation draft; missing on legacy records means complete. */
+  setupCompletedAt?: Date | null;
   /** A date marks a recoverable soft deletion; null/missing means active. */
   deletedAt?: Date | null;
   deletedBy?: ObjectId | null;

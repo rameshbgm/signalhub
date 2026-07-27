@@ -46,8 +46,8 @@ export const HELP_CATEGORIES: HelpCategory[] = [
           {
             heading: "Creating a page",
             paragraphs: [
-              "Go to Pages → fill in a name, optional custom slug, and page type (Public, Private password-protected, or Audience-specific). Optionally mark it as a hub page, or attach it as a child of an existing hub.",
-              "New pages route straight into the 4-step setup wizard: Add components → Add your logo → Notifications → Incidents.",
+              "Go to Pages → Create page, choose Status page or Hub, then enter the name, optional custom slug, and visibility. Status pages can optionally belong to an existing hub.",
+              "The first save creates a hidden draft. Complete branding, components or child pages, access, notifications, and webhooks on the unified creation screen, then select Finish & publish.",
             ],
           },
           {
@@ -64,7 +64,7 @@ export const HELP_CATEGORIES: HelpCategory[] = [
             heading: "Managing a page",
             paragraphs: [
               "Click Manage to edit branding (layout, logo, and brand color), components and component groups, and — for Audience pages — access groups and users.",
-              "Click Build my page to re-enter the setup wizard at any time.",
+              "Draft pages show Continue setup. Published pages show Manage page for ongoing changes.",
             ],
           },
         ],

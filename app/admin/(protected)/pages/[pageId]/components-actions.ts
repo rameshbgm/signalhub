@@ -17,9 +17,17 @@ import { withTransaction } from "@/lib/cascade";
 import { COMPONENT_STATUSES, type ComponentStatus } from "@/lib/status";
 import { fenceActiveOrganizationMutation } from "@/lib/organization-mutation";
 
+async function assertStatusPage(pageId: string, orgId: string) {
+  const page = await collections.pages().findOne({ _id: oid(pageId), orgId: oid(orgId) });
+  if (!page) throw new Error("Page not found in your organization");
+  if (page.isHub) throw new Error("Components belong to child status pages, not hubs");
+  return page;
+}
+
 export async function createGroup(pageId: string, formData: FormData) {
   const session = await requireCapability("page.configure", pageId);
   await assertPageInOrg(pageId, session.orgId);
+  await assertStatusPage(pageId, session.orgId);
   const name = String(formData.get("name") ?? "").trim();
   if (!name) throw new Error("Group name is required");
   await withTransaction(async (databaseSession) => {
@@ -48,6 +56,7 @@ export async function createGroup(pageId: string, formData: FormData) {
 export async function deleteGroup(pageId: string, groupId: string) {
   const session = await requireCapability("page.configure", pageId);
   await assertPageInOrg(pageId, session.orgId);
+  await assertStatusPage(pageId, session.orgId);
   await assertGroupInPage(groupId, pageId);
   await withTransaction(async (dbSession) => {
     await fenceActiveOrganizationMutation(session.orgId, dbSession);
@@ -75,6 +84,7 @@ export async function deleteGroup(pageId: string, groupId: string) {
 export async function createComponent(pageId: string, formData: FormData) {
   const session = await requireCapability("page.configure", pageId);
   await assertPageInOrg(pageId, session.orgId);
+  await assertStatusPage(pageId, session.orgId);
   const groupId = String(formData.get("groupId") ?? "");
   if (groupId) await assertGroupInPage(groupId, pageId);
   const name = String(formData.get("name") ?? "").trim();
@@ -133,6 +143,7 @@ export async function createComponent(pageId: string, formData: FormData) {
 export async function updateComponentStatus(pageId: string, componentId: string, formData: FormData) {
   const session = await requireCapability("component.update", pageId);
   await assertPageInOrg(pageId, session.orgId);
+  await assertStatusPage(pageId, session.orgId);
   const status = String(formData.get("status") ?? "OPERATIONAL");
   const note = String(formData.get("note") ?? "").trim();
   if (!COMPONENT_STATUSES.includes(status as ComponentStatus)) throw new Error("Invalid component status");
@@ -148,6 +159,7 @@ export async function updateComponentStatus(pageId: string, componentId: string,
 export async function updateComponentDetails(pageId: string, componentId: string, formData: FormData) {
   const session = await requireCapability("page.configure", pageId);
   await assertPageInOrg(pageId, session.orgId);
+  await assertStatusPage(pageId, session.orgId);
   await assertComponentInPage(componentId, pageId);
   const groupId = String(formData.get("groupId") ?? "");
   if (groupId) await assertGroupInPage(groupId, pageId);
@@ -188,6 +200,7 @@ export async function updateComponentDetails(pageId: string, componentId: string
 export async function reorderComponentOrder(pageId: string, orderedIds: string[]) {
   const session = await requireCapability("page.configure", pageId);
   await assertPageInOrg(pageId, session.orgId);
+  await assertStatusPage(pageId, session.orgId);
   if (new Set(orderedIds).size !== orderedIds.length) throw new Error("Duplicate component ordering entry");
   await withTransaction(async (databaseSession) => {
     await fenceActiveOrganizationMutation(session.orgId, databaseSession);
@@ -221,6 +234,7 @@ export async function reorderComponentOrder(pageId: string, orderedIds: string[]
 export async function deleteComponent(pageId: string, componentId: string) {
   const session = await requireCapability("page.configure", pageId);
   await assertPageInOrg(pageId, session.orgId);
+  await assertStatusPage(pageId, session.orgId);
   await assertComponentInPage(componentId, pageId);
   await deleteComponentCascade(componentId, session.orgId, pageId);
   revalidatePath(`/organization/pages/${pageId}`);

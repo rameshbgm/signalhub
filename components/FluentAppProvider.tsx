@@ -31,11 +31,10 @@ export function FluentAppProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <SSRProvider>
-      <FluentProvider
-        theme={dark ? webDarkTheme : webLightTheme}
-        className="min-h-screen bg-inherit text-inherit"
-      >
-        <ButtonInteractionGuard>{children}</ButtonInteractionGuard>
+      <FluentProvider theme={dark ? webDarkTheme : webLightTheme}>
+        <div className="min-h-screen bg-inherit text-inherit">
+          <ButtonInteractionGuard>{children}</ButtonInteractionGuard>
+        </div>
       </FluentProvider>
     </SSRProvider>
   );

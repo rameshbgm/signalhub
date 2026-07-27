@@ -38,6 +38,7 @@ export default async function PublicStatusPage({ params }: { params: Promise<{ s
   const { slug } = await params;
   const pageDoc = await collections.pages().findOne(publicPageFilter({ slug }));
   if (!pageDoc) notFound();
+  if (pageDoc.isHub) redirect(`/hub/${encodeURIComponent(pageDoc.slug)}`);
   const hubParentDoc = pageDoc.hubParentId ? await collections.pages().findOne(publicPageFilter({ _id: pageDoc.hubParentId })) : null;
   const page = { ...toId(pageDoc), hubParent: hubParentDoc ? toId(hubParentDoc) : null };
   const design = pageDesignFor(pageDoc);
