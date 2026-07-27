@@ -3,6 +3,7 @@ import {
   bannerCropFromDrag,
   coverImageStyle,
   defaultBannerCrop,
+  movedBannerCrop,
   normalizedCoverImageSettings,
 } from "@/lib/cover-image";
 
@@ -41,6 +42,12 @@ describe("cover image framing", () => {
     const crop = bannerCropFromDrag(100, 100, 900, 500, 1000, 700);
     expect(crop).not.toBeNull();
     expect((crop!.width / 100 * 1000) / (crop!.height / 100 * 700)).toBeCloseTo(16 / 5);
+  });
+
+  it("moves an existing crop without changing its size and clamps it to the image", () => {
+    const crop = { x: 10, y: 20, width: 60, height: 30 };
+    expect(movedBannerCrop(crop, 15, -10)).toEqual({ x: 25, y: 10, width: 60, height: 30 });
+    expect(movedBannerCrop(crop, 90, 90)).toEqual({ x: 40, y: 70, width: 60, height: 30 });
   });
 
   it("keeps overlays independent from image fitting", () => {

@@ -4,6 +4,7 @@ import { requireCapability } from "@/lib/admin-guard";
 import { collections } from "@/lib/db";
 import { oid } from "@/lib/mongo-utils";
 import { routeError } from "@/lib/api-response";
+import { auditRetentionCutoff } from "@/lib/audit-retention";
 
 function csv(value: unknown) {
   const text = typeof value === "string" ? value : JSON.stringify(value ?? "");
@@ -14,7 +15,7 @@ export async function GET(request: NextRequest) {
   try {
     const session = await requireCapability("audit.view");
     const format = request.nextUrl.searchParams.get("format") === "json" ? "json" : "csv";
-    const entries = await collections.auditLogs().find({ orgId: oid(session.orgId) })
+    const entries = await collections.auditLogs().find({ orgId: oid(session.orgId), createdAt: { $gte: auditRetentionCutoff() } })
       .sort({ createdAt: 1 }).limit(100_000).toArray();
     const body = format === "json"
       ? JSON.stringify({

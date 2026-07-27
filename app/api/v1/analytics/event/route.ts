@@ -7,6 +7,7 @@ import {
   fenceActiveOrganizationMutation,
   OrganizationMutationBlockedError,
 } from "@/lib/organization-mutation";
+import { publicPageFilter } from "@/lib/page-lifecycle";
 
 const schema = z.object({
   pageSlug: z.string().trim().min(1).max(200),
@@ -30,10 +31,10 @@ export async function POST(request: NextRequest) {
       limit: 120,
       windowMs: 60 * 60_000,
     });
-    const page = await collections.pages().findOne({
+    const page = await collections.pages().findOne(publicPageFilter({
       slug: parsed.data.pageSlug,
       analyticsEnabled: true,
-    });
+    }));
     if (!page) return new NextResponse(null, { status: 204 });
     const date = new Date().toISOString().slice(0, 10);
     let referrerDomain = "";
@@ -51,12 +52,12 @@ export async function POST(request: NextRequest) {
     await withTransaction(async (databaseSession) => {
       await fenceActiveOrganizationMutation(page.orgId, databaseSession);
       const currentPage = await collections.pages().findOne(
-        {
+        publicPageFilter({
           _id: page._id,
           orgId: page.orgId,
           slug: parsed.data.pageSlug,
           analyticsEnabled: true,
-        },
+        }),
         { session: databaseSession }
       );
       if (!currentPage) return;

@@ -513,14 +513,14 @@ export function DesignEditor({
         <span className={`ml-auto text-xs ${saveState === "ERROR" || saveState === "CONFLICT" ? "text-[var(--red)]" : "text-[var(--fg-dim)]"}`}>
           {saveState === "SAVING" ? "Saving…" : saveState === "DIRTY" ? "Unsaved changes" : saveState === "CONFLICT" ? "Editing conflict" : saveState === "ERROR" ? "Save failed" : `Draft r${revision}`}
         </span>
-        <button type="button" onClick={() => void saveEverything()} disabled={saveState === "SAVING" || saveState === "CONFLICT"} className="border border-[var(--cyan)] px-3 py-2 text-sm font-semibold text-[var(--cyan)] disabled:opacity-50">
+        <button type="button" data-button-guard="off" onClick={() => void saveEverything()} disabled={saveState === "SAVING" || saveState === "CONFLICT"} className="border border-[var(--cyan)] px-3 py-2 text-sm font-semibold text-[var(--cyan)] disabled:opacity-50">
           {saveState === "SAVING" ? "Saving…" : "Save all"}
         </button>
         <button type="button" onClick={() => startTransition(async () => {
           const result = await duplicateStatusPage(page.id);
           if (result.ok) location.href = `/organization/pages/${result.pageId}/design`;
         })} className="border border-[var(--line)] px-3 py-2 text-sm">Duplicate</button>
-        <Button appearance="secondary" shape="square" type="button" onClick={() => setResetDialogOpen(true)}>
+        <Button appearance="secondary" shape="square" type="button" data-button-busy-mode="interaction" onClick={() => setResetDialogOpen(true)}>
           Reset to default
         </Button>
         <Link
@@ -596,7 +596,7 @@ export function DesignEditor({
                 <div>
                   <PanelTitle>Portable design</PanelTitle>
                   <div className="flex gap-2">
-                    <button type="button" onClick={exportFile} className="border border-[var(--line)] px-3 py-2 text-xs hover:border-[var(--cyan)]">Export</button>
+                    <button type="button" data-button-guard="off" onClick={exportFile} className="border border-[var(--line)] px-3 py-2 text-xs hover:border-[var(--cyan)]">Export</button>
                     <label className="cursor-pointer border border-[var(--line)] px-3 py-2 text-xs hover:border-[var(--cyan)]">Import<input type="file" accept="application/json" className="sr-only" onChange={(event) => event.target.files?.[0] && importFile(event.target.files[0])} /></label>
                   </div>
                 </div>
@@ -655,6 +655,7 @@ export function DesignEditor({
                         <button
                           key={item.type}
                           type="button"
+                          data-button-busy-mode="interaction"
                           onClick={() => removeExisting ? requestBlockRemoval(existingBlock.id) : addBlock(item.type)}
                           aria-label={removeExisting ? `Remove ${item.label}` : `Add ${item.label}`}
                           className={`inline-flex items-center gap-2 border px-2.5 py-1.5 text-left text-xs ${removeExisting ? "border-[var(--red)]/40 text-[var(--red)] hover:border-[var(--red)]" : "border-[var(--line)] hover:border-[var(--cyan)]"}`}
@@ -801,6 +802,7 @@ function EditorSection({
     <section className="border border-[var(--line)] bg-[var(--surface)]">
       <button
         type="button"
+        data-button-busy-mode="interaction"
         aria-expanded={open}
         aria-controls={`editor-section-${id}`}
         onClick={() => onToggle(open ? null : id)}
@@ -989,10 +991,10 @@ function SortableBlock({ block, selected, onSelect, onRemove }: { block: PageDes
       style={{ transform: CSS.Transform.toString(transform), transition }}
       className={`flex w-full items-center gap-2 border px-3 py-2 text-left text-sm ${selected ? "border-[var(--cyan)] bg-[var(--cyan-soft)]" : "border-[var(--line)]"} ${isDragging ? "opacity-50" : ""}`}
     >
-      <button type="button" {...attributes} {...listeners} className="cursor-grab text-[var(--fg-dim)]" aria-label={`Reorder ${blockLabel(block)}`}>⠿</button>
-      <button type="button" onClick={onSelect} className="min-w-0 flex-1 text-left">{blockLabel(block)}</button>
+      <button type="button" data-button-guard="off" {...attributes} {...listeners} className="cursor-grab text-[var(--fg-dim)]" aria-label={`Reorder ${blockLabel(block)}`}>⠿</button>
+      <button type="button" data-button-guard="off" onClick={onSelect} className="min-w-0 flex-1 text-left">{blockLabel(block)}</button>
       {block.hidden && <span className="text-xs text-[var(--fg-dim)]">Hidden</span>}
-      <button type="button" onClick={onRemove} aria-label={`Remove ${blockLabel(block)}`} className="px-1 text-base text-[var(--red)]" title={`Remove ${blockLabel(block)}`}>−</button>
+      <button type="button" data-button-busy-mode="interaction" onClick={onRemove} aria-label={`Remove ${blockLabel(block)}`} className="px-1 text-base text-[var(--red)]" title={`Remove ${blockLabel(block)}`}>−</button>
     </div>
   );
 }
@@ -1105,7 +1107,7 @@ function BlockInspector({
         </div>
       )}
       <SectionSaveButton onClick={onSave}>Save block</SectionSaveButton>
-      <button type="button" onClick={onRemove} className="mt-4 text-xs text-[var(--red)] underline">Remove block</button>
+      <button type="button" data-button-busy-mode="interaction" onClick={onRemove} className="mt-4 text-xs text-[var(--red)] underline">Remove block</button>
     </section>
   );
 }
@@ -1419,7 +1421,7 @@ function AnnouncementPanel({ pageId, announcements }: { pageId: string; announce
           </div>
         ))}
       </div>
-      <button type="button" onClick={() => setExpanded((value) => !value)} className="mt-3 text-xs underline">
+      <button type="button" data-button-busy-mode="interaction" onClick={() => setExpanded((value) => !value)} className="mt-3 text-xs underline">
         {expanded ? "Close composer" : "Create announcement"}
       </button>
       {expanded && (
@@ -1588,7 +1590,7 @@ function StructurePanel({
                 <span className="min-w-0 flex-1 truncate">{component.name}</span>
                 <button type="button" onClick={() => moveComponent(null, component.id, null, -1)}>↑</button>
                 <button type="button" onClick={() => moveComponent(null, component.id, null, 1)}>↓</button>
-                <FluentSelect value="" onChange={(event) => moveComponent(null, component.id, event.target.value || null)} className="max-w-20 bg-transparent text-[10px]">
+                <FluentSelect aria-label={`Move ${component.name} to group`} value="" onChange={(event) => moveComponent(null, component.id, event.target.value || null)} className="max-w-20 bg-transparent text-[10px]">
                   <option value="">None</option>
                   {groups.map((target) => <option key={target.id} value={target.id}>{target.name}</option>)}
                 </FluentSelect>
@@ -1652,6 +1654,7 @@ function SectionSaveButton({ onClick, children }: { onClick: () => void; childre
   return (
     <button
       type="button"
+      data-button-guard="off"
       onClick={onClick}
       className="mt-4 w-full border border-[var(--cyan)] px-3 py-2 text-xs font-semibold text-[var(--cyan)] hover:bg-[var(--cyan-soft)]"
     >

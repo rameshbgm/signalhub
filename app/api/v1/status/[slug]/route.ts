@@ -5,6 +5,7 @@ import { authorizePublicSurface } from "@/lib/feed-access";
 import { buildStatusPayload } from "@/lib/public-api";
 import { consumeRateLimit, RateLimitError, requestIp } from "@/lib/rate-limit";
 import { absolutePublicPageUrl } from "@/lib/public-url";
+import { publicPageFilter } from "@/lib/page-lifecycle";
 
 export async function GET(
   request: NextRequest,
@@ -16,7 +17,7 @@ export async function GET(
       limit: 300,
       windowMs: 60_000,
     });
-    const page = await collections.pages().findOne({ slug });
+    const page = await collections.pages().findOne(publicPageFilter({ slug }));
     if (!page) return apiError(404, "PAGE_NOT_FOUND", "Page not found");
     const access = await authorizePublicSurface(request, page);
     if (!access.ok) return apiError(404, "PAGE_NOT_FOUND", "Page not found");

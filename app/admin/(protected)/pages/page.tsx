@@ -117,29 +117,25 @@ export default async function PagesListPage() {
                 <span className="text-xs text-[var(--fg-dim)] ml-2">/{p.slug}</span>
                 <span className="text-[10px] uppercase tracking-wide bg-[var(--surface-raised)] text-[var(--fg-soft)] px-1.5 py-0.5 ml-2">{p.type}</span>
                 {p.isHub && <span className="text-[10px] uppercase tracking-wide bg-[var(--cyan-soft)] text-[var(--cyan)] px-1.5 py-0.5 ml-2">hub</span>}
+                {p.publicVisible === false && <span className="ml-2 bg-[var(--amber-soft)] px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-[var(--amber)]">hidden</span>}
               </div>
               <div className="flex gap-2 shrink-0">
-                <a
-                  href={publicPagePath(p)}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="border border-[var(--cyan)]/30 px-2.5 py-1 text-xs font-semibold text-[var(--cyan)] transition-colors hover:bg-[var(--cyan-soft)]"
-                >
-                  View
-                </a>
+                {p.publicVisible !== false && (
+                  <a href={publicPagePath(p)} target="_blank" rel="noreferrer" className="border border-[var(--cyan)]/30 px-2.5 py-1 text-xs font-semibold text-[var(--cyan)] transition-colors hover:bg-[var(--cyan-soft)]">View</a>
+                )}
                 {canConfigure && (
                   <>
                     <Link
                       href={`/organization/pages/${p.id}/setup/components`}
                       className="border border-[var(--cyan)]/30 px-2.5 py-1 text-xs font-semibold text-[var(--cyan)] transition-colors hover:bg-[var(--cyan-soft)]"
                     >
-                      Build page
+                      Setup wizard
                     </Link>
                     <Link
                       href={`/organization/pages/${p.id}`}
                       className="border border-[var(--cyan)]/30 px-2.5 py-1 text-xs font-semibold text-[var(--cyan)] transition-colors hover:bg-[var(--cyan-soft)]"
                     >
-                      Configure
+                      Manage page
                     </Link>
                   </>
                 )}

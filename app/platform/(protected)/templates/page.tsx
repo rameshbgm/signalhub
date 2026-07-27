@@ -18,7 +18,7 @@ export default async function PlatformTemplatesPage() {
       <div>
         <h1 className="font-mono text-2xl font-semibold text-[var(--fg)]">Global monitor templates</h1>
         <p className="mt-1 text-sm text-[var(--fg-soft)]">
-          Curated starting points copied into tenant monitors. Editing a template never mutates existing monitors.
+          Master monitoring definitions used by status pages. Changes propagate to every page currently showing the template.
         </p>
       </div>
 

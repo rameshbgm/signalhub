@@ -12,7 +12,7 @@ export default async function ApiKeysPage({ searchParams }: { searchParams: Prom
   const { session, org } = await requireSession();
   await requireCapability("integration.manage");
   const { pageId: pageIdParam } = await searchParams;
-  const keys = (await collections.apiKeys().find({ orgId: oid(org.id) }).sort({ createdAt: 1 }).toArray()).map(toId);
+  const keys = (await collections.apiKeys().find({ orgId: oid(org.id), revokedAt: null }).sort({ createdAt: 1 }).toArray()).map(toId);
   const pages = (await collections.pages().find(scopedPageFilter(session, org.id)).sort({ createdAt: 1 }).toArray()).map(toId);
   const pageId = pageIdParam && pages.some((p) => p.id === pageIdParam) ? pageIdParam : pages[0]?.id;
   const webhookEndpoints = pageId

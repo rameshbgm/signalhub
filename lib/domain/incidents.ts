@@ -11,6 +11,7 @@ import {
 import { reconcileComponents } from "@/lib/component-status";
 import { fenceActiveOrganizationMutation } from "@/lib/organization-mutation";
 import { incidentUpdateInputSchema } from "@/lib/incident-update-validation";
+import { activePageFilter } from "@/lib/page-lifecycle";
 export {
   incidentUpdateEditInputSchema,
   incidentUpdateInputSchema,
@@ -58,7 +59,7 @@ async function validatePageAndComponents(input: {
 }, session?: ClientSession) {
   const pageId = oid(input.pageId);
   const page = await collections.pages().findOne(
-    { _id: pageId, orgId: oid(input.orgId) },
+    activePageFilter({ _id: pageId, orgId: oid(input.orgId) }),
     { session }
   );
   if (!page) throw new Error("Page not found in your organization");
@@ -170,7 +171,7 @@ export async function addIncidentUpdate(
   const input = incidentUpdateInputSchema.parse(rawInput);
   const incident = await collections.incidents().findOne({ _id: oid(incidentId), isMaintenance: false });
   if (!incident) throw new Error("Incident not found");
-  const page = await collections.pages().findOne({ _id: incident.pageId, orgId: oid(orgId) });
+  const page = await collections.pages().findOne(activePageFilter({ _id: incident.pageId, orgId: oid(orgId) }));
   if (!page) throw new Error("Incident not found");
   const links = await collections.incidentComponents().find({ incidentId: incident._id }).toArray();
   const updateId = new ObjectId();
@@ -225,7 +226,7 @@ export async function addIncidentUpdate(
 export async function deleteIncident(orgId: string, incidentId: string) {
   const incident = await collections.incidents().findOne({ _id: oid(incidentId), isMaintenance: false });
   if (!incident) return false;
-  const page = await collections.pages().findOne({ _id: incident.pageId, orgId: oid(orgId) });
+  const page = await collections.pages().findOne(activePageFilter({ _id: incident.pageId, orgId: oid(orgId) }));
   if (!page) return false;
   const links = await collections.incidentComponents().find({ incidentId: incident._id }).toArray();
   const session = mongoClient.startSession();

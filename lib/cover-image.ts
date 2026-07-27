@@ -107,6 +107,18 @@ export function bannerCropFromDrag(
   };
 }
 
+export function movedBannerCrop(
+  crop: CoverImageCrop,
+  deltaX: number,
+  deltaY: number,
+): CoverImageCrop {
+  return {
+    ...crop,
+    x: Math.min(100 - crop.width, Math.max(0, crop.x + deltaX)),
+    y: Math.min(100 - crop.height, Math.max(0, crop.y + deltaY)),
+  };
+}
+
 export function coverImageStyle(
   imageUrl: string,
   settings: CoverImageSettings = {},

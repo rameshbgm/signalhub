@@ -17,10 +17,11 @@ import { PageSurfaceLayout } from "@/components/public/PageSurfaceLayout";
 import type { PageDesignBlock } from "@/lib/page-design";
 import { AnnouncementList } from "@/components/public/AnnouncementList";
 import { SubscribeModal } from "@/components/public/SubscribeModal";
+import { publicPageFilter } from "@/lib/page-lifecycle";
 
 export default async function IncidentPermalinkPage({ params }: { params: Promise<{ slug: string; incidentId: string }> }) {
   const { slug, incidentId } = await params;
-  const pageDoc = await collections.pages().findOne({ slug });
+  const pageDoc = await collections.pages().findOne(publicPageFilter({ slug }));
   if (!pageDoc) notFound();
   const page = toId(pageDoc);
   const design = pageDesignFor(pageDoc);

@@ -3,8 +3,9 @@ import { ObjectId } from "mongodb";
 import { collections, mongoClient } from "@/lib/db";
 import { ensureIndexes } from "@/lib/ensure-indexes";
 import { DEFAULT_MONITOR_TEMPLATES } from "@/lib/default-monitor-templates";
-import { canonicalizeEmail } from "@/lib/identity";
+import { canonicalizeEmail, canonicalizeUsername } from "@/lib/identity";
 import { generateApiKey, generateAutomationToken } from "@/lib/tokens";
+import { createMonitor as createMonitorDomain, type MonitorInput } from "@/lib/domain/monitors";
 import {
   assertDevelopmentSeedEnabled,
   generateDevelopmentPassword,
@@ -19,9 +20,17 @@ function daysAgo(n: number) {
 
 async function upsertPage(slug: string, data: Record<string, unknown>) {
   const now = new Date();
+  const { publicVisible, deletedAt, deletedBy, ...insertData } = data;
   await collections.pages().updateOne(
     { slug },
-    { $setOnInsert: { ...data, slug, createdAt: now } },
+    {
+      $setOnInsert: { ...insertData, slug, createdAt: now },
+      $set: {
+        publicVisible: publicVisible === false ? false : true,
+        deletedAt: deletedAt instanceof Date ? deletedAt : null,
+        deletedBy: deletedBy instanceof ObjectId ? deletedBy : null,
+      },
+    },
     { upsert: true }
   );
   return (await collections.pages().findOne({ slug }))!;
@@ -77,11 +86,14 @@ async function main() {
     password: string
   ) {
     const canonicalEmail = canonicalizeEmail(email);
+    const canonicalUsername = canonicalizeUsername(
+      role === "ADMIN" ? "acme-admin" : "acme-responder"
+    );
     const passwordHash = await bcrypt.hash(password, 10);
     await collections.users().updateOne(
       { canonicalEmail },
       {
-        $set: { email, canonicalEmail, name, passwordHash, twoFactorEnabled: false, disabled: false, updatedAt: new Date() },
+        $set: { username: canonicalUsername, canonicalUsername, email, canonicalEmail, name, passwordHash, twoFactorEnabled: false, disabled: false, updatedAt: new Date() },
         $setOnInsert: { _id: new ObjectId(), createdAt: new Date() },
       },
       { upsert: true }
@@ -244,19 +256,70 @@ async function main() {
     customCss: null,
   });
 
+  console.log("Seeding hidden and deleted lifecycle examples...");
+  const hiddenPage = await upsertPage("operations-preview", {
+    orgId: org._id,
+    name: "Operations Preview",
+    type: "PUBLIC",
+    isHub: false,
+    hubParentId: null,
+    timezone: "UTC",
+    language: "en",
+    headline: "Operations Preview Status",
+    aboutText: "A hidden status page for signed-in operational testing.",
+    logoUrl: null,
+    faviconUrl: null,
+    coverImageUrl: null,
+    coverImageFit: "CONTAIN",
+    coverImagePositionX: 50,
+    coverImagePositionY: 50,
+    brandColor: "#0F766E",
+    supportUrl: null,
+    passwordHash: null,
+    removeBranding: false,
+    customCss: null,
+    publicVisible: false,
+  });
+  const deletedPage = await upsertPage("retired-status", {
+    orgId: org._id,
+    name: "Retired Status Page",
+    type: "PUBLIC",
+    isHub: false,
+    hubParentId: null,
+    timezone: "UTC",
+    language: "en",
+    headline: "Retired Service Status",
+    aboutText: "A soft-deleted sample page available from Deleted Pages.",
+    logoUrl: null,
+    faviconUrl: null,
+    coverImageUrl: null,
+    coverImageFit: "CONTAIN",
+    coverImagePositionX: 50,
+    coverImagePositionY: 50,
+    brandColor: "#64748B",
+    supportUrl: null,
+    passwordHash: null,
+    removeBranding: false,
+    customCss: null,
+    publicVisible: true,
+    deletedAt: daysAgo(3),
+  });
+
   // Development sample content is intentionally replaceable. Reset only the records managed by
   // this seed so rerunning it repairs the sample without duplicating history or
   // deleting administrator-created integrations and uploaded branding.
   console.log("Resetting generated sample content...");
-  const samplePageIds = [apiPage._id, appPage._id, internalPage._id, audiencePage._id];
-  const [existingComponents, existingIncidents, existingMetrics] = await Promise.all([
+  const samplePageIds = [apiPage._id, appPage._id, internalPage._id, audiencePage._id, hiddenPage._id, deletedPage._id];
+  const [existingComponents, existingIncidents, existingMetrics, existingMonitors] = await Promise.all([
     collections.components().find({ pageId: { $in: samplePageIds } }, { projection: { _id: 1 } }).toArray(),
     collections.incidents().find({ pageId: { $in: samplePageIds } }, { projection: { _id: 1 } }).toArray(),
     collections.metrics().find({ pageId: { $in: samplePageIds } }, { projection: { _id: 1 } }).toArray(),
+    collections.monitors().find({ pageId: { $in: samplePageIds } }, { projection: { _id: 1 } }).toArray(),
   ]);
   const existingComponentIds = existingComponents.map((component) => component._id);
   const existingIncidentIds = existingIncidents.map((incident) => incident._id);
   const existingMetricIds = existingMetrics.map((metric) => metric._id);
+  const existingMonitorIds = existingMonitors.map((monitor) => monitor._id);
   await Promise.all([
     existingComponentIds.length
       ? collections.componentStatusEvents().deleteMany({ componentId: { $in: existingComponentIds } })
@@ -270,6 +333,10 @@ async function main() {
     existingMetricIds.length
       ? collections.metricPoints().deleteMany({ metricId: { $in: existingMetricIds } })
       : Promise.resolve(),
+    existingMonitorIds.length
+      ? collections.monitorChecks().deleteMany({ monitorId: { $in: existingMonitorIds } })
+      : Promise.resolve(),
+    collections.monitors().deleteMany({ pageId: { $in: samplePageIds } }),
     collections.components().deleteMany({ pageId: { $in: samplePageIds } }),
     collections.componentGroups().deleteMany({ pageId: { $in: samplePageIds } }),
     collections.incidents().deleteMany({ pageId: { $in: samplePageIds } }),
@@ -345,6 +412,46 @@ async function main() {
   const enterpriseApi = await createComponent({ pageId: audiencePage._id, name: "Enterprise API Gateway", status: "OPERATIONAL", order: 0 });
   const enterpriseSso = await createComponent({ pageId: audiencePage._id, name: "SSO / SAML", status: "OPERATIONAL", order: 1 });
   const enterpriseReporting = await createComponent({ pageId: audiencePage._id, name: "Reporting Pipeline", status: "DEGRADED_PERFORMANCE", order: 2 });
+  const hiddenApi = await createComponent({ pageId: hiddenPage._id, name: "Preview API", status: "DEGRADED_PERFORMANCE", order: 0 });
+  const retiredApi = await createComponent({ pageId: deletedPage._id, name: "Retired API", status: "OPERATIONAL", order: 0 });
+
+  const sampleMonitorTemplate = await collections.monitorTemplates().findOne({ enabled: true });
+  if (sampleMonitorTemplate) {
+    await createMonitorDomain(org._id.toHexString(), apiPage._id.toHexString(), {
+      templateId: sampleMonitorTemplate._id.toHexString(),
+      name: sampleMonitorTemplate.name,
+      type: sampleMonitorTemplate.type as MonitorInput["type"],
+      componentId: restApiUs.toHexString(),
+      target: sampleMonitorTemplate.type === "HEARTBEAT" ? "inbound-heartbeat" : sampleMonitorTemplate.target,
+      port: sampleMonitorTemplate.port,
+      method: "GET",
+      requestBody: null,
+      requestHeaders: "",
+      expectedStatusRange: sampleMonitorTemplate.expectedStatusRange,
+      keywordMatch: sampleMonitorTemplate.keywordMatch,
+      keywordAbsent: null,
+      sslWarnDays: sampleMonitorTemplate.type === "TLS" ? 14 : null,
+      authType: "NONE",
+      authUsername: null,
+      authSecret: null,
+      authHeaderName: null,
+      verifyTls: true,
+      intervalSec: 300,
+      timeoutMs: 10_000,
+      failThreshold: 1,
+      recoverThreshold: 1,
+      downStatus: "MAJOR_OUTAGE",
+      actionFlipStatus: true,
+      actionRecordMetric: true,
+      actionAutoIncident: false,
+      actionNotify: false,
+      tags: ["global-template"],
+      groupName: sampleMonitorTemplate.category,
+      heartbeatGraceSec: sampleMonitorTemplate.type === "HEARTBEAT" ? 60 : null,
+      dnsRecordType: sampleMonitorTemplate.type === "DNS" ? "A" : null,
+      dnsExpectedValue: null,
+    });
+  }
 
   const groupA = new ObjectId();
   await collections.pageAccessGroups().insertOne({
@@ -484,6 +591,27 @@ async function main() {
       { status: "IDENTIFIED", body: "Root cause identified as a backlog in our notification queue. Applying a fix.", createdAt: daysAgo(0) },
       { status: "MONITORING", body: "The queue backlog has been cleared. We're monitoring delivery times.", createdAt: daysAgo(0) },
     ],
+  });
+
+  await createIncident({
+    pageId: hiddenPage._id,
+    name: "Preview API elevated latency",
+    status: "INVESTIGATING",
+    impact: "MINOR",
+    createdAt: daysAgo(0),
+    components: [{ componentId: hiddenApi, newStatus: "DEGRADED_PERFORMANCE" }],
+    updates: [{ status: "INVESTIGATING", body: "Operators are investigating elevated preview API latency.", createdAt: daysAgo(0) }],
+  });
+
+  await createIncident({
+    pageId: deletedPage._id,
+    name: "Historical retired service incident",
+    status: "RESOLVED",
+    impact: "MINOR",
+    createdAt: daysAgo(20),
+    resolvedAt: daysAgo(20),
+    components: [{ componentId: retiredApi, newStatus: "PARTIAL_OUTAGE" }],
+    updates: [{ status: "RESOLVED", body: "Historical incident retained with the soft-deleted page.", createdAt: daysAgo(20) }],
   });
 
   await createIncident({

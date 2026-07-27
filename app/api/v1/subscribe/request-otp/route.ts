@@ -12,6 +12,7 @@ import { hashSecret } from "@/lib/secrets";
 import { subscriptionCapabilities } from "@/lib/notification-capabilities";
 import { withTransaction } from "@/lib/cascade";
 import { fenceActiveOrganizationMutation } from "@/lib/organization-mutation";
+import { publicPageFilter } from "@/lib/page-lifecycle";
 
 const schema = z.object({
   pageSlug: z.string().trim().min(1),
@@ -50,7 +51,7 @@ export async function POST(request: NextRequest) {
       }),
     ]);
 
-    const page = await collections.pages().findOne({ slug: parsed.data.pageSlug });
+    const page = await collections.pages().findOne(publicPageFilter({ slug: parsed.data.pageSlug }));
     if (!page) return apiError(404, "PAGE_NOT_FOUND", "Page not found");
     const pageAccess = await checkPageAccess(toId(page));
     if (!pageAccess.ok) return apiError(404, "PAGE_NOT_FOUND", "Page not found");
@@ -85,7 +86,7 @@ export async function POST(request: NextRequest) {
     await withTransaction(async (databaseSession) => {
       await fenceActiveOrganizationMutation(page.orgId, databaseSession);
       const currentPage = await collections.pages().findOne(
-        { _id: page._id, orgId: page.orgId, slug: parsed.data.pageSlug },
+        publicPageFilter({ _id: page._id, orgId: page.orgId, slug: parsed.data.pageSlug }),
         { session: databaseSession }
       );
       if (!currentPage) throw new Error("Page is no longer available");

@@ -75,7 +75,7 @@ export function AdminShell({ sidebar, children }: { sidebar: ReactNode; children
         </>
       )}
       <main className="app-console-main min-w-0 flex-1 overflow-x-clip">
-        <div className={designer ? "" : "p-4 sm:p-6"}>{children}</div>
+        <div className={designer ? "" : "mx-auto w-full max-w-[96rem] p-4 sm:p-6 [&>*]:mx-auto"}>{children}</div>
       </main>
     </div>
   );

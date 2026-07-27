@@ -52,6 +52,7 @@ export function CopyButton({
       <button
         {...buttonProps}
         type="button"
+        data-button-guard="off"
         disabled={disabled || pending}
         aria-describedby={error ? errorId : undefined}
         onClick={() => void copy()}

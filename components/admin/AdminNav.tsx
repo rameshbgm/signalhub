@@ -10,6 +10,7 @@ const GROUPS = [
     items: [
       { href: "/organization", label: "Dashboard", icon: "◧" },
       { href: "/organization/pages", label: "Pages", icon: "▦" },
+      { href: "/organization/pages/deleted", label: "Deleted Pages", icon: "⌫", capability: "page.configure" },
       { href: "/organization/analytics", label: "Analytics", icon: "↗", capability: "analytics.view" },
       { href: "/organization/audit-log", label: "Audit Log", icon: "≣", capability: "audit.view" },
       { href: "/organization/help", label: "Help Center", icon: "?" },
@@ -84,7 +85,9 @@ export function AdminNav({ capabilities }: { capabilities: Capability[] }) {
           <p className="mb-1.5 px-4 font-mono text-[10px] uppercase tracking-wider text-[var(--fg-dim)]">{group.label}</p>
           <div>
             {items.map((item) => {
-              const active = item.href === "/organization" ? pathname === "/organization" : pathname.startsWith(item.href);
+              const active = item.href === "/organization" || item.href === "/organization/pages"
+                ? pathname === item.href
+                : pathname.startsWith(item.href);
               return (
                 <Link
                   key={item.href}

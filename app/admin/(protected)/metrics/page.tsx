@@ -64,6 +64,7 @@ export default async function MetricsPage({ searchParams }: { searchParams: Prom
           className="border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--fg)] outline-none placeholder:text-[var(--fg-dim)] focus:border-[var(--cyan)] sm:col-span-2"
         />
         <FluentSelect
+          aria-label="Component"
           name="componentId"
           className="border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--fg)] outline-none focus:border-[var(--cyan)]"
         >
@@ -139,6 +140,7 @@ export default async function MetricsPage({ searchParams }: { searchParams: Prom
             )}
             {canManage && <form action={pushMetricPoint.bind(null, m.id)} className="mt-3 flex gap-2">
               <input
+                aria-label={`Push data point for ${m.name}`}
                 name="value"
                 type="number"
                 step={10 ** -metricDecimals(m.decimals)}

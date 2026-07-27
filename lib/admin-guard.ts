@@ -14,6 +14,7 @@ import {
   type PlatformCapability,
 } from "@/lib/platform-policy";
 import { AdminAuthError } from "@/lib/admin-auth-error";
+import { activePageFilter } from "@/lib/page-lifecycle";
 
 export { AdminAuthError } from "@/lib/admin-auth-error";
 
@@ -117,6 +118,15 @@ export async function requireCapability(capability: Capability, pageId?: string)
   ) {
     throw new AdminAuthError("This page is outside your assigned scope", 403, "PAGE_SCOPE_FORBIDDEN");
   }
+  if (pageId) {
+    const activePage = await collections.pages().findOne(
+      activePageFilter({ _id: oid(pageId), orgId: oid(session.orgId) }),
+      { projection: { _id: 1 } }
+    );
+    if (!activePage) {
+      throw new AdminAuthError("Page not found in your organization", 404, "PAGE_NOT_FOUND");
+    }
+  }
   return session;
 }
 
@@ -137,7 +147,7 @@ export function scopedPageFilter(
     session.role !== "ADMIN" && session.pageIds !== null
       ? { _id: { $in: session.pageIds.map(oid) } }
       : {};
-  return { orgId: oid(orgId), ...scopedIds, ...extra };
+  return activePageFilter({ orgId: oid(orgId), ...scopedIds, ...extra });
 }
 
 /** Installation management is a capability of the standard Admin identity. */
@@ -167,7 +177,9 @@ export async function requirePlatformCapability(capability: PlatformCapability) 
 }
 
 export async function assertPageInOrg(pageId: string, orgId: string) {
-  const pageDoc = await collections.pages().findOne({ _id: oid(pageId), orgId: oid(orgId) });
+  const pageDoc = await collections.pages().findOne(
+    activePageFilter({ _id: oid(pageId), orgId: oid(orgId) })
+  );
   if (!pageDoc) throw new AdminAuthError("Page not found in your organization", 404, "PAGE_NOT_FOUND");
   const session = await getSession();
   if (session?.orgId === orgId) {

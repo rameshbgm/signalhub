@@ -10,6 +10,7 @@ import {
   fenceActiveOrganizationMutation,
   OrganizationMutationBlockedError,
 } from "@/lib/organization-mutation";
+import { activePageFilter } from "@/lib/page-lifecycle";
 
 const objectIdString = z.string().refine(ObjectId.isValid, "Malformed identifier");
 const MIN_REMINDER_MINUTES = 5;
@@ -69,7 +70,7 @@ export async function createMaintenance(
 ) {
   const input = createMaintenanceInputSchema.parse(rawInput);
   const pageId = oid(input.pageId);
-  const page = await collections.pages().findOne({ _id: pageId, orgId: oid(orgId) });
+  const page = await collections.pages().findOne(activePageFilter({ _id: pageId, orgId: oid(orgId) }));
   if (!page) throw new Error("Page not found in your organization");
   if (input.componentIds.length) {
     const count = await collections.components().countDocuments({
@@ -95,7 +96,7 @@ export async function createMaintenance(
     await session.withTransaction(async () => {
       await fenceActiveOrganizationMutation(orgId, session);
       const currentPage = await collections.pages().findOne(
-        { _id: pageId, orgId: oid(orgId) },
+        activePageFilter({ _id: pageId, orgId: oid(orgId) }),
         { session }
       );
       if (!currentPage) throw new Error("Page not found in your organization");
@@ -181,7 +182,7 @@ export async function transitionMaintenance(input: {
     isMaintenance: true,
   });
   if (!incident) return false;
-  const page = await collections.pages().findOne({ _id: incident.pageId });
+  const page = await collections.pages().findOne(activePageFilter({ _id: incident.pageId }));
   const organization = page
     ? await collections.organizations().findOne({ _id: page.orgId })
     : null;
@@ -262,7 +263,7 @@ export async function deleteMaintenance(orgId: string, incidentId: string) {
     isMaintenance: true,
   });
   if (!incident) return false;
-  const page = await collections.pages().findOne({ _id: incident.pageId, orgId: oid(orgId) });
+  const page = await collections.pages().findOne(activePageFilter({ _id: incident.pageId, orgId: oid(orgId) }));
   if (!page) return false;
   const links = await collections.incidentComponents().find({ incidentId: incident._id }).toArray();
   const session = mongoClient.startSession();
@@ -326,7 +327,7 @@ async function sendMaintenanceReminder(
   now: Date
 ) {
   if (!isMaintenanceReminderDue(maintenance, now)) return false;
-  const page = await collections.pages().findOne({ _id: maintenance.pageId });
+  const page = await collections.pages().findOne(activePageFilter({ _id: maintenance.pageId }));
   const organization = page
     ? await collections.organizations().findOne({ _id: page.orgId })
     : null;

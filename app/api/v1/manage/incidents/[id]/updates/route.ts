@@ -4,6 +4,7 @@ import { apiError, routeError, validationError } from "@/lib/api-response";
 import { addIncidentUpdate, incidentUpdateInputSchema } from "@/lib/domain/incidents";
 import { collections } from "@/lib/db";
 import { oid } from "@/lib/mongo-utils";
+import { activePageFilter } from "@/lib/page-lifecycle";
 
 export async function POST(
   request: NextRequest,
@@ -17,7 +18,7 @@ export async function POST(
     const { id } = await params;
     const incident = await collections.incidents().findOne({ _id: oid(id) });
     const page = incident
-      ? await collections.pages().findOne({ _id: incident.pageId, orgId: oid(apiKey.orgId) })
+      ? await collections.pages().findOne(activePageFilter({ _id: incident.pageId, orgId: oid(apiKey.orgId) }))
       : null;
     if (!page || !apiKeyAllowsPage(apiKey, page._id.toHexString())) {
       return apiError(404, "INCIDENT_NOT_FOUND", "Incident not found");

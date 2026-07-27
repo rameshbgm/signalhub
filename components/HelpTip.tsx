@@ -3,6 +3,7 @@ export function HelpTip({ text, align = "left" }: { text: string; align?: "left"
     <span className="help-tip">
       <button
         type="button"
+        data-button-guard="off"
         tabIndex={0}
         aria-label={text}
         className="flex h-3.5 w-3.5 items-center justify-center rounded-full border border-[var(--fg-dim)] text-[9px] font-bold leading-none text-[var(--fg-dim)] transition-colors hover:border-[var(--cyan)] hover:text-[var(--cyan)]"

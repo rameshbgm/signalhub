@@ -9,7 +9,6 @@ import { withTransaction } from "@/lib/cascade";
 import { fenceActiveOrganizationMutation } from "@/lib/organization-mutation";
 import { hashPassword } from "@/lib/auth";
 import { requireCapability, assertPageInOrg } from "@/lib/admin-guard";
-import { deletePageCascade } from "@/lib/cascade";
 import { sanitizeCustomCss } from "@/lib/custom-css";
 import { randomBytes } from "node:crypto";
 import {
@@ -19,9 +18,9 @@ import {
   validatedLayout,
   validatedTimezone,
 } from "@/lib/page-validation";
-import { writeActiveTenantAudit } from "@/lib/tenant-audit";
 import { templateDesign } from "@/lib/page-design";
 import { parseComponentDetailEdits } from "@/lib/component-detail-edits";
+import { activePageFilter, deletedPageFilter } from "@/lib/page-lifecycle";
 
 function slugify(input: string) {
   return input
@@ -101,6 +100,9 @@ export async function createPage(formData: FormData) {
       publishedDesign: initialDesign,
       publishedDesignVersion: 1,
       designPublishedAt: new Date(),
+      publicVisible: true,
+      deletedAt: null,
+      deletedBy: null,
       createdAt: new Date(),
     }, { session: databaseSession });
 
@@ -131,6 +133,16 @@ export async function updatePageSettings(pageId: string, formData: FormData) {
   const name = String(formData.get("name") ?? "").trim();
   if (!name) throw new Error("Page name is required");
   const brandColor = validatedBrandColor(String(formData.get("brandColor") ?? "#0052CC"));
+  const headline = String(formData.get("headline") ?? "");
+  const aboutText = String(formData.get("aboutText") ?? "");
+  const supportUrl = validatedExternalUrl(String(formData.get("supportUrl") ?? ""), { allowMailto: true, label: "Support URL" });
+  const termsUrl = validatedExternalUrl(String(formData.get("termsUrl") ?? ""), { label: "Terms URL" });
+  const privacyUrl = validatedExternalUrl(String(formData.get("privacyUrl") ?? ""), { label: "Privacy URL" });
+  const layout = validatedLayout(String(formData.get("layout") ?? "STANDARD"));
+  const allowThemeOverride = formData.get("allowThemeOverride") === "on";
+  const analyticsEnabled = formData.get("analyticsEnabled") === "on";
+  const timezone = validatedTimezone(String(formData.get("timezone") ?? "UTC"));
+  const language = validatedLanguage(String(formData.get("language") ?? "en"));
 
   const themePreset = String(formData.get("themePreset") ?? "SIGNAL");
   const themeMode = String(formData.get("themeMode") ?? "SYSTEM");
@@ -143,18 +155,43 @@ export async function updatePageSettings(pageId: string, formData: FormData) {
   await withTransaction(async (databaseSession) => {
     await fenceActiveOrganizationMutation(session.orgId, databaseSession);
     const page = await collections.pages().findOne(
-      { _id: oid(pageId), orgId: oid(session.orgId) },
+      activePageFilter({ _id: oid(pageId), orgId: oid(session.orgId) }),
       { session: databaseSession }
     );
     if (!page) throw new Error("Page not found in your organization");
     publicPath = page.isHub ? `/hub/${page.slug}` : `/${page.slug}`;
+    const nextSettings: Record<string, unknown> = {
+      name, headline, aboutText, supportUrl, termsUrl, privacyUrl, brandColor,
+      layout, themePreset, themeMode, allowThemeOverride, analyticsEnabled,
+      timezone, language, removeBranding,
+      ...(customCss !== undefined ? { customCss } : {}),
+    };
+    const changes = Object.entries(nextSettings)
+      .filter(([field, value]) => page[field as keyof typeof page] !== value)
+      .map(([field, after]) => ({ field, before: page[field as keyof typeof page] ?? null, after }));
 
     const currentComponents = await collections.components()
-      .find({ pageId: page._id }, { session: databaseSession, projection: { _id: 1 } })
+      .find({ pageId: page._id }, { session: databaseSession, projection: { _id: 1, name: 1, description: 1, groupId: 1, visible: 1, showUptime: 1 } })
       .toArray();
     const currentComponentIds = new Set(currentComponents.map((component) => component._id.toHexString()));
     if (componentEdits.some((component) => !currentComponentIds.has(component.id))) {
       throw new Error("Components changed while you were editing; reload and try again");
+    }
+    for (const edit of componentEdits) {
+      const current = currentComponents.find((component) => component._id.toHexString() === edit.id);
+      if (!current) continue;
+      const componentFields = {
+        name: edit.name,
+        description: edit.description,
+        groupId: edit.groupId,
+        visible: edit.visible,
+        showUptime: edit.showUptime,
+      };
+      for (const [field, after] of Object.entries(componentFields)) {
+        const rawBefore = current[field as keyof typeof current];
+        const before = rawBefore instanceof ObjectId ? rawBefore.toHexString() : rawBefore ?? null;
+        if (before !== after) changes.push({ field: `component.${edit.id}.${field}`, before, after });
+      }
     }
     const selectedGroupIds = [...new Set(componentEdits.flatMap((component) => component.groupId ? [component.groupId] : []))];
     if (selectedGroupIds.length) {
@@ -193,19 +230,19 @@ export async function updatePageSettings(pageId: string, formData: FormData) {
       {
         $set: {
           name,
-          headline: String(formData.get("headline") ?? ""),
-          aboutText: String(formData.get("aboutText") ?? ""),
-          supportUrl: validatedExternalUrl(String(formData.get("supportUrl") ?? ""), { allowMailto: true, label: "Support URL" }),
-          termsUrl: validatedExternalUrl(String(formData.get("termsUrl") ?? ""), { label: "Terms URL" }),
-          privacyUrl: validatedExternalUrl(String(formData.get("privacyUrl") ?? ""), { label: "Privacy URL" }),
+          headline,
+          aboutText,
+          supportUrl,
+          termsUrl,
+          privacyUrl,
           brandColor,
-          layout: validatedLayout(String(formData.get("layout") ?? "STANDARD")),
+          layout,
           themePreset,
           themeMode: themeMode as "SYSTEM" | "LIGHT" | "DARK",
-          allowThemeOverride: formData.get("allowThemeOverride") === "on",
-          analyticsEnabled: formData.get("analyticsEnabled") === "on",
-          timezone: validatedTimezone(String(formData.get("timezone") ?? "UTC")),
-          language: validatedLanguage(String(formData.get("language") ?? "en")),
+          allowThemeOverride,
+          analyticsEnabled,
+          timezone,
+          language,
           removeBranding,
           ...(customCss !== undefined ? { customCss } : {}),
           ...(passwordHash ? { passwordHash } : {}),
@@ -220,7 +257,7 @@ export async function updatePageSettings(pageId: string, formData: FormData) {
       actor: session.email,
       action: "UPDATE_PAGE_SETTINGS",
       target: pageId,
-      metadata: { componentCount: componentEdits.length },
+      metadata: { componentCount: componentEdits.length, changes },
       supportSessionId: session.supportSessionId ? oid(session.supportSessionId) : null,
       createdAt: new Date(),
     }, { session: databaseSession });
@@ -233,14 +270,78 @@ export async function updatePageSettings(pageId: string, formData: FormData) {
 export async function deletePage(pageId: string) {
   const session = await requireCapability("page.configure", pageId);
   await assertPageInOrg(pageId, session.orgId);
-  await deletePageCascade(pageId, session.orgId);
-  await writeActiveTenantAudit(session.orgId, {
-    actor: session.email,
-    action: "DELETE_PAGE",
-    target: pageId,
-    supportSessionId: session.supportSessionId ? oid(session.supportSessionId) : null,
-    createdAt: new Date(),
+  await withTransaction(async (databaseSession) => {
+    await fenceActiveOrganizationMutation(session.orgId, databaseSession);
+    const changed = await collections.pages().updateOne(
+      activePageFilter({ _id: oid(pageId), orgId: oid(session.orgId) }),
+      { $set: { deletedAt: new Date(), deletedBy: oid(session.userId) } },
+      { session: databaseSession }
+    );
+    if (!changed.matchedCount) throw new Error("Page is already deleted or unavailable");
+    await collections.auditLogs().insertOne({
+      _id: new ObjectId(),
+      orgId: oid(session.orgId),
+      actor: session.email,
+      action: "SOFT_DELETE_PAGE",
+      target: pageId,
+      metadata: { changes: [{ field: "deletedAt", before: null, after: "soft-deleted" }] },
+      supportSessionId: session.supportSessionId ? oid(session.supportSessionId) : null,
+      createdAt: new Date(),
+    }, { session: databaseSession });
   });
   revalidatePath("/organization/pages");
+  revalidatePath("/organization/pages/deleted");
   redirect("/organization/pages");
+}
+
+export async function restorePage(pageId: string) {
+  const session = await requireCapability("page.configure");
+  await withTransaction(async (databaseSession) => {
+    await fenceActiveOrganizationMutation(session.orgId, databaseSession);
+    const changed = await collections.pages().updateOne(
+      deletedPageFilter({ _id: oid(pageId), orgId: oid(session.orgId) }),
+      { $set: { deletedAt: null, deletedBy: null } },
+      { session: databaseSession }
+    );
+    if (!changed.matchedCount) throw new Error("Deleted page not found");
+    await collections.auditLogs().insertOne({
+      _id: new ObjectId(), orgId: oid(session.orgId), actor: session.email,
+      action: "RESTORE_PAGE", target: pageId,
+      metadata: { changes: [{ field: "deletedAt", before: "soft-deleted", after: null }] },
+      supportSessionId: session.supportSessionId ? oid(session.supportSessionId) : null,
+      createdAt: new Date(),
+    }, { session: databaseSession });
+  });
+  revalidatePath("/organization/pages");
+  revalidatePath("/organization/pages/deleted");
+}
+
+export async function setPagePublicVisibility(pageId: string, visible: boolean) {
+  const session = await requireCapability("page.configure", pageId);
+  await assertPageInOrg(pageId, session.orgId);
+  let publicPath = "";
+  await withTransaction(async (databaseSession) => {
+    await fenceActiveOrganizationMutation(session.orgId, databaseSession);
+    const page = await collections.pages().findOne(
+      activePageFilter({ _id: oid(pageId), orgId: oid(session.orgId) }),
+      { session: databaseSession }
+    );
+    if (!page) throw new Error("Page not found");
+    publicPath = page.isHub ? `/hub/${page.slug}` : `/${page.slug}`;
+    await collections.pages().updateOne(
+      { _id: page._id, orgId: page.orgId },
+      { $set: { publicVisible: visible } },
+      { session: databaseSession }
+    );
+    await collections.auditLogs().insertOne({
+      _id: new ObjectId(), orgId: page.orgId, actor: session.email,
+      action: visible ? "SHOW_PAGE_PUBLICLY" : "HIDE_PAGE_PUBLICLY", target: pageId,
+      metadata: { changes: [{ field: "publicVisible", before: page.publicVisible !== false, after: visible }] },
+      supportSessionId: session.supportSessionId ? oid(session.supportSessionId) : null,
+      createdAt: new Date(),
+    }, { session: databaseSession });
+  });
+  revalidatePath("/organization/pages");
+  revalidatePath(`/organization/pages/${pageId}`);
+  if (publicPath) revalidatePath(publicPath, "layout");
 }

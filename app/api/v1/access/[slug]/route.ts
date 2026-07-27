@@ -7,6 +7,7 @@ import { canonicalizeEmail } from "@/lib/identity";
 import { toId } from "@/lib/mongo-utils";
 import { consumeRateLimit, RateLimitError, requestIp } from "@/lib/rate-limit";
 import { isPageOrganizationActive } from "@/lib/public-page";
+import { publicPageFilter } from "@/lib/page-lifecycle";
 
 const schema = z.object({
   email: z.string().email().optional(),
@@ -26,7 +27,7 @@ export async function POST(
       windowMs: 15 * 60_000,
     });
 
-    const pageDoc = await collections.pages().findOne({ slug });
+    const pageDoc = await collections.pages().findOne(publicPageFilter({ slug }));
     if (!pageDoc) return apiError(404, "PAGE_NOT_FOUND", "Page not found");
     if (!(await isPageOrganizationActive(pageDoc.orgId))) {
       return apiError(404, "PAGE_NOT_FOUND", "Page not found");

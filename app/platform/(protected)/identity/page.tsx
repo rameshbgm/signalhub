@@ -41,15 +41,15 @@ export default async function IdentityPage() {
           >
             <input name="name" placeholder="Connection name" required className="border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm" />
             <input name="slug" placeholder="Stable slug" required pattern="[a-z0-9-]+" className="border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm" />
-            <FluentSelect name="type" className="border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm">
+            <FluentSelect aria-label="Connection type" name="type" className="border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm">
               <option value="OIDC">OpenID Connect</option>
               <option value="SAML">SAML 2.0</option>
             </FluentSelect>
-            <FluentSelect name="orgId" className="border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm">
+            <FluentSelect aria-label="Organization" name="orgId" className="border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm">
               <option value="">Choose organization</option>
               {organizations.map((org) => <option key={org._id.toHexString()} value={org._id.toHexString()}>{org.name}</option>)}
             </FluentSelect>
-            <FluentSelect name="defaultRole" defaultValue="VIEWER" className="border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm">
+            <FluentSelect aria-label="Default role" name="defaultRole" defaultValue="VIEWER" className="border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm">
               <option value="VIEWER">Default: Viewer</option>
               <option value="RESPONDER">Default: Responder</option>
               <option value="INCIDENT_MANAGER">Default: Incident manager</option>

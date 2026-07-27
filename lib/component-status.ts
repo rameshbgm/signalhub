@@ -6,6 +6,7 @@ import {
   worstStatus,
 } from "@/lib/status";
 import { fenceActiveOrganizationMutation } from "@/lib/organization-mutation";
+import { activePageFilter } from "@/lib/page-lifecycle";
 
 type ReconciliationSources = {
   manualStatus: ComponentStatus;
@@ -40,7 +41,7 @@ async function reconcileInSession(
   const component = await collections.components().findOne({ _id: componentId }, { session });
   if (!component) return false;
   const page = await collections.pages().findOne(
-    { _id: component.pageId },
+    activePageFilter({ _id: component.pageId }),
     { session }
   );
   if (!page) return false;

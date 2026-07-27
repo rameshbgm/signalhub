@@ -10,6 +10,7 @@ import {
 } from "@/lib/monitor-validation";
 import { validateMonitorTarget } from "@/lib/monitor-target-validation";
 import { fenceActiveOrganizationMutation } from "@/lib/organization-mutation";
+import { activePageFilter } from "@/lib/page-lifecycle";
 
 const MONITOR_DOWN_STATUSES = [
   "DEGRADED_PERFORMANCE",
@@ -18,6 +19,7 @@ const MONITOR_DOWN_STATUSES = [
 ] as const;
 
 const monitorInputSchema = z.object({
+  templateId: z.string().nullable().optional(),
   name: z.string().trim().min(1).max(200),
   type: z.enum(MONITOR_TYPES),
   componentId: z.string().nullable(),
@@ -87,7 +89,7 @@ export async function createPreparedMonitor(
 ) {
   await fenceActiveOrganizationMutation(orgId, session);
   const page = await collections.pages().findOne(
-    { _id: oid(pageId), orgId: oid(orgId) },
+    activePageFilter({ _id: oid(pageId), orgId: oid(orgId) }),
     { session }
   );
   if (!page) throw new Error("Page not found in your organization");
@@ -121,6 +123,7 @@ export async function createPreparedMonitor(
   const monitor: WithId<MonitorDoc> = {
     _id: monitorId,
     pageId: page._id,
+    templateId: input.templateId ? oid(input.templateId) : null,
     componentId: input.componentId ? oid(input.componentId) : null,
     name: input.name,
     type: input.type,

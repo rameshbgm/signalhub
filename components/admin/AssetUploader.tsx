@@ -8,11 +8,26 @@ import {
   bannerCropFromDrag,
   coverImageStyle,
   defaultBannerCrop,
+  movedBannerCrop,
   normalizedCoverImageCrop,
   normalizedCoverImageSettings,
   type CoverImageCrop,
   type CoverImageFit,
 } from "@/lib/cover-image";
+
+type CropHandle = "nw" | "ne" | "sw" | "se";
+
+type CropInteraction =
+  | { mode: "draw"; startX: number; startY: number }
+  | { mode: "move"; startX: number; startY: number; initial: CoverImageCrop }
+  | { mode: "resize"; anchorX: number; anchorY: number };
+
+const CROP_HANDLES: Array<{ handle: CropHandle; className: string }> = [
+  { handle: "nw", className: "-left-2 -top-2 cursor-nwse-resize" },
+  { handle: "ne", className: "-right-2 -top-2 cursor-nesw-resize" },
+  { handle: "sw", className: "-bottom-2 -left-2 cursor-nesw-resize" },
+  { handle: "se", className: "-bottom-2 -right-2 cursor-nwse-resize" },
+];
 
 export function AssetUploader({
   pageId,
@@ -43,7 +58,7 @@ export function AssetUploader({
 }) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
-  const cropStartRef = useRef<{ x: number; y: number } | null>(null);
+  const cropInteractionRef = useRef<CropInteraction | null>(null);
   const [preview, setPreview] = useState(currentUrl ?? "");
   const [message, setMessage] = useState<string | null>(null);
   const [messageIsError, setMessageIsError] = useState(false);
@@ -188,21 +203,53 @@ export function AssetUploader({
   function startCrop(event: ReactPointerEvent<HTMLDivElement>) {
     if (coverFit !== "COVER" || busy) return;
     const point = cropPoint(event);
-    cropStartRef.current = { x: point.x, y: point.y };
+    const target = event.target as HTMLElement;
+    const handle = target.closest<HTMLElement>("[data-crop-handle]")?.dataset.cropHandle as CropHandle | undefined;
+    if (handle && coverCrop) {
+      const left = (coverCrop.x / 100) * point.width;
+      const top = (coverCrop.y / 100) * point.height;
+      const right = left + (coverCrop.width / 100) * point.width;
+      const bottom = top + (coverCrop.height / 100) * point.height;
+      cropInteractionRef.current = {
+        mode: "resize",
+        anchorX: handle === "nw" || handle === "sw" ? right : left,
+        anchorY: handle === "nw" || handle === "ne" ? bottom : top,
+      };
+    } else if (target.closest("[data-crop-selection]") && coverCrop) {
+      cropInteractionRef.current = {
+        mode: "move",
+        startX: point.x,
+        startY: point.y,
+        initial: coverCrop,
+      };
+    } else {
+      cropInteractionRef.current = { mode: "draw", startX: point.x, startY: point.y };
+    }
+    event.preventDefault();
     event.currentTarget.setPointerCapture(event.pointerId);
   }
 
   function updateCrop(event: ReactPointerEvent<HTMLDivElement>) {
-    const start = cropStartRef.current;
-    if (!start || coverFit !== "COVER") return;
+    const interaction = cropInteractionRef.current;
+    if (!interaction || coverFit !== "COVER") return;
     const point = cropPoint(event);
-    const crop = bannerCropFromDrag(start.x, start.y, point.x, point.y, point.width, point.height);
+    if (interaction.mode === "move") {
+      setCoverCrop(movedBannerCrop(
+        interaction.initial,
+        ((point.x - interaction.startX) / point.width) * 100,
+        ((point.y - interaction.startY) / point.height) * 100,
+      ));
+      return;
+    }
+    const startX = interaction.mode === "resize" ? interaction.anchorX : interaction.startX;
+    const startY = interaction.mode === "resize" ? interaction.anchorY : interaction.startY;
+    const crop = bannerCropFromDrag(startX, startY, point.x, point.y, point.width, point.height);
     if (crop) setCoverCrop(crop);
   }
 
   function finishCrop(event: ReactPointerEvent<HTMLDivElement>) {
     updateCrop(event);
-    cropStartRef.current = null;
+    cropInteractionRef.current = null;
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
@@ -256,8 +303,10 @@ export function AssetUploader({
                 />
                 {coverFit === "COVER" && coverCrop && (
                   <span
+                    data-crop-selection
+                    role="group"
                     aria-label="Selected banner crop"
-                    className="pointer-events-none absolute border-2 border-white shadow-[0_0_0_9999px_rgba(15,23,42,0.62)]"
+                    className="absolute cursor-move border-2 border-white shadow-[0_0_0_9999px_rgba(15,23,42,0.62)]"
                     style={{
                       left: `${coverCrop.x}%`,
                       top: `${coverCrop.y}%`,
@@ -265,7 +314,18 @@ export function AssetUploader({
                       height: `${coverCrop.height}%`,
                     }}
                   >
-                    <span className="absolute inset-0 border border-black/30" />
+                    <span className="pointer-events-none absolute inset-0 border border-black/30" />
+                    <span className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 whitespace-nowrap rounded bg-black/60 px-2 py-1 text-[10px] font-semibold text-white">
+                      Drag to move
+                    </span>
+                    {CROP_HANDLES.map(({ handle, className }) => (
+                      <span
+                        key={handle}
+                        data-crop-handle={handle}
+                        aria-hidden="true"
+                        className={`absolute h-4 w-4 rounded-sm border-2 border-white bg-[var(--cyan)] shadow ${className}`}
+                      />
+                    ))}
                   </span>
                 )}
               </div>
@@ -319,7 +379,7 @@ export function AssetUploader({
             </div>
             <p className="text-xs text-[var(--fg-dim)]">
               {coverFit === "COVER"
-                ? "Drag anywhere across the full image to draw a new banner frame. The selection keeps the public banner’s 16:5 shape."
+                ? "Drag inside the frame to reposition it, drag a corner to resize it, or drag outside the frame to draw a new 16:5 banner selection."
                 : "The public page shows the complete image without cropping and caps its height responsively."}
             </p>
           </div>

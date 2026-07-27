@@ -7,6 +7,7 @@ import { collections } from "@/lib/db";
 import { oid, toId } from "@/lib/mongo-utils";
 import { withTransaction } from "@/lib/cascade";
 import { fenceActiveOrganizationMutation } from "@/lib/organization-mutation";
+import { activePageFilter } from "@/lib/page-lifecycle";
 
 const schema = z.object({ value: z.number().finite(), timestamp: z.string().datetime().optional() });
 
@@ -20,10 +21,10 @@ export async function POST(
     const { id } = await params;
     const metric = await collections.metrics().findOne({ _id: oid(id) });
     if (!metric) return apiError(404, "METRIC_NOT_FOUND", "Metric not found");
-    const page = await collections.pages().findOne({
+    const page = await collections.pages().findOne(activePageFilter({
       _id: metric.pageId,
       orgId: oid(apiKey.orgId),
-    });
+    }));
     if (!page || !apiKeyAllowsPage(apiKey, page._id.toHexString())) {
       return apiError(404, "METRIC_NOT_FOUND", "Metric not found");
     }
@@ -43,7 +44,7 @@ export async function POST(
       );
       const currentPage = currentMetric
         ? await collections.pages().findOne(
-            { _id: currentMetric.pageId, orgId: oid(apiKey.orgId) },
+            activePageFilter({ _id: currentMetric.pageId, orgId: oid(apiKey.orgId) }),
             { session: databaseSession }
           )
         : null;

@@ -8,6 +8,7 @@ import {
   type ComponentStatus,
 } from "@/lib/status";
 import { activeIncidentIndicator } from "@/lib/public-surface-policy";
+import { publicPageFilter } from "@/lib/page-lifecycle";
 
 export async function getPublicSurfaceSummary(
   pageId: string,
@@ -41,7 +42,7 @@ export async function getAuthorizedHubChildren(
 ) {
   const childPages = await collections
     .pages()
-    .find({ hubParentId: hub._id, orgId: hub.orgId, isHub: false })
+    .find(publicPageFilter({ hubParentId: hub._id, orgId: hub.orgId, isHub: false }))
     .sort({ createdAt: 1 })
     .toArray();
 

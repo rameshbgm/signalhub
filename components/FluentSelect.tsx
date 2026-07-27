@@ -156,10 +156,16 @@ export function FluentSelect({
   const parsedOptions = useMemo(() => optionsFromChildren(children), [children]);
   const firstValue = parsedOptions.find((option) => !option.disabled)?.value ?? "";
   const controlledValue = value === undefined ? undefined : String(value);
+  const resolvedDefaultValue = String(defaultValue ?? firstValue);
   const [open, setOpen] = useState(false);
   const [internalValue, setInternalValue] = useState(
     () => String(controlledValue ?? defaultValue ?? firstValue)
   );
+  const [defaultValueSnapshot, setDefaultValueSnapshot] = useState(resolvedDefaultValue);
+  if (controlledValue === undefined && defaultValueSnapshot !== resolvedDefaultValue) {
+    setDefaultValueSnapshot(resolvedDefaultValue);
+    setInternalValue(resolvedDefaultValue);
+  }
   const listboxId = useId();
   const rootRef = useRef<HTMLDivElement>(null);
   const hiddenInputRef = useRef<HTMLInputElement>(null);
@@ -285,6 +291,7 @@ export function FluentSelect({
       >
         <Button
           ref={buttonRef}
+          data-button-guard="off"
           id={id}
           aria-controls={open ? listboxId : undefined}
           aria-expanded={open}

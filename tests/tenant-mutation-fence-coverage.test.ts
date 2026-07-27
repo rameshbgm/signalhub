@@ -110,7 +110,6 @@ describe("tenant mutation lifecycle-fence coverage", () => {
 
   it("keeps cascade deletes fenced, tenant-scoped, and count checked", () => {
     const callers = [
-      exportedFunctionSource("app/admin/(protected)/pages/actions.ts", "deletePage"),
       exportedFunctionSource(
         "app/admin/(protected)/pages/[pageId]/components-actions.ts",
         "deleteComponent"
@@ -120,7 +119,7 @@ describe("tenant mutation lifecycle-fence coverage", () => {
     ];
     for (const contents of callers) {
       expect(contents).toMatch(
-        /delete(?:Page|Component|Metric|Monitor)Cascade\([^;]*session\.orgId/
+        /delete(?:Component|Metric|Monitor)Cascade\([^;]*session\.orgId/
       );
     }
 
@@ -137,6 +136,15 @@ describe("tenant mutation lifecycle-fence coverage", () => {
       expect(contents).toContain("deletedCount");
     }
     expect(cascadeSource).toContain("return true");
+  });
+
+  it("soft-deletes pages behind the tenant fence without cascading related data", () => {
+    const contents = exportedFunctionSource("app/admin/(protected)/pages/actions.ts", "deletePage");
+    expect(contents).toContain("withTransaction(");
+    expect(contents).toContain("fenceActiveOrganizationMutation(");
+    expect(contents).toContain("deletedAt: new Date()");
+    expect(contents).toContain("changed.matchedCount");
+    expect(contents).not.toContain("deletePageCascade");
   });
 
   it("holds the page lifecycle fence while deleting recorded asset objects", () => {

@@ -19,10 +19,11 @@ import { AnnouncementList } from "@/components/public/AnnouncementList";
 import type { PageDesignBlock } from "@/lib/page-design";
 import type { Metadata } from "next";
 import { publicFaviconMetadata } from "@/lib/public-favicon";
+import { publicPageFilter } from "@/lib/page-lifecycle";
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params;
-  const hub = await collections.pages().findOne({ slug, isHub: true });
+  const hub = await collections.pages().findOne(publicPageFilter({ slug, isHub: true }));
   if (!hub) return {};
   const design = pageDesignFor(hub);
   return {
@@ -36,7 +37,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 
 export default async function HubPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const hubDoc = await collections.pages().findOne({ slug });
+  const hubDoc = await collections.pages().findOne(publicPageFilter({ slug }));
   if (!hubDoc || !hubDoc.isHub) notFound();
   const hub = toId(hubDoc);
   const design = pageDesignFor(hubDoc);
@@ -51,7 +52,7 @@ export default async function HubPage({ params }: { params: Promise<{ slug: stri
   }
   const candidateChildren = await collections
     .pages()
-    .find({ hubParentId: hubDoc._id, orgId: hubDoc.orgId, isHub: false })
+    .find(publicPageFilter({ hubParentId: hubDoc._id, orgId: hubDoc.orgId, isHub: false }))
     .sort({ createdAt: 1 })
     .toArray();
   const childData = (

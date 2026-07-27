@@ -49,10 +49,10 @@ export default async function EmbedPage({ searchParams }: { searchParams: Promis
       {page && (
         <>
           <div>
-            <h2 className="mb-2 flex items-center gap-1.5 font-mono text-sm font-semibold text-[var(--fg)]">
-              Auto-appearing incident banner
+            <div className="mb-2 flex items-center gap-1.5">
+              <h2 className="font-mono text-sm font-semibold text-[var(--fg)]">Auto-appearing incident banner</h2>
               <HelpTip text="Renders a banner on your site automatically during active incidents or maintenance — no code changes needed after install." />
-            </h2>
+            </div>
             <pre className="overflow-x-auto border border-[var(--line)] bg-[var(--bg)] p-3 text-xs text-[var(--fg-soft)]">{scriptTag}</pre>
           </div>
           <div>

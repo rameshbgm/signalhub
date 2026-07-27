@@ -9,6 +9,7 @@ import { secretMatches } from "@/lib/secrets";
 import { isPageOrganizationActive } from "@/lib/public-page";
 import { withTransaction } from "@/lib/cascade";
 import { fenceActiveOrganizationMutation } from "@/lib/organization-mutation";
+import { publicPageFilter } from "@/lib/page-lifecycle";
 
 const schema = z.object({
   pageSlug: z.string().trim().min(1),
@@ -29,7 +30,7 @@ export async function POST(request: NextRequest) {
       parsed.data.channel === "EMAIL"
         ? canonicalizeEmail(parsed.data.contact)
         : parsed.data.contact.replace(/[\s()-]/g, "");
-    const page = await collections.pages().findOne({ slug: parsed.data.pageSlug });
+    const page = await collections.pages().findOne(publicPageFilter({ slug: parsed.data.pageSlug }));
     if (!page) return apiError(404, "PAGE_NOT_FOUND", "Page not found");
     if (!(await isPageOrganizationActive(page.orgId))) {
       return apiError(404, "PAGE_NOT_FOUND", "Page not found");
@@ -55,7 +56,7 @@ export async function POST(request: NextRequest) {
     await withTransaction(async (databaseSession) => {
       await fenceActiveOrganizationMutation(page.orgId, databaseSession);
       const currentPage = await collections.pages().findOne(
-        { _id: page._id, orgId: page.orgId, slug: parsed.data.pageSlug },
+        publicPageFilter({ _id: page._id, orgId: page.orgId, slug: parsed.data.pageSlug }),
         { session: databaseSession }
       );
       const currentOtp = currentPage

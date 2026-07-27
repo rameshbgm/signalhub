@@ -18,10 +18,11 @@ import { pageDesignFor, type PageDesignBlock } from "@/lib/page-design";
 import { PageDesignShell, contentWidthClass } from "@/components/public/PageDesignShell";
 import { AnnouncementList } from "@/components/public/AnnouncementList";
 import { publicFaviconMetadata } from "@/lib/public-favicon";
+import { publicPageFilter } from "@/lib/page-lifecycle";
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params;
-  const page = await collections.pages().findOne({ slug });
+  const page = await collections.pages().findOne(publicPageFilter({ slug }));
   if (!page) return {};
   const design = pageDesignFor(page);
   return {
@@ -35,9 +36,9 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 
 export default async function PublicStatusPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const pageDoc = await collections.pages().findOne({ slug });
+  const pageDoc = await collections.pages().findOne(publicPageFilter({ slug }));
   if (!pageDoc) notFound();
-  const hubParentDoc = pageDoc.hubParentId ? await collections.pages().findOne({ _id: pageDoc.hubParentId }) : null;
+  const hubParentDoc = pageDoc.hubParentId ? await collections.pages().findOne(publicPageFilter({ _id: pageDoc.hubParentId })) : null;
   const page = { ...toId(pageDoc), hubParent: hubParentDoc ? toId(hubParentDoc) : null };
   const design = pageDesignFor(pageDoc);
   const basePath = publicPagePath(page);

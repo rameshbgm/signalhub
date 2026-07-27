@@ -103,7 +103,7 @@ export default async function PlatformAuditPage({
             <input name="name" placeholder="Sink name" required className="border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-xs" />
             <input name="url" type="url" placeholder="https://siem.example/events" required className="border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-xs" />
             <input name="secret" type="password" minLength={32} placeholder="HMAC signing secret (32+ characters)" required className="border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-xs" />
-            <FluentSelect name="orgId" className="border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-xs">
+            <FluentSelect aria-label="Audit sink organization" name="orgId" className="border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-xs">
               <option value="">Platform audit</option>
               {sinkOrganizations.map((org) => <option key={org._id.toHexString()} value={org._id.toHexString()}>{org.name}</option>)}
             </FluentSelect>

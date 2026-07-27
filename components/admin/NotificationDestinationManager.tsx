@@ -208,6 +208,7 @@ export function NotificationDestinationManager({
                 <button
                   key={provider.value}
                   type="button"
+                  data-button-guard="off"
                   aria-pressed={selected}
                   onClick={() => {
                     setChannel(provider.value);

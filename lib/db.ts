@@ -462,6 +462,11 @@ export interface PageDoc {
   publishedDesign?: StatusPageDesign;
   publishedDesignVersion?: number;
   designPublishedAt?: Date | null;
+  /** Missing on legacy records means visible. */
+  publicVisible?: boolean;
+  /** A date marks a recoverable soft deletion; null/missing means active. */
+  deletedAt?: Date | null;
+  deletedBy?: ObjectId | null;
   createdAt: Date;
 }
 
@@ -667,6 +672,8 @@ export interface MetricPointDoc {
 export interface MonitorDoc {
   _id: ObjectId;
   pageId: ObjectId;
+  /** Present when this monitor is attached from the global master catalog. */
+  templateId?: ObjectId | null;
   componentId: ObjectId | null;
   name: string;
   type: string; // HTTP, TCP, PING, SSL, KEYWORD

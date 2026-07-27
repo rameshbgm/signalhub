@@ -1,5 +1,6 @@
 import { db, collections } from "@/lib/db";
 import { pruneAuditBefore } from "@/lib/audit-integrity";
+import { auditRetentionCutoff } from "@/lib/audit-retention";
 
 export const RETENTION_BOUNDS = {
   monitorChecksDays: { min: 7, max: 3650 },
@@ -108,7 +109,7 @@ export async function runRetentionSweep(workerId: string, now = new Date()) {
         status: { $in: ["SENT", "DEAD_LETTER"] },
         updatedAt: { $lt: cutoff(now, policy.notificationLogsDays) },
       }),
-      pruneAuditBefore(cutoff(now, policy.auditLogsDays), organization._id),
+      pruneAuditBefore(auditRetentionCutoff(now), organization._id),
     ]);
     const expiredIncidents = await collections.incidents().find(
       {
@@ -127,8 +128,7 @@ export async function runRetentionSweep(workerId: string, now = new Date()) {
       await collections.incidents().deleteMany({ _id: { $in: ids } });
     }
   }
-  const platformPolicy = await effectiveRetention(null);
-  await pruneAuditBefore(cutoff(now, platformPolicy.auditLogsDays));
+  await pruneAuditBefore(auditRetentionCutoff(now));
   await leases.updateOne(
     { _id: "retention", owner: workerId },
     {

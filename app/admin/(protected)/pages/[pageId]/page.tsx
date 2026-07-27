@@ -5,7 +5,7 @@ import { requireSession } from "@/lib/require-session";
 import { collections } from "@/lib/db";
 import { oid, toId } from "@/lib/mongo-utils";
 import { COMPONENT_STATUSES, COMPONENT_STATUS_LABEL } from "@/lib/status";
-import { updatePageSettings, deletePage } from "../actions";
+import { updatePageSettings, deletePage, setPagePublicVisibility } from "../actions";
 import { createGroup, deleteGroup, createComponent, updateComponentStatus, deleteComponent } from "./components-actions";
 import { createAccessGroup, deleteAccessGroup, createAccessUser, deleteAccessUser } from "./access-actions";
 import { LayoutPicker } from "@/components/admin/LayoutPicker";
@@ -53,6 +53,8 @@ export default async function PageDetail({ params }: { params: Promise<{ pageId:
 
   const boundUpdatePage = updatePageSettings.bind(null, pageId);
   const boundDeletePage = deletePage.bind(null, pageId);
+  const boundShowPage = setPagePublicVisibility.bind(null, pageId, true);
+  const boundHidePage = setPagePublicVisibility.bind(null, pageId, false);
   const boundCreateGroup = createGroup.bind(null, pageId);
   const boundCreateComponent = createComponent.bind(null, pageId);
   const boundCreateAccessGroup = createAccessGroup.bind(null, pageId);
@@ -73,9 +75,13 @@ export default async function PageDetail({ params }: { params: Promise<{ pageId:
           >
             Save all settings
           </PlatformSubmitButton>
-          <a href={publicPagePath(page)} target="_blank" rel="noreferrer" className="text-sm text-[var(--cyan)] hover:underline">
-            View public page →
-          </a>
+          {page.publicVisible !== false ? (
+            <a href={publicPagePath(page)} target="_blank" rel="noreferrer" className="text-sm text-[var(--cyan)] hover:underline">
+              View public page →
+            </a>
+          ) : (
+            <span className="border border-[var(--amber)]/40 bg-[var(--amber-soft)] px-2 py-1 font-mono text-xs text-[var(--amber)]">Hidden from public</span>
+          )}
         </div>
       </div>
 
@@ -105,14 +111,14 @@ export default async function PageDetail({ params }: { params: Promise<{ pageId:
             <input name="brandColor" type="color" defaultValue={page.brandColor} className="w-16 h-9 border border-[var(--line)] bg-[var(--bg)]" />
           </Field>
           <Field label="Theme preset">
-            <FluentSelect name="themePreset" defaultValue={page.themePreset ?? "SIGNAL"} className="w-full border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm">
+            <FluentSelect aria-label="Theme preset" name="themePreset" defaultValue={page.themePreset ?? "SIGNAL"} className="w-full border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm">
               <option value="SIGNAL">Signal</option>
               <option value="CALM">Calm</option>
               <option value="CONTRAST">High contrast</option>
             </FluentSelect>
           </Field>
           <Field label="Color mode">
-            <FluentSelect name="themeMode" defaultValue={page.themeMode ?? "SYSTEM"} className="w-full border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm">
+            <FluentSelect aria-label="Color mode" name="themeMode" defaultValue={page.themeMode ?? "SYSTEM"} className="w-full border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm">
               <option value="SYSTEM">Follow visitor system</option>
               <option value="LIGHT">Always light</option>
               <option value="DARK">Always dark</option>
@@ -165,6 +171,26 @@ export default async function PageDetail({ params }: { params: Promise<{ pageId:
       </section>
       </form>
 
+      <section className="flex flex-col gap-4 border border-[var(--line)] bg-[var(--surface)] p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
+        <div>
+          <h2 className="font-mono font-semibold text-[var(--fg)]">Public visibility</h2>
+          <p className="mt-1 max-w-2xl text-sm text-[var(--fg-soft)]">
+            {page.publicVisible === false
+              ? "This page is hidden from visitors. Assigned incident managers and responders can still manage it after signing in."
+              : "This page is available on its public URL. Hide it without interrupting signed-in operational work."}
+          </p>
+        </div>
+        <form action={page.publicVisible === false ? boundShowPage : boundHidePage}>
+          <PlatformSubmitButton
+            pendingLabel={page.publicVisible === false ? "Publishing…" : "Hiding…"}
+            confirmMessage={page.publicVisible === false ? undefined : `Hide ${page.name} from the public? Signed-in operators will retain access.`}
+            className="shrink-0 border border-[var(--cyan)]/40 px-4 py-2 text-sm font-semibold text-[var(--cyan)] hover:bg-[var(--cyan-soft)]"
+          >
+            {page.publicVisible === false ? "Publish publicly" : "Hide from public"}
+          </PlatformSubmitButton>
+        </form>
+      </section>
+
       <section className="bg-[var(--surface)] border border-[var(--line)] p-4 sm:p-5">
         <h2 className="font-mono font-semibold mb-4 text-[var(--fg)]">Component Groups</h2>
         <form action={boundCreateGroup} className="flex flex-col gap-2 mb-4 sm:flex-row">
@@ -187,7 +213,7 @@ export default async function PageDetail({ params }: { params: Promise<{ pageId:
         <h2 className="font-mono font-semibold mb-4 text-[var(--fg)]">Components</h2>
         <form action={boundCreateComponent} className="grid sm:grid-cols-2 gap-3 mb-6 border-b border-[var(--line)] pb-6">
           <input name="name" placeholder="Component name" className="border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--fg)] placeholder:text-[var(--fg-dim)] focus:border-[var(--cyan)] focus:outline-none" />
-          <FluentSelect name="groupId" className="border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--fg)] focus:border-[var(--cyan)] focus:outline-none">
+          <FluentSelect aria-label="Component group" name="groupId" className="border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--fg)] focus:border-[var(--cyan)] focus:outline-none">
             <option value="">No group</option>
             {groups.map((g) => (
               <option key={g.id} value={g.id}>
@@ -231,7 +257,7 @@ export default async function PageDetail({ params }: { params: Promise<{ pageId:
                       <p className="font-mono text-xs font-semibold uppercase tracking-wide text-[var(--fg-dim)]">Public status</p>
                       <p className="mt-1 text-xs text-[var(--fg-dim)]">Publish a status change and an optional customer-facing note.</p>
                     </div>
-                    <FluentSelect name="status" defaultValue={c.status} className="w-full border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--fg)] focus:border-[var(--cyan)] focus:outline-none">
+                    <FluentSelect aria-label={`Public status for ${c.name}`} name="status" defaultValue={c.status} className="w-full border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--fg)] focus:border-[var(--cyan)] focus:outline-none">
                       {COMPONENT_STATUSES.map((s) => (
                         <option key={s} value={s}>{COMPONENT_STATUS_LABEL[s]}</option>
                       ))}
@@ -255,7 +281,7 @@ export default async function PageDetail({ params }: { params: Promise<{ pageId:
                       </label>
                       <label className="text-xs text-[var(--fg-soft)]">
                         Group
-                        <FluentSelect form="page-settings-form" name={`component.${c.id}.groupId`} defaultValue={c.groupId?.toString() ?? ""} className="mt-1 w-full border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--fg)]">
+                        <FluentSelect aria-label={`Group for ${c.name}`} form="page-settings-form" name={`component.${c.id}.groupId`} defaultValue={c.groupId?.toString() ?? ""} className="mt-1 w-full border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--fg)]">
                           <option value="">No group</option>
                           {groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
                         </FluentSelect>
@@ -317,7 +343,7 @@ export default async function PageDetail({ params }: { params: Promise<{ pageId:
           <form action={boundCreateAccessUser} className="grid sm:grid-cols-2 gap-3 mb-4 border-b border-[var(--line)] pb-4">
             <input name="email" type="email" placeholder="Customer email" className="border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--fg)] placeholder:text-[var(--fg-dim)] focus:border-[var(--cyan)] focus:outline-none" required />
             <input name="password" type="password" placeholder="Password" className="border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--fg)] placeholder:text-[var(--fg-dim)] focus:border-[var(--cyan)] focus:outline-none" required />
-            <FluentSelect name="groupId" className="border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--fg)] focus:border-[var(--cyan)] focus:outline-none">
+            <FluentSelect aria-label="Access group" name="groupId" className="border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--fg)] focus:border-[var(--cyan)] focus:outline-none">
               <option value="">No group</option>
               {accessGroups.map((g) => (
                 <option key={g.id} value={g.id}>
@@ -352,8 +378,14 @@ export default async function PageDetail({ params }: { params: Promise<{ pageId:
       <section className="bg-[var(--surface)] border border-[var(--red)]/30 p-4 sm:p-5">
         <h2 className="font-mono font-semibold mb-2 text-[var(--red)]">Danger Zone</h2>
         <form action={boundDeletePage} className="flex items-center gap-2">
-          <button className="text-red-400 border border-red-400/40 px-3 py-1.5 text-sm hover:bg-[var(--red-soft)]">Delete this page</button>
-          <HelpTip text="Permanently deletes this page and all of its components, incidents, and subscribers. This cannot be undone." />
+          <PlatformSubmitButton
+            pendingLabel="Deleting…"
+            confirmMessage={`Delete ${page.name}? This page will become unavailable to everyone. An administrator can restore it from Deleted Pages.`}
+            className="border border-[var(--red)]/40 px-3 py-1.5 text-sm font-semibold text-[var(--red)] hover:bg-[var(--red-soft)]"
+          >
+            Delete this page
+          </PlatformSubmitButton>
+          <HelpTip text="Soft-deletes this page and makes it inaccessible. Administrators can restore it from Deleted Pages." />
         </form>
       </section>
     </div>

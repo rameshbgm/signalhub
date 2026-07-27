@@ -138,6 +138,7 @@ export default async function IncidentDetailPage({ params }: { params: Promise<{
         <div className="bg-[var(--surface)] border border-[var(--line)] p-4 sm:p-5">
           <h2 className="font-mono font-semibold mb-3 text-sm text-[var(--fg)]">Postmortem</h2>
           <PostmortemComposer
+            key={`${incident.postmortemBody ?? ""}:${incident.postmortemPublishedAt?.toISOString() ?? ""}`}
             action={boundPostmortem}
             initialBody={incident.postmortemBody ?? ""}
             published={Boolean(incident.postmortemPublishedAt)}

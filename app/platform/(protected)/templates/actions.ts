@@ -72,6 +72,25 @@ export async function saveMonitorTemplate(templateId: string | null, formData: F
           { $set: values },
           { session: databaseSession }
         );
+        await collections.monitors().updateMany(
+          { templateId: id },
+          {
+            $set: {
+              name: values.name,
+              type: values.type,
+              target: values.type === "HEARTBEAT" ? "inbound-heartbeat" : values.target,
+              port: values.port,
+              expectedStatusRange: values.expectedStatusRange,
+              keywordMatch: values.keywordMatch,
+              groupName: values.category,
+              enabled: values.enabled,
+              runRequestedAt: new Date(),
+              leaseOwner: null,
+              leaseExpiresAt: null,
+            },
+          },
+          { session: databaseSession }
+        );
       } else {
         await collections
           .monitorTemplates()
@@ -110,6 +129,13 @@ export async function deleteMonitorTemplate(templateId: string, formData: FormDa
         { session: databaseSession }
       );
       if (!template) throw new Error("Monitor template not found");
+      const attachmentCount = await collections.monitors().countDocuments(
+        { templateId: template._id },
+        { session: databaseSession }
+      );
+      if (attachmentCount) {
+        throw new Error(`Remove this template from ${attachmentCount} page${attachmentCount === 1 ? "" : "s"} before deleting the global master`);
+      }
       const deleted = await collections.monitorTemplates().deleteOne(
         { _id: template._id },
         { session: databaseSession }

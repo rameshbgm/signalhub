@@ -98,10 +98,10 @@ export default async function SetupNotificationsPage({ params }: { params: Promi
       </section>
 
       <section className="mt-10" aria-labelledby="status-webhooks-title">
-        <h2 id="status-webhooks-title" className="flex items-center gap-1.5 font-mono text-base font-semibold text-[var(--fg)]">
-          Signed status-event webhooks
+        <div className="flex items-center gap-1.5">
+          <h2 id="status-webhooks-title" className="font-mono text-base font-semibold text-[var(--fg)]">Signed status-event webhooks</h2>
           <HelpTip text="We'll POST a JSON payload to this URL every time an incident or maintenance event happens." />
-        </h2>
+        </div>
         <p className="mb-4 mt-1 text-sm text-[var(--fg-dim)]">For custom systems, register an HTTPS endpoint with HMAC signatures, verification, retries, and secret rotation.</p>
         <WebhookEndpointManager
           pageId={pageId}

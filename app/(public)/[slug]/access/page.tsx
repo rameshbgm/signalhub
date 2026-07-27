@@ -9,6 +9,7 @@ import { PageSurfaceLayout } from "@/components/public/PageSurfaceLayout";
 import { PublicFooter, PublicHeader } from "@/components/public/PublicChrome";
 import type { PageDesignBlock } from "@/lib/page-design";
 import { scopeCustomCss } from "@/lib/custom-css";
+import { publicPageFilter } from "@/lib/page-lifecycle";
 
 export default async function AccessPage({
   params,
@@ -22,7 +23,7 @@ export default async function AccessPage({
   const returnTo = requestedReturnTo?.startsWith("/") && !requestedReturnTo.startsWith("//")
     ? requestedReturnTo
     : `/${slug}`;
-  const pageDoc = await collections.pages().findOne({ slug });
+  const pageDoc = await collections.pages().findOne(publicPageFilter({ slug }));
   if (!pageDoc) notFound();
   const page = toId(pageDoc);
   const design = pageDesignFor(pageDoc);

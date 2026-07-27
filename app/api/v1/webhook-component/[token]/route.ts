@@ -8,6 +8,7 @@ import { hashSecret } from "@/lib/secrets";
 import { apiError, routeError, validationError } from "@/lib/api-response";
 import { consumeRateLimit, RateLimitError, requestIp } from "@/lib/rate-limit";
 import { organizationIsActive } from "@/lib/organization-state";
+import { activePageFilter } from "@/lib/page-lifecycle";
 
 /**
  * Per-component automation endpoint (token in the URL is the credential).
@@ -26,7 +27,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
     const { token } = await params;
     const componentDoc = await collections.components().findOne({ automationTokenHash: hashSecret(token) });
     if (!componentDoc) return apiError(404, "INVALID_AUTOMATION_TOKEN", "Invalid automation token");
-    const page = await collections.pages().findOne({ _id: componentDoc.pageId });
+    const page = await collections.pages().findOne(activePageFilter({ _id: componentDoc.pageId }));
     const organization = page
       ? await collections.organizations().findOne({ _id: page.orgId })
       : null;

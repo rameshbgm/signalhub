@@ -3,6 +3,7 @@ import { collections } from "@/lib/db";
 import { toId } from "@/lib/mongo-utils";
 import { HelpTip } from "@/components/HelpTip";
 import { requireCapability } from "@/lib/admin-guard";
+import Link from "next/link";
 
 export default async function ThirdPartyCatalogPage() {
   await requireSession();
@@ -17,16 +18,17 @@ export default async function ThirdPartyCatalogPage() {
   }
 
   return (
-    <div className="max-w-3xl space-y-6">
-      <h1 className="flex items-center gap-1.5 font-mono text-xl font-semibold text-[var(--fg)]">
-        Monitor Templates
-        <HelpTip text="Templates create real worker-backed monitors. You can change every target, interval, assertion, and action after creating one." />
-      </h1>
+    <div className="mx-auto w-full max-w-5xl space-y-6">
+      <div className="flex items-center gap-1.5">
+        <h1 className="font-mono text-xl font-semibold text-[var(--fg)]">
+          Monitor Templates
+        </h1>
+        <HelpTip text="This is the read-only global master catalog. Pages can add or remove templates, but cannot edit them." />
+      </div>
       <p className="text-sm text-[var(--fg-soft)]">
-        {providers.length} curated checks with stable public endpoints. Select one while adding a component to create an enabled
-        monitor with editable configuration. Templates are starting points; the worker always evaluates the stored monitor
-        configuration.
+        {providers.length} master checks maintained globally. Status pages can show or remove these monitors without changing their definitions.
       </p>
+      <Link href="/organization/monitors" className="inline-block bg-[var(--cyan)] px-4 py-2 text-sm font-semibold text-[var(--on-cyan)]">Add or remove monitors on a page</Link>
       <div className="grid gap-6 sm:grid-cols-2">
         {[...byCategory.entries()].map(([category, items]) => (
           <div key={category} className="border border-[var(--line)] bg-[var(--surface)] p-4">

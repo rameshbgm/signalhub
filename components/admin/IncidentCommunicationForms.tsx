@@ -106,7 +106,7 @@ export function IncidentUpdateComposer({
           </div>
         </div>
       )}
-      <FluentSelect name="status" value={status} onChange={(event) => setStatus(event.target.value)} className="w-full border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm">
+      <FluentSelect aria-label="Update status" name="status" value={status} onChange={(event) => setStatus(event.target.value)} className="w-full border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm">
         {INCIDENT_STATUSES.map((value) => <option key={value} value={value}>{INCIDENT_STATUS_LABEL[value]}</option>)}
       </FluentSelect>
       <textarea name="body" value={body} onChange={(event) => setBody(event.target.value)} rows={4} placeholder="What changed, who is affected, and when is the next update?" className="w-full border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm" required />
@@ -191,6 +191,7 @@ export function MaintenanceUpdateComposer({
         </div>
       )}
       <FluentSelect
+        aria-label="Maintenance status"
         name="maintenanceStatus"
         value={status}
         onChange={(event) => setStatus(event.target.value)}

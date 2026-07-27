@@ -86,14 +86,14 @@ export default async function TemplatesPage({ searchParams }: { searchParams: Pr
             className="w-full bg-[var(--bg)] border border-[var(--line)] px-3 py-2 text-sm text-[var(--fg)] placeholder:text-[var(--fg-dim)] focus:border-[var(--cyan)] focus:outline-none"
           />
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <FluentSelect name="kind" className="bg-[var(--bg)] border border-[var(--line)] px-3 py-2 text-sm text-[var(--fg)]">
+            <FluentSelect aria-label="Template kind" name="kind" className="bg-[var(--bg)] border border-[var(--line)] px-3 py-2 text-sm text-[var(--fg)]">
               <option value="INCIDENT">New incident</option>
               <option value="UPDATE">Incident update</option>
               <option value="RESOLUTION">Resolution</option>
               <option value="MAINTENANCE">Maintenance</option>
               <option value="POSTMORTEM">Postmortem</option>
             </FluentSelect>
-            <FluentSelect name="groupId" className="bg-[var(--bg)] border border-[var(--line)] px-3 py-2 text-sm text-[var(--fg)] focus:border-[var(--cyan)] focus:outline-none">
+            <FluentSelect aria-label="Template group" name="groupId" className="bg-[var(--bg)] border border-[var(--line)] px-3 py-2 text-sm text-[var(--fg)] focus:border-[var(--cyan)] focus:outline-none">
               <option value="">No group</option>
               {groups.map((g) => (
                 <option key={g.id} value={g.id}>
@@ -101,14 +101,14 @@ export default async function TemplatesPage({ searchParams }: { searchParams: Pr
                 </option>
               ))}
             </FluentSelect>
-            <FluentSelect name="defaultStatus" className="bg-[var(--bg)] border border-[var(--line)] px-3 py-2 text-sm text-[var(--fg)] focus:border-[var(--cyan)] focus:outline-none">
+            <FluentSelect aria-label="Default status" name="defaultStatus" className="bg-[var(--bg)] border border-[var(--line)] px-3 py-2 text-sm text-[var(--fg)] focus:border-[var(--cyan)] focus:outline-none">
               {INCIDENT_STATUSES.map((s) => (
                 <option key={s} value={s}>
                   {INCIDENT_STATUS_LABEL[s]}
                 </option>
               ))}
             </FluentSelect>
-            <FluentSelect name="defaultImpact" className="bg-[var(--bg)] border border-[var(--line)] px-3 py-2 text-sm text-[var(--fg)] focus:border-[var(--cyan)] focus:outline-none">
+            <FluentSelect aria-label="Default impact" name="defaultImpact" className="bg-[var(--bg)] border border-[var(--line)] px-3 py-2 text-sm text-[var(--fg)] focus:border-[var(--cyan)] focus:outline-none">
               {IMPACTS.map((i) => (
                 <option key={i} value={i}>
                   {IMPACT_LABEL[i]}
@@ -147,10 +147,10 @@ export default async function TemplatesPage({ searchParams }: { searchParams: Pr
             <details className="mt-3 border-t border-[var(--line)] pt-3">
               <summary className="cursor-pointer text-xs font-semibold text-[var(--cyan)]">Edit template</summary>
               <form action={updateTemplate.bind(null, t.id)} className="mt-3 space-y-2">
-                <input name="title" defaultValue={t.title} className="w-full border border-[var(--line)] bg-[var(--bg)] px-3 py-2" required />
-                <textarea name="body" defaultValue={t.body} rows={4} className="w-full border border-[var(--line)] bg-[var(--bg)] px-3 py-2" required />
+                <input aria-label={`Template title for ${t.title}`} name="title" defaultValue={t.title} className="w-full border border-[var(--line)] bg-[var(--bg)] px-3 py-2" required />
+                <textarea aria-label={`Template body for ${t.title}`} name="body" defaultValue={t.body} rows={4} className="w-full border border-[var(--line)] bg-[var(--bg)] px-3 py-2" required />
                 <div className="flex flex-wrap gap-3">
-                  <FluentSelect name="kind" defaultValue={t.kind ?? "INCIDENT"} className="border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-xs">
+                  <FluentSelect aria-label={`Template kind for ${t.title}`} name="kind" defaultValue={t.kind ?? "INCIDENT"} className="border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-xs">
                     <option value="INCIDENT">New incident</option><option value="UPDATE">Incident update</option><option value="RESOLUTION">Resolution</option><option value="MAINTENANCE">Maintenance</option><option value="POSTMORTEM">Postmortem</option>
                   </FluentSelect>
                   <label className="flex items-center gap-2 text-xs"><input type="checkbox" name="notifyByDefault" defaultChecked={t.notifyByDefault ?? true} /> Notify by default</label>

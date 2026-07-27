@@ -203,9 +203,7 @@ export default async function AdminDashboard() {
                   </div>
                 </div>
                 <div className="flex shrink-0 items-center gap-2 text-xs font-semibold">
-                  <a href={publicPagePath(p)} target="_blank" rel="noreferrer" className="inline-flex min-h-8 items-center justify-center border border-transparent px-2.5 py-1 text-[var(--fg-soft)] hover:border-[var(--line)] hover:text-[var(--fg)]">
-                    View
-                  </a>
+                  {p.publicVisible !== false && <a href={publicPagePath(p)} target="_blank" rel="noreferrer" className="inline-flex min-h-8 items-center justify-center border border-transparent px-2.5 py-1 text-[var(--fg-soft)] hover:border-[var(--line)] hover:text-[var(--fg)]">View</a>}
                   {canConfigurePages && <Link
                     href={`/organization/pages/${p.id}`}
                     className="inline-flex min-h-8 items-center justify-center border border-[var(--cyan)]/30 px-2.5 py-1 text-xs font-semibold text-[var(--cyan)] transition-colors hover:bg-[var(--cyan-soft)]"

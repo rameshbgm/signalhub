@@ -114,6 +114,14 @@ const coverImageCropFrameSource = `
 direct-cover-image-crop-frame-v1
 `;
 
+const pageLifecycleSource = `
+recoverable-page-deletion-and-public-visibility-v1
+`;
+
+const sixMonthAuditRetentionSource = `
+six-calendar-month-audit-retention-v1
+`;
+
 async function productionFoundation(database: Db, session: ClientSession) {
   const legacyMembers = await database
     .collection("teamMembers")
@@ -1119,6 +1127,30 @@ const migrations: Migration[] = [
             coverImageCropHeight: null,
           },
         },
+        { session }
+      );
+    },
+  },
+  {
+    id: "013-page-lifecycle",
+    description: "Add recoverable page deletion and public visibility defaults",
+    source: pageLifecycleSource,
+    run: async (database, session) => {
+      await database.collection("pages").updateMany(
+        {},
+        { $set: { publicVisible: true, deletedAt: null, deletedBy: null } },
+        { session }
+      );
+    },
+  },
+  {
+    id: "014-six-month-audit-retention",
+    description: "Limit audit retention policies to six months",
+    source: sixMonthAuditRetentionSource,
+    run: async (database, session) => {
+      await database.collection("retentionPolicies").updateMany(
+        {},
+        { $set: { auditLogsDays: 183 } },
         { session }
       );
     },

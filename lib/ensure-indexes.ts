@@ -126,6 +126,10 @@ export async function ensureIndexes() {
     collections.apiKeys().createIndex({ keyHash: 1 }, { unique: true }),
     collections.apiKeys().createIndex({ orgId: 1, revokedAt: 1, expiresAt: 1 }),
     collections.pages().createIndex({ slug: 1 }, { unique: true }),
+    collections.monitors().createIndex(
+      { pageId: 1, templateId: 1 },
+      { unique: true, partialFilterExpression: { templateId: { $type: "objectId" } } }
+    ),
     collections.pageDesignDrafts().createIndex({ pageId: 1 }, { unique: true }),
     collections.pageDesignVersions().createIndex({ pageId: 1, version: -1 }, { unique: true }),
     collections.pageAnnouncements().createIndex({ pageId: 1, startsAt: 1, endsAt: 1 }),

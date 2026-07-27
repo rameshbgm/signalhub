@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { collections } from "@/lib/db";
 import { publicFaviconMetadata } from "@/lib/public-favicon";
+import { publicPageFilter } from "@/lib/page-lifecycle";
 
 export async function generateMetadata({
   params,
@@ -9,7 +10,7 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { slug } = await params;
   const page = await collections.pages().findOne(
-    { slug, isHub: false },
+    publicPageFilter({ slug, isHub: false }),
     { projection: { faviconUrl: 1 } }
   );
   return publicFaviconMetadata(page?.faviconUrl);

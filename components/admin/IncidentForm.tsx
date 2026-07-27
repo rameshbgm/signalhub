@@ -167,6 +167,7 @@ export function IncidentForm({
           {components.map((c) => (
             <div key={c.id} className="flex items-center gap-2 text-sm">
               <input
+                aria-label={c.name}
                 type="checkbox"
                 name="componentIds"
                 value={c.id}
@@ -181,6 +182,7 @@ export function IncidentForm({
               <span className="flex-1 text-[var(--fg)]">{c.name}</span>
               {c.id in selected && (
                 <FluentSelect
+                  aria-label={`Status for ${c.name}`}
                   name={`componentStatus_${c.id}`}
                   value={selected[c.id]}
                   onChange={(e) => setSelected({ ...selected, [c.id]: e.target.value })}
