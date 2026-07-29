@@ -15,7 +15,8 @@ import { publicPagePath } from "@/lib/public-path";
 import { PublicAnalytics } from "@/components/public/PublicAnalytics";
 import type { Metadata } from "next";
 import { pageDesignFor, type PageDesignBlock } from "@/lib/page-design";
-import { PageDesignShell, contentWidthClass } from "@/components/public/PageDesignShell";
+import { PageDesignShell } from "@/components/public/PageDesignShell";
+import { PageSurfaceLayout } from "@/components/public/PageSurfaceLayout";
 import { AnnouncementList } from "@/components/public/AnnouncementList";
 import { publicFaviconMetadata } from "@/lib/public-favicon";
 import { publicPageFilter } from "@/lib/page-lifecycle";
@@ -193,7 +194,6 @@ export default async function PublicStatusPage({ params }: { params: Promise<{ s
     }
   }
 
-  const statusSurface = design.surfaces.status;
   return (
     <PageDesignShell pageId={page.id} publishedVersion={page.publishedDesignVersion} design={design} customCss={scopedCss} language={page.language}>
       {page.analyticsEnabled && <PublicAnalytics pageSlug={page.slug} />}
@@ -225,28 +225,20 @@ export default async function PublicStatusPage({ params }: { params: Promise<{ s
           />
         }
       />
-      <main className={`${contentWidthClass(design)} mx-auto w-full flex-1 px-4 py-8 sm:py-12`}>
-        <section className="mb-8">
-          <div>
-              <p className="font-mono text-xs uppercase tracking-[0.18em] text-[var(--fg-dim)]">Live service health</p>
-              <h1 className="mt-2 text-2xl font-semibold tracking-tight text-[var(--fg)] sm:text-3xl">{page.headline || "Service Status"}</h1>
-              {page.aboutText && !statusSurface.full.some((block) => block.type === "OVERALL_STATUS" && !block.hidden && block.settings.showDescription) && (
-                <p className="mt-2 max-w-2xl text-sm leading-relaxed text-[var(--fg-soft)]">{page.aboutText}</p>
-              )}
-          </div>
-        </section>
-        <div className="space-y-[var(--page-block-gap)]">
-          {statusSurface.full.map((block) => <div key={block.id} data-page-block={block.type}>{renderBlock(block)}</div>)}
-        </div>
-        <div className={`mt-[var(--page-block-gap)] grid gap-[var(--page-block-gap)] ${statusSurface.sidebar.some((block) => !block.hidden) ? "lg:grid-cols-[minmax(0,2fr)_minmax(16rem,1fr)]" : ""}`}>
-          <div className="space-y-[var(--page-block-gap)]">
-            {statusSurface.primary.map((block) => <div key={block.id} data-page-block={block.type}>{renderBlock(block)}</div>)}
-          </div>
-          <aside className="space-y-[var(--page-block-gap)]">
-            {statusSurface.sidebar.map((block) => <div key={block.id} data-page-block={block.type}>{renderBlock(block)}</div>)}
-          </aside>
-          </div>
-      </main>
+      <PageSurfaceLayout
+        design={design}
+        surface="status"
+        intro={(
+          <section className="mb-8">
+            <p className="font-mono text-xs uppercase tracking-[0.18em] text-[var(--fg-dim)]">Live service health</p>
+            <h1 className="mt-2 text-2xl font-semibold tracking-tight text-[var(--fg)] sm:text-3xl">{page.headline || "Service Status"}</h1>
+            {page.aboutText && !design.surfaces.status.full.some((block) => block.type === "OVERALL_STATUS" && !block.hidden && block.settings.showDescription) && (
+              <p className="mt-2 max-w-2xl text-sm leading-relaxed text-[var(--fg-soft)]">{page.aboutText}</p>
+            )}
+          </section>
+        )}
+        renderBlock={renderBlock}
+      />
       <PublicFooter removeBranding={page.removeBranding} termsUrl={page.termsUrl} privacyUrl={page.privacyUrl} supportUrl={page.supportUrl} design={design} />
     </PageDesignShell>
   );

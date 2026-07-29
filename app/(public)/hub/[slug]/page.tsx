@@ -107,6 +107,11 @@ export default async function HubPage({ params }: { params: Promise<{ slug: stri
     ctaUrl: announcement.ctaUrl,
     dismissible: announcement.dismissible,
   }));
+  const hubHasAnnouncementBlock = [
+    ...design.surfaces.hub.full,
+    ...design.surfaces.hub.primary,
+    ...design.surfaces.hub.sidebar,
+  ].some((block) => block.type === "ANNOUNCEMENTS");
 
   function renderBlock(block: PageDesignBlock) {
     switch (block.type) {
@@ -242,6 +247,11 @@ export default async function HubPage({ params }: { params: Promise<{ slug: stri
             <h1 className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">{hub.headline || hub.name}</h1>
             {hub.aboutText && !design.surfaces.hub.full.some((block) => block.type === "OVERALL_STATUS" && !block.hidden && block.settings.showDescription) && (
               <p className="mt-2 max-w-2xl text-sm text-[var(--fg-soft)]">{hub.aboutText}</p>
+            )}
+            {!hubHasAnnouncementBlock && announcements.length > 0 && (
+              <div className="mt-6">
+                <AnnouncementList pageId={hub.id} announcements={announcements} maxItems={3} />
+              </div>
             )}
           </section>
         )}

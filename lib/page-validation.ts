@@ -1,4 +1,13 @@
-const LAYOUTS = ["STANDARD", "COVER", "MINIMAL"] as const;
+import {
+  PAGE_TEMPLATE_KEYS,
+  type PageTemplateKey,
+} from "@/lib/page-design";
+
+const LEGACY_LAYOUTS: Record<string, PageTemplateKey> = {
+  STANDARD: "CENTERED_SUMMARY",
+  COVER: "ILLUSTRATED_HERO",
+  MINIMAL: "MINIMAL_ENTERPRISE",
+};
 
 export function validatedBrandColor(value: string) {
   const color = value.trim();
@@ -9,9 +18,8 @@ export function validatedBrandColor(value: string) {
 }
 
 export function validatedLayout(value: string) {
-  return LAYOUTS.includes(value as (typeof LAYOUTS)[number])
-    ? (value as (typeof LAYOUTS)[number])
-    : "STANDARD";
+  if (PAGE_TEMPLATE_KEYS.includes(value as PageTemplateKey)) return value as PageTemplateKey;
+  return LEGACY_LAYOUTS[value] ?? "CENTERED_SUMMARY";
 }
 
 export function validatedExternalUrl(

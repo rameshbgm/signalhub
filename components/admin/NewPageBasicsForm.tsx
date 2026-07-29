@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { FluentSelect } from "@/components/FluentSelect";
+import { PlatformActionForm } from "@/components/platform/PlatformActionForm";
 
 type HubOption = { id: string; name: string };
 
@@ -18,7 +19,7 @@ export function NewPageBasicsForm({
   const [visibility, setVisibility] = useState("PUBLIC");
 
   return (
-    <form action={action} className="space-y-7">
+    <PlatformActionForm action={action} successMessage="Page draft created" className="space-y-7">
       <fieldset>
         <legend className="text-sm font-semibold text-[var(--fg)]">What are you creating?</legend>
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
@@ -26,12 +27,12 @@ export function NewPageBasicsForm({
             {
               value: "STATUS" as const,
               title: "Status page",
-              description: "Publish components, incidents, maintenance, and uptime.",
+              description: "Own services, incidents, maintenance, and uptime. Add it to a hub now or later.",
             },
             {
               value: "HUB" as const,
               title: "Hub",
-              description: "Aggregate multiple child status pages in one public view.",
+              description: "Summarize several status pages in one directory. A hub never owns services directly.",
             },
           ].map((option) => (
             <label
@@ -62,6 +63,7 @@ export function NewPageBasicsForm({
             placeholder={kind === "HUB" ? "Company status hub" : "Customer status"}
             className="w-full border border-[var(--line)] bg-[var(--bg)] px-3 py-2.5 text-sm font-normal text-[var(--fg)] placeholder:text-[var(--fg-dim)] focus:border-[var(--cyan)] focus:outline-none"
             required
+            maxLength={120}
           />
         </label>
         <label className="grid gap-1.5 text-xs font-semibold text-[var(--fg-soft)]">
@@ -69,6 +71,9 @@ export function NewPageBasicsForm({
           <input
             name="slug"
             placeholder="Generated from the page name"
+            maxLength={80}
+            pattern="[a-z0-9]+(?:-[a-z0-9]+)*"
+            title="Use lowercase letters, numbers, and single hyphens"
             className="w-full border border-[var(--line)] bg-[var(--bg)] px-3 py-2.5 text-sm font-normal text-[var(--fg)] placeholder:text-[var(--fg-dim)] focus:border-[var(--cyan)] focus:outline-none"
           />
         </label>
@@ -101,14 +106,14 @@ export function NewPageBasicsForm({
         )}
         {kind === "STATUS" && hubs.length > 0 && (
           <div className="grid gap-1.5 text-xs font-semibold text-[var(--fg-soft)]">
-            Hub parent
+            Add to hub <span className="font-normal text-[var(--fg-dim)]">(optional)</span>
             <FluentSelect
-              aria-label="Hub parent"
+              aria-label="Add to hub"
               name="hubParentId"
               defaultValue={initialHubParentId}
               className="w-full border border-[var(--line)] bg-[var(--bg)] px-3 py-2.5 text-sm font-normal text-[var(--fg)] focus:border-[var(--cyan)] focus:outline-none"
             >
-              <option value="">No hub parent</option>
+              <option value="">Keep as a standalone status page</option>
               {hubs.map((hub) => <option key={hub.id} value={hub.id}>{hub.name}</option>)}
             </FluentSelect>
           </div>
@@ -116,14 +121,14 @@ export function NewPageBasicsForm({
       </div>
 
       <aside className="border border-[var(--cyan)]/30 bg-[var(--cyan-soft)] p-4 text-sm text-[var(--fg-soft)]">
-        This first save creates a private draft. Branding, content, access, notifications, and webhooks unlock next on the same creation workspace. Nothing is public until you finish setup.
+        This first save creates a hidden draft. The next screen separates Content, Appearance, Access, Notifications, and Settings so you can finish one area at a time. Nothing is public until you publish it.
       </aside>
 
       <div className="flex justify-end border-t border-[var(--line)] pt-5">
         <button className="w-full bg-[var(--cyan)] px-6 py-2.5 font-mono text-sm font-semibold text-[var(--on-cyan)] sm:w-auto">
-          Save details and continue
+          Create draft and continue
         </button>
       </div>
-    </form>
+    </PlatformActionForm>
   );
 }

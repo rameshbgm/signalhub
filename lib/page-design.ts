@@ -52,6 +52,7 @@ export const PAGE_THEME_PRESET_DESCRIPTIONS: Record<PageThemePresetKey, string> 
 
 export const PAGE_TEMPLATE_KEYS = [
   "CENTERED_SUMMARY",
+  "BANNER_SPOTLIGHT",
   "UPTIME_TIMELINE",
   "ILLUSTRATED_HERO",
   "GROUPED_DIRECTORY",
@@ -70,6 +71,7 @@ export function sameStatusPageDesign(left: unknown, right: unknown) {
 
 export const PAGE_TEMPLATE_LABELS: Record<PageTemplateKey, string> = {
   CENTERED_SUMMARY: "Centered summary",
+  BANNER_SPOTLIGHT: "Banner spotlight",
   UPTIME_TIMELINE: "Uptime timeline",
   ILLUSTRATED_HERO: "Illustrated hero",
   GROUPED_DIRECTORY: "Grouped directory",
@@ -237,6 +239,7 @@ export const statusPageDesignSchema = z
     schemaVersion: z.literal(PAGE_DESIGN_SCHEMA_VERSION),
     templateKey: z.enum(PAGE_TEMPLATE_KEYS),
     theme: z.object({
+      preset: z.enum(PAGE_THEME_PRESET_KEYS).default("DEFAULT"),
       mode: z.enum(["SYSTEM", "LIGHT", "DARK"]).default("SYSTEM"),
       allowVisitorMode: z.boolean().default(true),
       palette: z.object({
@@ -394,6 +397,7 @@ function baseDesign(templateKey: PageTemplateKey, brand = "#0f8ca8"): StatusPage
     schemaVersion: 1,
     templateKey,
     theme: {
+      preset: "DEFAULT",
       mode: "SYSTEM",
       allowVisitorMode: true,
       palette: {
@@ -458,7 +462,11 @@ function baseDesign(templateKey: PageTemplateKey, brand = "#0f8ca8"): StatusPage
         sidebar: [],
       },
       hub: {
-        full: [overall("hub-overall-status"), b({ id: "hub-grid", type: "HUB_GRID", hidden: false, settings: { columns: 2, showDescriptions: true } })],
+        full: [
+          overall("hub-overall-status"),
+          b({ id: "hub-announcements", type: "ANNOUNCEMENTS", hidden: false, settings: { maxItems: 3 } }),
+          b({ id: "hub-grid", type: "HUB_GRID", hidden: false, settings: { columns: 2, showDescriptions: true } }),
+        ],
         primary: [],
         sidebar: [],
       },
@@ -474,6 +482,12 @@ export function templateDesign(templateKey: PageTemplateKey, brand = "#0f8ca8"):
   switch (templateKey) {
     case "CENTERED_SUMMARY":
       design.chrome.header.variant = "CENTERED";
+      design.surfaces.status.full[0].settings = { style: "CENTERED", showLastUpdated: true, showDescription: true };
+      break;
+    case "BANNER_SPOTLIGHT":
+      design.chrome.header.variant = "STANDARD";
+      design.theme.contentWidth = "WIDE";
+      design.theme.density = "SPACIOUS";
       design.surfaces.status.full[0].settings = { style: "CENTERED", showLastUpdated: true, showDescription: true };
       break;
     case "UPTIME_TIMELINE":
@@ -525,6 +539,7 @@ export function templateDesign(templateKey: PageTemplateKey, brand = "#0f8ca8"):
 
 export function pageThemePreset(key: PageThemePresetKey): StatusPageDesign["theme"] {
   const theme = structuredClone(baseDesign("CENTERED_SUMMARY").theme);
+  theme.preset = key;
   switch (key) {
     case "DEFAULT":
       return theme;
@@ -584,7 +599,13 @@ export function pageThemePreset(key: PageThemePresetKey): StatusPageDesign["them
 
 export function designWithThemePreset(design: StatusPageDesign, key: PageThemePresetKey) {
   const next = structuredClone(design);
+  const mode = next.theme.mode;
+  const allowVisitorMode = next.theme.allowVisitorMode;
   next.theme = pageThemePreset(key);
+  // Presets are color/appearance systems. Color mode and visitor override are
+  // independent choices and must survive a preset change.
+  next.theme.mode = mode;
+  next.theme.allowVisitorMode = allowVisitorMode;
   return statusPageDesignSchema.parse(next);
 }
 
@@ -596,7 +617,9 @@ export function legacyPageDesign(page: {
   allowThemeOverride?: boolean | null;
 }): StatusPageDesign {
   const templateKey: PageTemplateKey =
-    page.layout === "COVER"
+    PAGE_TEMPLATE_KEYS.includes(page.layout as PageTemplateKey)
+      ? (page.layout as PageTemplateKey)
+      : page.layout === "COVER"
       ? "ILLUSTRATED_HERO"
       : page.layout === "MINIMAL"
         ? "MINIMAL_ENTERPRISE"
@@ -606,6 +629,12 @@ export function legacyPageDesign(page: {
     ? (page.themeMode as "SYSTEM" | "LIGHT" | "DARK")
     : "SYSTEM";
   design.theme.allowVisitorMode = page.allowThemeOverride ?? true;
+  if (PAGE_THEME_PRESET_KEYS.includes(page.themePreset as PageThemePresetKey)) {
+    const presetDesign = designWithThemePreset(design, page.themePreset as PageThemePresetKey);
+    presetDesign.theme.mode = design.theme.mode;
+    presetDesign.theme.allowVisitorMode = design.theme.allowVisitorMode;
+    return presetDesign;
+  }
   if (page.themePreset === "CALM") {
     design.theme.palette.background = "#f7f7f4";
     design.theme.palette.surface = "#fffefa";

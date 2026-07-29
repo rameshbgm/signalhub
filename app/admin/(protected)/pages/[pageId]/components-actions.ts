@@ -20,7 +20,7 @@ import { fenceActiveOrganizationMutation } from "@/lib/organization-mutation";
 async function assertStatusPage(pageId: string, orgId: string) {
   const page = await collections.pages().findOne({ _id: oid(pageId), orgId: oid(orgId) });
   if (!page) throw new Error("Page not found in your organization");
-  if (page.isHub) throw new Error("Components belong to child status pages, not hubs");
+  if (page.isHub) throw new Error("Services belong to status pages, not hubs");
   return page;
 }
 

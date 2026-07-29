@@ -6,12 +6,12 @@ function source(path: string) {
 }
 
 describe("unified page creation workflow", () => {
-  it("offers one page-list entry point and no setup wizard", () => {
+  it("offers one primary page-list entry point and no setup wizard", () => {
     const pageList = source("app/admin/(protected)/pages/page.tsx");
     expect(pageList).toContain('href="/organization/pages/new"');
     expect(pageList).toContain("Continue setup");
     expect(pageList).not.toContain("Setup wizard");
-    expect(pageList).not.toContain("Create a status page");
+    expect(pageList).toContain("Create status page in this hub");
   });
 
   it("creates hidden drafts and only publishes through setup completion", () => {
@@ -20,18 +20,19 @@ describe("unified page creation workflow", () => {
     expect(actions).toContain("publicVisible: false");
     expect(actions).toContain("export async function finishPageSetup");
     expect(actions).toContain("Add at least one visible component");
-    expect(actions).toContain("at least one child status page");
+    expect(actions).toContain("if (!page.isHub)");
+    expect(actions).not.toContain("at least one child status page");
   });
 
   it("keeps hub content and status-page components mutually exclusive", () => {
     const basics = source("components/admin/NewPageBasicsForm.tsx");
-    const detail = source("app/admin/(protected)/pages/[pageId]/page.tsx");
+    const content = source("app/admin/(protected)/pages/[pageId]/content/page.tsx");
     const componentActions = source("app/admin/(protected)/pages/[pageId]/components-actions.ts");
     expect(basics).toContain('value: "STATUS"');
     expect(basics).toContain('value: "HUB"');
-    expect(detail).toContain("Child status pages");
-    expect(detail).toContain("Components belong to those child pages");
-    expect(componentActions).toContain("Components belong to child status pages, not hubs");
+    expect(content).toContain("Status pages in this hub");
+    expect(content).toContain("Services always belong to those status pages");
+    expect(componentActions).toContain("Services belong to status pages, not hubs");
   });
 
   it("redirects legacy wizard URLs and noncanonical hub URLs", () => {
@@ -42,13 +43,18 @@ describe("unified page creation workflow", () => {
     expect(publicPage).toContain("if (pageDoc.isHub) redirect(`/hub/${encodeURIComponent(pageDoc.slug)}`)");
   });
 
-  it("includes all setup essentials on the configuration screen", () => {
-    const detail = source("app/admin/(protected)/pages/[pageId]/page.tsx");
+  it("separates setup essentials into page-management sections", () => {
+    const overview = source("app/admin/(protected)/pages/[pageId]/page.tsx");
+    const shell = source("components/admin/PageManagementShell.tsx");
+    const appearance = source("app/admin/(protected)/pages/[pageId]/appearance/page.tsx");
+    const access = source("app/admin/(protected)/pages/[pageId]/access/page.tsx");
+    const notificationsPage = source("app/admin/(protected)/pages/[pageId]/notifications/page.tsx");
     const notifications = source("components/admin/PageNotificationsSection.tsx");
-    for (const label of ["Branding & Settings", "Audience Access", "Review & publish", "Incident readiness"]) {
-      expect(detail).toContain(label);
-    }
-    expect(detail).toContain("PageNotificationsSection");
+    for (const label of ["Overview", "Content", "Appearance", "Access", "Notifications", "Settings"]) expect(shell).toContain(label);
+    expect(overview).toContain("Incident readiness");
+    expect(appearance).toContain("Brand essentials");
+    expect(access).toContain("Audience-specific access");
+    expect(notificationsPage).toContain("PageNotificationsSection");
     expect(notifications).toContain("Subscriber channels");
     expect(notifications).toContain("Team and on-call destinations");
     expect(notifications).toContain("Signed status-event webhooks");

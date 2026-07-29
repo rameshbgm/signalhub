@@ -46,8 +46,8 @@ export const HELP_CATEGORIES: HelpCategory[] = [
           {
             heading: "Creating a page",
             paragraphs: [
-              "Go to Pages → Create page, choose Status page or Hub, then enter the name, optional custom slug, and visibility. Status pages can optionally belong to an existing hub.",
-              "The first save creates a hidden draft. Complete branding, components or child pages, access, notifications, and webhooks on the unified creation screen, then select Finish & publish.",
+              "Go to Pages → Create page, choose Status page or Hub, then enter the name, optional custom slug, and visibility. A status page can optionally be added to an existing hub now or later.",
+              "The first save creates a hidden draft. Use the page navigation to complete Content, Appearance, Access, Notifications, and Settings, then publish from Overview.",
             ],
           },
           {
@@ -57,13 +57,13 @@ export const HELP_CATEGORIES: HelpCategory[] = [
               "Public — anyone with the URL can view it.",
               "Private — requires a shared password to view.",
               "Audience-specific — each visitor logs in and sees only the components assigned to their user or group.",
-              "Hub — aggregates several child pages into one directory-style landing page.",
+              "Hub — groups several normal status pages into one directory-style landing page and never owns services directly.",
             ],
           },
           {
             heading: "Managing a page",
             paragraphs: [
-              "Click Manage to edit branding (layout, logo, and brand color), components and component groups, and — for Audience pages — access groups and users.",
+              "Click Manage to open the page Overview. Content holds services or hub membership, Appearance holds everyday branding, Access holds visitor controls, and Notifications holds delivery integrations.",
               "Draft pages show Continue setup. Published pages show Manage page for ongoing changes.",
             ],
           },
@@ -446,7 +446,7 @@ export const HELP_CATEGORIES: HelpCategory[] = [
           {
             heading: "Workspace layout",
             paragraphs: [
-              "The designer uses a two-pane workspace. Branding, page settings, block controls, theme, navigation, SEO, announcements, service groups, and versions live in collapsed sections in the scrolling main canvas. Opening a section automatically closes the previously open section.",
+              "The Advanced designer uses a two-pane workspace for page templates, block composition, advanced appearance, header/footer presentation, service display, and saved versions. Everyday branding, page settings, search metadata, and announcements live in the page-management sections instead.",
               "The right preview rail stays visible and does not scroll with the editor. The rendered page scrolls inside its own bounded preview frame while the preview toolbar remains fixed. Use the surface and viewport controls to review status, history, incident, access, hub, and embed layouts at desktop, tablet, or mobile sizes.",
             ],
           },
@@ -465,10 +465,10 @@ export const HELP_CATEGORIES: HelpCategory[] = [
             ],
           },
           {
-            heading: "Templates and theme presets",
+            heading: "Templates and advanced appearance",
             paragraphs: [
-              "Choose a page template from the dropdown and inspect the full preview before using it. Layout templates preserve the current theme and SEO settings.",
-              "Theme presets are independent of layout. Preview Default or one of the curated color systems before applying it, then use the manual theme controls for typography, density, width, radius, shadow, and individual status colors.",
+              "Choose a page template from the dropdown and inspect the full preview before saving it. Layout templates preserve the current style and search settings.",
+              "Choose style presets, brand color, and visitor light/dark behavior from Appearance. Use Advanced appearance only for typography, density, width, radius, shadow, and detailed surface-color overrides.",
             ],
           },
           {

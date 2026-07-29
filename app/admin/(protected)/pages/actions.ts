@@ -18,7 +18,16 @@ import {
   validatedLayout,
   validatedTimezone,
 } from "@/lib/page-validation";
-import { templateDesign } from "@/lib/page-design";
+import {
+  PAGE_THEME_PRESET_KEYS,
+  PAGE_DESIGN_VERSION_HISTORY_LIMIT,
+  designWithThemePreset,
+  pageDesignFor,
+  sameStatusPageDesign,
+  statusPageDesignSchema,
+  templateDesign,
+  type PageThemePresetKey,
+} from "@/lib/page-design";
 import { parseComponentDetailEdits } from "@/lib/component-detail-edits";
 import { activePageFilter, deletedPageFilter } from "@/lib/page-lifecycle";
 
@@ -42,7 +51,8 @@ export async function createPage(formData: FormData) {
   const password = String(formData.get("password") ?? "");
   if (password && password.length < 12) throw new Error("Page passwords must contain at least 12 characters");
 
-  if (!name || !slug) throw new Error("Name is required");
+  if (!name || name.length > 120) throw new Error("Page name is required and must be 120 characters or fewer");
+  if (!slug || slug.length > 80) throw new Error("URL slug is required and must be 80 characters or fewer");
   if (!["PUBLIC", "PRIVATE", "AUDIENCE"].includes(type)) throw new Error("Invalid page type");
   if (isHub && hubParentId) throw new Error("A hub cannot belong to another hub");
   if (type === "PRIVATE" && password.length < 12) {
@@ -54,7 +64,7 @@ export async function createPage(formData: FormData) {
       orgId: oid(session.orgId),
       isHub: true,
     }));
-    if (!parent) throw new Error("Hub parent not found in your organization");
+    if (!parent) throw new Error("Selected hub was not found in your organization");
   }
 
   const existing = await collections.pages().findOne({ slug });
@@ -138,18 +148,7 @@ export async function finishPageSetup(pageId: string) {
     if (!page) throw new Error("Page not found in your organization");
     if (page.setupCompletedAt !== null) throw new Error("Page setup is already complete");
 
-    if (page.isHub) {
-      const childCount = await collections.pages().countDocuments(
-        activePageFilter({
-          orgId: page.orgId,
-          hubParentId: page._id,
-          isHub: false,
-          publicVisible: { $ne: false },
-        }),
-        { session: databaseSession }
-      );
-      if (!childCount) throw new Error("Add and publish at least one child status page before publishing this hub");
-    } else {
+    if (!page.isHub) {
       const componentCount = await collections.components().countDocuments(
         { pageId: page._id, visible: true },
         { session: databaseSession }
@@ -188,7 +187,7 @@ export async function finishPageSetup(pageId: string) {
 export async function attachChildPage(hubId: string, formData: FormData) {
   const session = await requireCapability("page.configure", hubId);
   const childId = String(formData.get("childPageId") ?? "");
-  if (!childId) throw new Error("Choose a child status page");
+  if (!childId) throw new Error("Choose a status page to add");
   let hubPublicPath = "";
   await withTransaction(async (databaseSession) => {
     await fenceActiveOrganizationMutation(session.orgId, databaseSession);
@@ -216,6 +215,8 @@ export async function attachChildPage(hubId: string, formData: FormData) {
     if (!changed.matchedCount) throw new Error("Status page changed; reload and try again");
   });
   revalidatePath(`/organization/pages/${hubId}`);
+  revalidatePath(`/organization/pages/${hubId}/content`);
+  revalidatePath("/organization/pages");
   if (hubPublicPath) revalidatePath(hubPublicPath, "layout");
 }
 
@@ -238,6 +239,8 @@ export async function detachChildPage(hubId: string, childId: string) {
     if (!changed.matchedCount) throw new Error("Child status page not found on this hub");
   });
   revalidatePath(`/organization/pages/${hubId}`);
+  revalidatePath(`/organization/pages/${hubId}/content`);
+  revalidatePath("/organization/pages");
   if (hubPublicPath) revalidatePath(hubPublicPath, "layout");
 }
 
@@ -251,10 +254,12 @@ export async function updatePageSettings(pageId: string, formData: FormData) {
     ? sanitizeCustomCss(String(formData.get("customCss") ?? ""))
     : undefined;
   const name = String(formData.get("name") ?? "").trim();
-  if (!name) throw new Error("Page name is required");
+  if (!name || name.length > 120) throw new Error("Page name is required and must be 120 characters or fewer");
   const brandColor = validatedBrandColor(String(formData.get("brandColor") ?? "#0052CC"));
   const headline = String(formData.get("headline") ?? "");
   const aboutText = String(formData.get("aboutText") ?? "");
+  if (headline.length > 180) throw new Error("Headline must be 180 characters or fewer");
+  if (aboutText.length > 4_000) throw new Error("About text must be 4,000 characters or fewer");
   const supportUrl = validatedExternalUrl(String(formData.get("supportUrl") ?? ""), { allowMailto: true, label: "Support URL" });
   const termsUrl = validatedExternalUrl(String(formData.get("termsUrl") ?? ""), { label: "Terms URL" });
   const privacyUrl = validatedExternalUrl(String(formData.get("privacyUrl") ?? ""), { label: "Privacy URL" });
@@ -264,9 +269,9 @@ export async function updatePageSettings(pageId: string, formData: FormData) {
   const timezone = validatedTimezone(String(formData.get("timezone") ?? "UTC"));
   const language = validatedLanguage(String(formData.get("language") ?? "en"));
 
-  const themePreset = String(formData.get("themePreset") ?? "SIGNAL");
+  const themePreset = String(formData.get("themePreset") ?? "DEFAULT");
   const themeMode = String(formData.get("themeMode") ?? "SYSTEM");
-  if (!["SIGNAL", "CALM", "CONTRAST"].includes(themePreset)) throw new Error("Invalid theme preset");
+  if (!PAGE_THEME_PRESET_KEYS.includes(themePreset as PageThemePresetKey)) throw new Error("Choose a valid theme preset");
   if (!["SYSTEM", "LIGHT", "DARK"].includes(themeMode)) throw new Error("Invalid theme mode");
   const componentEdits = parseComponentDetailEdits(formData);
 
@@ -280,6 +285,26 @@ export async function updatePageSettings(pageId: string, formData: FormData) {
     );
     if (!page) throw new Error("Page not found in your organization");
     publicPath = page.isHub ? `/hub/${page.slug}` : `/${page.slug}`;
+    const currentDesign = pageDesignFor(page);
+    let nextDesign = currentDesign.templateKey === layout
+      ? structuredClone(currentDesign)
+      : templateDesign(layout, currentDesign.theme.palette.brand);
+    if (currentDesign.templateKey !== layout) {
+      nextDesign.theme = structuredClone(currentDesign.theme);
+      nextDesign.seo = structuredClone(currentDesign.seo);
+    }
+    if (nextDesign.theme.preset !== themePreset) {
+      nextDesign = designWithThemePreset(nextDesign, themePreset as PageThemePresetKey);
+    }
+    nextDesign.theme.palette.brand = brandColor;
+    nextDesign.theme.mode = themeMode as "SYSTEM" | "LIGHT" | "DARK";
+    nextDesign.theme.allowVisitorMode = allowThemeOverride;
+    nextDesign = statusPageDesignSchema.parse(nextDesign);
+    const designChanged = !sameStatusPageDesign(currentDesign, nextDesign);
+    const nextDesignVersion = designChanged
+      ? (page.publishedDesignVersion ?? 0) + 1
+      : (page.publishedDesignVersion ?? 1);
+    const now = new Date();
     const nextSettings: Record<string, unknown> = {
       name, headline, aboutText, supportUrl, termsUrl, privacyUrl, brandColor,
       layout, themePreset, themeMode, allowThemeOverride, analyticsEnabled,
@@ -364,6 +389,9 @@ export async function updatePageSettings(pageId: string, formData: FormData) {
           timezone,
           language,
           removeBranding,
+          publishedDesign: nextDesign,
+          publishedDesignVersion: nextDesignVersion,
+          ...(designChanged ? { designPublishedAt: now } : {}),
           ...(customCss !== undefined ? { customCss } : {}),
           ...(passwordHash ? { passwordHash } : {}),
         },
@@ -371,6 +399,37 @@ export async function updatePageSettings(pageId: string, formData: FormData) {
       { session: databaseSession }
     );
     if (!changed.matchedCount) throw new Error("Page not found in your organization");
+    if (designChanged) {
+      await collections.pageDesignVersions().insertOne({
+        _id: new ObjectId(),
+        pageId: page._id,
+        version: nextDesignVersion,
+        design: nextDesign,
+        publishedBy: oid(session.userId),
+        publishedAt: now,
+      }, { session: databaseSession });
+      const expiredVersions = await collections.pageDesignVersions().find({ pageId: page._id }, { session: databaseSession }).sort({ publishedAt: -1, _id: -1 }).skip(PAGE_DESIGN_VERSION_HISTORY_LIMIT).project({ _id: 1 }).toArray();
+      if (expiredVersions.length) await collections.pageDesignVersions().deleteMany({ pageId: page._id, _id: { $in: expiredVersions.map((version) => version._id) } }, { session: databaseSession });
+      const draft = await collections.pageDesignDrafts().findOne(
+        { pageId: page._id },
+        { session: databaseSession }
+      );
+      if (draft) {
+        await collections.pageDesignDrafts().updateOne(
+          { _id: draft._id, revision: draft.revision },
+          {
+            $set: {
+              design: nextDesign,
+              revision: draft.revision + 1,
+              basePublishedVersion: nextDesignVersion,
+              updatedBy: oid(session.userId),
+              updatedAt: now,
+            },
+          },
+          { session: databaseSession }
+        );
+      }
+    }
     await collections.auditLogs().insertOne({
       _id: new ObjectId(),
       orgId: oid(session.orgId),
@@ -379,12 +438,157 @@ export async function updatePageSettings(pageId: string, formData: FormData) {
       target: pageId,
       metadata: { componentCount: componentEdits.length, changes },
       supportSessionId: session.supportSessionId ? oid(session.supportSessionId) : null,
-      createdAt: new Date(),
+      createdAt: now,
     }, { session: databaseSession });
   });
 
   revalidatePath(`/organization/pages/${pageId}`);
   if (publicPath) revalidatePath(publicPath, "layout");
+}
+
+export async function updatePageAppearance(pageId: string, formData: FormData) {
+  const session = await requireCapability("page.configure", pageId);
+  await assertPageInOrg(pageId, session.orgId);
+  const brandColor = validatedBrandColor(String(formData.get("brandColor") ?? "#0052CC"));
+  const themePreset = String(formData.get("themePreset") ?? "DEFAULT");
+  const themeMode = String(formData.get("themeMode") ?? "SYSTEM");
+  const allowThemeOverride = formData.get("allowThemeOverride") === "on";
+  if (!PAGE_THEME_PRESET_KEYS.includes(themePreset as PageThemePresetKey)) throw new Error("Choose a valid style preset");
+  if (!["SYSTEM", "LIGHT", "DARK"].includes(themeMode)) throw new Error("Choose a valid visitor appearance");
+
+  let publicPath = "";
+  await withTransaction(async (databaseSession) => {
+    await fenceActiveOrganizationMutation(session.orgId, databaseSession);
+    const page = await collections.pages().findOne(
+      activePageFilter({ _id: oid(pageId), orgId: oid(session.orgId) }),
+      { session: databaseSession }
+    );
+    if (!page) throw new Error("Page not found in your organization");
+    publicPath = page.isHub ? `/hub/${page.slug}` : `/${page.slug}`;
+    const currentDesign = pageDesignFor(page);
+    let nextDesign = currentDesign.theme.preset === themePreset
+      ? structuredClone(currentDesign)
+      : designWithThemePreset(currentDesign, themePreset as PageThemePresetKey);
+    nextDesign.theme.palette.brand = brandColor;
+    nextDesign.theme.mode = themeMode as "SYSTEM" | "LIGHT" | "DARK";
+    nextDesign.theme.allowVisitorMode = allowThemeOverride;
+    nextDesign = statusPageDesignSchema.parse(nextDesign);
+    const designChanged = !sameStatusPageDesign(currentDesign, nextDesign);
+    const now = new Date();
+    const nextVersion = designChanged ? (page.publishedDesignVersion ?? 0) + 1 : (page.publishedDesignVersion ?? 1);
+    const changed = await collections.pages().updateOne(
+      { _id: page._id, orgId: page.orgId },
+      { $set: {
+        brandColor,
+        themePreset,
+        themeMode: themeMode as "SYSTEM" | "LIGHT" | "DARK",
+        allowThemeOverride,
+        publishedDesign: nextDesign,
+        publishedDesignVersion: nextVersion,
+        ...(designChanged ? { designPublishedAt: now } : {}),
+      } },
+      { session: databaseSession }
+    );
+    if (!changed.matchedCount) throw new Error("Page appearance changed; reload and retry");
+    if (designChanged) {
+      await collections.pageDesignVersions().insertOne({
+        _id: new ObjectId(), pageId: page._id, version: nextVersion, design: nextDesign,
+        publishedBy: oid(session.userId), publishedAt: now,
+      }, { session: databaseSession });
+      const expiredVersions = await collections.pageDesignVersions().find({ pageId: page._id }, { session: databaseSession }).sort({ publishedAt: -1, _id: -1 }).skip(PAGE_DESIGN_VERSION_HISTORY_LIMIT).project({ _id: 1 }).toArray();
+      if (expiredVersions.length) await collections.pageDesignVersions().deleteMany({ pageId: page._id, _id: { $in: expiredVersions.map((version) => version._id) } }, { session: databaseSession });
+      const draft = await collections.pageDesignDrafts().findOne({ pageId: page._id }, { session: databaseSession });
+      if (draft) {
+        const synced = await collections.pageDesignDrafts().updateOne(
+          { _id: draft._id, revision: draft.revision },
+          { $set: { design: nextDesign, revision: draft.revision + 1, basePublishedVersion: nextVersion, updatedBy: oid(session.userId), updatedAt: now } },
+          { session: databaseSession }
+        );
+        if (!synced.matchedCount) throw new Error("The advanced designer changed in another session; reload and retry");
+      }
+    }
+    await collections.auditLogs().insertOne({
+      _id: new ObjectId(), orgId: page.orgId, actor: session.email, action: "UPDATE_PAGE_APPEARANCE", target: pageId,
+      metadata: { themePreset, themeMode, brandColor },
+      supportSessionId: session.supportSessionId ? oid(session.supportSessionId) : null, createdAt: now,
+    }, { session: databaseSession });
+  });
+  revalidatePath(`/organization/pages/${pageId}/appearance`);
+  revalidatePath(`/organization/pages/${pageId}/design`);
+  if (publicPath) revalidatePath(publicPath, "layout");
+}
+
+export async function updatePageGeneralSettings(pageId: string, formData: FormData) {
+  const session = await requireCapability("page.configure", pageId);
+  await assertPageInOrg(pageId, session.orgId);
+  const name = String(formData.get("name") ?? "").trim();
+  const headline = String(formData.get("headline") ?? "").trim();
+  const aboutText = String(formData.get("aboutText") ?? "").trim();
+  if (!name || name.length > 120) throw new Error("Page name is required and must be 120 characters or fewer");
+  if (headline.length > 180) throw new Error("Headline must be 180 characters or fewer");
+  if (aboutText.length > 4_000) throw new Error("About text must be 4,000 characters or fewer");
+  const supportUrl = validatedExternalUrl(String(formData.get("supportUrl") ?? ""), { allowMailto: true, label: "Support URL" });
+  const termsUrl = validatedExternalUrl(String(formData.get("termsUrl") ?? ""), { label: "Terms URL" });
+  const privacyUrl = validatedExternalUrl(String(formData.get("privacyUrl") ?? ""), { label: "Privacy URL" });
+  const timezone = validatedTimezone(String(formData.get("timezone") ?? "UTC"));
+  const language = validatedLanguage(String(formData.get("language") ?? "en"));
+  const removeBranding = formData.get("removeBranding") === "on";
+  const analyticsEnabled = formData.get("analyticsEnabled") === "on";
+  const seoTitle = String(formData.get("seoTitle") ?? "").trim();
+  const seoDescription = String(formData.get("seoDescription") ?? "").trim();
+  const seoSocialImageUrl = String(formData.get("seoSocialImageUrl") ?? "").trim();
+  if (seoTitle.length > 160) throw new Error("Search title must be 160 characters or fewer");
+  if (seoDescription.length > 320) throw new Error("Search description must be 320 characters or fewer");
+  const noIndex = formData.get("noIndex") === "on";
+
+  let publicPath = "";
+  await withTransaction(async (databaseSession) => {
+    await fenceActiveOrganizationMutation(session.orgId, databaseSession);
+    const page = await collections.pages().findOne(activePageFilter({ _id: oid(pageId), orgId: oid(session.orgId) }), { session: databaseSession });
+    if (!page) throw new Error("Page not found in your organization");
+    publicPath = page.isHub ? `/hub/${page.slug}` : `/${page.slug}`;
+    const currentDesign = pageDesignFor(page);
+    const nextDesign = statusPageDesignSchema.parse({ ...currentDesign, seo: { ...currentDesign.seo, title: seoTitle, description: seoDescription, socialImageUrl: seoSocialImageUrl || null, noIndex } });
+    const designChanged = !sameStatusPageDesign(currentDesign, nextDesign);
+    const now = new Date();
+    const nextVersion = designChanged ? (page.publishedDesignVersion ?? 0) + 1 : (page.publishedDesignVersion ?? 1);
+    const changed = await collections.pages().updateOne(
+      { _id: page._id, orgId: page.orgId },
+      { $set: { name, headline, aboutText, supportUrl, termsUrl, privacyUrl, timezone, language, removeBranding, analyticsEnabled, publishedDesign: nextDesign, publishedDesignVersion: nextVersion, ...(designChanged ? { designPublishedAt: now } : {}) } },
+      { session: databaseSession }
+    );
+    if (!changed.matchedCount) throw new Error("Page settings changed; reload and retry");
+    if (designChanged) {
+      await collections.pageDesignVersions().insertOne({ _id: new ObjectId(), pageId: page._id, version: nextVersion, design: nextDesign, publishedBy: oid(session.userId), publishedAt: now }, { session: databaseSession });
+      const expiredVersions = await collections.pageDesignVersions().find({ pageId: page._id }, { session: databaseSession }).sort({ publishedAt: -1, _id: -1 }).skip(PAGE_DESIGN_VERSION_HISTORY_LIMIT).project({ _id: 1 }).toArray();
+      if (expiredVersions.length) await collections.pageDesignVersions().deleteMany({ pageId: page._id, _id: { $in: expiredVersions.map((version) => version._id) } }, { session: databaseSession });
+      const draft = await collections.pageDesignDrafts().findOne({ pageId: page._id }, { session: databaseSession });
+      if (draft) {
+        const synced = await collections.pageDesignDrafts().updateOne({ _id: draft._id, revision: draft.revision }, { $set: { design: nextDesign, revision: draft.revision + 1, basePublishedVersion: nextVersion, updatedBy: oid(session.userId), updatedAt: now } }, { session: databaseSession });
+        if (!synced.matchedCount) throw new Error("The advanced designer changed in another session; reload and retry");
+      }
+    }
+    await collections.auditLogs().insertOne({ _id: new ObjectId(), orgId: page.orgId, actor: session.email, action: "UPDATE_PAGE_SETTINGS", target: pageId, supportSessionId: session.supportSessionId ? oid(session.supportSessionId) : null, createdAt: now }, { session: databaseSession });
+  });
+  revalidatePath(`/organization/pages/${pageId}/settings`);
+  revalidatePath(`/organization/pages/${pageId}/design`);
+  revalidatePath(`/organization/pages/${pageId}`);
+  revalidatePath("/organization/pages");
+  if (publicPath) revalidatePath(publicPath, "layout");
+}
+
+export async function updatePrivatePagePassword(pageId: string, formData: FormData) {
+  const session = await requireCapability("page.configure", pageId);
+  await assertPageInOrg(pageId, session.orgId);
+  const password = String(formData.get("password") ?? "");
+  if (password.length < 12) throw new Error("Page passwords must contain at least 12 characters");
+  const passwordHash = await hashPassword(password);
+  await withTransaction(async (databaseSession) => {
+    await fenceActiveOrganizationMutation(session.orgId, databaseSession);
+    const changed = await collections.pages().updateOne(activePageFilter({ _id: oid(pageId), orgId: oid(session.orgId), type: "PRIVATE" }), { $set: { passwordHash } }, { session: databaseSession });
+    if (!changed.matchedCount) throw new Error("Private page not found in your organization");
+  });
+  revalidatePath(`/organization/pages/${pageId}/access`);
 }
 
 export async function deletePage(pageId: string) {

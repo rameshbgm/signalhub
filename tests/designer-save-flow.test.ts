@@ -49,19 +49,19 @@ describe("designer save workflow", () => {
   });
 
   it("keeps starting-point dropdowns preview-only without an apply action", () => {
-    expect(editor).toContain("Layout and color system changes update the preview only");
+    expect(editor).toContain("Choose a layout starting point");
+    expect(editor).toContain("Style presets, brand assets, and visitor appearance live in the page&apos;s Appearance section");
     expect(editor).not.toContain("Apply preview to draft");
     expect(editor).not.toContain("function applyPresetPreview");
   });
 
-  it("promotes the selected template and theme preview when saving", () => {
+  it("promotes the selected template preview when saving", () => {
     expect(editor).toContain("const designToSave = cloneDesign(previewDesign)");
     expect(editor).toContain("saveDesign(page.id, designToSave, revisionRef.current)");
     expect(editor).toContain("setDesign(designToSave)");
     expect(editor).toContain("setTemplatePreviewActive(false)");
-    expect(editor).toContain("setThemePreviewActive(false)");
     expect(editor).toContain("Template preview ready. Save all to update the public page.");
-    expect(editor).toContain("Theme preview ready. Save all to update the public page.");
+    expect(editor).not.toContain("Theme preview ready. Save all to update the public page.");
   });
 
   it("does not expose semantic status colors as theme customization", () => {

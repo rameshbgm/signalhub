@@ -46,6 +46,8 @@ export function PublicHeader({
   subscribeSlot?: ReactNode;
 }) {
   const header = design?.chrome.header;
+  const effectiveThemeMode = design?.theme.mode ?? themeMode;
+  const effectiveThemeOverride = design?.theme.allowVisitorMode ?? allowThemeOverride;
   const headerVariant = header?.variant ?? (layout === "COVER" ? "HERO" : layout === "MINIMAL" ? "MINIMAL" : "STANDARD");
   const visibleItems = header?.items.filter((item) => !item.hidden) ?? standardHeaderItems();
   const showCompleteCover = Boolean(coverImageUrl && coverImageFit !== "COVER");
@@ -96,7 +98,7 @@ export function PublicHeader({
           );
         }
         if (item.type === "SUBSCRIBE" && subscribeSlot) return <span key={item.id}>{subscribeSlot}</span>;
-        if (item.type === "THEME_TOGGLE" && allowThemeOverride && themeMode === "SYSTEM") return <span key={item.id}><ThemeToggle /></span>;
+        if (item.type === "THEME_TOGGLE" && effectiveThemeOverride && effectiveThemeMode === "SYSTEM") return <span key={item.id}><ThemeToggle /></span>;
         return null;
       })}
     </div>

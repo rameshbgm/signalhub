@@ -18,10 +18,9 @@ export default async function PageDesignBuilder({
     orgId: oid(session.orgId),
   });
   if (!pageDoc) notFound();
-  const [draft, versions, announcements, groupDocs, componentDocs] = await Promise.all([
+  const [draft, versions, groupDocs, componentDocs] = await Promise.all([
     collections.pageDesignDrafts().findOne({ pageId: pageDoc._id }),
     collections.pageDesignVersions().find({ pageId: pageDoc._id }).sort({ publishedAt: -1, _id: -1 }).limit(PAGE_DESIGN_VERSION_HISTORY_LIMIT).toArray(),
-    collections.pageAnnouncements().find({ pageId: pageDoc._id }).sort({ startsAt: -1 }).toArray(),
     collections.componentGroups().find({ pageId: pageDoc._id }).sort({ order: 1 }).toArray(),
     collections.components().find({ pageId: pageDoc._id }).sort({ order: 1 }).toArray(),
   ]);
@@ -45,6 +44,8 @@ export default async function PageDesignBuilder({
         coverImageCropHeight: pageDoc.coverImageCropHeight,
         supportUrl: pageDoc.supportUrl,
         publicPath: pageDoc.isHub ? `/hub/${pageDoc.slug}` : `/${pageDoc.slug}`,
+        isHub: pageDoc.isHub,
+        publicAvailable: pageDoc.setupCompletedAt !== null && pageDoc.publicVisible !== false,
         legacyCssActive: Boolean(pageDoc.customCss),
       }}
       initialDesign={draft ? statusPageDesignSchema.parse(draft.design) : pageDesignFor(pageDoc)}
@@ -55,18 +56,6 @@ export default async function PageDesignBuilder({
         templateKey: version.design.templateKey,
         savedAt: version.publishedAt.toISOString(),
         design: statusPageDesignSchema.parse(version.design),
-      }))}
-      announcements={announcements.map((announcement) => ({
-        id: announcement._id.toHexString(),
-        title: announcement.title,
-        body: announcement.body,
-        severity: announcement.severity,
-        ctaLabel: announcement.ctaLabel,
-        ctaUrl: announcement.ctaUrl,
-        startsAt: announcement.startsAt.toISOString(),
-        endsAt: announcement.endsAt?.toISOString() ?? null,
-        dismissible: announcement.dismissible,
-        priority: announcement.priority,
       }))}
       groups={groupDocs.map((group) => ({
         ...toId(group),

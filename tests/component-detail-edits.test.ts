@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { parseComponentDetailEdits } from "@/lib/component-detail-edits";
 
-describe("unified page and component settings", () => {
+describe("component detail settings", () => {
   it("parses group and visibility settings for every component", () => {
     const formData = new FormData();
     formData.append("componentId", "component-one");
@@ -32,13 +32,13 @@ describe("unified page and component settings", () => {
     expect(parseComponentDetailEdits(formData)[0].groupId).toBeNull();
   });
 
-  it("uses the top settings form and removes per-component detail save buttons", () => {
-    const pageSource = readFileSync("app/admin/(protected)/pages/[pageId]/page.tsx", "utf8");
-    const actionSource = readFileSync("app/admin/(protected)/pages/actions.ts", "utf8");
-    expect(pageSource).not.toContain("Save Details");
-    expect(pageSource).toContain('form="page-settings-form" name="componentId"');
-    expect(pageSource).toContain("component.${c.id}.groupId");
-    expect(actionSource).toContain("parseComponentDetailEdits(formData)");
-    expect(actionSource).toContain("groupId: component.groupId ? oid(component.groupId) : null");
+  it("uses a focused save form for each service", () => {
+    const contentSource = readFileSync("app/admin/(protected)/pages/[pageId]/content/page.tsx", "utf8");
+    const actionSource = readFileSync("app/admin/(protected)/pages/[pageId]/components-actions.ts", "utf8");
+    expect(contentSource).toContain("updateComponentDetails.bind(null, pageId, component.id)");
+    expect(contentSource).toContain("Save service");
+    expect(contentSource).not.toContain("page-settings-form");
+    expect(actionSource).toContain("export async function updateComponentDetails");
+    expect(actionSource).toContain("groupId: groupId ? oid(groupId) : null");
   });
 });

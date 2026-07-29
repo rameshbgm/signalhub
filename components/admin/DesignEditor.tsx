@@ -35,12 +35,9 @@ import { CSS } from "@dnd-kit/utilities";
 import {
   PAGE_TEMPLATE_KEYS,
   PAGE_TEMPLATE_LABELS,
-  PAGE_THEME_PRESET_DESCRIPTIONS,
-  PAGE_THEME_PRESET_KEYS,
   UPTIME_BAR_SIZES,
   UPTIME_BAR_STYLES,
   UPTIME_ICON_STYLES,
-  designWithThemePreset,
   movePageDesignBlock,
   statusPageDesignSchema,
   templateDesign,
@@ -48,7 +45,6 @@ import {
   type PageDesignZone,
   type PageSurfaceKey,
   type PageTemplateKey,
-  type PageThemePresetKey,
   type StatusPageDesign,
 } from "@/lib/page-design";
 import {
@@ -57,7 +53,6 @@ import {
   duplicateStatusPage,
   reorderPageComponents,
   resetLegacyCss,
-  saveDesignerBranding,
   saveDesign,
 } from "@/app/admin/(protected)/pages/[pageId]/design/actions";
 import { COMPONENT_STATUS_COLOR } from "@/lib/status";
@@ -80,6 +75,8 @@ type EditorPage = {
   coverImageCropHeight?: number | null;
   supportUrl: string | null;
   publicPath: string;
+  isHub: boolean;
+  publicAvailable: boolean;
   legacyCssActive: boolean;
 };
 
@@ -239,7 +236,6 @@ export function DesignEditor({
   initialRevision,
   publishedVersion,
   versions,
-  announcements,
   groups,
   ungrouped,
 }: {
@@ -248,7 +244,6 @@ export function DesignEditor({
   initialRevision: number;
   publishedVersion: number;
   versions: Array<{ version: number; templateKey: string; savedAt: string; design: StatusPageDesign }>;
-  announcements: EditorAnnouncement[];
   groups: StructureGroup[];
   ungrouped: Array<{ id: string; name: string }>;
 }) {
@@ -265,7 +260,7 @@ export function DesignEditor({
   const [, startTransition] = useTransition();
   const [structureGroups, setStructureGroups] = useState(groups);
   const [structureUngrouped, setStructureUngrouped] = useState(ungrouped);
-  const [branding, setBranding] = useState(page);
+  const [branding] = useState(page);
   const [liveVersion, setLiveVersion] = useState(publishedVersion);
   const [resetDialogOpen, setResetDialogOpen] = useState(false);
   const [pendingBlockRemoval, setPendingBlockRemoval] = useState<{
@@ -275,9 +270,7 @@ export function DesignEditor({
     surface: PageSurfaceKey;
   } | null>(null);
   const [templatePreviewKey, setTemplatePreviewKey] = useState<PageTemplateKey>(initialDesign.templateKey);
-  const [themePreviewKey, setThemePreviewKey] = useState<PageThemePresetKey>("DEFAULT");
   const [templatePreviewActive, setTemplatePreviewActive] = useState(false);
-  const [themePreviewActive, setThemePreviewActive] = useState(false);
   const [expandedSection, setExpandedSection] = useState<string | null>(null);
   const compositionSensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
@@ -299,7 +292,7 @@ export function DesignEditor({
       preview.theme = structuredClone(design.theme);
       preview.seo = structuredClone(design.seo);
     }
-    return themePreviewActive ? designWithThemePreset(preview, themePreviewKey) : preview;
+    return preview;
   })();
 
   function commit(next: StatusPageDesign) {
@@ -318,7 +311,6 @@ export function DesignEditor({
       setSavedDesign(cloneDesign(designToSave));
       setTemplatePreviewKey(designToSave.templateKey);
       setTemplatePreviewActive(false);
-      setThemePreviewActive(false);
       if (!findDesignBlock(designToSave, surface, selectedId ?? "")) {
         const firstBlock = Object.values(designToSave.surfaces[surface]).flat()[0];
         setSelectedId(firstBlock?.id ?? null);
@@ -337,20 +329,16 @@ export function DesignEditor({
   }
 
   async function saveSupportingSections() {
-    const brandingResult = await saveDesignerBranding(page.id, {
-      name: branding.name,
-      headline: branding.headline,
-      aboutText: branding.aboutText,
-      supportUrl: branding.supportUrl ?? "",
-    });
-    if (!brandingResult.ok) throw new Error(brandingResult.error);
-    await reorderPageComponents(page.id, {
-      groups: structureGroups.map((group) => ({ id: group.id, collapsed: group.collapsed })),
-      components: [
-        ...structureGroups.flatMap((group) => group.components.map((component) => ({ id: component.id, groupId: group.id }))),
-        ...structureUngrouped.map((component) => ({ id: component.id, groupId: null })),
-      ],
-    });
+    if (!page.isHub) {
+      const structureResult = await reorderPageComponents(page.id, {
+        groups: structureGroups.map((group) => ({ id: group.id, collapsed: group.collapsed })),
+        components: [
+          ...structureGroups.flatMap((group) => group.components.map((component) => ({ id: component.id, groupId: group.id }))),
+          ...structureUngrouped.map((component) => ({ id: component.id, groupId: null })),
+        ],
+      });
+      if (!structureResult.ok) throw new Error(structureResult.error);
+    }
   }
 
   async function saveEverything() {
@@ -440,9 +428,7 @@ export function DesignEditor({
     setSurface("status");
     setSelectedId(next.surfaces.status.full[0]?.id ?? null);
     setTemplatePreviewKey("CENTERED_SUMMARY");
-    setThemePreviewKey("DEFAULT");
     setTemplatePreviewActive(false);
-    setThemePreviewActive(false);
     setMessage("Default design loaded locally. Review it, then Save all to update the public page.");
   }
 
@@ -469,7 +455,6 @@ export function DesignEditor({
         commit(parsed);
         setTemplatePreviewKey(parsed.templateKey);
         setTemplatePreviewActive(false);
-        setThemePreviewActive(false);
         setSurface("status");
         setSelectedId(parsed.surfaces.status.full[0]?.id ?? null);
         setMessage("Design imported locally. Review it, then save to update the public page.");
@@ -484,7 +469,6 @@ export function DesignEditor({
     commit(restored);
     setTemplatePreviewKey(restored.templateKey);
     setTemplatePreviewActive(false);
-    setThemePreviewActive(false);
     setSurface("status");
     setSelectedId(restored.surfaces.status.full[0]?.id ?? null);
     setMessage(`Version ${version.version} loaded locally. Save to make it live.`);
@@ -503,11 +487,11 @@ export function DesignEditor({
   return (
     <div className="flex h-dvh min-h-0 flex-col overflow-hidden bg-[var(--bg)]">
       <header className="z-40 flex shrink-0 flex-wrap items-center gap-3 border-b border-[var(--line)] bg-[var(--surface)] px-4 py-3">
-        <Link href={`/organization/pages/${page.id}`} className="inline-flex min-h-9 items-center border border-[var(--line)] px-3 text-sm font-semibold hover:border-[var(--cyan)]">
+        <Link href={`/organization/pages/${page.id}/appearance`} className="inline-flex min-h-9 items-center border border-[var(--line)] px-3 text-sm font-semibold hover:border-[var(--cyan)]">
           ← Back
         </Link>
         <div>
-          <p className="text-xs uppercase tracking-wider text-[var(--fg-dim)]">Status-page designer</p>
+          <p className="text-xs uppercase tracking-wider text-[var(--fg-dim)]">Advanced designer</p>
           <h1 className="font-mono text-lg font-semibold">{page.name}</h1>
         </div>
         <span className={`ml-auto text-xs ${saveState === "ERROR" || saveState === "CONFLICT" ? "text-[var(--red)]" : "text-[var(--fg-dim)]"}`}>
@@ -523,14 +507,20 @@ export function DesignEditor({
         <Button appearance="secondary" shape="square" type="button" data-button-busy-mode="interaction" onClick={() => setResetDialogOpen(true)}>
           Reset to default
         </Button>
-        <Link
-          href={page.publicPath}
-          target="_blank"
-          rel="noreferrer"
-          className="inline-flex min-h-9 items-center border border-[var(--line)] px-3 text-sm font-semibold hover:border-[var(--cyan)]"
-        >
-          View live page ↗
-        </Link>
+        {page.publicAvailable ? (
+          <Link
+            href={page.publicPath}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex min-h-9 items-center border border-[var(--line)] px-3 text-sm font-semibold hover:border-[var(--cyan)]"
+          >
+            View live page ↗
+          </Link>
+        ) : (
+          <Link href={`/organization/pages/${page.id}#publish`} className="inline-flex min-h-9 items-center border border-[var(--amber)]/40 px-3 text-sm font-semibold text-[var(--amber)]">
+            Finish setup to view live page
+          </Link>
+        )}
       </header>
 
       <Dialog open={resetDialogOpen} onOpenChange={(_event, data) => setResetDialogOpen(data.open)}>
@@ -606,9 +596,9 @@ export function DesignEditor({
             <section className="border border-[var(--line)] bg-[var(--surface)] p-4">
               <div className="mb-4">
                 <h2 className="font-mono text-sm font-semibold">Starting point</h2>
-                <p className="mt-1 text-xs text-[var(--fg-dim)]">Layout and color system changes update the preview only. Your saved design stays unchanged.</p>
+                <p className="mt-1 text-xs text-[var(--fg-dim)]">Choose a layout starting point. Style presets, brand assets, and visitor appearance live in the page&apos;s Appearance section.</p>
               </div>
-            <div className="grid gap-4 md:grid-cols-2">
+            <div className="max-w-xl">
               <div>
                 <PanelTitle>Page template</PanelTitle>
                 <Select
@@ -623,21 +613,6 @@ export function DesignEditor({
                   options={[...PAGE_TEMPLATE_KEYS]}
                 />
                 <p className="mt-2 text-xs text-[var(--fg-dim)]">{PAGE_TEMPLATE_LABELS[templatePreviewKey]} changes page composition while preserving SEO and the selected theme.</p>
-              </div>
-              <div>
-                <PanelTitle>Theme preset</PanelTitle>
-                <Select
-                  label="Color system"
-                  value={themePreviewKey}
-                  onChange={(value) => {
-                    setThemePreviewKey(value as PageThemePresetKey);
-                    setThemePreviewActive(true);
-                    setSaveState("DIRTY");
-                    setMessage("Theme preview ready. Save all to update the public page.");
-                  }}
-                  options={[...PAGE_THEME_PRESET_KEYS]}
-                />
-                <p className="mt-2 text-xs text-[var(--fg-dim)]">{PAGE_THEME_PRESET_DESCRIPTIONS[themePreviewKey]}</p>
               </div>
             </div>
             </section>
@@ -699,29 +674,13 @@ export function DesignEditor({
             )}
 
             <div className="grid items-start gap-5 2xl:grid-cols-2">
-              <EditorSection id="branding" title="Branding and page details" description="Page identity, public copy, support link, and uploaded artwork." open={expandedSection === "branding"} onToggle={setExpandedSection}>
-                <BrandingPanel
-                  page={branding}
-                  onChange={(next) => {
-                    setBranding(next);
-                    setSaveState("DIRTY");
-                  }}
-                  onSave={() => void saveEverything()}
-                />
-              </EditorSection>
-              <EditorSection id="theme" title="Theme and appearance" description="Typography, spacing, shape, and brand colors." open={expandedSection === "theme"} onToggle={setExpandedSection}>
+              <EditorSection id="theme" title="Advanced appearance" description="Typography, spacing, shape, and detailed surface colors." open={expandedSection === "theme"} onToggle={setExpandedSection}>
                 <ThemePanel design={design} updateTheme={updateTheme} updatePalette={updatePalette} onSave={() => void saveEverything()} />
               </EditorSection>
               <EditorSection id="chrome" title="Header and footer" description="Navigation, visitor actions, footer links, and legal content." open={expandedSection === "chrome"} onToggle={setExpandedSection}>
                 <ChromePanel design={design} onChange={commit} onSave={() => void saveEverything()} />
               </EditorSection>
-              <EditorSection id="seo" title="Search and sharing" description="Search metadata, social image, and indexing controls." open={expandedSection === "seo"} onToggle={setExpandedSection}>
-                <SeoPanel design={design} onChange={commit} onSave={() => void saveEverything()} />
-              </EditorSection>
-              <EditorSection id="announcements" title="Announcements" description="Create and manage public banners for incidents or maintenance." open={expandedSection === "announcements"} onToggle={setExpandedSection}>
-                <AnnouncementPanel pageId={page.id} announcements={announcements} />
-              </EditorSection>
-              <EditorSection id="services" title="Services and groups" description="Organize how components appear in grouped directory layouts." open={expandedSection === "services"} onToggle={setExpandedSection}>
+              {!page.isHub && <EditorSection id="services" title="Services and groups" description="Organize how components appear in grouped directory layouts." open={expandedSection === "services"} onToggle={setExpandedSection}>
                 <StructurePanel
                   pageId={page.id}
                   groups={structureGroups}
@@ -732,7 +691,7 @@ export function DesignEditor({
                     setSaveState("DIRTY");
                   }}
                 />
-              </EditorSection>
+              </EditorSection>}
             </div>
 
             <EditorSection id="versions" title="Saved versions" description="Review earlier saved designs and load one into the local draft." open={expandedSection === "versions"} onToggle={setExpandedSection}>
@@ -819,47 +778,6 @@ function EditorSection({
   );
 }
 
-function BrandingPanel({
-  page,
-  onChange,
-  onSave,
-}: {
-  page: EditorPage;
-  onChange: (page: EditorPage) => void;
-  onSave: () => void;
-}) {
-  const patch = (value: Partial<EditorPage>) => onChange({ ...page, ...value });
-  return (
-    <section>
-      <div className="space-y-2">
-        <Text label="Page name" value={page.name} onChange={(name) => patch({ name })} />
-        <Text label="Headline" value={page.headline} onChange={(headline) => patch({ headline })} />
-        <label className="block text-xs text-[var(--fg-soft)]">
-          About text
-          <textarea rows={4} value={page.aboutText} onChange={(event) => patch({ aboutText: event.target.value })} className="mt-1 w-full border border-[var(--line)] bg-[var(--bg)] p-2 text-[var(--fg)]" />
-        </label>
-        <Text label="Support URL" value={page.supportUrl ?? ""} onChange={(supportUrl) => patch({ supportUrl })} />
-        <div className="grid grid-cols-3 gap-2 pt-1">
-          {([
-            ["Logo", page.logoUrl],
-            ["Favicon", page.faviconUrl],
-            ["Cover", page.coverImageUrl],
-          ] as const).map(([label, url]) => (
-            <div key={label} className="border border-[var(--line)] bg-[var(--bg)] p-2 text-center text-[10px] text-[var(--fg-dim)]">
-              <div className="relative mb-1 h-12 overflow-hidden bg-[var(--surface-raised)]">
-                {url ? <Image unoptimized src={url} alt={`${label} preview`} fill className="object-contain" /> : <span className="flex h-full items-center justify-center">None</span>}
-              </div>
-              {label}
-            </div>
-          ))}
-        </div>
-        <Link href={`/organization/pages/${page.id}#branding`} className="inline-flex text-xs font-semibold text-[var(--cyan)] hover:underline">Manage uploaded images</Link>
-      </div>
-      <SectionSaveButton onClick={onSave}>Save branding and settings</SectionSaveButton>
-    </section>
-  );
-}
-
 function ChromePanel({ design, onChange, onSave }: { design: StatusPageDesign; onChange: (design: StatusPageDesign) => void; onSave: () => void }) {
   function updateHeader(mutator: (header: StatusPageDesign["chrome"]["header"]) => void) {
     const next = cloneDesign(design);
@@ -932,28 +850,6 @@ function parseLinks(value: string) {
     .map(([label, url]) => ({ label: label.slice(0, 80), url }));
 }
 
-function SeoPanel({ design, onChange, onSave }: { design: StatusPageDesign; onChange: (design: StatusPageDesign) => void; onSave: () => void }) {
-  function update(key: keyof StatusPageDesign["seo"], value: string | boolean | null) {
-    const next = cloneDesign(design);
-    if (key === "noIndex") next.seo.noIndex = Boolean(value);
-    else if (key === "socialImageUrl") next.seo.socialImageUrl = typeof value === "string" && value ? value : null;
-    else if (key === "title") next.seo.title = String(value);
-    else next.seo.description = String(value);
-    onChange(next);
-  }
-  return (
-    <section>
-      <div className="space-y-2">
-        <Text label="SEO title" value={design.seo.title} onChange={(value) => update("title", value)} />
-        <label className="block text-xs">Description<textarea rows={3} value={design.seo.description} onChange={(event) => update("description", event.target.value)} className="mt-1 w-full border border-[var(--line)] bg-[var(--bg)] p-2" /></label>
-        <Text label="Social image URL" value={design.seo.socialImageUrl ?? ""} onChange={(value) => update("socialImageUrl", value)} />
-        <Check label="Hide from search engines" checked={design.seo.noIndex} onChange={(value) => update("noIndex", value)} />
-      </div>
-      <SectionSaveButton onClick={onSave}>Save search settings</SectionSaveButton>
-    </section>
-  );
-}
-
 function SortableZone({
   zone,
   label,
@@ -1013,19 +909,15 @@ function ThemePanel({
   return (
     <section>
       <div className="grid grid-cols-2 gap-2">
-        <Select label="Mode" value={design.theme.mode} onChange={(value) => updateTheme("mode", value as StatusPageDesign["theme"]["mode"])} options={["SYSTEM", "LIGHT", "DARK"]} />
         <Select label="Type" value={design.theme.typography} onChange={(value) => updateTheme("typography", value as StatusPageDesign["theme"]["typography"])} options={["SYSTEM", "HUMANIST", "GEOMETRIC", "MONO"]} />
         <Select label="Density" value={design.theme.density} onChange={(value) => updateTheme("density", value as StatusPageDesign["theme"]["density"])} options={["COMPACT", "COMFORTABLE", "SPACIOUS"]} />
         <Select label="Width" value={design.theme.contentWidth} onChange={(value) => updateTheme("contentWidth", value as StatusPageDesign["theme"]["contentWidth"])} options={["NARROW", "STANDARD", "WIDE"]} />
         <Select label="Radius" value={design.theme.radius} onChange={(value) => updateTheme("radius", value as StatusPageDesign["theme"]["radius"])} options={["NONE", "SMALL", "MEDIUM", "LARGE"]} />
         <Select label="Shadow" value={design.theme.shadow} onChange={(value) => updateTheme("shadow", value as StatusPageDesign["theme"]["shadow"])} options={["NONE", "SUBTLE", "ELEVATED"]} />
       </div>
-      <label className="mt-3 flex items-center gap-2 text-xs">
-        <input type="checkbox" checked={design.theme.allowVisitorMode} onChange={(event) => updateTheme("allowVisitorMode", event.target.checked)} />
-        Let visitors switch light/dark
-      </label>
-      <div className="mt-3 grid grid-cols-4 gap-2">
-        {(["brand", "background", "surface", "text"] as const).map((key) => (
+      <p className="mt-3 text-xs text-[var(--fg-dim)]">These values override the selected style preset. Choose a new preset from Appearance to reset them.</p>
+      <div className="mt-3 grid grid-cols-3 gap-2">
+        {(["background", "surface", "text"] as const).map((key) => (
           <label key={key} title={key} className="text-[10px] capitalize text-[var(--fg-dim)]">
             <input type="color" value={design.theme.palette[key]} onChange={(event) => updatePalette(key, event.target.value)} className="h-8 w-full border-0 bg-transparent" />
             {key.replace(/([A-Z])/g, " $1")}
@@ -1035,7 +927,7 @@ function ThemePanel({
       <p className="mt-3 text-xs text-[var(--fg-dim)]">
         Operational, degraded, outage, and maintenance colors use the standard SignalHub severity palette.
       </p>
-      <SectionSaveButton onClick={onSave}>Save theme</SectionSaveButton>
+      <SectionSaveButton onClick={onSave}>Save advanced appearance</SectionSaveButton>
     </section>
   );
 }
@@ -1153,7 +1045,7 @@ function DesignPreview({
           <span className="ml-auto text-xs" style={{ color: palette.mutedText }}>Subscribe</span>
         )}
       </div>
-      {design.chrome.header.variant === "HERO" && (
+      {(design.chrome.header.variant === "HERO" || design.templateKey === "BANNER_SPOTLIGHT" || page.coverImageUrl) && (
         <div
           className="h-28 bg-[var(--surface-raised)] opacity-90"
           style={page.coverImageUrl
@@ -1389,7 +1281,7 @@ function PreviewBlock({
   );
 }
 
-function AnnouncementPanel({ pageId, announcements }: { pageId: string; announcements: EditorAnnouncement[] }) {
+export function PageAnnouncementManager({ pageId, announcements }: { pageId: string; announcements: EditorAnnouncement[] }) {
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [severity, setSeverity] = useState<EditorAnnouncement["severity"]>("INFO");
@@ -1460,22 +1352,40 @@ function AnnouncementPanel({ pageId, announcements }: { pageId: string; announce
               disabled={!title.trim() || !startsAt || pending}
               onClick={() => startTransition(async () => {
                 setError("");
-                try {
-                  await createAnnouncement(pageId, {
+                const startDate = new Date(startsAt);
+                const endDate = endsAt ? new Date(endsAt) : null;
+                if (!title.trim() || title.trim().length > 160) {
+                  setError("Announcement title is required and must be 160 characters or fewer");
+                  return;
+                }
+                if (body.length > 2_000) {
+                  setError("Announcement message must be 2,000 characters or fewer");
+                  return;
+                }
+                if (Boolean(ctaLabel.trim()) !== Boolean(ctaUrl.trim())) {
+                  setError("CTA label and URL must be provided together");
+                  return;
+                }
+                if (Number.isNaN(startDate.getTime()) || (endDate && Number.isNaN(endDate.getTime()))) {
+                  setError("Enter a valid announcement schedule");
+                  return;
+                }
+                const result = await createAnnouncement(pageId, {
                     title,
                     body,
                     severity,
                     ctaLabel: ctaLabel || undefined,
                     ctaUrl: ctaUrl || undefined,
-                    startsAt: new Date(startsAt).toISOString(),
-                    endsAt: endsAt ? new Date(endsAt).toISOString() : undefined,
+                    startsAt: startDate.toISOString(),
+                    endsAt: endDate?.toISOString(),
                     dismissible,
                     priority: Number(priority) || 0,
                   });
-                  location.reload();
-                } catch (caught) {
-                  setError(caught instanceof Error ? caught.message : "Could not create announcement");
+                if (!result.ok) {
+                  setError(result.error);
+                  return;
                 }
+                location.reload();
               })}
               className="border border-[var(--line)] bg-[var(--bg)] px-3 py-1.5 text-xs font-medium"
             >
@@ -1602,7 +1512,7 @@ function StructurePanel({
       {status && <p role="status" className="mt-2 text-xs text-[var(--fg-dim)]">{status}</p>}
       <div className="mt-3 flex flex-wrap items-center gap-3">
         <button type="button" disabled={saving} onClick={save} className="border border-[var(--cyan)] px-3 py-1.5 text-xs font-semibold text-[var(--cyan)]">{saving ? "Saving…" : "Save groups and components"}</button>
-        <Link href={`/organization/pages/${pageId}`} className="text-xs font-semibold text-[var(--cyan)] hover:underline">Edit group and component details</Link>
+        <Link href={`/organization/pages/${pageId}/content`} className="text-xs font-semibold text-[var(--cyan)] hover:underline">Edit group and component details</Link>
       </div>
     </section>
   );
@@ -1678,6 +1588,22 @@ function Check({ label, checked, onChange }: { label: string; checked: boolean; 
   return <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} />{label}</label>;
 }
 
-function Text({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
-  return <label className="block text-xs">{label}<input value={value} onChange={(event) => onChange(event.target.value)} className="mt-1 w-full border border-[var(--line)] bg-[var(--bg)] px-2 py-1.5" /></label>;
+function Text({
+  label,
+  value,
+  onChange,
+  required = false,
+  maxLength,
+  inputMode,
+  placeholder,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  required?: boolean;
+  maxLength?: number;
+  inputMode?: "url" | "text";
+  placeholder?: string;
+}) {
+  return <label className="block text-xs">{label}<input value={value} required={required} maxLength={maxLength} inputMode={inputMode} placeholder={placeholder} onChange={(event) => onChange(event.target.value)} className="mt-1 w-full border border-[var(--line)] bg-[var(--bg)] px-2 py-1.5" /></label>;
 }

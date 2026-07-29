@@ -85,9 +85,11 @@ export function AdminNav({ capabilities }: { capabilities: Capability[] }) {
           <p className="mb-1.5 px-4 font-mono text-[10px] uppercase tracking-wider text-[var(--fg-dim)]">{group.label}</p>
           <div>
             {items.map((item) => {
-              const active = item.href === "/organization" || item.href === "/organization/pages"
+              const active = item.href === "/organization"
                 ? pathname === item.href
-                : pathname.startsWith(item.href);
+                : item.href === "/organization/pages"
+                  ? pathname === item.href || (pathname.startsWith(`${item.href}/`) && !pathname.startsWith("/organization/pages/deleted"))
+                  : pathname.startsWith(item.href);
               return (
                 <Link
                   key={item.href}

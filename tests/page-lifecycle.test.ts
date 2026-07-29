@@ -20,10 +20,11 @@ describe("page lifecycle filters", () => {
   });
 
   it("requires a confirmation and exposes restore navigation", () => {
-    const detail = readFileSync("app/admin/(protected)/pages/[pageId]/page.tsx", "utf8");
+    const overview = readFileSync("app/admin/(protected)/pages/[pageId]/page.tsx", "utf8");
+    const settings = readFileSync("app/admin/(protected)/pages/[pageId]/settings/page.tsx", "utf8");
     const nav = readFileSync("components/admin/AdminNav.tsx", "utf8");
-    expect(detail).toContain("This page will become unavailable to everyone");
-    expect(detail).toContain("Hide from public");
+    expect(settings).toContain("This page will become unavailable to everyone");
+    expect(overview).toContain("Hide from public");
     expect(nav).toContain("Deleted Pages");
   });
 });

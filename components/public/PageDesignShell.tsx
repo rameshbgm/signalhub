@@ -36,6 +36,7 @@ export function PageDesignShell({
       data-status-page={pageId}
       data-published-version={publishedVersion}
       data-template={design.templateKey}
+      data-theme-preset={design.theme.preset}
       data-theme-mode={design.theme.mode}
       data-density={design.theme.density}
       data-content-width={design.theme.contentWidth}

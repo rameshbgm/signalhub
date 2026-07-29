@@ -30,6 +30,8 @@ describe("status page design", () => {
   });
 
   it("ships a valid design for every curated template", () => {
+    expect(PAGE_TEMPLATE_KEYS).toHaveLength(8);
+    expect(PAGE_TEMPLATE_KEYS).toContain("BANNER_SPOTLIGHT");
     for (const key of PAGE_TEMPLATE_KEYS) {
       const design = templateDesign(key, "#123456");
       expect(statusPageDesignSchema.parse(design).templateKey).toBe(key);
@@ -59,6 +61,18 @@ describe("status page design", () => {
       expect(themed.theme.palette.majorOutage).toBe(COMPONENT_STATUS_COLOR.MAJOR_OUTAGE);
       expect(themed.theme.palette.maintenance).toBe(COMPONENT_STATUS_COLOR.UNDER_MAINTENANCE);
     }
+  });
+
+  it("keeps color mode and visitor override independent from theme presets", () => {
+    const design = templateDesign("CENTERED_SUMMARY");
+    design.theme.mode = "LIGHT";
+    design.theme.allowVisitorMode = false;
+    const themed = designWithThemePreset(design, "MIDNIGHT");
+
+    expect(themed.theme.preset).toBe("MIDNIGHT");
+    expect(themed.theme.mode).toBe("LIGHT");
+    expect(themed.theme.allowVisitorMode).toBe(false);
+    expect(themed.theme.palette.background).toBe("#070b14");
   });
 
   it("detects unchanged normalized drafts before publishing a new version", () => {
@@ -161,5 +175,10 @@ describe("status page design", () => {
     expect(statusOverall?.id).not.toBe(hubOverall?.id);
     if (statusOverall?.type === "OVERALL_STATUS") statusOverall.settings.style = "SOLID";
     expect(hubOverall?.type === "OVERALL_STATUS" && hubOverall.settings.style).toBe("PANEL");
+  });
+
+  it("includes announcements on the hub surface by default", () => {
+    const design = templateDesign("CENTERED_SUMMARY");
+    expect(design.surfaces.hub.full.some((block) => block.type === "ANNOUNCEMENTS")).toBe(true);
   });
 });

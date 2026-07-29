@@ -120,6 +120,8 @@ export async function saveDesign(
               publishedDesignVersion: liveVersion,
               designPublishedAt: now,
               brandColor: design.theme.palette.brand,
+              layout: design.templateKey,
+              themePreset: design.theme.preset,
               themeMode: design.theme.mode,
               allowThemeOverride: design.theme.allowVisitorMode,
             },
@@ -178,7 +180,7 @@ export async function saveDesignerBranding(pageId: string, input: {
     if (headline.length > 180) throw new Error("Headline must be 180 characters or fewer");
     if (aboutText.length > 4_000) throw new Error("About text must be 4,000 characters or fewer");
     const supportUrl = input.supportUrl.trim()
-      ? validatedExternalUrl(input.supportUrl.trim(), { label: "Support URL" })
+      ? validatedExternalUrl(input.supportUrl.trim(), { allowMailto: true, label: "Support URL" })
       : null;
     await withTransaction(async (databaseSession) => {
       await fenceActiveOrganizationMutation(session.orgId, databaseSession);
@@ -206,7 +208,12 @@ export async function reorderPageComponents(
   }
 ) {
   const { session, page } = await authorizedPage(pageId);
-  if (page.isHub) throw new Error("Components belong to child status pages, not hubs");
+  if (page.isHub) {
+    if (payload.groups.length || payload.components.length) {
+      return { ok: false, error: "Services belong to status pages, not hubs" } as const;
+    }
+    return { ok: true } as const;
+  }
   const groupIds = new Set(payload.groups.map((group) => group.id));
   if (groupIds.size !== payload.groups.length) throw new Error("Duplicate group ordering entry");
   if (new Set(payload.components.map((component) => component.id)).size !== payload.components.length) {
@@ -266,41 +273,50 @@ export async function createAnnouncement(pageId: string, input: {
   dismissible?: boolean;
   priority?: number;
 }) {
-  const { session, page } = await authorizedPage(pageId);
-  const title = input.title.trim();
-  if (!title || title.length > 160) throw new Error("Announcement title is required and must be 160 characters or fewer");
-  if (input.body.length > 2_000) throw new Error("Announcement body must be 2,000 characters or fewer");
-  const startsAt = new Date(input.startsAt);
-  const endsAt = input.endsAt ? new Date(input.endsAt) : null;
-  if (Number.isNaN(startsAt.getTime()) || (endsAt && Number.isNaN(endsAt.getTime()))) throw new Error("Invalid announcement schedule");
-  if (endsAt && endsAt <= startsAt) throw new Error("Announcement end must be after its start");
-  const now = new Date();
-  await collections.pageAnnouncements().insertOne({
-    _id: new ObjectId(),
-    pageId: page._id,
-    title,
-    body: input.body.trim(),
-    severity: input.severity,
-    ctaLabel: input.ctaLabel?.trim() || null,
-    ctaUrl: input.ctaUrl ? validatedExternalUrl(input.ctaUrl, { label: "Announcement link" }) : null,
-    startsAt,
-    endsAt,
-    dismissible: input.dismissible ?? false,
-    priority: Math.max(-100, Math.min(100, input.priority ?? 0)),
-    surfaces: ["STATUS", "HISTORY", "INCIDENT", "HUB"],
-    createdBy: oid(session.userId),
-    createdAt: now,
-    updatedAt: now,
-  });
-  revalidatePath(`/${page.slug}`);
-  revalidatePath(`/organization/pages/${pageId}/design`);
-  return { ok: true };
+  try {
+    const { session, page } = await authorizedPage(pageId);
+    const title = input.title.trim();
+    const ctaLabel = input.ctaLabel?.trim() || null;
+    const rawCtaUrl = input.ctaUrl?.trim() || "";
+    if (!title || title.length > 160) throw new Error("Announcement title is required and must be 160 characters or fewer");
+    if (input.body.length > 2_000) throw new Error("Announcement body must be 2,000 characters or fewer");
+    if (Boolean(ctaLabel) !== Boolean(rawCtaUrl)) throw new Error("Announcement CTA label and URL must be provided together");
+    const startsAt = new Date(input.startsAt);
+    const endsAt = input.endsAt ? new Date(input.endsAt) : null;
+    if (Number.isNaN(startsAt.getTime()) || (endsAt && Number.isNaN(endsAt.getTime()))) throw new Error("Enter a valid announcement schedule");
+    if (endsAt && endsAt <= startsAt) throw new Error("Announcement end must be after its start");
+    const now = new Date();
+    await collections.pageAnnouncements().insertOne({
+      _id: new ObjectId(),
+      pageId: page._id,
+      title,
+      body: input.body.trim(),
+      severity: input.severity,
+      ctaLabel,
+      ctaUrl: rawCtaUrl ? validatedExternalUrl(rawCtaUrl, { label: "Announcement link" }) : null,
+      startsAt,
+      endsAt,
+      dismissible: input.dismissible ?? false,
+      priority: Math.max(-100, Math.min(100, input.priority ?? 0)),
+      surfaces: ["STATUS", "HISTORY", "INCIDENT", "HUB"],
+      createdBy: oid(session.userId),
+      createdAt: now,
+      updatedAt: now,
+    });
+    revalidatePath(`/${page.slug}`);
+    revalidatePath(`/hub/${page.slug}`);
+    revalidatePath(`/organization/pages/${pageId}/design`);
+    return { ok: true } as const;
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : "Could not create announcement" } as const;
+  }
 }
 
 export async function deleteAnnouncement(pageId: string, announcementId: string) {
   const { page } = await authorizedPage(pageId);
   await collections.pageAnnouncements().deleteOne({ _id: oid(announcementId), pageId: page._id });
   revalidatePath(`/${page.slug}`);
+  revalidatePath(`/hub/${page.slug}`);
   revalidatePath(`/organization/pages/${pageId}/design`);
   return { ok: true };
 }
