@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { errorFields, logger } from "@/lib/logger";
 import { createSession } from "@/lib/auth";
-import { collections } from "@/lib/db";
+import { database } from "@/lib/postgres/client";
 import {
   exchangeAndVerifyOidcCode,
   OIDC_TRANSACTION_COOKIE,
@@ -37,29 +38,21 @@ export async function GET(request: NextRequest) {
       redirectUri: oidcRedirectUri(request.nextUrl.origin),
     });
 
-    const user = await collections.users().findOne({
-      oidcIssuer: identity.issuer,
-      oidcSubject: identity.subject,
-    });
+    const user = await database.selectFrom("users").selectAll()
+      .where("oidcIssuer", "=", identity.issuer)
+      .where("oidcSubject", "=", identity.subject)
+      .executeTakeFirst();
     if (!user || user.disabled) return loginError(request, "oidc_account_disabled");
 
-    const memberships = await collections
-      .memberships()
-      .find({ userId: user._id, status: "ACTIVE" })
-      .sort({ createdAt: 1 })
-      .toArray();
-    if (!memberships.length) return loginError(request, "oidc_no_membership");
-
-    const activeOrganizations = await collections
-      .organizations()
-      .find({
-        _id: { $in: memberships.map((membership) => membership.orgId) },
-        suspended: { $ne: true },
-        status: { $nin: ["PROVISIONING", "SUSPENDED", "DELETING"] },
-      })
-      .toArray();
-    const activeIds = new Set(activeOrganizations.map((organization) => organization._id.toHexString()));
-    const membership = memberships.find((item) => activeIds.has(item.orgId.toHexString()));
+    const membership = await database.selectFrom("memberships as membership")
+      .innerJoin("organizations as organization", "organization.id", "membership.orgId")
+      .selectAll("membership")
+      .where("membership.userId", "=", user.id)
+      .where("membership.status", "=", "ACTIVE")
+      .where("organization.suspended", "=", false)
+      .where("organization.status", "=", "ACTIVE")
+      .orderBy("membership.createdAt")
+      .executeTakeFirst();
     if (!membership) return loginError(request, "oidc_no_active_organization");
 
     const authorized = await writeActiveTenantAudit(
@@ -72,24 +65,15 @@ export async function GET(request: NextRequest) {
         createdAt: new Date(),
       },
       async (databaseSession) => {
-        const currentUser = await collections.users().findOne(
-          {
-            _id: user!._id,
-            disabled: { $ne: true },
-            oidcIssuer: identity.issuer,
-            oidcSubject: identity.subject,
-          },
-          { session: databaseSession }
-        );
-        const currentMembership = await collections.memberships().findOne(
-          {
-            _id: membership._id,
-            userId: user!._id,
-            orgId: membership.orgId,
-            status: "ACTIVE",
-          },
-          { session: databaseSession }
-        );
+        const currentUser = await databaseSession.selectFrom("users").selectAll()
+          .where("id", "=", user.id).where("disabled", "=", false)
+          .where("oidcIssuer", "=", identity.issuer)
+          .where("oidcSubject", "=", identity.subject)
+          .executeTakeFirst();
+        const currentMembership = await databaseSession.selectFrom("memberships").selectAll()
+          .where("id", "=", membership.id).where("userId", "=", user.id)
+          .where("orgId", "=", membership.orgId).where("status", "=", "ACTIVE")
+          .executeTakeFirst();
         if (!currentUser || !currentMembership) {
           throw new Error("OIDC authorization changed during login");
         }
@@ -97,9 +81,9 @@ export async function GET(request: NextRequest) {
       }
     );
     await createSession({
-      userId: authorized.user._id.toHexString(),
-      membershipId: authorized.membership._id.toHexString(),
-      orgId: authorized.membership.orgId.toHexString(),
+      userId: authorized.user.id,
+      membershipId: authorized.membership.id,
+      orgId: authorized.membership.orgId,
       username: authorized.user.username,
       email: authorized.user.email,
       name: authorized.user.name,
@@ -114,7 +98,7 @@ export async function GET(request: NextRequest) {
     response.cookies.delete(OIDC_TRANSACTION_COOKIE);
     return response;
   } catch (error) {
-    console.error("OIDC callback failed", error);
+    logger.error({ ...errorFields(error) }, "OIDC callback failed");
     return loginError(request, "oidc_failed");
   }
 }

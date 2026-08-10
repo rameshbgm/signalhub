@@ -1,16 +1,6 @@
-import { collections } from "@/lib/db";
 import { getPageAccessSession } from "@/lib/auth";
-import { oid } from "@/lib/mongo-utils";
 import { isPageOrganizationActive } from "@/lib/public-page";
-
-function parseComponentIds(value: string) {
-  try {
-    const parsed: unknown = JSON.parse(value || "[]");
-    return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === "string") : [];
-  } catch {
-    return [];
-  }
-}
+import { database } from "@/lib/postgres/client";
 
 export type AccessResult =
   | { ok: true; visibleComponentIds: string[] | null } // null = all components visible
@@ -35,17 +25,22 @@ export async function checkPageAccess(page: { id: string; type: string; orgId: s
 
   if (page.type === "AUDIENCE") {
     if (session?.pageId === page.id && session.userId) {
-      const user = await collections.pageAccessUsers().findOne({
-        _id: oid(session.userId),
-        pageId: oid(page.id),
-      });
+      const user = await database
+        .selectFrom("pageAccessUsers")
+        .selectAll()
+        .where("id", "=", session.userId)
+        .where("pageId", "=", page.id)
+        .executeTakeFirst();
       if (!user) return { ok: false, reason: "login" };
       const group = user.groupId
-        ? await collections.pageAccessGroups().findOne({ _id: user.groupId, pageId: oid(page.id) })
+        ? await database
+            .selectFrom("pageAccessGroups")
+            .select("componentIds")
+            .where("id", "=", user.groupId)
+            .where("pageId", "=", page.id)
+            .executeTakeFirst()
         : null;
-      const own = parseComponentIds(user.componentIds);
-      const groupIds = group ? parseComponentIds(group.componentIds) : [];
-      const merged = Array.from(new Set([...own, ...groupIds]));
+      const merged = Array.from(new Set([...user.componentIds, ...(group?.componentIds ?? [])]));
       return { ok: true, visibleComponentIds: merged };
     }
     return { ok: false, reason: "login" };

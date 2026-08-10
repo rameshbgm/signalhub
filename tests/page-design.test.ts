@@ -4,12 +4,17 @@ import { PageDesignShell } from "../components/public/PageDesignShell";
 import {
   PAGE_TEMPLATE_KEYS,
   PAGE_THEME_PRESET_KEYS,
+  allSurfaceBlocks,
+  applyPageTemplateLayout,
   designWithThemePreset,
   legacyPageDesign,
   movePageDesignBlock,
+  pageGridPlacements,
+  resetPageGridBreakpoint,
   statusPageDesignSchema,
   sameStatusPageDesign,
   templateDesign,
+  updatePageGridPlacement,
 } from "../lib/page-design";
 import { COMPONENT_STATUS_COLOR } from "../lib/status";
 
@@ -37,6 +42,45 @@ describe("status page design", () => {
       expect(statusPageDesignSchema.parse(design).templateKey).toBe(key);
       expect(design.theme.palette.brand).toBe("#123456");
     }
+  });
+
+  it("normalizes legacy zone designs into schema-v2 responsive placements", () => {
+    const legacy = structuredClone(templateDesign("CENTERED_SUMMARY")) as unknown as Record<string, unknown>;
+    legacy.schemaVersion = 1;
+    const surfaces = legacy.surfaces as Record<string, Record<string, unknown>>;
+    for (const surface of Object.values(surfaces)) delete surface.grid;
+    delete legacy.presentation;
+
+    const migrated = statusPageDesignSchema.parse(legacy);
+    expect(migrated.schemaVersion).toBe(2);
+    expect(migrated.surfaces.status.grid.desktop).toHaveLength(allSurfaceBlocks(migrated, "status").length);
+    expect(migrated.surfaces.status.grid.tablet).toBeNull();
+  });
+
+  it("inherits smaller breakpoints until they are explicitly edited", () => {
+    const design = templateDesign("CENTERED_SUMMARY");
+    const block = allSurfaceBlocks(design, "status")[0];
+    const inherited = pageGridPlacements(design, "status", "mobile").find((placement) => placement.blockId === block.id);
+    expect(inherited?.span).toBe(4);
+
+    const customized = updatePageGridPlacement(design, "status", "mobile", block.id, { span: 2 });
+    expect(customized.surfaces.status.grid.mobile).not.toBeNull();
+    expect(pageGridPlacements(customized, "status", "mobile").find((placement) => placement.blockId === block.id)?.span).toBe(2);
+    expect(resetPageGridBreakpoint(customized, "status", "mobile").surfaces.status.grid.mobile).toBeNull();
+  });
+
+  it("applies starting points without replacing blocks, settings, or presentation", () => {
+    const design = templateDesign("CENTERED_SUMMARY");
+    design.presentation.supportUrl = "https://status.example.com/help";
+    const component = allSurfaceBlocks(design, "status").find((block) => block.type === "COMPONENT_STATUS");
+    if (component?.type === "COMPONENT_STATUS") component.settings.searchEnabled = true;
+    const ids = allSurfaceBlocks(design, "status").map((block) => block.id);
+
+    const applied = applyPageTemplateLayout(design, "PRODUCT_GRID");
+    expect(allSurfaceBlocks(applied, "status").map((block) => block.id)).toEqual(ids);
+    const appliedComponent = allSurfaceBlocks(applied, "status").find((block) => block.type === "COMPONENT_STATUS");
+    expect(appliedComponent?.type === "COMPONENT_STATUS" && appliedComponent.settings.searchEnabled).toBe(true);
+    expect(applied.presentation.supportUrl).toBe("https://status.example.com/help");
   });
 
   it("builds the uptime timeline composition used by the live public page", () => {
@@ -103,6 +147,25 @@ describe("status page design", () => {
     expect(moved?.targetZone).toBe("sidebar");
     expect(moved?.design.surfaces.status.primary.some((block) => block.id === component.id)).toBe(false);
     expect(moved?.design.surfaces.status.sidebar.at(-1)?.id).toBe(component.id);
+  });
+
+  it("allows every status-page block to move into every layout zone", () => {
+    const design = templateDesign("CENTERED_SUMMARY");
+    const blocks = allSurfaceBlocks(design, "status");
+
+    for (const block of blocks) {
+      for (const zone of ["full", "primary", "sidebar"] as const) {
+        const current = allSurfaceBlocks(design, "status")
+          .find((candidate) => candidate.id === block.id);
+        expect(current).toBeDefined();
+        const sourceZone = (["full", "primary", "sidebar"] as const)
+          .find((zone) => design.surfaces.status[zone].some((candidate) => candidate.id === block.id));
+        if (sourceZone === zone) continue;
+        const moved = movePageDesignBlock(design, "status", block.id, `zone-${zone}`);
+        expect(moved?.targetZone).toBe(zone);
+        if (moved) Object.assign(design, moved.design);
+      }
+    }
   });
 
   it("defaults older saved designs to the compatible component directory layout", () => {

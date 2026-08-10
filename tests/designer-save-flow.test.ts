@@ -1,86 +1,88 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
-describe("designer save workflow", () => {
-  const actions = readFileSync("app/admin/(protected)/pages/[pageId]/design/actions.ts", "utf8");
-  const editor = readFileSync("components/admin/DesignEditor.tsx", "utf8");
+function source(path: string) {
+  return readFileSync(path, "utf8");
+}
 
-  it("saves the draft and live design in one fenced transaction", () => {
-    expect(actions).toContain("export async function saveDesign(");
+describe("unified responsive designer workflow", () => {
+  const actions = source("app/admin/(protected)/pages/[pageId]/design/actions.ts");
+  const editor = source("components/admin/DesignEditor.tsx");
+  const appearance = source("app/admin/(protected)/pages/[pageId]/appearance/page.tsx");
+  const legacyRoute = source("app/admin/(protected)/pages/[pageId]/design/page.tsx");
+  const assets = source("app/api/admin/pages/[pageId]/assets/route.ts");
+
+  it("autosaves drafts without publishing them", () => {
+    expect(actions).toContain("export async function saveDesignDraft(");
+    expect(actions).toContain('insertInto("pageDesignDrafts")');
+    expect(editor).toContain("saveDesignDraft(page.id, designToSave, revisionRef.current)");
+    expect(editor).toContain("window.setTimeout(() => { void saveChanges");
+    expect(editor).toContain("}, 800)");
+  });
+
+  it("publishes an exact draft in one fenced transaction", () => {
+    expect(actions).toContain("export async function publishDesignDraft(");
     expect(actions).toContain("withTransaction(");
     expect(actions).toContain("fenceActiveOrganizationMutation(");
-    expect(actions).toContain("pageDesignVersions().insertOne(");
+    expect(actions).toContain('insertInto("pageDesignVersions")');
     expect(actions).toContain("publishedDesign: design");
-    expect(actions).toContain('action: "SAVE_PAGE_DESIGN"');
+    expect(actions).toContain('action: "PUBLISH_PAGE_DESIGN"');
+    expect(editor).toContain('"Publish"');
   });
 
-  it("does not expose a separate publish action and skips unchanged versions", () => {
-    expect(actions).not.toContain("export async function publishDesignDraft");
-    expect(editor).not.toContain("publishDesignDraft");
-    expect(editor).not.toMatch(/>\s*Publish\s*</);
-    expect(actions).toContain("const liveChanged = !sameStatusPageDesign(design, publishedDesign)");
-    expect(actions).toContain("if (liveChanged) {");
+  it("retains only the newest published versions", () => {
+    expect(actions).toContain("delete from page_design_versions");
+    expect(actions).toContain("limit ${PAGE_DESIGN_VERSION_HISTORY_LIMIT}");
+    expect(appearance).toContain(".limit(PAGE_DESIGN_VERSION_HISTORY_LIMIT)");
   });
 
-  it("keeps reset, import, and version restore local until save", () => {
-    expect(editor).toContain("function resetToDefaultDraft()");
+  it("uses Appearance as the canonical full-screen builder", () => {
+    expect(appearance).toContain("<DesignEditor");
+    expect(appearance).toContain("initialPublishedDesign={publishedDesign}");
+    expect(legacyRoute).toContain("redirect(\`/organization/pages/\${pageId}/appearance\`)");
+    expect(editor).toContain("Visual designer");
+  });
+
+  it("provides responsive canvas placement and inheritance controls", () => {
+    expect(editor).toContain("ResponsiveGridCanvas");
+    expect(editor).toContain("GridPlacementControls");
+    expect(editor).toContain("PAGE_GRID_COLUMNS[breakpoint]");
+    expect(editor).toContain("Reset to desktop inheritance");
+    expect(editor).toContain("resetPageGridBreakpoint");
+    expect(editor).toContain("updatePageGridPlacement");
+  });
+
+  it("applies starting points as layout-only draft changes", () => {
+    expect(editor).toContain("Starting points");
+    expect(editor).toContain("applyPageTemplateLayout(design, key)");
+    expect(editor).toContain("without replacing blocks, content, branding, or appearance");
+    expect(editor).toContain("Starting point applied to the draft. Publish when ready.");
+  });
+
+  it("includes theme essentials, advanced appearance, and direct canvas selection", () => {
+    expect(editor).toContain('label="Style preset"');
+    expect(editor).toContain("Brand color");
+    expect(editor).toContain("Visitor appearance");
+    expect(editor).toContain("Advanced appearance");
+    expect(editor).toContain('aria-label="Edit page header"');
+    expect(editor).toContain('aria-label="Edit page footer"');
+  });
+
+  it("stages presentation assets and visitor links until publish", () => {
+    expect(editor).toContain("staged");
+    expect(editor).toContain("design.presentation.logoUrl");
+    expect(editor).toContain("Terms of Service URL");
+    expect(editor).toContain("Privacy Policy URL");
+    expect(assets).toContain('request.nextUrl.searchParams.get("stage") === "1"');
+    expect(actions).toContain("const presentation = design.presentation");
+    expect(actions).toContain("pruneUnreferencedDesignerAssets");
+  });
+
+  it("supports undo, redo, import, reset, and version restore as draft operations", () => {
+    expect(editor).toContain('aria-label="Undo design change"');
+    expect(editor).toContain('aria-label="Redo design change"');
     expect(editor).toContain("commit(parsed)");
+    expect(editor).toContain("function resetToDefaultDraft()");
     expect(editor).toContain("function restoreVersion(");
-    expect(editor).toContain("Save to make it live");
-  });
-
-  it("retains only the newest 30 saved design versions per page", () => {
-    const page = readFileSync("app/admin/(protected)/pages/[pageId]/design/page.tsx", "utf8");
-    const designModel = readFileSync("lib/page-design.ts", "utf8");
-
-    expect(designModel).toContain("PAGE_DESIGN_VERSION_HISTORY_LIMIT = 30");
-    expect(actions).toContain(".skip(PAGE_DESIGN_VERSION_HISTORY_LIMIT)");
-    expect(actions).toContain("pageDesignVersions().deleteMany(");
-    expect(actions).toContain("{ pageId: page._id, _id: { $in:");
-    expect(page).toContain(".limit(PAGE_DESIGN_VERSION_HISTORY_LIMIT)");
-  });
-
-  it("uses a collapsed, single-open settings accordion while leaving the starting point visible", () => {
-    expect(editor).toContain('const [expandedSection, setExpandedSection] = useState<string | null>(null)');
-    expect(editor).toContain('onClick={() => onToggle(open ? null : id)}');
-    expect(editor).toContain('{open && <div id={`editor-section-${id}`}');
-    expect(editor).toContain('<h2 className="font-mono text-sm font-semibold">Starting point</h2>');
-    expect(editor).not.toContain("defaultOpen");
-  });
-
-  it("keeps starting-point dropdowns preview-only without an apply action", () => {
-    expect(editor).toContain("Choose a layout starting point");
-    expect(editor).toContain("Style presets, brand assets, and visitor appearance live in the page&apos;s Appearance section");
-    expect(editor).not.toContain("Apply preview to draft");
-    expect(editor).not.toContain("function applyPresetPreview");
-  });
-
-  it("promotes the selected template preview when saving", () => {
-    expect(editor).toContain("const designToSave = cloneDesign(previewDesign)");
-    expect(editor).toContain("saveDesign(page.id, designToSave, revisionRef.current)");
-    expect(editor).toContain("setDesign(designToSave)");
-    expect(editor).toContain("setTemplatePreviewActive(false)");
-    expect(editor).toContain("Template preview ready. Save all to update the public page.");
-    expect(editor).not.toContain("Theme preview ready. Save all to update the public page.");
-  });
-
-  it("does not expose semantic status colors as theme customization", () => {
-    expect(editor).toContain("standard SignalHub severity palette");
-    expect(editor).not.toContain('["brand", "background", "surface", "text", "operational"');
-  });
-
-  it("lets every block be removed and warns about its unsaved field changes", () => {
-    expect(editor).toContain("function requestBlockRemoval(blockId: string)");
-    expect(editor).toContain("describeBlockChanges(savedDesign");
-    expect(editor).toContain("This block has unsaved changes. Removing it will discard:");
-    expect(editor).toContain("Remove {pendingBlockRemoval?.label}?");
-    expect(editor).not.toContain("This block is required for an accessible, truthful status surface");
-    expect(editor).not.toContain("disabled={required}");
-  });
-
-  it("keeps the page preview inside its own scrollable frame", () => {
-    expect(editor).toContain('aria-label="Scrollable page preview"');
-    expect(editor).toContain("overflow-y-auto overscroll-contain");
-    expect(editor).toContain("h-dvh min-h-0 flex-col overflow-hidden");
   });
 });

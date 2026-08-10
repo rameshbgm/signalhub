@@ -1,20 +1,19 @@
-import { ObjectId } from "mongodb";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { assertPageInOrg, requireCapability } from "@/lib/admin-guard";
 import { apiError, routeError, validationError } from "@/lib/api-response";
-import { collections } from "@/lib/db";
+import { newDatabaseId, isDatabaseId } from "@/lib/database-id";
 import { encryptSecret } from "@/lib/encryption";
 import {
   DESTINATION_CHANNELS,
   deliverDestination,
   type DestinationChannel,
 } from "@/lib/notification-providers";
-import { isValidOid, oid } from "@/lib/mongo-utils";
-import { validateHttpTarget } from "@/lib/target-validation";
-import { withTransaction } from "@/lib/cascade";
 import { fenceActiveOrganizationMutation } from "@/lib/organization-mutation";
 import { enabledDestinationChannels } from "@/lib/platform-configuration";
+import { database, withDatabaseTransaction } from "@/lib/postgres/client";
+import type { NotificationDestinationRow } from "@/lib/postgres/schema";
+import { validateHttpTarget } from "@/lib/target-validation";
 
 const schema = z.object({
   pageId: z.string(),
@@ -65,16 +64,20 @@ export async function POST(request: NextRequest) {
     if (!enabledChannels.includes(parsed.data.channel)) {
       return apiError(403, "DESTINATION_DISABLED", "This notification provider is disabled by the platform administrator");
     }
-    const page = await collections.pages().findOne({
-      _id: oid(parsed.data.pageId),
-      orgId: oid(session.orgId),
-    });
+    const page = await database
+      .selectFrom("pages")
+      .select(["id", "name"])
+      .where("id", "=", parsed.data.pageId)
+      .where("orgId", "=", session.orgId)
+      .where("deletedAt", "is", null)
+      .executeTakeFirst();
     if (!page) return apiError(404, "PAGE_NOT_FOUND", "Page not found");
+
     const config = await validateConfig(parsed.data.channel, parsed.data.config);
     const now = new Date();
-    const destination = {
-      _id: new ObjectId(),
-      pageId: page._id,
+    const destination: NotificationDestinationRow = {
+      id: newDatabaseId(),
+      pageId: page.id,
       name: parsed.data.name,
       channel: parsed.data.channel,
       configCiphertext: encryptSecret(JSON.stringify(config)),
@@ -92,22 +95,23 @@ export async function POST(request: NextRequest) {
       body: "This destination is ready to receive incident and maintenance updates.",
       eventType: "destination.test",
     });
-    await withTransaction(async (databaseSession) => {
-      await fenceActiveOrganizationMutation(session.orgId, databaseSession);
-      const currentPage = await collections.pages().findOne(
-        { _id: page._id, orgId: oid(session.orgId) },
-        { session: databaseSession }
-      );
+    await withDatabaseTransaction(async (transaction) => {
+      await fenceActiveOrganizationMutation(session.orgId, transaction);
+      const currentPage = await transaction
+        .selectFrom("pages")
+        .select("id")
+        .where("id", "=", page.id)
+        .where("orgId", "=", session.orgId)
+        .where("deletedAt", "is", null)
+        .forShare()
+        .executeTakeFirst();
       if (!currentPage) throw new Error("Page not found in your organization");
-      await collections.notificationDestinations().insertOne(
-        destination,
-        { session: databaseSession }
-      );
+      await transaction.insertInto("notificationDestinations").values(destination).execute();
     });
     return NextResponse.json({
       ok: true,
       destination: {
-        id: destination._id.toHexString(),
+        id: destination.id,
         name: destination.name,
         channel: destination.channel,
         active: true,
@@ -123,67 +127,43 @@ export async function PATCH(request: NextRequest) {
   try {
     const body = await request.json().catch(() => ({}));
     const id = String(body.id ?? "");
-    if (!isValidOid(id)) return apiError(400, "INVALID_ID", "Invalid destination");
-    const destination = await collections.notificationDestinations().findOne({ _id: oid(id) });
+    if (!isDatabaseId(id)) return apiError(400, "INVALID_ID", "Invalid destination");
+    const destination = await database
+      .selectFrom("notificationDestinations")
+      .selectAll()
+      .where("id", "=", id)
+      .executeTakeFirst();
     if (!destination) return apiError(404, "NOT_FOUND", "Destination not found");
-    const session = await requireCapability("integration.manage", destination.pageId.toHexString());
-    await assertPageInOrg(destination.pageId.toHexString(), session.orgId);
+    const session = await requireCapability("integration.manage", destination.pageId);
+    const page = await assertPageInOrg(destination.pageId, session.orgId);
+
     if (body.action === "toggle") {
-      await withTransaction(async (databaseSession) => {
-        await fenceActiveOrganizationMutation(session.orgId, databaseSession);
-        const page = await collections.pages().findOne(
-          { _id: destination.pageId, orgId: oid(session.orgId) },
-          { session: databaseSession }
-        );
-        if (!page) throw new Error("Destination not found");
-        await collections.notificationDestinations().updateOne(
-          { _id: destination._id, pageId: page._id },
-          { $set: { active: !destination.active } },
-          { session: databaseSession }
-        );
+      await withDatabaseTransaction(async (transaction) => {
+        await fenceActiveOrganizationMutation(session.orgId, transaction);
+        const updated = await transaction
+          .updateTable("notificationDestinations")
+          .set({ active: !destination.active })
+          .where("id", "=", destination.id)
+          .where("pageId", "=", page.id)
+          .returning("id")
+          .executeTakeFirst();
+        if (!updated) throw new Error("Destination not found");
       });
       return NextResponse.json({ ok: true });
     }
-    const page = await collections.pages().findOne({
-      _id: destination.pageId,
-      orgId: oid(session.orgId),
-    });
-    if (!page) return apiError(404, "NOT_FOUND", "Destination not found");
+
     try {
       await deliverDestination(destination, {
-        subject: `${page?.name ?? "SignalHub"} connection test`,
+        subject: `${page.name} connection test`,
         body: "This destination is ready to receive incident and maintenance updates.",
         eventType: "destination.test",
       });
-      await withTransaction(async (databaseSession) => {
-        await fenceActiveOrganizationMutation(session.orgId, databaseSession);
-        const currentPage = await collections.pages().findOne(
-          { _id: destination.pageId, orgId: oid(session.orgId) },
-          { session: databaseSession }
-        );
-        if (!currentPage) throw new Error("Destination not found");
-        await collections.notificationDestinations().updateOne(
-          { _id: destination._id, pageId: currentPage._id },
-          { $set: { lastTestedAt: new Date(), lastTestOk: true, lastError: null, verifiedAt: new Date() } },
-          { session: databaseSession }
-        );
-      });
+      const testedAt = new Date();
+      await updateTestResult(destination.id, page.id, session.orgId, testedAt, true, null);
       return NextResponse.json({ ok: true });
     } catch (error) {
       const message = error instanceof Error ? error.message.slice(0, 300) : "Connection test failed";
-      await withTransaction(async (databaseSession) => {
-        await fenceActiveOrganizationMutation(session.orgId, databaseSession);
-        const currentPage = await collections.pages().findOne(
-          { _id: destination.pageId, orgId: oid(session.orgId) },
-          { session: databaseSession }
-        );
-        if (!currentPage) throw new Error("Destination not found");
-        await collections.notificationDestinations().updateOne(
-          { _id: destination._id, pageId: currentPage._id },
-          { $set: { lastTestedAt: new Date(), lastTestOk: false, lastError: message } },
-          { session: databaseSession }
-        );
-      });
+      await updateTestResult(destination.id, page.id, session.orgId, new Date(), false, message);
       return apiError(502, "TEST_FAILED", message);
     }
   } catch (error) {
@@ -191,25 +171,51 @@ export async function PATCH(request: NextRequest) {
   }
 }
 
+async function updateTestResult(
+  destinationId: string,
+  pageId: string,
+  organizationId: string,
+  testedAt: Date,
+  ok: boolean,
+  error: string | null
+) {
+  await withDatabaseTransaction(async (transaction) => {
+    await fenceActiveOrganizationMutation(organizationId, transaction);
+    const updated = await transaction
+      .updateTable("notificationDestinations")
+      .set({
+        lastTestedAt: testedAt,
+        lastTestOk: ok,
+        lastError: error,
+        ...(ok ? { verifiedAt: testedAt } : {}),
+      })
+      .where("id", "=", destinationId)
+      .where("pageId", "=", pageId)
+      .returning("id")
+      .executeTakeFirst();
+    if (!updated) throw new Error("Destination not found");
+  });
+}
+
 export async function DELETE(request: NextRequest) {
   try {
     const id = request.nextUrl.searchParams.get("id") ?? "";
-    if (!isValidOid(id)) return apiError(400, "INVALID_ID", "Invalid destination");
-    const destination = await collections.notificationDestinations().findOne({ _id: oid(id) });
+    if (!isDatabaseId(id)) return apiError(400, "INVALID_ID", "Invalid destination");
+    const destination = await database
+      .selectFrom("notificationDestinations")
+      .select(["id", "pageId"])
+      .where("id", "=", id)
+      .executeTakeFirst();
     if (!destination) return NextResponse.json({ ok: true });
-    const session = await requireCapability("integration.manage", destination.pageId.toHexString());
-    await assertPageInOrg(destination.pageId.toHexString(), session.orgId);
-    await withTransaction(async (databaseSession) => {
-      await fenceActiveOrganizationMutation(session.orgId, databaseSession);
-      const page = await collections.pages().findOne(
-        { _id: destination.pageId, orgId: oid(session.orgId) },
-        { session: databaseSession }
-      );
-      if (!page) return;
-      await collections.notificationDestinations().deleteOne(
-        { _id: destination._id, pageId: page._id },
-        { session: databaseSession }
-      );
+    const session = await requireCapability("integration.manage", destination.pageId);
+    const page = await assertPageInOrg(destination.pageId, session.orgId);
+    await withDatabaseTransaction(async (transaction) => {
+      await fenceActiveOrganizationMutation(session.orgId, transaction);
+      await transaction
+        .deleteFrom("notificationDestinations")
+        .where("id", "=", destination.id)
+        .where("pageId", "=", page.id)
+        .execute();
     });
     return NextResponse.json({ ok: true });
   } catch (error) {

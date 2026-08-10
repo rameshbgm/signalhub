@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { errorFields, logger } from "@/lib/logger";
 import { createSession } from "@/lib/auth";
-import { collections } from "@/lib/db";
+import { database } from "@/lib/postgres/client";
 import { connectionMfaSatisfied, findEnabledConnection, upsertExternalUser } from "@/lib/identity-connections";
 import { verifyOidcTransaction } from "@/lib/oidc";
 import { organizationIsActive } from "@/lib/organization-state";
@@ -32,20 +33,21 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const result = await upsertExternalUser({ connection, ...identity });
     if (!result) return loginError(request, "saml_no_membership");
     const organization = result.membership.role === "ADMIN"
-      ? await collections.organizations().find({ suspended: { $ne: true }, status: "ACTIVE" }).sort({ createdAt: 1 }).limit(1).next()
-      : await collections.organizations().findOne({ _id: result.membership.orgId });
+      ? await database.selectFrom("organizations").selectAll().where("suspended", "=", false)
+        .where("status", "=", "ACTIVE").orderBy("createdAt", "asc").executeTakeFirst()
+      : await database.selectFrom("organizations").selectAll().where("id", "=", result.membership.orgId).executeTakeFirst();
     if (!organization || !organizationIsActive(organization)) return loginError(request, "saml_no_active_organization");
-    await writeActiveTenantAudit(organization._id, {
+    await writeActiveTenantAudit(organization.id, {
       actor: result.user.username,
       action: "LOGIN",
       target: "session",
-      metadata: { method: "saml", connectionId: connection._id.toHexString() },
+      metadata: { method: "saml", connectionId: connection.id },
       createdAt: new Date(),
     });
     await createSession({
-      userId: result.user._id.toHexString(),
-      membershipId: result.membership._id.toHexString(),
-      orgId: organization._id.toHexString(),
+      userId: result.user.id,
+      membershipId: result.membership.id,
+      orgId: organization.id,
       username: result.user.username,
       email: result.user.email,
       name: result.user.name,
@@ -58,7 +60,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     });
     return NextResponse.redirect(new URL(transaction.returnTo, request.nextUrl.origin), 303);
   } catch (error) {
-    console.error("SAML ACS failed", error);
+    logger.error({ ...errorFields(error), connection: slug }, "SAML assertion callback failed");
     return loginError(request, "saml_failed");
   }
 }

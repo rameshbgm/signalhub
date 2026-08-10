@@ -29,11 +29,16 @@ export function PageManagementShell({ page, children }: { page: ManagedPage; chi
   const pathname = usePathname();
   const router = useRouter();
   const base = `/organization/pages/${page.id}`;
+  const visibleSections = page.type === "PUBLIC"
+    ? sections.filter((section) => section.key !== "access")
+    : sections;
 
-  if (pathname === `${base}/design` || pathname.startsWith(`${base}/setup/`)) return children;
+  if (pathname === `${base}/appearance` || pathname === `${base}/design` || pathname.startsWith(`${base}/setup/`)) return children;
 
-  const current = sections.find((section) => pathname === `${base}${section.suffix}`) ?? sections[0];
+  const current = visibleSections.find((section) => pathname === `${base}${section.suffix}`) ?? visibleSections[0];
   const state = !page.setupCompleted ? "Draft" : page.publicVisible ? "Published" : "Hidden";
+  const sectionLabel = (key: typeof visibleSections[number]["key"], fallback: string) =>
+    key === "content" ? (page.isHub ? "Status pages" : "Services & groups") : fallback;
 
   return (
     <div className="mx-auto w-full max-w-7xl space-y-5">
@@ -64,19 +69,19 @@ export function PageManagementShell({ page, children }: { page: ManagedPage; chi
           onChange={(event) => router.push(event.target.value)}
           className="border border-[var(--line)] bg-[var(--surface)] px-3 py-2.5 text-sm text-[var(--fg)]"
         >
-          {sections.map((section) => <option key={section.key} value={`${base}${section.suffix}`}>{section.label}</option>)}
+          {visibleSections.map((section) => <option key={section.key} value={`${base}${section.suffix}`}>{sectionLabel(section.key, section.label)}</option>)}
         </select>
       </label>
 
       <div className="grid items-start gap-6 lg:grid-cols-[13rem_minmax(0,1fr)]">
         <nav aria-label="Page management" className="sticky top-5 hidden border border-[var(--line)] bg-[var(--surface)] p-2 lg:block">
-          {sections.map((section) => {
+          {visibleSections.map((section) => {
             const href = `${base}${section.suffix}`;
             const active = current.key === section.key;
             return (
               <Link key={section.key} href={href} aria-current={active ? "page" : undefined} className={`relative block px-3 py-2.5 font-mono text-sm ${active ? "bg-[var(--cyan-soft)] font-semibold text-[var(--cyan)]" : "text-[var(--fg-soft)] hover:bg-[var(--hover-overlay)] hover:text-[var(--fg)]"}`}>
                 {active && <span className="absolute bottom-1 left-0 top-1 w-0.5 bg-[var(--cyan)]" aria-hidden />}
-                {section.label}
+                {sectionLabel(section.key, section.label)}
               </Link>
             );
           })}

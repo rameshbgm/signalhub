@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, type ComponentPropsWithoutRef, type ReactNode } from "react";
+import { useActionState, useEffect, type ComponentPropsWithoutRef, type ReactNode } from "react";
 import { runPlatformActionWithFeedback } from "@/app/platform/(protected)/action-feedback";
 
 type PlatformAction = (formData: FormData) => void | Promise<void>;
@@ -19,6 +19,7 @@ type PlatformActionFormProps = Omit<
   children: ReactNode;
   successMessage: string;
   messageClassName?: string;
+  onSuccess?: () => void;
 };
 
 export function PlatformActionForm({
@@ -26,6 +27,7 @@ export function PlatformActionForm({
   children,
   successMessage,
   messageClassName = "",
+  onSuccess,
   ...formProps
 }: PlatformActionFormProps) {
   const [state, formAction, pending] = useActionState(
@@ -33,6 +35,10 @@ export function PlatformActionForm({
     INITIAL_STATE
   );
   const feedback = pending ? INITIAL_STATE : state;
+
+  useEffect(() => {
+    if (state.status === "success") onSuccess?.();
+  }, [onSuccess, state]);
 
   return (
     <form action={formAction} {...formProps}>

@@ -1,27 +1,23 @@
 import { requireSession } from "@/lib/require-session";
-import { collections } from "@/lib/db";
-import { oid, toId } from "@/lib/mongo-utils";
+import { database } from "@/lib/postgres/client";
 import { createIncident } from "../actions";
 import { IncidentForm } from "@/components/admin/IncidentForm";
 import { PageSelect } from "@/components/admin/PageSelect";
-import { requireCapability, scopedPageFilter } from "@/lib/admin-guard";
+import { getScopedPages, requireCapability } from "@/lib/admin-guard";
 
 export default async function NewIncidentPage({ searchParams }: { searchParams: Promise<{ pageId?: string }> }) {
   const { session, org } = await requireSession();
   await requireCapability("incident.manage");
   const { pageId: pageIdParam } = await searchParams;
-  const pages = (await collections.pages().find(scopedPageFilter(session, org.id, { isHub: false })).sort({ createdAt: 1 }).toArray()).map(toId);
+  const pages = await getScopedPages(session, org.id, { isHub: false });
   const pageId = pageIdParam && pages.some((p) => p.id === pageIdParam) ? pageIdParam : pages[0]?.id;
 
   const components = pageId
-    ? (await collections.components().find({ pageId: oid(pageId) }).sort({ order: 1 }).toArray()).map(toId)
+    ? await database.selectFrom("components").selectAll().where("pageId", "=", pageId).orderBy("order", "asc").execute()
     : [];
   const templates = pageId
-    ? (await collections.incidentTemplates().find({
-        pageId: oid(pageId),
-        archivedAt: null,
-        $or: [{ kind: "INCIDENT" }, { kind: { $exists: false } }],
-      }).toArray()).map(toId)
+    ? await database.selectFrom("incidentTemplates").selectAll().where("pageId", "=", pageId)
+      .where("archivedAt", "is", null).where("kind", "=", "INCIDENT").execute()
     : [];
 
   return (

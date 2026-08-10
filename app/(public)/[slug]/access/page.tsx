@@ -1,6 +1,4 @@
 import { notFound, redirect } from "next/navigation";
-import { collections } from "@/lib/db";
-import { toId } from "@/lib/mongo-utils";
 import { checkPageAccess } from "@/lib/access";
 import { AccessForm } from "@/components/public/AccessForm";
 import { pageDesignFor } from "@/lib/page-design";
@@ -9,7 +7,7 @@ import { PageSurfaceLayout } from "@/components/public/PageSurfaceLayout";
 import { PublicFooter, PublicHeader } from "@/components/public/PublicChrome";
 import type { PageDesignBlock } from "@/lib/page-design";
 import { scopeCustomCss } from "@/lib/custom-css";
-import { publicPageFilter } from "@/lib/page-lifecycle";
+import { getPublicPageBySlug } from "@/lib/pages";
 
 export default async function AccessPage({
   params,
@@ -23,10 +21,10 @@ export default async function AccessPage({
   const returnTo = requestedReturnTo?.startsWith("/") && !requestedReturnTo.startsWith("//")
     ? requestedReturnTo
     : `/${slug}`;
-  const pageDoc = await collections.pages().findOne(publicPageFilter({ slug }));
+  const pageDoc = await getPublicPageBySlug(slug);
   if (!pageDoc) notFound();
-  const page = toId(pageDoc);
-  const design = pageDesignFor(pageDoc);
+  const page = pageDoc!;
+  const design = pageDesignFor(page);
   if (page.type === "PUBLIC") redirect(returnTo);
 
   const access = await checkPageAccess(page);

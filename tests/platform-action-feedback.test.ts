@@ -33,7 +33,7 @@ describe("platform action feedback", () => {
 
   it("does not expose unexpected implementation errors", async () => {
     const databaseError = new Error("database host and collection details");
-    databaseError.name = "MongoServerError";
+    databaseError.name = "DatabaseError";
 
     const state = await runPlatformActionWithFeedback(
       async () => {

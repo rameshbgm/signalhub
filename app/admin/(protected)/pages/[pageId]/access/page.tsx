@@ -1,11 +1,9 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { FluentSelect } from "@/components/FluentSelect";
 import { PlatformActionForm } from "@/components/platform/PlatformActionForm";
 import { PlatformSubmitButton } from "@/components/platform/PlatformSubmitButton";
 import { assertPageInOrg, requireCapability } from "@/lib/admin-guard";
-import { collections } from "@/lib/db";
-import { oid, toId } from "@/lib/mongo-utils";
-import { activePageFilter } from "@/lib/page-lifecycle";
+import { database } from "@/lib/postgres/client";
 import { createAccessGroup, createAccessUser, deleteAccessGroup, deleteAccessUser } from "../access-actions";
 import { updatePrivatePagePassword } from "../../actions";
 
@@ -13,9 +11,11 @@ export default async function PageAccess({ params }: { params: Promise<{ pageId:
   const { pageId } = await params;
   const session = await requireCapability("page.configure", pageId);
   await assertPageInOrg(pageId, session.orgId);
-  const page = await collections.pages().findOne(activePageFilter({ _id: oid(pageId), orgId: oid(session.orgId) }));
+  const page = await database.selectFrom("pages").selectAll()
+    .where("id", "=", pageId).where("orgId", "=", session.orgId)
+    .where("deletedAt", "is", null).executeTakeFirst();
   if (!page) notFound();
-  if (page.type === "PUBLIC") return <AccessSummary title="Public access" description="Anyone with the public URL can view this page. The access model is chosen when the page is created." />;
+  if (page.type === "PUBLIC") redirect(`/organization/pages/${pageId}`);
   if (page.type === "PRIVATE") return (
     <div className="space-y-5">
       <AccessSummary title="Shared-password access" description="Visitors enter one shared password before viewing this page. The password itself is never displayed after saving." />
@@ -30,13 +30,13 @@ export default async function PageAccess({ params }: { params: Promise<{ pageId:
   );
 
   const [groupDocs, userDocs, components] = await Promise.all([
-    collections.pageAccessGroups().find({ pageId: page._id }).toArray(),
-    collections.pageAccessUsers().find({ pageId: page._id }).toArray(),
-    page.isHub ? Promise.resolve([]) : collections.components().find({ pageId: page._id }).sort({ order: 1 }).toArray(),
+    database.selectFrom("pageAccessGroups").selectAll().where("pageId", "=", page.id).execute(),
+    database.selectFrom("pageAccessUsers").selectAll().where("pageId", "=", page.id).execute(),
+    page.isHub ? Promise.resolve([]) : database.selectFrom("components").selectAll().where("pageId", "=", page.id).orderBy("order", "asc").execute(),
   ]);
-  const groups = groupDocs.map(toId);
-  const groupById = new Map(groupDocs.map((group) => [group._id.toHexString(), group.name]));
-  const users = userDocs.map((user) => ({ ...toId(user), groupName: user.groupId ? groupById.get(user.groupId.toHexString()) ?? null : null }));
+  const groups = groupDocs;
+  const groupById = new Map(groupDocs.map((group) => [group.id, group.name]));
+  const users = userDocs.map((user) => ({ ...user, groupName: user.groupId ? groupById.get(user.groupId) ?? null : null }));
   return (
     <div className="space-y-5">
       <AccessSummary title="Audience-specific access" description={page.isHub ? "Each visitor signs in to the hub. Status pages assigned to it continue to enforce their own access rules independently." : "Each visitor signs in and sees only the services assigned directly or through their group."} />
@@ -68,6 +68,6 @@ function AccessSummary({ title, description }: { title: string; description: str
   return <section className="border border-[var(--line)] bg-[var(--surface)] p-5"><p className="font-mono text-xs font-semibold uppercase tracking-wider text-[var(--cyan)]">Access model</p><h2 className="mt-1 font-mono text-lg font-semibold">{title}</h2><p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--fg-dim)]">{description}</p></section>;
 }
 
-function ComponentChoices({ components }: { components: Array<{ _id: { toHexString(): string }; name: string }> }) {
-  return <div className="flex flex-wrap gap-2 border border-[var(--line)] p-2 text-xs text-[var(--fg-soft)]">{components.map((component) => <label key={component._id.toHexString()} className="flex items-center gap-1"><input type="checkbox" name="componentIds" value={component._id.toHexString()} /> {component.name}</label>)}</div>;
+function ComponentChoices({ components }: { components: Array<{ id: string; name: string }> }) {
+  return <div className="flex flex-wrap gap-2 border border-[var(--line)] p-2 text-xs text-[var(--fg-soft)]">{components.map((component) => <label key={component.id} className="flex items-center gap-1"><input type="checkbox" name="componentIds" value={component.id} /> {component.name}</label>)}</div>;
 }

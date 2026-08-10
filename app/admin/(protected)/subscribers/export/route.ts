@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { assertPageInOrg, requireCapability } from "@/lib/admin-guard";
 import { apiError, routeError } from "@/lib/api-response";
-import { collections } from "@/lib/db";
-import { oid } from "@/lib/mongo-utils";
+import { database } from "@/lib/postgres/client";
 
 function spreadsheetSafe(value: unknown) {
   const text = String(value ?? "");
@@ -19,12 +18,11 @@ export async function GET(request: NextRequest) {
     if (!pageId) return apiError(400, "MISSING_PAGE_ID", "pageId is required");
     const session = await requireCapability("subscriber.manage", pageId);
     await assertPageInOrg(pageId, session.orgId);
-    const page = await collections.pages().findOne({
-      _id: oid(pageId),
-      orgId: oid(session.orgId),
-    });
+    const page = await database.selectFrom("pages").select(["id", "slug"])
+      .where("id", "=", pageId).where("orgId", "=", session.orgId)
+      .where("deletedAt", "is", null).executeTakeFirst();
     if (!page) return apiError(404, "PAGE_NOT_FOUND", "Page not found");
-    const subscribers = await collections.subscribers().find({ pageId: page._id }).toArray();
+    const subscribers = await database.selectFrom("subscribers").selectAll().where("pageId", "=", page.id).execute();
     const rows = [
       ["channel", "contact", "verified", "quarantined", "created_at"].map(csvField).join(","),
       ...subscribers.map((subscriber) =>
@@ -47,6 +45,6 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error) {
-    return routeError(error);
+    return routeError(error, { route: "GET /organization/subscribers/export" });
   }
 }

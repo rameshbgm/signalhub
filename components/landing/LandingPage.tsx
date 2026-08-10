@@ -40,6 +40,7 @@ const SECURITY_URL =
   "https://github.com/rameshbgm/signalhub/blob/main/SECURITY.md";
 const HELM_GUIDE_URL =
   "https://github.com/rameshbgm/signalhub/tree/main/deploy/helm/status";
+const USER_MANUAL_PATH = "/docs/user-manual.html";
 
 const CAPABILITIES = [
   {
@@ -113,7 +114,7 @@ const OWNERSHIP_STEPS = [
     icon: LockKeyhole,
     kicker: "Own the data",
     title: "Keep operational records and subscriber data inside your security boundary.",
-    body: "Your MongoDB, object storage, identity connections, encryption keys, domains, backups, and retention policies remain yours.",
+    body: "Your PostgreSQL database, object storage, identity connections, encryption keys, domains, backups, and retention policies remain yours.",
   },
   {
     number: "03",
@@ -129,7 +130,7 @@ const DEPLOYMENTS = [
     icon: Container,
     eyebrow: "Straightforward start",
     title: "Docker Compose",
-    body: "Run the web app, worker, migrations, and replica-set MongoDB from the production stack included in the repository.",
+    body: "Run the web app, worker, migrations, and PostgreSQL from the production stack included in the repository.",
     detail: "Ideal for a controlled host or evaluation environment.",
   },
   {
@@ -141,10 +142,10 @@ const DEPLOYMENTS = [
   },
   {
     icon: ServerCog,
-    eyebrow: "Your control plane",
-    title: "Operator controlled",
-    body: "Choose the network, regions, delivery providers, observability stack, backup policy, and recovery process.",
-    detail: "Private cloud, sovereign cloud, or isolated network.",
+    eyebrow: "Any infrastructure",
+    title: "AWS, Azure, GCP, or VPS",
+    body: "Follow provider blueprints while keeping the same PostgreSQL, web, worker, migration, storage, and recovery contract.",
+    detail: "Public cloud, private cloud, sovereign cloud, or isolated network.",
   },
 ] as const;
 
@@ -234,6 +235,7 @@ export function LandingPage({ fontClassName }: { fontClassName: string }) {
             <a href="#why">Why SignalHub</a>
             <a href="#capabilities">Capabilities</a>
             <a href="#deploy">Deploy</a>
+            <Link href={USER_MANUAL_PATH}>User manual</Link>
           </div>
 
           <div className={styles.navActions}>
@@ -333,6 +335,10 @@ export function LandingPage({ fontClassName }: { fontClassName: string }) {
                   Read the deployment guide
                   <ExternalLink size={16} aria-hidden="true" />
                 </ExternalAnchor>
+                <Link href={USER_MANUAL_PATH} className={styles.secondaryButton}>
+                  Read the user manual
+                  <ArrowRight size={16} aria-hidden="true" />
+                </Link>
               </motion.div>
               <motion.div
                 className={styles.costNotes}
@@ -534,8 +540,8 @@ export function LandingPage({ fontClassName }: { fontClassName: string }) {
               <p className={styles.sectionKicker}>Choose your environment</p>
               <h2 id="deploy-title">Deployment that fits your operating model.</h2>
               <p>
-                Start on one host, run in your Kubernetes platform, or shape
-                SignalHub around stricter infrastructure boundaries.
+                Start with Docker on one host, deploy with Helm on Kubernetes,
+                or follow the AWS, Azure, GCP, and generic VPS blueprints.
               </p>
             </Reveal>
             <Reveal delay={0.08}>
@@ -622,6 +628,7 @@ export function LandingPage({ fontClassName }: { fontClassName: string }) {
               <a href="#why">Why SignalHub</a>
               <a href="#capabilities">Capabilities</a>
               <a href="#deploy">Deploy</a>
+              <Link href={USER_MANUAL_PATH}>User manual</Link>
               <Link href="/login">Log in</Link>
             </div>
             <div>
@@ -631,6 +638,7 @@ export function LandingPage({ fontClassName }: { fontClassName: string }) {
                 Setup guide
               </ExternalAnchor>
               <ExternalAnchor href={HELM_GUIDE_URL}>Helm chart</ExternalAnchor>
+              <Link href={USER_MANUAL_PATH}>User manual</Link>
               <ExternalAnchor href={SECURITY_URL}>
                 Security policy
               </ExternalAnchor>

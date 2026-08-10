@@ -1,51 +1,34 @@
-import { ObjectId } from "mongodb";
 import { NextRequest, NextResponse } from "next/server";
 import { requireCapability } from "@/lib/admin-guard";
 import { apiError, routeError } from "@/lib/api-response";
-import { collections } from "@/lib/db";
-import { oid } from "@/lib/mongo-utils";
-import { generateApiKey } from "@/lib/tokens";
-import { withTransaction } from "@/lib/cascade";
+import { isDatabaseId } from "@/lib/database-id";
 import { fenceActiveOrganizationMutation } from "@/lib/organization-mutation";
+import { withDatabaseTransaction } from "@/lib/postgres/client";
+import { generateApiKey } from "@/lib/tokens";
 
-export async function POST(
-  _request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function POST(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await requireCapability("integration.manage");
     const { id } = await params;
+    if (!isDatabaseId(id)) return apiError(404, "API_KEY_NOT_FOUND", "API key not found");
     const secret = generateApiKey();
-    const result = await withTransaction(async (databaseSession) => {
-      await fenceActiveOrganizationMutation(session.orgId, databaseSession);
-      const changed = await collections.apiKeys().updateOne(
-        { _id: oid(id), orgId: oid(session.orgId), revokedAt: null },
-        {
-          $set: {
-            keyHash: secret.hash,
-            prefix: secret.prefix,
-            lastFour: secret.lastFour,
-            lastUsedAt: null,
-            legacyFullAccess: false,
-          },
-        },
-        { session: databaseSession }
-      );
-      if (!changed.matchedCount) return changed;
-      await collections.auditLogs().insertOne({
-        _id: new ObjectId(),
-        orgId: oid(session.orgId),
-        actor: session.email,
-        action: "ROTATE_API_KEY",
-        target: id,
-        supportSessionId: session.supportSessionId ? oid(session.supportSessionId) : null,
-        createdAt: new Date(),
-      }, { session: databaseSession });
-      return changed;
+    const changed = await withDatabaseTransaction(async (transaction) => {
+      await fenceActiveOrganizationMutation(session.orgId, transaction);
+      const key = await transaction.updateTable("apiKeys").set({
+        keyHash: secret.hash, prefix: secret.prefix, lastFour: secret.lastFour,
+        lastUsedAt: null, legacyFullAccess: false,
+      }).where("id", "=", id).where("orgId", "=", session.orgId).where("revokedAt", "is", null)
+        .returning("id").executeTakeFirst();
+      if (!key) return false;
+      await transaction.insertInto("auditLogs").values({
+        orgId: session.orgId, actor: session.email, action: "ROTATE_API_KEY", target: id,
+        supportSessionId: session.supportSessionId ?? null, createdAt: new Date(),
+      }).execute();
+      return true;
     });
-    if (!result.matchedCount) return apiError(404, "API_KEY_NOT_FOUND", "API key not found");
+    if (!changed) return apiError(404, "API_KEY_NOT_FOUND", "API key not found");
     return NextResponse.json({ token: secret.token, prefix: secret.prefix, lastFour: secret.lastFour });
   } catch (error) {
-    return routeError(error);
+    return routeError(error, { route: "POST /api/admin/api-keys/:id/rotate" });
   }
 }

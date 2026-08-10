@@ -1,5 +1,5 @@
 import type { NextRequest } from "next/server";
-import type { PageDoc } from "@/lib/db";
+import type { PageRow } from "@/lib/postgres/schema";
 import { getIncidentsForPage } from "@/lib/public-data";
 import { getAuthorizedHubChildren } from "@/lib/public-surface";
 
@@ -13,7 +13,7 @@ export function escapeXml(value: string) {
   );
 }
 
-export function feedCacheControl(request: NextRequest, page: PageDoc) {
+export function feedCacheControl(request: NextRequest, page: PageRow) {
   const hasCredential =
     request.headers.has("authorization") ||
     request.nextUrl.searchParams.has("token") ||
@@ -25,7 +25,7 @@ export function feedCacheControl(request: NextRequest, page: PageDoc) {
 
 export async function getFeedIncidents(
   request: NextRequest,
-  page: PageDoc,
+  page: PageRow,
   visibleComponentIds: string[] | null
 ) {
   const sources = page.isHub
@@ -35,7 +35,7 @@ export async function getFeedIncidents(
     await Promise.all(
       sources.map(async (source) => {
         const sourceIncidents = await getIncidentsForPage(
-          source.page._id.toHexString(),
+          source.page.id,
           source.access.visibleComponentIds
         );
         return sourceIncidents.map((incident) => ({

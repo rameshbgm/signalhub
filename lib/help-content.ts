@@ -355,15 +355,16 @@ export const HELP_CATEGORIES: HelpCategory[] = [
             heading: "Roles",
             paragraphs: [],
             list: [
-              "OWNER — identity policy, ownership changes, and every organization administrative capability.",
-              "ADMIN — team, pages, integrations, and organization configuration without ownership transfer authority.",
+              "ADMIN — every organization capability, including team, pages, integrations, organization settings, and installation administration.",
+              "INCIDENT MANAGER — incident lifecycle, subscriber management, analytics, and audit.",
               "RESPONDER — incidents, maintenance, monitors, metrics, and component status.",
+              "VIEWER — read-only analytics and audit access.",
             ],
           },
           {
             heading: "Creating a user",
             paragraphs: [
-              "Go to Users & Roles, enter the user's name, email, role, page scope, and a temporary password for a new local identity. The membership becomes active immediately and a new local user must change the temporary password at first sign-in. Existing password or SSO identities keep their current authentication. Owners and Admins can create users; only an Owner can grant ownership, and the last enabled active Owner can never be removed or demoted.",
+              "Go to Users & Roles, enter the user's name, email, role, page scope, and a temporary password for a new local identity. The membership becomes active immediately and a new local user must change the temporary password at first sign-in. Existing password or SSO identities keep their current authentication. Admins can create users and change or revoke organization access.",
             ],
           },
         ],
@@ -421,12 +422,12 @@ export const HELP_CATEGORIES: HelpCategory[] = [
         body: [
           {
             heading: "General settings",
-            paragraphs: ["Update your organization's display name and optional operational contact email. Owners and Admins can change these."],
+            paragraphs: ["Update your organization's display name and optional operational contact email. Admins can change these."],
           },
           {
             heading: "Deleting the organization",
             paragraphs: [
-              "Contact your platform operator with the organization slug. A platform Owner must suspend the tenant, reauthenticate, and queue the retryable purge; the console preserves the request, job, and tombstone audit evidence.",
+              "Contact an installation Admin with the organization slug. The Admin must suspend the tenant, reauthenticate, and queue the retryable purge; the console preserves the request, job, and tombstone audit evidence.",
             ],
           },
         ],
@@ -441,41 +442,41 @@ export const HELP_CATEGORIES: HelpCategory[] = [
       {
         slug: "designer-and-saving",
         title: "Designer, saving, and versions",
-        summary: "Build page layouts, preview templates and themes, save changes live, restore versions, and reset defaults.",
+        summary: "Build responsive page layouts, autosave drafts, publish deliberately, restore versions, and reset defaults.",
         body: [
           {
             heading: "Workspace layout",
             paragraphs: [
-              "The Advanced designer uses a two-pane workspace for page templates, block composition, advanced appearance, header/footer presentation, service display, and saved versions. Everyday branding, page settings, search metadata, and announcements live in the page-management sections instead.",
-              "The right preview rail stays visible and does not scroll with the editor. The rendered page scrolls inside its own bounded preview frame while the preview toolbar remains fixed. Use the surface and viewport controls to review status, history, incident, access, hub, and embed layouts at desktop, tablet, or mobile sizes.",
+              "Appearance opens one visual designer for starting points, responsive block layout, brand assets, theme controls, header/footer presentation, and saved versions.",
+              "The live canvas stays visible beside the tool panel. Use the surface and viewport controls to review status, history, incident, access, hub, and embed layouts at desktop, tablet, or mobile sizes.",
             ],
           },
           {
             heading: "Draft versus live",
             paragraphs: [
-              "Designer changes stay only in the browser until you choose Save, Save composition, or Save all. Every explicit save persists the design and updates the public page immediately.",
-              "Saving an unchanged design does not increment its draft revision or create another live version.",
+              "Designer changes autosave to a private draft after a short pause. The public page remains unchanged until you choose Publish.",
+              "Publishing an unchanged draft does not create another live version. If another session changes the draft or live page, the designer stops and asks you to reload rather than overwriting it.",
             ],
           },
           {
             heading: "Blocks and composition",
             paragraphs: [
-              "The Add block library marks singleton blocks as Added and keeps reusable Rich text and Link cards available. New blocks enter the Primary zone and are selected for configuration.",
-              "Drag blocks within Full width, Primary, or Sidebar to reorder them, or drag across zones. You can also select a block and change its Zone from the inspector. Save the composition when the preview is correct.",
+              "The Add block library keeps reusable Rich text and Link cards available. New blocks enter the responsive canvas full-width and are selected for configuration.",
+              "The desktop canvas uses 12 columns, tablet uses 8, and mobile uses 4. Smaller layouts inherit desktop until edited; drag to reorder and use the placement controls to change column or width.",
             ],
           },
           {
             heading: "Templates and advanced appearance",
             paragraphs: [
-              "Choose a page template from the dropdown and inspect the full preview before saving it. Layout templates preserve the current style and search settings.",
-              "Choose style presets, brand color, and visitor light/dark behavior from Appearance. Use Advanced appearance only for typography, density, width, radius, shadow, and detailed surface-color overrides.",
+              "Starting points rearrange existing blocks across surfaces without replacing block content, branding, theme, visitor links, or search settings.",
+              "Theme combines style presets, brand color, visitor light/dark behavior, typography, density, width, radius, shadow, and detailed surface colors.",
             ],
           },
           {
             heading: "Versions and reset",
             paragraphs: [
-              "Each page retains its 30 newest saved design versions. When the next version is saved, the oldest version for that page is removed automatically. Restore loads a version into a reviewable local draft rather than immediately replacing the live page.",
-              "Reset to default first shows a warning. Confirmation loads the default layout, blocks, theme, header/footer, SEO, and uptime presentation locally; it does not delete services, groups, incidents, subscribers, status history, or uploaded assets. Nothing public changes until you save.",
+              "Each page retains its 30 newest published design versions. Restore loads a version into the autosaved draft rather than immediately replacing the live page.",
+              "Reset to default first shows a warning. It does not delete services, groups, incidents, subscribers, or status history. Nothing public changes until you Publish.",
             ],
           },
         ],
@@ -704,7 +705,7 @@ export const HELP_CATEGORIES: HelpCategory[] = [
             heading: "Administrative separation",
             paragraphs: [
               "Platform roles and organization roles are separate. Grant platform access only to operators who need cross-tenant administration, and use organization-scoped roles for normal status operations.",
-              "Identity configuration controls global SAML/OIDC connections and SCIM behavior. Test new connections before enforcing them and maintain a recoverable owner path.",
+              "Identity configuration controls global SAML/OIDC connections and SCIM behavior. Test new connections before enforcing them and maintain a recoverable local Admin path.",
             ],
           },
           {

@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { requirePlatformCapability } from "@/lib/admin-guard";
-import { collections } from "@/lib/db";
+import { database } from "@/lib/postgres/client";
 import { routeError } from "@/lib/api-response";
 
 function csv(value: unknown) {
@@ -13,24 +13,24 @@ export async function GET(request: NextRequest) {
   try {
     await requirePlatformCapability("audit.read");
     const format = request.nextUrl.searchParams.get("format") === "json" ? "json" : "csv";
-    const entries = await collections.platformAuditLogs().find({})
-      .sort({ createdAt: 1 }).limit(100_000).toArray();
+    const entries = await database.selectFrom("platformAuditLogs").selectAll()
+      .orderBy("createdAt", "asc").limit(100_000).execute();
     const body = format === "json"
       ? JSON.stringify({
-          manifest: { format: "status-platform-audit-export", version: 1, generatedAt: new Date().toISOString() },
+          manifest: { format: "signalhub-platform-audit-export", version: 1, generatedAt: new Date().toISOString() },
           entries,
         })
       : [
           "id,createdAt,actorEmail,actorRole,action,targetType,targetId,organizationId,reason,metadata",
           ...entries.map((entry) => [
-            entry._id.toHexString(),
+            entry.id,
             entry.createdAt.toISOString(),
             entry.actorEmail,
             entry.actorRole,
             entry.action,
             entry.targetType,
             entry.targetId,
-            entry.organizationId?.toHexString() ?? "",
+            entry.organizationId ?? "",
             entry.reason ?? "",
             entry.metadata ?? {},
           ].map(csv).join(",")),
@@ -45,6 +45,6 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error) {
-    return routeError(error);
+    return routeError(error, { route: "GET /api/platform/audit/export" });
   }
 }

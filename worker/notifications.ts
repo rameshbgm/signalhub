@@ -1,14 +1,9 @@
 import { createHmac } from "node:crypto";
-import { ObjectId, type ClientSession, type WithId } from "mongodb";
-import {
-  collections,
-  mongoClient,
-  type NotificationJobDoc,
-} from "@/lib/db";
+import { database, withDatabaseTransaction, type DatabaseExecutor } from "@/lib/postgres/client";
+import type { NotificationJobRow } from "@/lib/postgres/schema";
 import { decryptSecret } from "@/lib/encryption";
 import { smtpTransport, verifySmtp } from "@/lib/smtp";
 import { deliverDestination, deliverSms } from "@/lib/notification-providers";
-import { organizationIsActive } from "@/lib/organization-state";
 import { startLeaseHeartbeat } from "@/worker/lease-heartbeat";
 
 const NOTIFICATION_LEASE_MILLISECONDS = 30_000;
@@ -56,11 +51,7 @@ ${input.logoUrl ? `<img src="${escapeHtml(input.logoUrl)}" alt="${escapeHtml(inp
 </div></div></body></html>`;
 }
 
-async function postJson(
-  url: string,
-  body: string,
-  headers: Record<string, string> = {}
-) {
+async function postJson(url: string, body: string, headers: Record<string, string> = {}) {
   const response = await fetch(url, {
     method: "POST",
     headers: { "content-type": "application/json", ...headers },
@@ -80,11 +71,15 @@ async function postJson(
   return response.status;
 }
 
-async function deliver(job: WithId<NotificationJobDoc>) {
+async function deliver(job: NotificationJobRow) {
   if (job.channel === "EMAIL") {
     let result;
     try {
-      const page = await collections.pages().findOne({ _id: job.pageId });
+      const page = await database
+        .selectFrom("pages")
+        .select(["name", "logoUrl", "brandColor"])
+        .where("id", "=", job.pageId)
+        .executeTakeFirst();
       result = await smtpTransport().sendMail({
         from: process.env.SMTP_FROM ?? "SignalHub <signalhub@localhost>",
         to: job.contact,
@@ -107,15 +102,15 @@ async function deliver(job: WithId<NotificationJobDoc>) {
     if (!result.accepted?.length) throw new DeliveryError("SMTP server did not accept the recipient", true);
     return null;
   }
-  if (job.channel === "SMS") {
-    return deliverSms(job.contact, job.body);
-  }
+  if (job.channel === "SMS") return deliverSms(job.contact, job.body);
   if (job.destinationId) {
-    const destination = await collections.notificationDestinations().findOne({
-      _id: job.destinationId,
-      active: true,
-      verifiedAt: { $ne: null },
-    });
+    const destination = await database
+      .selectFrom("notificationDestinations")
+      .selectAll()
+      .where("id", "=", job.destinationId)
+      .where("active", "=", true)
+      .where("verifiedAt", "is not", null)
+      .executeTakeFirst();
     if (!destination) throw new DeliveryError("Notification destination is no longer active", false);
     try {
       return await deliverDestination(destination, {
@@ -124,48 +119,39 @@ async function deliver(job: WithId<NotificationJobDoc>) {
         eventType: job.eventType,
       });
     } catch (error) {
-      throw new DeliveryError(
-        error instanceof Error ? error.message : "Destination delivery failed",
-        true
-      );
+      throw new DeliveryError(error instanceof Error ? error.message : "Destination delivery failed", true);
     }
   }
-
   if (job.channel === "SLACK") {
-    return postJson(
-      job.contact,
-      JSON.stringify({ text: `*${job.subject}*\n${job.body}` })
-    );
+    return postJson(job.contact, JSON.stringify({ text: `*${job.subject}*\n${job.body}` }));
   }
   if (job.channel === "MICROSOFT_TEAMS") {
-    return postJson(
-      job.contact,
-      JSON.stringify({
-        type: "message",
-        attachments: [
-          {
-            contentType: "application/vnd.microsoft.card.adaptive",
-            content: {
-              type: "AdaptiveCard",
-              version: "1.4",
-              body: [
-                { type: "TextBlock", weight: "Bolder", text: job.subject },
-                { type: "TextBlock", wrap: true, text: job.body },
-              ],
-            },
-          },
-        ],
-      })
-    );
+    return postJson(job.contact, JSON.stringify({
+      type: "message",
+      attachments: [{
+        contentType: "application/vnd.microsoft.card.adaptive",
+        content: {
+          type: "AdaptiveCard",
+          version: "1.4",
+          body: [
+            { type: "TextBlock", weight: "Bolder", text: job.subject },
+            { type: "TextBlock", wrap: true, text: job.body },
+          ],
+        },
+      }],
+    }));
   }
   if (job.channel === "WEBHOOK" && job.endpointId) {
-    const endpoint = await collections.webhookEndpoints().findOne({
-      _id: job.endpointId,
-      active: true,
-      verifiedAt: { $ne: null },
-    });
+    const endpoint = await database
+      .selectFrom("webhookEndpoints")
+      .selectAll()
+      .where("id", "=", job.endpointId)
+      .where("active", "=", true)
+      .where("verifiedAt", "is not", null)
+      .executeTakeFirst();
     if (!endpoint) throw new DeliveryError("Webhook endpoint is no longer active", false);
-    const body = JSON.stringify({ id: job._id.toHexString(), ...job.payload });
+    const payload = job.payload && typeof job.payload === "object" ? job.payload : {};
+    const body = JSON.stringify({ id: job.id, ...payload });
     const timestamp = Math.floor(Date.now() / 1000).toString();
     const signature = createHmac("sha256", decryptSecret(endpoint.secretCiphertext))
       .update(`${timestamp}.${body}`)
@@ -174,99 +160,92 @@ async function deliver(job: WithId<NotificationJobDoc>) {
       "x-status-event": job.eventType,
       "x-status-timestamp": timestamp,
       "x-status-signature": `sha256=${signature}`,
-      "x-status-delivery": job._id.toHexString(),
+      "x-status-delivery": job.id,
     });
   }
   throw new DeliveryError(`Unsupported notification channel ${job.channel}`, false);
 }
 
 async function leaseNotificationJob(workerId: string) {
-  const now = new Date();
-  return collections.notificationJobs().findOneAndUpdate(
-    {
-      status: { $in: ["PENDING", "PROCESSING"] },
-      $expr: { $lt: ["$attempts", "$maxAttempts"] },
-      nextAttemptAt: { $lte: now },
-      $or: [{ leaseExpiresAt: null }, { leaseExpiresAt: { $lte: now } }],
-    },
-    {
-      $set: {
+  return withDatabaseTransaction(async (transaction) => {
+    const now = new Date();
+    const candidate = await transaction
+      .selectFrom("notificationJobs")
+      .select("id")
+      .where("status", "in", ["PENDING", "PROCESSING"])
+      .whereRef("attempts", "<", "maxAttempts")
+      .where("nextAttemptAt", "<=", now)
+      .where((expression) => expression.or([
+        expression("leaseExpiresAt", "is", null),
+        expression("leaseExpiresAt", "<=", now),
+      ]))
+      .orderBy("nextAttemptAt", "asc")
+      .orderBy("createdAt", "asc")
+      .forUpdate()
+      .skipLocked()
+      .executeTakeFirst();
+    if (!candidate) return null;
+    return transaction
+      .updateTable("notificationJobs")
+      .set({
         status: "PROCESSING",
         leaseOwner: workerId,
-        leaseExpiresAt: new Date(
-          now.getTime() + NOTIFICATION_LEASE_MILLISECONDS
-        ),
+        leaseExpiresAt: new Date(now.getTime() + NOTIFICATION_LEASE_MILLISECONDS),
         updatedAt: now,
-      },
-    },
-    { sort: { nextAttemptAt: 1, createdAt: 1 }, returnDocument: "after" }
-  );
+      })
+      .where("id", "=", candidate.id)
+      .returningAll()
+      .executeTakeFirst();
+  });
 }
 
-async function renewNotificationLease(
-  job: WithId<NotificationJobDoc>,
-  workerId: string
-) {
-  const renewed = await collections.notificationJobs().updateOne(
-    { _id: job._id, status: "PROCESSING", leaseOwner: workerId },
-    {
-      $set: {
-        leaseExpiresAt: new Date(
-          Date.now() + NOTIFICATION_LEASE_MILLISECONDS
-        ),
-        updatedAt: new Date(),
-      },
-    }
-  );
-  if (renewed.matchedCount !== 1) {
-    throw new Error("Notification lease is no longer owned by this worker");
-  }
+async function renewNotificationLease(job: NotificationJobRow, workerId: string) {
+  const renewed = await database
+    .updateTable("notificationJobs")
+    .set({
+      leaseExpiresAt: new Date(Date.now() + NOTIFICATION_LEASE_MILLISECONDS),
+      updatedAt: new Date(),
+    })
+    .where("id", "=", job.id)
+    .where("status", "=", "PROCESSING")
+    .where("leaseOwner", "=", workerId)
+    .returning("id")
+    .executeTakeFirst();
+  if (!renewed) throw new Error("Notification lease is no longer owned by this worker");
 }
 
 async function activeOrganizationForNotification(
-  job: WithId<NotificationJobDoc>,
-  session?: ClientSession
+  job: NotificationJobRow,
+  executor: DatabaseExecutor = database
 ) {
-  const options = session ? { session } : undefined;
-  const page = await collections.pages().findOne(
-    { _id: job.pageId },
-    options
-  );
-  const organization = page
-    ? await collections.organizations().findOne({ _id: page.orgId }, options)
-    : null;
-  return page && organization && organizationIsActive(organization)
-    ? organization
-    : null;
+  return executor
+    .selectFrom("pages as page")
+    .innerJoin("organizations as organization", "organization.id", "page.orgId")
+    .select("organization.id")
+    .where("page.id", "=", job.pageId)
+    .where("page.deletedAt", "is", null)
+    .where("organization.status", "=", "ACTIVE")
+    .where("organization.suspended", "=", false)
+    .executeTakeFirst();
 }
 
-async function blockInactiveNotification(
-  job: WithId<NotificationJobDoc>,
-  workerId: string
-) {
-  await collections.notificationJobs().updateOne(
-    { _id: job._id, leaseOwner: workerId },
-    {
-      $set: {
-        status: "BLOCKED",
-        leaseOwner: null,
-        leaseExpiresAt: null,
-        lastError:
-          "Delivery paused because the organization became inactive",
-        updatedAt: new Date(),
-      },
-    }
-  );
+async function blockInactiveNotification(job: NotificationJobRow, workerId: string) {
+  await database
+    .updateTable("notificationJobs")
+    .set({
+      status: "BLOCKED",
+      leaseOwner: null,
+      leaseExpiresAt: null,
+      lastError: "Delivery paused because the organization became inactive",
+      updatedAt: new Date(),
+    })
+    .where("id", "=", job.id)
+    .where("leaseOwner", "=", workerId)
+    .execute();
 }
 
 type NotificationOutcome =
-  | {
-      status: "SENT";
-      attempt: number;
-      responseStatus: number | null;
-      error: null;
-      now: Date;
-    }
+  | { status: "SENT"; attempt: number; responseStatus: number | null; error: null; now: Date }
   | {
       status: "FAILED";
       attempt: number;
@@ -278,86 +257,61 @@ type NotificationOutcome =
     };
 
 async function commitNotificationOutcome(
-  job: WithId<NotificationJobDoc>,
+  job: NotificationJobRow,
   workerId: string,
   outcome: NotificationOutcome
 ) {
-  const session = mongoClient.startSession();
-  try {
-    let committed = false;
-    const logId = new ObjectId();
-    await session.withTransaction(async () => {
-      if (!(await activeOrganizationForNotification(job, session))) return;
-      const update =
-        outcome.status === "SENT"
-          ? {
-              status: "SENT" as const,
-              attempts: outcome.attempt,
-              responseStatus: outcome.responseStatus,
-              lastError: null,
-              leaseOwner: null,
-              leaseExpiresAt: null,
-              sentAt: outcome.now,
-              updatedAt: outcome.now,
-            }
-          : {
-              status: outcome.terminal ? ("DEAD_LETTER" as const) : ("PENDING" as const),
-              attempts: outcome.terminal ? job.maxAttempts : outcome.attempt,
-              responseStatus: outcome.responseStatus,
-              lastError: outcome.error,
-              nextAttemptAt: outcome.nextAttemptAt,
-              leaseOwner: null,
-              leaseExpiresAt: null,
-              updatedAt: outcome.now,
-            };
-      const updated = await collections.notificationJobs().updateOne(
-        { _id: job._id, status: "PROCESSING", leaseOwner: workerId },
-        { $set: update },
-        { session }
-      );
-      if (updated.matchedCount !== 1) return;
-      await collections.notificationLogs().insertOne(
-        {
-          _id: logId,
-          pageId: job.pageId.toHexString(),
-          channel: job.channel,
-          contact: job.contact,
-          subject: job.subject,
-          body: job.body,
-          status: outcome.status,
+  return withDatabaseTransaction(async (transaction) => {
+    if (!(await activeOrganizationForNotification(job, transaction))) return false;
+    const values = outcome.status === "SENT"
+      ? {
+          status: "SENT" as const,
+          attempts: outcome.attempt,
           responseStatus: outcome.responseStatus,
-          error: outcome.error,
-          attempt: outcome.attempt,
-          createdAt: outcome.now,
-        },
-        { session }
-      );
-      committed = true;
-    });
-    return committed;
-  } finally {
-    await session.endSession();
-  }
-}
-
-export async function processNotificationJob(
-  job: WithId<NotificationJobDoc>,
-  workerId: string
-) {
-  if (!(await activeOrganizationForNotification(job))) {
-    await collections.notificationJobs().updateOne(
-      { _id: job._id, leaseOwner: workerId },
-      {
-        $set: {
-          status: "BLOCKED",
+          lastError: null,
           leaseOwner: null,
           leaseExpiresAt: null,
-          lastError:
-            "Delivery blocked because the page or organization is inactive",
-          updatedAt: new Date(),
-        },
-      }
-    );
+          sentAt: outcome.now,
+          updatedAt: outcome.now,
+        }
+      : {
+          status: outcome.terminal ? "DEAD_LETTER" as const : "PENDING" as const,
+          attempts: outcome.terminal ? job.maxAttempts : outcome.attempt,
+          responseStatus: outcome.responseStatus,
+          lastError: outcome.error,
+          nextAttemptAt: outcome.nextAttemptAt,
+          leaseOwner: null,
+          leaseExpiresAt: null,
+          updatedAt: outcome.now,
+        };
+    const updated = await transaction
+      .updateTable("notificationJobs")
+      .set(values)
+      .where("id", "=", job.id)
+      .where("status", "=", "PROCESSING")
+      .where("leaseOwner", "=", workerId)
+      .returning("id")
+      .executeTakeFirst();
+    if (!updated) return false;
+    await transaction.insertInto("notificationLogs").values({
+      pageId: job.pageId,
+      channel: job.channel,
+      contact: job.contact,
+      subject: job.subject,
+      body: job.body,
+      status: outcome.status,
+      responseStatus: outcome.responseStatus,
+      error: outcome.error,
+      attempt: outcome.attempt,
+      createdAt: outcome.now,
+    }).execute();
+    return true;
+  });
+}
+
+export async function processNotificationJob(job: NotificationJobRow, workerId: string) {
+  if (!(await activeOrganizationForNotification(job))) {
+    await blockInactiveNotification(job, workerId);
     return;
   }
   const attempt = job.attempts + 1;
@@ -368,19 +322,11 @@ export async function processNotificationJob(
   let outcome: NotificationOutcome;
   try {
     const responseStatus = await deliver(job);
-    const now = new Date();
-    outcome = {
-      status: "SENT",
-      responseStatus,
-      error: null,
-      attempt,
-      now,
-    };
+    outcome = { status: "SENT", responseStatus, error: null, attempt, now: new Date() };
   } catch (error) {
-    const deliveryError =
-      error instanceof DeliveryError
-        ? error
-        : new DeliveryError(error instanceof Error ? error.message : "Delivery failed", true);
+    const deliveryError = error instanceof DeliveryError
+      ? error
+      : new DeliveryError(error instanceof Error ? error.message : "Delivery failed", true);
     const terminal = !deliveryError.transient || attempt >= job.maxAttempts;
     const backoffMs = Math.min(60 * 60_000, 2 ** Math.min(attempt, 10) * 1_000);
     const jitterMs = Math.floor(Math.random() * Math.max(250, backoffMs * 0.2));
@@ -397,18 +343,10 @@ export async function processNotificationJob(
       now,
     };
   }
-
-  // External SMTP/webhook/SMS work can outlive a lifecycle transition. Do not
-  // persist its outcome unless the tenant is still ACTIVE after the network
-  // call and this worker can extend the same lease through the final write.
   let activeAfterDelivery = false;
   try {
-    activeAfterDelivery = Boolean(
-      await activeOrganizationForNotification(job)
-    );
-    if (activeAfterDelivery) {
-      await renewNotificationLease(job, workerId);
-    }
+    activeAfterDelivery = Boolean(await activeOrganizationForNotification(job));
+    if (activeAfterDelivery) await renewNotificationLease(job, workerId);
   } finally {
     await heartbeat.stop();
   }
@@ -416,8 +354,9 @@ export async function processNotificationJob(
     await blockInactiveNotification(job, workerId);
     return;
   }
-  const committed = await commitNotificationOutcome(job, workerId, outcome);
-  if (!committed) await blockInactiveNotification(job, workerId);
+  if (!(await commitNotificationOutcome(job, workerId, outcome))) {
+    await blockInactiveNotification(job, workerId);
+  }
 }
 
 export async function drainNotificationJobs(workerId: string, limit = 25) {

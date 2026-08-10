@@ -1,22 +1,13 @@
-import { ObjectId, type ClientSession, type WithId } from "mongodb";
 import { z } from "zod";
-import { collections, mongoClient, type MonitorDoc } from "@/lib/db";
-import { oid, toId } from "@/lib/mongo-utils";
+import { withDatabaseTransaction, type DatabaseTransaction } from "@/lib/postgres/client";
 import { encryptSecret } from "@/lib/encryption";
 import { generateAutomationToken } from "@/lib/tokens";
-import {
-  MONITOR_TYPES,
-  normalizeMonitorConfiguration,
-} from "@/lib/monitor-validation";
+import { MONITOR_TYPES, normalizeMonitorConfiguration } from "@/lib/monitor-validation";
 import { validateMonitorTarget } from "@/lib/monitor-target-validation";
 import { fenceActiveOrganizationMutation } from "@/lib/organization-mutation";
-import { activePageFilter } from "@/lib/page-lifecycle";
+import { enqueueJobSweep, JOB_TASKS } from "@/lib/jobs";
 
-const MONITOR_DOWN_STATUSES = [
-  "DEGRADED_PERFORMANCE",
-  "PARTIAL_OUTAGE",
-  "MAJOR_OUTAGE",
-] as const;
+const MONITOR_DOWN_STATUSES = ["DEGRADED_PERFORMANCE", "PARTIAL_OUTAGE", "MAJOR_OUTAGE"] as const;
 
 const monitorInputSchema = z.object({
   templateId: z.string().nullable().optional(),
@@ -54,19 +45,13 @@ const monitorInputSchema = z.object({
 });
 
 export type MonitorInput = z.infer<typeof monitorInputSchema>;
-
 declare const preparedMonitorInputBrand: unique symbol;
-export type PreparedMonitorInput = MonitorInput & {
-  readonly [preparedMonitorInputBrand]: true;
-};
+export type PreparedMonitorInput = MonitorInput & { readonly [preparedMonitorInputBrand]: true };
 
-export async function prepareMonitorInput(
-  rawInput: MonitorInput
-): Promise<PreparedMonitorInput> {
+export async function prepareMonitorInput(rawInput: MonitorInput): Promise<PreparedMonitorInput> {
   const parsed = monitorInputSchema.parse(rawInput);
   const input = normalizeMonitorConfiguration(parsed);
-  const allowPrivate = process.env.MONITOR_ALLOW_PRIVATE_TARGETS === "true";
-  await validateMonitorTarget(input, allowPrivate);
+  await validateMonitorTarget(input, process.env.MONITOR_ALLOW_PRIVATE_TARGETS === "true");
   if (input.requestHeaders.trim()) {
     const headers: unknown = JSON.parse(input.requestHeaders);
     if (!headers || Array.isArray(headers) || typeof headers !== "object") {
@@ -76,55 +61,45 @@ export async function prepareMonitorInput(
   return input as PreparedMonitorInput;
 }
 
-/**
- * Inserts a previously validated monitor using the caller's transaction.
- * This lets compound operations (for example component + monitor creation)
- * commit or roll back as one unit without nesting MongoDB transactions.
- */
 export async function createPreparedMonitor(
   orgId: string,
   pageId: string,
   input: PreparedMonitorInput,
-  session: ClientSession
+  transaction: DatabaseTransaction
 ) {
-  await fenceActiveOrganizationMutation(orgId, session);
-  const page = await collections.pages().findOne(
-    activePageFilter({ _id: oid(pageId), orgId: oid(orgId) }),
-    { session }
-  );
+  await fenceActiveOrganizationMutation(orgId, transaction);
+  const page = await transaction.selectFrom("pages").select("id")
+    .where("id", "=", pageId).where("orgId", "=", orgId)
+    .where("deletedAt", "is", null).forShare().executeTakeFirst();
   if (!page) throw new Error("Page not found in your organization");
   if (input.componentId) {
-    const component = await collections.components().findOne({
-      _id: oid(input.componentId),
-      pageId: page._id,
-    }, { session });
+    const component = await transaction.selectFrom("components").select("id")
+      .where("id", "=", input.componentId).where("pageId", "=", page.id).executeTakeFirst();
     if (!component) throw new Error("Component not found on this page");
   }
+  if (input.templateId) {
+    const template = await transaction.selectFrom("monitorTemplates").select("id")
+      .where("id", "=", input.templateId).where("enabled", "=", true).executeTakeFirst();
+    if (!template) throw new Error("Monitor template not found");
+  }
 
-  const monitorId = new ObjectId();
-  const metricId = input.actionRecordMetric ? new ObjectId() : null;
-  const now = new Date();
-  const heartbeatToken = input.type === "HEARTBEAT" ? generateAutomationToken() : null;
-  if (metricId) {
-    await collections.metrics().insertOne(
-      {
-        _id: metricId,
-        pageId: page._id,
-        componentId: input.componentId ? oid(input.componentId) : null,
+  const metric = input.actionRecordMetric
+    ? await transaction.insertInto("metrics").values({
+        pageId: page.id,
+        componentId: input.componentId,
         name: `${input.name} response time`,
         suffix: "ms",
         description: `Automatically recorded by monitor "${input.name}"`,
         visible: true,
         decimals: 0,
-      },
-      { session }
-    );
-  }
-  const monitor: WithId<MonitorDoc> = {
-    _id: monitorId,
-    pageId: page._id,
-    templateId: input.templateId ? oid(input.templateId) : null,
-    componentId: input.componentId ? oid(input.componentId) : null,
+      }).returning("id").executeTakeFirstOrThrow()
+    : null;
+  const now = new Date();
+  const heartbeatToken = input.type === "HEARTBEAT" ? generateAutomationToken() : null;
+  const monitor = await transaction.insertInto("monitors").values({
+    pageId: page.id,
+    templateId: input.templateId ?? null,
+    componentId: input.componentId,
     name: input.name,
     type: input.type,
     enabled: true,
@@ -151,7 +126,7 @@ export async function createPreparedMonitor(
     actionRecordMetric: input.actionRecordMetric,
     actionAutoIncident: input.actionAutoIncident,
     actionNotify: input.actionNotify,
-    metricId,
+    metricId: metric?.id ?? null,
     lastCheckedAt: null,
     lastLatencyMs: null,
     lastOk: null,
@@ -171,25 +146,12 @@ export async function createPreparedMonitor(
     lastHeartbeatAt: null,
     dnsRecordType: input.dnsRecordType ?? null,
     dnsExpectedValue: input.dnsExpectedValue ?? null,
-  };
-  await collections.monitors().insertOne(monitor, { session });
-  return toId(monitor);
+  }).returningAll().executeTakeFirstOrThrow();
+  await enqueueJobSweep(transaction, JOB_TASKS.monitors);
+  return monitor;
 }
 
-export async function createMonitor(
-  orgId: string,
-  pageId: string,
-  rawInput: MonitorInput
-) {
+export async function createMonitor(orgId: string, pageId: string, rawInput: MonitorInput) {
   const input = await prepareMonitorInput(rawInput);
-  const session = mongoClient.startSession();
-  try {
-    let monitor: Awaited<ReturnType<typeof createPreparedMonitor>>;
-    await session.withTransaction(async () => {
-      monitor = await createPreparedMonitor(orgId, pageId, input, session);
-    });
-    return monitor!;
-  } finally {
-    await session.endSession();
-  }
+  return withDatabaseTransaction((transaction) => createPreparedMonitor(orgId, pageId, input, transaction));
 }

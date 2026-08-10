@@ -1,0 +1,544 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark light">
+  <meta name="description" content="Complete SignalHub user manual for status pages, incidents, maintenance, monitoring, subscribers, integrations, security, and installation administration.">
+  <title>SignalHub User Manual</title>
+  <style>
+    :root {
+      --bg: #071014;
+      --surface: #0d191f;
+      --surface-2: #13242c;
+      --line: #29404a;
+      --text: #edf7f8;
+      --soft: #b7c9ce;
+      --dim: #81969d;
+      --cyan: #44d9e6;
+      --cyan-soft: rgba(68, 217, 230, .12);
+      --green: #66dfa0;
+      --amber: #ffc766;
+      --red: #ff7d84;
+      --shadow: 0 18px 60px rgba(0, 0, 0, .28);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body { margin: 0; background: var(--bg); color: var(--text); line-height: 1.65; }
+    a { color: var(--cyan); text-underline-offset: 3px; }
+    code, pre, .mono { font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace; }
+    code { border: 1px solid var(--line); background: var(--surface-2); padding: .08rem .35rem; font-size: .9em; }
+    pre { overflow: auto; border: 1px solid var(--line); background: #050b0e; padding: 1rem; color: #d8f8fb; }
+    pre code { border: 0; background: transparent; padding: 0; }
+    h1, h2, h3, h4 { line-height: 1.2; letter-spacing: -.025em; scroll-margin-top: 1.25rem; }
+    h1 { max-width: 880px; margin: .35rem 0 1rem; font-size: clamp(2.2rem, 6vw, 4.8rem); }
+    h2 { margin: 0 0 1rem; font-size: clamp(1.75rem, 3vw, 2.6rem); }
+    h3 { margin: 2rem 0 .65rem; font-size: 1.25rem; }
+    h4 { margin: 1.4rem 0 .45rem; font-size: 1rem; text-transform: uppercase; letter-spacing: .06em; color: var(--soft); }
+    p { margin: .65rem 0 1rem; }
+    ul, ol { padding-left: 1.4rem; }
+    li + li { margin-top: .35rem; }
+    table { width: 100%; border-collapse: collapse; margin: 1rem 0 1.5rem; font-size: .94rem; }
+    th, td { border: 1px solid var(--line); padding: .75rem; text-align: left; vertical-align: top; }
+    th { background: var(--surface-2); color: var(--text); }
+    tbody tr:nth-child(even) { background: rgba(255,255,255,.018); }
+    .skip { position: fixed; left: 1rem; top: -5rem; z-index: 50; background: var(--cyan); color: #041012; padding: .7rem 1rem; font-weight: 700; }
+    .skip:focus { top: 1rem; }
+    .hero { border-bottom: 1px solid var(--line); background: radial-gradient(circle at 80% 10%, rgba(68,217,230,.15), transparent 32%), linear-gradient(145deg, #09171c, #071014 60%); }
+    .hero-inner { max-width: 1440px; margin: auto; padding: clamp(2rem, 7vw, 6.5rem) clamp(1rem, 5vw, 5rem); }
+    .kicker { margin: 0; color: var(--cyan); font: 700 .76rem/1.4 "SFMono-Regular", Consolas, monospace; letter-spacing: .14em; text-transform: uppercase; }
+    .lead { max-width: 850px; color: var(--soft); font-size: clamp(1.05rem, 2vw, 1.35rem); }
+    .meta { display: flex; flex-wrap: wrap; gap: .6rem; margin-top: 1.5rem; }
+    .pill { border: 1px solid var(--line); background: var(--surface); padding: .4rem .65rem; color: var(--soft); font-size: .82rem; }
+    .layout { display: grid; grid-template-columns: minmax(240px, 310px) minmax(0, 1fr); max-width: 1440px; margin: auto; }
+    .sidebar { position: sticky; top: 0; height: 100vh; overflow: auto; border-right: 1px solid var(--line); padding: 1.3rem; background: rgba(7,16,20,.96); }
+    .sidebar strong { display: block; margin-bottom: .7rem; font-size: .83rem; letter-spacing: .08em; text-transform: uppercase; }
+    .search { width: 100%; border: 1px solid var(--line); background: var(--surface); color: var(--text); padding: .7rem .8rem; font: inherit; }
+    .search:focus { outline: 2px solid var(--cyan); outline-offset: 1px; }
+    .toc { list-style: none; padding: 0; margin: 1rem 0; }
+    .toc li { margin: 0; }
+    .toc a { display: block; border-left: 2px solid transparent; padding: .38rem .55rem; color: var(--soft); text-decoration: none; font-size: .9rem; }
+    .toc a:hover, .toc a:focus { border-color: var(--cyan); background: var(--cyan-soft); color: var(--text); }
+    .sidebar-note { border-top: 1px solid var(--line); padding-top: 1rem; color: var(--dim); font-size: .78rem; }
+    main { min-width: 0; padding: clamp(1.5rem, 5vw, 5rem); }
+    article { max-width: 980px; margin: 0 auto; padding: 0 0 5rem; }
+    article + article { border-top: 1px solid var(--line); padding-top: 4rem; }
+    .callout { border: 1px solid var(--line); border-left: 4px solid var(--cyan); background: var(--surface); padding: 1rem 1.15rem; margin: 1.25rem 0; box-shadow: var(--shadow); }
+    .callout strong { color: var(--cyan); }
+    .callout.warning { border-left-color: var(--amber); }
+    .callout.warning strong { color: var(--amber); }
+    .callout.danger { border-left-color: var(--red); }
+    .callout.danger strong { color: var(--red); }
+    .callout.success { border-left-color: var(--green); }
+    .callout.success strong { color: var(--green); }
+    .grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 1rem; margin: 1.2rem 0; }
+    .card { border: 1px solid var(--line); background: var(--surface); padding: 1rem; }
+    .card h3 { margin-top: 0; }
+    .steps { counter-reset: manual-step; list-style: none; padding: 0; }
+    .steps > li { position: relative; min-height: 2.7rem; margin: 0 0 1rem; padding: .25rem 0 0 3.3rem; }
+    .steps > li::before { counter-increment: manual-step; content: counter(manual-step); position: absolute; left: 0; top: 0; display: grid; place-items: center; width: 2.3rem; height: 2.3rem; border: 1px solid var(--cyan); background: var(--cyan-soft); color: var(--cyan); font: 700 .85rem/1 monospace; }
+    .workflow { display: flex; flex-wrap: wrap; align-items: center; gap: .55rem; margin: 1rem 0; }
+    .state { border: 1px solid var(--line); background: var(--surface-2); padding: .45rem .65rem; font: 700 .78rem/1 monospace; text-transform: uppercase; }
+    .arrow { color: var(--dim); }
+    .tag { display: inline-block; border: 1px solid var(--line); padding: .08rem .35rem; color: var(--soft); font-size: .78rem; }
+    .search-hidden { display: none !important; }
+    footer { border-top: 1px solid var(--line); padding: 2rem; color: var(--dim); text-align: center; font-size: .85rem; }
+    @media (max-width: 900px) {
+      .layout { display: block; }
+      .sidebar { position: relative; height: auto; border-right: 0; border-bottom: 1px solid var(--line); }
+      .toc { columns: 2; }
+      .grid { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 560px) { .toc { columns: 1; } th, td { padding: .55rem; } table { font-size: .82rem; } }
+    @media print {
+      :root { --bg: #fff; --surface: #fff; --surface-2: #f2f5f6; --line: #aab7ba; --text: #111; --soft: #333; --dim: #555; --cyan: #006977; --cyan-soft: #eef8f9; }
+      .sidebar, .skip, .search { display: none; }
+      .layout { display: block; }
+      main { padding: 1cm; }
+      article { max-width: none; break-before: page; }
+      article:first-child { break-before: auto; }
+      a { color: inherit; }
+      .callout { box-shadow: none; }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip" href="#manual">Skip to manual</a>
+  <header class="hero">
+    <div class="hero-inner">
+      <p class="kicker">SignalHub documentation</p>
+      <h1>Complete user manual</h1>
+      <p class="lead">A role-aware guide to setting up status pages, operating incidents and maintenance, monitoring services, communicating with subscribers, integrating automation, governing organizations, and administering the installation.</p>
+      <div class="meta">
+        <span class="pill">Product: SignalHub</span>
+        <span class="pill">Database: PostgreSQL 18+</span>
+        <span class="pill">Console: <span class="mono">/organization</span></span>
+        <span class="pill">Manual revision: 10 August 2026</span>
+      </div>
+    </div>
+  </header>
+
+  <div class="layout">
+    <aside class="sidebar" aria-label="Manual navigation">
+      <strong>Find a topic</strong>
+      <label>
+        <span class="mono" style="font-size:.75rem;color:var(--dim)">Search this manual</span>
+        <input id="manual-search" class="search" type="search" placeholder="Incident, monitor, page…" autocomplete="off">
+      </label>
+      <nav>
+        <ol class="toc">
+          <li><a href="#start">1. Start here</a></li>
+          <li><a href="#roles">2. Roles and access</a></li>
+          <li><a href="#menus">3. Menu reference</a></li>
+          <li><a href="#pages">4. Pages and hubs</a></li>
+          <li><a href="#incidents">5. Incident operations</a></li>
+          <li><a href="#maintenance">6. Maintenance</a></li>
+          <li><a href="#monitoring">7. Monitoring and metrics</a></li>
+          <li><a href="#communication">8. Subscribers and delivery</a></li>
+          <li><a href="#integrations">9. Integrations and APIs</a></li>
+          <li><a href="#identity">10. Users and security</a></li>
+          <li><a href="#platform">11. Installation administration</a></li>
+          <li><a href="#public">12. Public visitor guide</a></li>
+          <li><a href="#runbooks">13. Operating runbooks</a></li>
+          <li><a href="#troubleshooting">14. Troubleshooting</a></li>
+          <li><a href="#glossary">15. Glossary</a></li>
+        </ol>
+      </nav>
+      <p class="sidebar-note">Menu items are capability-aware. If an item in this manual is not visible, ask an Admin to verify your role and page scope. Use the signed-in Help Center for shorter contextual articles.</p>
+    </aside>
+
+    <main id="manual">
+      <article id="start" data-search="start first login bootstrap dashboard setup checklist onboarding">
+        <p class="kicker">01 · Start here</p>
+        <h2>From first login to a working status page</h2>
+        <p>SignalHub separates public status experiences from the authenticated organization console. Operators sign in at <code>/login</code> and use canonical console URLs under <code>/organization</code>. Visitors use a page slug, custom domain, hub, feed, embed, badge, or public API.</p>
+
+        <div class="callout success"><strong>Recommended first outcome:</strong> create one page, add one service, publish it, declare and resolve a test incident, verify delivery, and only then connect production monitors.</div>
+
+        <h3>First Admin login</h3>
+        <ol class="steps">
+          <li>Open <code>https://your-signalhub-host/login</code> and sign in with the bootstrap user ID and password supplied by the installation operator.</li>
+          <li>Change the temporary password. If a profile field is required, complete it before continuing.</li>
+          <li>Open <strong>Security</strong>, enroll MFA when required, save recovery codes offline, and verify the session list.</li>
+          <li>Open <strong>Settings</strong> and confirm the organization name, slug, contact address, retention expectations, and configured identity methods.</li>
+          <li>Open <strong>Pages → Create page</strong>. Choose a status page unless you are building a portfolio hub.</li>
+          <li>Complete page details, add at least one visible service, review appearance, configure optional notifications, and publish.</li>
+          <li>Use <strong>View public page</strong> in a private browser window. Confirm the page, history, subscription controls, and mobile layout.</li>
+          <li>Create a test incident, add an update, resolve it, and verify public history and enabled destinations.</li>
+        </ol>
+
+        <h3>Before production use</h3>
+        <div class="grid">
+          <section class="card"><h3>People</h3><ul><li>Assign Admin, incident, responder, and viewer responsibilities.</li><li>Define who may publish customer communication.</li><li>Keep a tested local Admin recovery path.</li></ul></section>
+          <section class="card"><h3>Content</h3><ul><li>Name services in customer language.</li><li>Prepare incident and maintenance templates.</li><li>Agree on severity, impact, and update cadence.</li></ul></section>
+          <section class="card"><h3>Delivery</h3><ul><li>Verify SMTP and optional SMS.</li><li>Test Slack, Teams, and signed webhooks.</li><li>Confirm the worker is ready before relying on delivery.</li></ul></section>
+          <section class="card"><h3>Recovery</h3><ul><li>Back up PostgreSQL and assets.</li><li>Restore into an isolated environment.</li><li>Monitor SignalHub from outside its primary infrastructure.</li></ul></section>
+        </div>
+      </article>
+
+      <article id="roles" data-search="roles admin incident manager responder viewer permissions capability page scope access">
+        <p class="kicker">02 · Roles and access</p>
+        <h2>Give each person only the access they need</h2>
+        <table>
+          <thead><tr><th>Role</th><th>Use it for</th><th>Core access</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Admin</strong></td><td>Organization and installation owners/operators.</td><td>All organization capabilities, users, pages, integrations, settings, and installation administration.</td></tr>
+            <tr><td><strong>Incident Manager</strong></td><td>Communications leads and incident commanders.</td><td>Incident lifecycle and updates, component updates, subscribers, analytics, and audit.</td></tr>
+            <tr><td><strong>Responder</strong></td><td>On-call engineers and service responders.</td><td>Incident updates, monitors, component updates, and analytics.</td></tr>
+            <tr><td><strong>Viewer</strong></td><td>Auditors, leadership, support, and read-only stakeholders.</td><td>Analytics and audit views.</td></tr>
+          </tbody>
+        </table>
+        <p>Non-Admin memberships can be limited to selected page IDs. Page scope applies on the server and affects pages, incidents, monitors, metrics, and other page-owned resources. An empty page selection means all pages for that membership.</p>
+        <div class="callout warning"><strong>Menu visibility is not the security boundary.</strong> SignalHub checks authorization in server actions and API routes. If a user can see an unexpected menu item, still report it, but do not assume hidden controls are the only protection.</div>
+      </article>
+
+      <article id="menus" data-search="menu dashboard pages deleted analytics audit help incidents maintenance templates subscribers destinations metrics monitors embed api keys security users settings platform">
+        <p class="kicker">03 · Menu reference</p>
+        <h2>What every organization menu is for</h2>
+        <table>
+          <thead><tr><th>Group / item</th><th>When to use it</th><th>Typical action</th></tr></thead>
+          <tbody>
+            <tr><td>Overview · Dashboard</td><td>Start and end an operator shift; review active incidents, scheduled maintenance, worker state, and page readiness.</td><td>Open the item needing attention.</td></tr>
+            <tr><td>Overview · Pages</td><td>Create, publish, group, and manage public, private, audience, and hub experiences.</td><td>Create page; continue setup; view public output.</td></tr>
+            <tr><td>Overview · Deleted Pages</td><td>Review soft-deleted pages before their lifecycle ends.</td><td>Restore or follow the approved deletion process.</td></tr>
+            <tr><td>Overview · Analytics</td><td>Understand page visits, engagement, and subscriber activity without exposing visitor identity.</td><td>Select a page and time range.</td></tr>
+            <tr><td>Overview · Audit Log</td><td>Investigate administrative changes and export evidence.</td><td>Filter, verify context, export CSV/JSON.</td></tr>
+            <tr><td>Overview · Help Center</td><td>Get short, signed-in help for a specific task.</td><td>Search an article; return here for the full manual.</td></tr>
+            <tr><td>Incidents · Incidents</td><td>Communicate unplanned degradation or outage.</td><td>Declare, update, resolve, edit timeline, publish postmortem.</td></tr>
+            <tr><td>Incidents · Maintenance</td><td>Announce planned service work.</td><td>Schedule a window and optional automatic transitions.</td></tr>
+            <tr><td>Incidents · Templates</td><td>Standardize recurring incident or maintenance messages.</td><td>Create grouped reusable content and defaults.</td></tr>
+            <tr><td>Communicate · Subscribers</td><td>Review and manage verified contacts for a selected page.</td><td>Import, quarantine, export, or inspect state.</td></tr>
+            <tr><td>Communicate · Destinations</td><td>Configure team channels and signed event endpoints.</td><td>Test and save Slack, Teams, or webhook destinations.</td></tr>
+            <tr><td>Monitoring · Metrics</td><td>Publish numeric service indicators.</td><td>Create a metric and push data points.</td></tr>
+            <tr><td>Monitoring · Monitors</td><td>Check availability and optionally reconcile component status.</td><td>Create or attach a check; inspect history and thresholds.</td></tr>
+            <tr><td>Integrations · SignalHub Embed</td><td>Show incident state on another website.</td><td>Copy the script or badge snippet.</td></tr>
+            <tr><td>Integrations · Monitor Templates</td><td>Start from an installation-curated monitor blueprint.</td><td>Add the template to a page and review its target.</td></tr>
+            <tr><td>Integrations · API Keys</td><td>Automate management actions without a browser session.</td><td>Create a scoped, expiring, CIDR-limited key.</td></tr>
+            <tr><td>Organization · Security</td><td>Manage MFA, sessions, SSO, SCIM, and identity policy.</td><td>Enroll, test, rotate, or revoke.</td></tr>
+            <tr><td>Organization · Users &amp; Roles</td><td>Grant or remove organization access.</td><td>Create a user; change role or page scope.</td></tr>
+            <tr><td>Organization · Settings</td><td>Change organization details and review lifecycle policy.</td><td>Update contact information or contact installation Admins.</td></tr>
+            <tr><td>Platform</td><td>Admin-only installation management across organizations.</td><td>Inspect runtime, identity, global users, configuration, and audit.</td></tr>
+          </tbody>
+        </table>
+      </article>
+
+      <article id="pages" data-search="page hub public private audience setup content appearance access notifications settings services groups designer custom css publish draft versions">
+        <p class="kicker">04 · Pages and hubs</p>
+        <h2>Design the right status experience for each audience</h2>
+        <h3>Choose the page type</h3>
+        <table>
+          <thead><tr><th>Type</th><th>Use when</th><th>Access model</th></tr></thead>
+          <tbody>
+            <tr><td>Public status page</td><td>Anyone should see health and incident history.</td><td>No sign-in; optional verified subscriptions.</td></tr>
+            <tr><td>Private page</td><td>The whole page is restricted to approved viewers.</td><td>Access challenge and configured policy.</td></tr>
+            <tr><td>Audience page</td><td>Different users/groups should see scoped components.</td><td>Audience identities and groups determine visibility.</td></tr>
+            <tr><td>Hub</td><td>A portfolio, region, brand, or business unit needs a parent directory.</td><td>Contains child status pages instead of service components.</td></tr>
+          </tbody>
+        </table>
+
+        <h3>Page creation and publication</h3>
+        <ol class="steps">
+          <li>Open <strong>Pages → Create page</strong>, select page or hub, choose a stable slug, and optionally assign a parent hub.</li>
+          <li>Open <strong>Content</strong>. For a status page, create groups and services, set their visibility, and order them in the way customers understand. For a hub, create or attach child pages.</li>
+          <li>Open <strong>Appearance</strong>. Configure logo, favicon, cover, brand color, layout, custom CSS, modules, announcements, footer links, and responsive presentation.</li>
+          <li>For private or audience pages, open <strong>Access</strong> and configure allowed identities/groups and component scope. Test with a non-Admin account.</li>
+          <li>Open <strong>Notifications</strong> to review subscriber channels, team destinations, feeds, and webhooks for the page.</li>
+          <li>Open <strong>Settings</strong> to confirm page name, locale, description, public visibility, and destructive controls.</li>
+          <li>Use the overview checklist to publish. A status page needs at least one visible service; a hub can publish its page directory.</li>
+        </ol>
+
+        <h3>Page-management tabs</h3>
+        <table>
+          <thead><tr><th>Tab</th><th>Purpose</th><th>Operational advice</th></tr></thead>
+          <tbody>
+            <tr><td>Overview</td><td>Readiness checklist, publication state, quick links.</td><td>Use before launch and after major design changes.</td></tr>
+            <tr><td>Content</td><td>Services/groups for a page; child pages for a hub.</td><td>Prefer customer language over internal system names.</td></tr>
+            <tr><td>Appearance</td><td>Responsive designer, branding, modules, versions.</td><td>Preview desktop/mobile, save drafts, publish deliberately, and keep accessible contrast.</td></tr>
+            <tr><td>Access</td><td>Private/audience identities, groups, and component visibility.</td><td>Test least-privilege access in a private session.</td></tr>
+            <tr><td>Notifications</td><td>Page delivery and integration overview.</td><td>Verify providers and worker readiness before launch.</td></tr>
+            <tr><td>Settings</td><td>Metadata, visibility, locale, and page lifecycle.</td><td>Treat slug/domain changes as customer-facing changes.</td></tr>
+          </tbody>
+        </table>
+
+        <div class="callout"><strong>Effective component status:</strong> manual status, active incidents, active maintenance, and linked monitor state are reconciled. Recovery from one source does not automatically clear another active source.</div>
+      </article>
+
+      <article id="incidents" data-search="incident investigating identified monitoring resolved severity impact updates timeline postmortem notifications affected components edit">
+        <p class="kicker">05 · Incident operations</p>
+        <h2>Communicate unplanned disruption with a durable timeline</h2>
+        <div class="workflow" aria-label="Incident lifecycle">
+          <span class="state">Investigating</span><span class="arrow">→</span>
+          <span class="state">Identified</span><span class="arrow">→</span>
+          <span class="state">Monitoring</span><span class="arrow">→</span>
+          <span class="state">Resolved</span>
+        </div>
+
+        <h3>Declare an incident</h3>
+        <ol class="steps">
+          <li>Confirm the affected customer experience. Do not wait for complete root-cause certainty before acknowledging a clear impact.</li>
+          <li>Open <strong>Incidents → New incident</strong>, choose the page, apply a template if appropriate, and enter a plain-language title.</li>
+          <li>Select status, severity/impact, affected services, and the first public update. State what users observe, what the team is doing, and when the next update is expected.</li>
+          <li>Review whether subscriber notifications should be sent. Publish and verify the public page and delivery history.</li>
+        </ol>
+
+        <h3>Update cadence</h3>
+        <ul>
+          <li><strong>Investigating:</strong> acknowledge symptoms and scope; avoid unsupported causes.</li>
+          <li><strong>Identified:</strong> explain the known cause or failing dependency and mitigation underway.</li>
+          <li><strong>Monitoring:</strong> report the mitigation and what signals are being watched.</li>
+          <li><strong>Resolved:</strong> state restoration time, customer outcome, and whether a postmortem will follow.</li>
+        </ul>
+        <p>Add a new update when state, impact, workaround, scope, or estimated recovery changes. If nothing changes, keep the promised cadence and say the investigation continues.</p>
+
+        <h3>Edit timeline and publish a postmortem</h3>
+        <p>Authorized users can correct an update while preserving the incident's durable chronology. Use edits for accuracy, not to hide operational history. After resolution, add a postmortem with impact, timeline, cause, contributing conditions, recovery, corrective actions, owners, and target dates.</p>
+        <div class="callout danger"><strong>Do not use maintenance for an unplanned outage.</strong> If customers are unexpectedly affected, declare an incident even when work is already underway.</div>
+      </article>
+
+      <article id="maintenance" data-search="maintenance scheduled planned window auto transition templates in progress completed duration">
+        <p class="kicker">06 · Maintenance</p>
+        <h2>Set expectations before planned work begins</h2>
+        <ol class="steps">
+          <li>Open <strong>Maintenance → Schedule maintenance</strong>, choose a page, title, start time, duration, and clear customer-facing description.</li>
+          <li>Select affected services and the status they should display, normally <em>Under Maintenance</em>.</li>
+          <li>Enable automatic transition when the worker should move the window to In Progress at the start and Completed at the end.</li>
+          <li>Publish early enough for subscribers to plan. Verify timezone presentation and enabled delivery channels.</li>
+          <li>At start, confirm the real work matches the announced scope. If impact becomes unexpected or exceeds the plan, open an incident.</li>
+          <li>At completion, verify service health and public component state before closing the window.</li>
+        </ol>
+        <h3>Templates</h3>
+        <p>Use <strong>Templates</strong> for recurring work or incident patterns. A template can provide a default title/body, status, impact, and affected services. Organize related templates into groups. Review templated facts before publishing; boilerplate accelerates communication but does not replace incident-specific judgment.</p>
+      </article>
+
+      <article id="monitoring" data-search="monitor http keyword tcp dns ssl icmp heartbeat threshold recovery history component metric points worker check">
+        <p class="kicker">07 · Monitoring and metrics</p>
+        <h2>Detect failure without creating noisy public status changes</h2>
+        <table>
+          <thead><tr><th>Monitor</th><th>Use it for</th><th>Key configuration</th></tr></thead>
+          <tbody>
+            <tr><td>HTTP</td><td>Web/API availability.</td><td>Method, URL, headers/body/auth, expected status range, timeout, response limit.</td></tr>
+            <tr><td>Keyword</td><td>Confirm response content, not only reachability.</td><td>Expected text and HTTP behavior.</td></tr>
+            <tr><td>TCP</td><td>Port-level reachability.</td><td>Host, port, timeout.</td></tr>
+            <tr><td>DNS</td><td>Name resolution and expected records.</td><td>Name, record type, expected response.</td></tr>
+            <tr><td>SSL certificate</td><td>Certificate validity and expiry warning.</td><td>TLS hostname and threshold.</td></tr>
+            <tr><td>ICMP</td><td>Network reachability where the runtime permits it.</td><td>Explicit installation enablement and container/network permissions.</td></tr>
+            <tr><td>Heartbeat</td><td>Cron, backup, ETL, or job completion.</td><td>Generated token URL and expected interval.</td></tr>
+          </tbody>
+        </table>
+
+        <h3>Create and tune a monitor</h3>
+        <ol class="steps">
+          <li>Select the page, monitor type, target, interval, timeout, tags/group, and optional service.</li>
+          <li>Set failure and recovery thresholds. Requiring consecutive outcomes prevents one transient check from flipping state.</li>
+          <li>Save with automated component action disabled when possible. Use <strong>Check on next poll</strong> and inspect results, latency, and error detail.</li>
+          <li>Enable component synchronization only after the monitor reliably represents customer impact.</li>
+          <li>Alert operators on stale worker heartbeat, missing checks, and repeated monitor errors.</li>
+        </ol>
+
+        <div class="callout warning"><strong>Private targets are denied by default.</strong> Enabling private-target monitoring expands network reach. Place workers in a controlled monitoring network and restrict egress before enabling it.</div>
+
+        <h3>Metrics</h3>
+        <p>Metrics are numeric time series displayed on a status page. Create a name, optional unit suffix, and optional component link. Push points manually for validation or through <code>POST /api/v1/manage/metrics/&lt;id&gt;/points</code>. A chart appears publicly after it has data. Metrics explain performance; monitors determine check state.</p>
+      </article>
+
+      <article id="communication" data-search="subscribers email sms slack teams webhook rss atom otp verify quarantine export destinations notifications delivery worker dead letter">
+        <p class="kicker">08 · Subscribers and delivery</p>
+        <h2>Send the right update through verified channels</h2>
+        <table>
+          <thead><tr><th>Channel</th><th>Audience</th><th>Readiness requirement</th></tr></thead>
+          <tbody>
+            <tr><td>Email</td><td>Verified page subscribers.</td><td>SMTP configured and delivery worker healthy.</td></tr>
+            <tr><td>SMS</td><td>Verified phone subscribers where enabled.</td><td>Twilio settings, enabled platform policy, healthy worker.</td></tr>
+            <tr><td>Slack / Teams</td><td>Internal or customer team channels.</td><td>Destination enabled and tested before save.</td></tr>
+            <tr><td>Signed webhook</td><td>Automation and downstream incident systems.</td><td>Verified HTTPS endpoint, saved secret, signature validation, idempotent receiver.</td></tr>
+            <tr><td>RSS / Atom</td><td>Feed readers and polling integrations.</td><td>Public feed or revocable signed token for protected access.</td></tr>
+          </tbody>
+        </table>
+
+        <h3>Subscriber workflow</h3>
+        <p>Visitors request a one-time code and verify ownership before activation. Administrators use <strong>Subscribers</strong> to filter by page/channel, import approved email contacts, quarantine a contact without deleting it, and export CSV. Treat subscriber contact information as protected operational data.</p>
+
+        <h3>Delivery troubleshooting order</h3>
+        <ol>
+          <li>Confirm the worker is ready and recently heartbeating.</li>
+          <li>Confirm the provider is enabled in installation configuration.</li>
+          <li>Confirm tenant credentials and destination verification state.</li>
+          <li>Inspect the queued attempt, retry schedule, last error, and dead-letter state.</li>
+          <li>Send a controlled test before replaying a broad set of deliveries.</li>
+        </ol>
+      </article>
+
+      <article id="integrations" data-search="api key openapi bearer scope cidr webhook signature hmac component token heartbeat embed badge rss atom automation">
+        <p class="kicker">09 · Integrations and APIs</p>
+        <h2>Automate with scoped credentials, not browser sessions</h2>
+        <h3>Management API keys</h3>
+        <ol class="steps">
+          <li>Open <strong>API Keys</strong>, select the page context, name the integration, and choose only required scopes.</li>
+          <li>Add page restrictions, expiration, and source CIDRs where practical.</li>
+          <li>Copy the token once into a secret manager. SignalHub stores its hash and cannot show the full token again.</li>
+          <li>Send <code>Authorization: Bearer &lt;token&gt;</code> to <code>/api/v1/manage/*</code>.</li>
+          <li>Rotate before expiry or immediately after suspected exposure; revoke the old key and verify audit evidence.</li>
+        </ol>
+        <pre><code>curl -fsS https://status.example.com/api/v1/manage/incidents \
+  -H 'Authorization: Bearer &lt;api-key&gt;' \
+  -H 'Content-Type: application/json' \
+  --data '{"pageId":"&lt;page-id&gt;","title":"Elevated API errors","status":"INVESTIGATING"}'</code></pre>
+        <p>Use the live OpenAPI 3.1 contract at <code>/api/openapi</code> as the authoritative request/response reference for the deployed version.</p>
+
+        <h3>Purpose-specific integrations</h3>
+        <ul>
+          <li><strong>Component automation token:</strong> updates one component through <code>/api/v1/webhook-component/:token</code>.</li>
+          <li><strong>Heartbeat token:</strong> records expected job activity through <code>/api/v1/heartbeat/:token</code>.</li>
+          <li><strong>Embed:</strong> incident banner script for another site.</li>
+          <li><strong>Badge:</strong> compact dynamic status response.</li>
+          <li><strong>Public status API:</strong> page health JSON with page access rules enforced.</li>
+          <li><strong>Feeds:</strong> RSS/Atom for public pages or revocable signed access.</li>
+        </ul>
+
+        <h3>Signed outbound webhooks</h3>
+        <p>Register and test an HTTPS endpoint, copy its secret once, and validate the HMAC signature against the exact raw request body. Reject invalid timestamps/signatures, process event IDs idempotently, return success promptly, and move slow work to the receiver's queue. Rotate secrets after exposure.</p>
+      </article>
+
+      <article id="identity" data-search="users roles security password mfa totp recovery session oidc saml scim sso invite revoke disable">
+        <p class="kicker">10 · Users and security</p>
+        <h2>Manage human identity and session risk</h2>
+        <h3>Create an organization user</h3>
+        <ol class="steps">
+          <li>Open <strong>Users &amp; Roles</strong> and enter name, user ID, email, role, and optional page scope.</li>
+          <li>For a new local identity, set a temporary password through the protected workflow. The user must change it at first sign-in.</li>
+          <li>For an existing identity, add the organization membership without replacing its current authentication method.</li>
+          <li>Review access after role changes, team transfers, and incident rotations. Remove or revoke access immediately when no longer needed.</li>
+        </ol>
+
+        <h3>Security menu</h3>
+        <ul>
+          <li>Enroll TOTP MFA and store recovery codes offline.</li>
+          <li>Review active sessions and revoke unknown or stale sessions.</li>
+          <li>Change passwords through the authenticated flow; relevant sessions are revoked.</li>
+          <li>Configure OIDC or SAML using the callback/metadata values shown by SignalHub.</li>
+          <li>Test identity connections before enforcing them.</li>
+          <li>Create and rotate SCIM bearer tokens; test create, update, group mapping, disable, and delete behavior.</li>
+        </ul>
+        <div class="callout danger"><strong>Preserve recovery access.</strong> Before enforcing SSO or changing role mappings, verify a local Admin account, MFA recovery material, canonical URL, and direct database-backed sign-in path.</div>
+      </article>
+
+      <article id="platform" data-search="platform installation administration organizations global users operations jobs templates configuration identity audit purge suspend reactivate diagnostics retention">
+        <p class="kicker">11 · Installation administration</p>
+        <h2>Operate all organizations from the unified Admin console</h2>
+        <p>Admins see the <strong>Platform</strong> group and use paths under <code>/organization/platform</code>. These controls have installation-wide impact and require an explicit operational reason where the workflow requests one.</p>
+        <table>
+          <thead><tr><th>Menu</th><th>Use it for</th><th>High-risk considerations</th></tr></thead>
+          <tbody>
+            <tr><td>Overview</td><td>Organization counts, identities, database, worker, queues, and dead letters.</td><td>Treat stale worker/database state as an incident.</td></tr>
+            <tr><td>Organizations</td><td>Provision, switch into, suspend, reactivate, and queue purge.</td><td>Suspension freezes tenant traffic/work; purge is permanent and audited.</td></tr>
+            <tr><td>Global Users</td><td>Review cross-organization memberships and emergency-disable an identity.</td><td>Disable affects every organization and revokes authorization.</td></tr>
+            <tr><td>Operations</td><td>Worker readiness, platform jobs, retries, delivery state, migrations, and retention.</td><td>Understand the failure before retrying; avoid duplicate external effects.</td></tr>
+            <tr><td>Monitor Templates</td><td>Maintain installation-curated monitor blueprints.</td><td>Templates must point to stable, safe, observable targets.</td></tr>
+            <tr><td>Configuration</td><td>Enable destination providers and review runtime/storage capability.</td><td>Provider enablement affects what every organization can configure.</td></tr>
+            <tr><td>Identity</td><td>OIDC, SAML, SCIM tokens, JIT/group mappings.</td><td>Test before enforcement; rotate tokens after exposure.</td></tr>
+            <tr><td>Platform Audit</td><td>Installation-wide evidence, export, chain state, and audit sinks.</td><td>Validate sink signatures/retries and preserve evidence during retention.</td></tr>
+          </tbody>
+        </table>
+
+        <h3>Organization lifecycle</h3>
+        <div class="workflow"><span class="state">Active</span><span class="arrow">→</span><span class="state">Suspended</span><span class="arrow">→</span><span class="state">Deleting</span><span class="arrow">→</span><span class="state">Purged</span></div>
+        <p>Suspension is reversible; purge is not. Before purge, confirm the organization slug, business approval, legal/retention requirements, exports, backups, and reason. Monitor the queued job and tombstone evidence to completion.</p>
+      </article>
+
+      <article id="public" data-search="visitor public status page subscribe otp history incident metric feed rss atom private audience access">
+        <p class="kicker">12 · Public visitor guide</p>
+        <h2>How customers and employees use a status page</h2>
+        <ul>
+          <li>The page header communicates overall status. Service groups explain which capabilities are affected.</li>
+          <li>Active incidents and maintenance show the latest public state and affected services.</li>
+          <li><strong>History</strong> contains resolved incidents, completed maintenance, and available postmortems.</li>
+          <li>Metrics show published numeric history such as response time or uptime.</li>
+          <li>Visitors subscribe by requesting and entering a one-time verification code. They can later use the signed unsubscribe link.</li>
+          <li>RSS and Atom support feed readers. Protected pages may require a revocable signed feed URL.</li>
+          <li>Private and audience pages show an access challenge and only reveal content allowed by policy.</li>
+        </ul>
+        <p>Operators should test visitor workflows without an Admin session and with assistive/mobile layouts before launch.</p>
+      </article>
+
+      <article id="runbooks" data-search="runbook daily weekly monthly quarterly incident delivery security backup restore upgrade key rotation operational checklist">
+        <p class="kicker">13 · Operating runbooks</p>
+        <h2>Repeatable checks for a dependable status service</h2>
+        <h3>Each operator shift</h3>
+        <ul><li>Review dashboard, active incidents, upcoming maintenance, worker readiness, queue depth, and dead letters.</li><li>Confirm external monitoring can reach public pages.</li><li>Handoff open communication commitments and next-update times.</li></ul>
+        <h3>Weekly</h3>
+        <ul><li>Review failed monitors, noisy thresholds, delivery retries, certificate warnings, stale API keys, and audit anomalies.</li><li>Confirm backups completed and asset protection is healthy.</li><li>Review scheduled maintenance and templates for accuracy.</li></ul>
+        <h3>Monthly</h3>
+        <ul><li>Review users, roles, page scopes, sessions, API keys, webhook endpoints, and identity mappings.</li><li>Patch the base image and dependencies through the organization's release process.</li><li>Verify audit chains and SIEM delivery.</li></ul>
+        <h3>Quarterly</h3>
+        <ul><li>Restore PostgreSQL and assets into an isolated environment.</li><li>Test Admin recovery, MFA recovery codes, SSO failover, and SCIM deprovisioning.</li><li>Exercise a test incident, maintenance window, subscriber delivery, webhook verification, and key rotation plan.</li></ul>
+
+        <h3>Safe upgrade sequence</h3>
+        <ol class="steps">
+          <li>Review release notes, environment template, chart values, migrations, and dependency findings.</li>
+          <li>Create and verify a database and asset backup.</li>
+          <li>Build/pull the reviewed immutable image; run preflight and migration check.</li>
+          <li>Run the migration once, then roll workers and web replicas according to the deployment guide.</li>
+          <li>Validate readiness, migration state, login, public pages, monitors, queues, and delivery.</li>
+        </ol>
+      </article>
+
+      <article id="troubleshooting" data-search="troubleshooting 503 login worker monitor asset notification page publish api 401 403 ready health">
+        <p class="kicker">14 · Troubleshooting</p>
+        <h2>Start with the failing boundary</h2>
+        <table>
+          <thead><tr><th>Symptom</th><th>Check first</th><th>Then inspect</th></tr></thead>
+          <tbody>
+            <tr><td>Readiness is 503</td><td><code>/api/health/ready</code> checks object.</td><td>Database connectivity, migration state, worker heartbeat, provider/storage configuration.</td></tr>
+            <tr><td>Login returns to form</td><td>Canonical HTTPS URL and browser cookie.</td><td>Shared signing keys, database session, account/membership state, clock, proxy headers.</td></tr>
+            <tr><td>Menu item missing</td><td>User role and capability.</td><td>Page scope, active membership, organization status.</td></tr>
+            <tr><td>Page will not publish</td><td>Overview checklist.</td><td>Visible services, required details, page visibility, access configuration.</td></tr>
+            <tr><td>Worker offline/stale</td><td>Worker <code>/ready</code> and logs.</td><td>Database, migrations, lease errors, egress, health port, shutdown state.</td></tr>
+            <tr><td>Monitor has no results</td><td>Enabled state and worker health.</td><td>Target DNS/network, private-target policy, timeout, check history, response limit.</td></tr>
+            <tr><td>Notification not sent</td><td>Provider readiness and worker.</td><td>Destination verification, recipient state, retry/dead-letter detail.</td></tr>
+            <tr><td>Assets differ by replica</td><td><code>ASSET_STORAGE_DRIVER</code>.</td><td>Use shared S3-compatible storage; local files are not shared between replicas.</td></tr>
+            <tr><td>API returns 401/403</td><td>Bearer token, expiry, revocation.</td><td>Scope, page boundary, source CIDR, organization/page lifecycle.</td></tr>
+            <tr><td>Component stays degraded</td><td>All effective-status sources.</td><td>Active incident, maintenance, manual state, and every linked monitor.</td></tr>
+          </tbody>
+        </table>
+        <p>Use request IDs to correlate web, worker, provider, and audit events. Redact tokens, passwords, subscriber contacts, and encrypted material before sharing diagnostics.</p>
+      </article>
+
+      <article id="glossary" data-search="glossary definition page hub component service incident maintenance monitor metric subscriber destination worker platform organization">
+        <p class="kicker">15 · Glossary</p>
+        <h2>SignalHub terms</h2>
+        <dl>
+          <dt><strong>Organization</strong></dt><dd>A tenant boundary containing memberships, pages, incidents, monitors, subscribers, integrations, and audit data.</dd>
+          <dt><strong>Status page</strong></dt><dd>A visitor-facing service-health experience identified by a slug or custom domain.</dd>
+          <dt><strong>Hub</strong></dt><dd>A parent directory of status pages for a portfolio, business unit, region, or brand.</dd>
+          <dt><strong>Service / component</strong></dt><dd>A customer-understandable capability whose effective health may come from manual state, incidents, maintenance, and monitors.</dd>
+          <dt><strong>Incident</strong></dt><dd>An unplanned service-impact record with status, severity/impact, affected services, updates, resolution, and optional postmortem.</dd>
+          <dt><strong>Maintenance</strong></dt><dd>A planned service window with scheduled lifecycle and affected services.</dd>
+          <dt><strong>Monitor</strong></dt><dd>A worker-executed availability check with failure and recovery thresholds.</dd>
+          <dt><strong>Metric</strong></dt><dd>A numeric time series published as a chart.</dd>
+          <dt><strong>Subscriber</strong></dt><dd>A verified contact that follows a status page through an enabled channel.</dd>
+          <dt><strong>Destination</strong></dt><dd>A tested team channel or signed webhook endpoint receiving status events.</dd>
+          <dt><strong>Worker</strong></dt><dd>The background runtime for checks, notifications, exports, audit delivery, retention, maintenance transitions, and lifecycle jobs.</dd>
+          <dt><strong>Installation administration</strong></dt><dd>Admin-only cross-organization controls under <code>/organization/platform</code>.</dd>
+        </dl>
+        <div class="callout"><strong>More documentation:</strong> deployment operators should read the repository's Open-Source Enterprise Setup Guide, Helm chart guide, environment template, security policy, and live OpenAPI contract in addition to this product manual.</div>
+      </article>
+    </main>
+  </div>
+
+  <footer>SignalHub · Apache-2.0 · Self-hosted status pages, monitoring, and incident communication.</footer>
+  <script>
+    (() => {
+      const input = document.getElementById('manual-search');
+      const articles = Array.from(document.querySelectorAll('main article'));
+      input.addEventListener('input', () => {
+        const query = input.value.trim().toLowerCase();
+        articles.forEach((article) => {
+          const content = `${article.dataset.search || ''} ${article.textContent || ''}`.toLowerCase();
+          article.classList.toggle('search-hidden', Boolean(query) && !content.includes(query));
+        });
+      });
+    })();
+  </script>
+</body>
+</html>

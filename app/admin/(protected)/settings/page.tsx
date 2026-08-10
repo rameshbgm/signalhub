@@ -3,23 +3,22 @@ import { requestOrgExport, updateOrgRetention, updateOrgSettings } from "./actio
 import { HelpTip } from "@/components/HelpTip";
 import { requireCapability } from "@/lib/admin-guard";
 import { effectiveRetention, RETENTION_BOUNDS } from "@/lib/retention";
-import { oid } from "@/lib/mongo-utils";
-import { collections } from "@/lib/db";
+import { database } from "@/lib/postgres/client";
 import Link from "next/link";
 
 export default async function OrgSettingsPage() {
   const { session, org } = await requireSession();
   await requireCapability("organization.manage");
   const isAdmin = session.role === "ADMIN";
-  const retention = await effectiveRetention(oid(org.id));
+  const retention = await effectiveRetention(org.id);
   const exports = isAdmin
-    ? await collections.dataExportJobs().find({ orgId: oid(org.id) }).sort({ createdAt: -1 }).limit(10).toArray()
+    ? await database.selectFrom("dataExportJobs").selectAll().where("orgId", "=", org.id)
+        .orderBy("createdAt", "desc").limit(10).execute()
     : [];
   const identityConnections = isAdmin
-    ? await collections.identityConnections().find({
-        orgId: oid(org.id),
-        audience: "ORGANIZATION",
-      }, { projection: { name: 1, slug: 1, type: 1, enabled: 1, roleMappings: 1, defaultRole: 1 } }).toArray()
+    ? await database.selectFrom("identityConnections")
+        .select(["id", "name", "slug", "type", "enabled", "roleMappings", "defaultRole"])
+        .where("orgId", "=", org.id).where("audience", "=", "ORGANIZATION").execute()
     : [];
 
   return (
@@ -61,7 +60,7 @@ export default async function OrgSettingsPage() {
             />
           </label>
           {isAdmin && <button className="bg-[var(--cyan)] px-4 py-2 text-sm font-medium text-[var(--on-cyan)]">Save</button>}
-          {!isAdmin && <p className="text-xs text-[var(--fg-dim)]">Only Admins and Admins can change organization settings.</p>}
+          {!isAdmin && <p className="text-xs text-[var(--fg-dim)]">Only Admins can change organization settings.</p>}
         </form>
       </section>
 
@@ -100,7 +99,7 @@ export default async function OrgSettingsPage() {
           </p>
           <div className="mt-3 divide-y divide-[var(--line)] border border-[var(--line)]">
             {identityConnections.map((connection) => (
-              <div key={connection._id.toHexString()} className="p-3 text-xs">
+              <div key={connection.id} className="p-3 text-xs">
                 <div className="flex items-center justify-between gap-2">
                   <span className="font-semibold">{connection.name} · {connection.type}</span>
                   <span className={connection.enabled ? "text-[var(--green)]" : "text-[var(--red)]"}>{connection.enabled ? "Enabled" : "Disabled"}</span>
@@ -131,10 +130,10 @@ export default async function OrgSettingsPage() {
           </form>
           <div className="mt-4 divide-y divide-[var(--line)] border border-[var(--line)]">
             {exports.map((job) => (
-              <div key={job._id.toHexString()} className="flex flex-wrap items-center justify-between gap-2 p-3 text-xs">
+              <div key={job.id} className="flex flex-wrap items-center justify-between gap-2 p-3 text-xs">
                 <span>{job.createdAt.toLocaleString()} · {job.status}</span>
                 {job.status === "SUCCEEDED" ? (
-                  <a href={`/api/admin/exports/${job._id.toHexString()}`} className="font-semibold text-[var(--cyan)]">Download</a>
+                  <a href={`/api/admin/exports/${job.id}`} className="font-semibold text-[var(--cyan)]">Download</a>
                 ) : job.lastError ? <span className="text-[var(--red)]">{job.lastError}</span> : null}
               </div>
             ))}

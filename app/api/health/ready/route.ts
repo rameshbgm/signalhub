@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { collections, db } from "@/lib/db";
 import { inspectMigrationState } from "@/lib/migrations";
+import { database, verifyDatabaseConnection } from "@/lib/postgres/client";
 
 export async function GET() {
   const checks = {
@@ -20,16 +20,22 @@ export async function GET() {
     enterpriseIdentityConnections: 0,
   };
   try {
-    await db.command({ ping: 1 }, { timeoutMS: 2_000 });
+    await verifyDatabaseConnection();
     checks.database = true;
     checks.migrations = (await inspectMigrationState()).current;
-    checks.enterpriseIdentityConnections = await collections.identityConnections().countDocuments({ enabled: true });
-    const heartbeat = await collections
-      .workerHeartbeats()
-      .find({ status: "READY", lastSeenAt: { $gt: new Date(Date.now() - 30_000) } })
-      .sort({ lastSeenAt: -1 })
-      .limit(1)
-      .next();
+    const identityCount = await database
+      .selectFrom("identityConnections")
+      .select(({ fn }) => fn.countAll<number>().as("count"))
+      .where("enabled", "=", true)
+      .executeTakeFirstOrThrow();
+    checks.enterpriseIdentityConnections = Number(identityCount.count);
+    const heartbeat = await database
+      .selectFrom("workerHeartbeats")
+      .select("id")
+      .where("status", "=", "READY")
+      .where("lastSeenAt", ">", new Date(Date.now() - 30_000))
+      .orderBy("lastSeenAt", "desc")
+      .executeTakeFirst();
     checks.worker = Boolean(heartbeat);
   } catch {
     // The structured response below identifies which dependency is unavailable.

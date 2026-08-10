@@ -52,11 +52,31 @@ describe("unified page creation workflow", () => {
     const notifications = source("components/admin/PageNotificationsSection.tsx");
     for (const label of ["Overview", "Content", "Appearance", "Access", "Notifications", "Settings"]) expect(shell).toContain(label);
     expect(overview).toContain("Incident readiness");
-    expect(appearance).toContain("Brand essentials");
+    expect(appearance).toContain("DesignEditor");
+    expect(shell).toContain("Services & groups");
+    expect(shell).toContain("Status pages");
     expect(access).toContain("Audience-specific access");
     expect(notificationsPage).toContain("PageNotificationsSection");
     expect(notifications).toContain("Subscriber channels");
     expect(notifications).toContain("Team and on-call destinations");
     expect(notifications).toContain("Signed status-event webhooks");
+  });
+
+  it("does not show a redundant access section for public pages", () => {
+    const shell = source("components/admin/PageManagementShell.tsx");
+    const access = source("app/admin/(protected)/pages/[pageId]/access/page.tsx");
+    expect(shell).toContain('page.type === "PUBLIC"');
+    expect(shell).toContain('section.key !== "access"');
+    expect(access).toContain('if (page.type === "PUBLIC") redirect(`/organization/pages/${pageId}`)');
+    expect(access).not.toContain("Anyone with the public URL can view this page");
+  });
+
+  it("keeps visitor footer links out of general settings", () => {
+    const settings = source("app/admin/(protected)/pages/[pageId]/settings/page.tsx");
+    const actions = source("app/admin/(protected)/pages/actions.ts");
+    expect(settings).not.toContain('name="supportUrl"');
+    expect(settings).not.toContain('name="termsUrl"');
+    expect(settings).not.toContain('name="privacyUrl"');
+    expect(actions).not.toContain('{ $set: { name, headline, aboutText, supportUrl, termsUrl, privacyUrl, timezone');
   });
 });

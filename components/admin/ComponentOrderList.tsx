@@ -68,7 +68,7 @@ export function ComponentOrderList({
   }
 
   return (
-    <div>
+    <div className="mt-5">
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
         <SortableContext items={orderedIds} strategy={verticalListSortingStrategy}>
           <div className="space-y-2" aria-busy={pending}>

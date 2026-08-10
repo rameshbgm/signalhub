@@ -1,5 +1,5 @@
-import { collections } from "@/lib/db";
-import { requirePlatformCapability } from "@/lib/admin-guard";
+import { database } from "@/lib/postgres/client";
+import { requirePlatformPageCapability } from "@/lib/platform-page-guard";
 import { hasPlatformCapability } from "@/lib/platform-policy";
 import {
   inspectMigrationState,
@@ -14,7 +14,7 @@ import { PlatformSubmitButton } from "@/components/platform/PlatformSubmitButton
 import { effectiveRetention, RETENTION_BOUNDS } from "@/lib/retention";
 
 export default async function PlatformOperationsPage() {
-  const actor = await requirePlatformCapability("operations.read");
+  const actor = await requirePlatformPageCapability("operations.read");
   // eslint-disable-next-line react-hooks/purity
   const renderedAt = Date.now();
   const [
@@ -29,20 +29,16 @@ export default async function PlatformOperationsPage() {
     delivered,
     smtp,
   ] = await Promise.all([
-    collections.workerHeartbeats().find().sort({ lastSeenAt: -1 }).limit(20).toArray(),
-    collections.platformJobs().find().sort({ createdAt: -1 }).limit(100).toArray(),
-    collections
-      .notificationJobs()
-      .find({ status: "DEAD_LETTER" })
-      .sort({ updatedAt: -1 })
-      .limit(50)
-      .toArray(),
-    collections.notificationJobs().countDocuments({ status: "DEAD_LETTER" }),
+    database.selectFrom("workerHeartbeats").selectAll().orderBy("lastSeenAt", "desc").limit(20).execute(),
+    database.selectFrom("platformJobs").selectAll().orderBy("createdAt", "desc").limit(100).execute(),
+    database.selectFrom("notificationJobs").selectAll().where("status", "=", "DEAD_LETTER")
+      .orderBy("updatedAt", "desc").limit(50).execute(),
+    countNotificationJobs("DEAD_LETTER"),
     inspectMigrationState(),
-    collections.notificationJobs().countDocuments({ status: "PENDING" }),
-    collections.notificationJobs().countDocuments({ status: "PROCESSING" }),
-    collections.notificationJobs().countDocuments({ status: "BLOCKED" }),
-    collections.notificationJobs().countDocuments({ status: "SENT" }),
+    countNotificationJobs("PENDING"),
+    countNotificationJobs("PROCESSING"),
+    countNotificationJobs("BLOCKED"),
+    countNotificationJobs("SENT"),
     verifySmtp(),
   ]);
   const canRetry = hasPlatformCapability(actor.role, "operations.retry");
@@ -96,7 +92,7 @@ export default async function PlatformOperationsPage() {
         </div>
         <div className="space-y-2">
           {platformJobs.map((job) => (
-            <article key={job._id.toHexString()} className="border border-[var(--line)] bg-[var(--surface)] p-4">
+            <article key={job.id} className="border border-[var(--line)] bg-[var(--surface)] p-4">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                   <div className="flex items-center gap-2">
@@ -113,7 +109,7 @@ export default async function PlatformOperationsPage() {
                   job.status === "FAILED" &&
                   job.attempts >= job.maxAttempts && (
                   <PlatformActionForm
-                    action={retryPlatformJob.bind(null, job._id.toHexString())}
+                    action={retryPlatformJob.bind(null, job.id)}
                     successMessage="Platform job queued for retry."
                     className="flex flex-wrap gap-2"
                   >
@@ -145,7 +141,7 @@ export default async function PlatformOperationsPage() {
         </div>
         <div className="space-y-2">
           {deadLetterJobs.map((job) => (
-            <article key={job._id.toHexString()} className="border border-[var(--line)] bg-[var(--surface)] p-4">
+            <article key={job.id} className="border border-[var(--line)] bg-[var(--surface)] p-4">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                   <p className="font-semibold text-[var(--fg)]">{job.subject}</p>
@@ -156,7 +152,7 @@ export default async function PlatformOperationsPage() {
                 </div>
                 {canRetry && (
                   <PlatformActionForm
-                    action={retryNotificationDelivery.bind(null, job._id.toHexString())}
+                    action={retryNotificationDelivery.bind(null, job.id)}
                     successMessage="Notification delivery queued for retry."
                     className="flex flex-wrap gap-2"
                   >
@@ -188,7 +184,7 @@ export default async function PlatformOperationsPage() {
               {workers.map((worker) => {
                 const fresh = worker.lastSeenAt > new Date(renderedAt - 30_000);
                 return (
-                  <tr key={worker._id.toHexString()}>
+                  <tr key={worker.id}>
                     <td className="px-4 py-3 font-mono text-[var(--fg)]">{worker.workerId}</td>
                     <td className={`px-4 py-3 font-semibold ${fresh && worker.status === "READY" ? "text-[var(--green)]" : "text-[var(--red)]"}`}>{worker.status}</td>
                     <td className="px-4 py-3 text-[var(--fg-soft)]">{worker.lastSeenAt.toLocaleString()}</td>
@@ -256,4 +252,11 @@ function redactContact(value: string) {
     }
   }
   return value.length > 6 ? `${value.slice(0, 3)}…${value.slice(-2)}` : "redacted";
+}
+
+async function countNotificationJobs(status: "PENDING" | "PROCESSING" | "BLOCKED" | "SENT" | "DEAD_LETTER") {
+  const row = await database.selectFrom("notificationJobs")
+    .select(({ fn }) => fn.countAll<number>().as("count"))
+    .where("status", "=", status).executeTakeFirstOrThrow();
+  return Number(row.count);
 }

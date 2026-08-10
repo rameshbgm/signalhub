@@ -39,6 +39,14 @@ describe("component detail settings", () => {
     expect(contentSource).toContain("Save service");
     expect(contentSource).not.toContain("page-settings-form");
     expect(actionSource).toContain("export async function updateComponentDetails");
-    expect(actionSource).toContain("groupId: groupId ? oid(groupId) : null");
+    expect(actionSource).toContain("if (groupId) await assertGroupInPage(groupId, pageId)");
+    expect(actionSource).toContain("groupId,");
+  });
+
+  it("refreshes the service list and exposes explicit edit and confirmed delete actions", () => {
+    const contentSource = readFileSync("app/admin/(protected)/pages/[pageId]/content/page.tsx", "utf8");
+    expect(contentSource).toContain('key={components.map((component) => component.id).join(":")}');
+    expect(contentSource).toContain(">Edit</a>");
+    expect(contentSource).toContain("This action cannot be undone.");
   });
 });

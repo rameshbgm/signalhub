@@ -13,7 +13,7 @@ const MIGRATION_MANIFEST: readonly MigrationManifestEntry[] = [
 
 function appliedManifest(manifest: readonly MigrationManifestEntry[] = MIGRATION_MANIFEST) {
   return manifest.map((migration) => ({
-    _id: migration.id,
+    id: migration.id,
     checksum: migration.checksum,
   }));
 }
@@ -55,7 +55,7 @@ describe("migration manifest inspection", () => {
     const inspection = evaluateMigrationState(
       [
         ...appliedManifest(),
-        { _id: "004-future-release", checksum: "checksum-004" },
+        { id: "004-future-release", checksum: "checksum-004" },
       ],
       MIGRATION_MANIFEST
     );

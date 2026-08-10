@@ -1,8 +1,7 @@
 import Link from "next/link";
 import { requireSession } from "@/lib/require-session";
-import { collections } from "@/lib/db";
-import { oid, toId } from "@/lib/mongo-utils";
-import { scopedPageFilter } from "@/lib/admin-guard";
+import { database } from "@/lib/postgres/client";
+import { getScopedPages } from "@/lib/admin-guard";
 import { sessionHasCapability } from "@/lib/admin-guard";
 import { publicPagePath } from "@/lib/public-path";
 import {
@@ -15,12 +14,17 @@ import {
   type PageHealthSignals,
 } from "@/lib/status";
 
-export default async function AdminDashboard() {
-  const { session, org } = await requireSession();
-
-  const pages = (await collections.pages().find(scopedPageFilter(session, org.id)).sort({ createdAt: 1 }).toArray()).map(toId);
-  const pageIds = pages.map((p) => oid(p.id));
-
+async function dashboardData(pageIds: string[]) {
+  if (!pageIds.length) {
+    return {
+      openIncidentDocs: [],
+      subscriberCount: 0,
+      componentDocs: [],
+      upcomingMaintenance: 0,
+      activeMaintenanceDocs: [],
+      monitorDocs: [],
+    };
+  }
   const [
     openIncidentDocs,
     subscriberCount,
@@ -29,25 +33,44 @@ export default async function AdminDashboard() {
     activeMaintenanceDocs,
     monitorDocs,
   ] = await Promise.all([
-    collections
-      .incidents()
-      .find({ pageId: { $in: pageIds }, isMaintenance: false, status: { $ne: "RESOLVED" } })
-      .sort({ createdAt: -1 })
-      .toArray(),
-    collections.subscribers().countDocuments({ pageId: { $in: pageIds } }),
-    collections.components().find({ pageId: { $in: pageIds } }).toArray(),
-    collections.incidents().countDocuments({ pageId: { $in: pageIds }, isMaintenance: true, maintenanceStatus: "SCHEDULED" }),
-    collections
-      .incidents()
-      .find({
-        pageId: { $in: pageIds },
-        isMaintenance: true,
-        maintenanceStatus: { $in: ["IN_PROGRESS", "VERIFYING"] },
-      })
-      .toArray(),
-    collections.monitors().find({ pageId: { $in: pageIds }, enabled: true }).toArray(),
+    database.selectFrom("incidents").selectAll().where("pageId", "in", pageIds)
+      .where("isMaintenance", "=", false).where("status", "!=", "RESOLVED")
+      .orderBy("createdAt", "desc").execute(),
+    database.selectFrom("subscribers").select(({ fn }) => fn.countAll<number>().as("count"))
+      .where("pageId", "in", pageIds).executeTakeFirstOrThrow().then((row) => Number(row.count)),
+    database.selectFrom("components").selectAll().where("pageId", "in", pageIds).execute(),
+    database.selectFrom("incidents").select(({ fn }) => fn.countAll<number>().as("count"))
+      .where("pageId", "in", pageIds).where("isMaintenance", "=", true)
+      .where("maintenanceStatus", "=", "SCHEDULED").executeTakeFirstOrThrow().then((row) => Number(row.count)),
+    database.selectFrom("incidents").selectAll().where("pageId", "in", pageIds)
+      .where("isMaintenance", "=", true).where("maintenanceStatus", "in", ["IN_PROGRESS", "VERIFYING"]).execute(),
+    database.selectFrom("monitors").selectAll().where("pageId", "in", pageIds).where("enabled", "=", true).execute(),
   ]);
-  const openIncidents = openIncidentDocs.map(toId);
+  return {
+    openIncidentDocs,
+    subscriberCount,
+    componentDocs,
+    upcomingMaintenance,
+    activeMaintenanceDocs,
+    monitorDocs,
+  };
+}
+
+export default async function AdminDashboard() {
+  const { session, org } = await requireSession();
+
+  const pages = await getScopedPages(session, org.id);
+  const pageIds = pages.map((p) => p.id);
+
+  const {
+    openIncidentDocs,
+    subscriberCount,
+    componentDocs,
+    upcomingMaintenance,
+    activeMaintenanceDocs,
+    monitorDocs,
+  } = await dashboardData(pageIds);
+  const openIncidents = openIncidentDocs;
 
   const signalsByPage = new Map<string, PageHealthSignals>(
     pages.map((page) => [
@@ -62,17 +85,17 @@ export default async function AdminDashboard() {
     ])
   );
   for (const component of componentDocs) {
-    signalsByPage.get(component.pageId.toHexString())?.componentStatuses.push(component.status);
+    signalsByPage.get(component.pageId)?.componentStatuses.push(component.status);
   }
   for (const incident of openIncidentDocs) {
-    signalsByPage.get(incident.pageId.toHexString())?.activeIncidentImpacts.push(incident.impact);
+    signalsByPage.get(incident.pageId)?.activeIncidentImpacts.push(incident.impact);
   }
   for (const maintenance of activeMaintenanceDocs) {
-    const signals = signalsByPage.get(maintenance.pageId.toHexString());
+    const signals = signalsByPage.get(maintenance.pageId);
     if (signals) signals.maintenanceActive = true;
   }
   for (const monitor of monitorDocs) {
-    const signals = signalsByPage.get(monitor.pageId.toHexString());
+    const signals = signalsByPage.get(monitor.pageId);
     if (!signals) continue;
     if (monitor.isDown) signals.downMonitorStatuses.push(monitor.downStatus);
     else if (monitor.lastOk === true) signals.hasHealthyMonitor = true;

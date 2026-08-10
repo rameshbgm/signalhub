@@ -1,25 +1,20 @@
 import Link from "next/link";
 import { requireSession } from "@/lib/require-session";
-import { collections } from "@/lib/db";
-import { oid, toId } from "@/lib/mongo-utils";
+import { database } from "@/lib/postgres/client";
 import { INCIDENT_STATUS_LABEL, IMPACT_LABEL, type IncidentStatus, type Impact } from "@/lib/status";
-import { scopedPageFilter, sessionHasCapability } from "@/lib/admin-guard";
+import { getScopedPages, sessionHasCapability } from "@/lib/admin-guard";
 
 export default async function IncidentsListPage() {
   const { session, org } = await requireSession();
-  const pages = (await collections.pages().find(scopedPageFilter(session, org.id)).toArray()).map(toId);
-  const pageIds = pages.map((p) => oid(p.id));
+  const pages = await getScopedPages(session, org.id);
+  const pageIds = pages.map((p) => p.id);
   const pageNameById = Object.fromEntries(pages.map((p) => [p.id, p.name]));
   const canDeclare = sessionHasCapability(session, "incident.manage");
 
-  const incidents = (
-    await collections
-      .incidents()
-      .find({ pageId: { $in: pageIds }, isMaintenance: false })
-      .sort({ createdAt: -1 })
-      .limit(100)
-      .toArray()
-  ).map(toId);
+  const incidents = pageIds.length
+    ? await database.selectFrom("incidents").selectAll().where("pageId", "in", pageIds)
+      .where("isMaintenance", "=", false).orderBy("createdAt", "desc").limit(100).execute()
+    : [];
 
   return (
     <div>

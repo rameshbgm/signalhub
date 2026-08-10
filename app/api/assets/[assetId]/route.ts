@@ -1,15 +1,17 @@
 import { NextResponse } from "next/server";
 import { assetStorageForDriver } from "@/lib/asset-storage";
-import { collections } from "@/lib/db";
-import { isValidOid, oid } from "@/lib/mongo-utils";
+import { isDatabaseId } from "@/lib/database-id";
+import { errorFields, logger } from "@/lib/logger";
+import { database } from "@/lib/postgres/client";
 
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ assetId: string }> }
 ) {
   const { assetId } = await params;
-  if (!isValidOid(assetId)) return new NextResponse("Not found", { status: 404 });
-  const asset = await collections.assets().findOne({ _id: oid(assetId), deletedAt: null });
+  if (!isDatabaseId(assetId)) return new NextResponse("Not found", { status: 404 });
+  const asset = await database.selectFrom("assets").selectAll()
+    .where("id", "=", assetId).where("deletedAt", "is", null).executeTakeFirst();
   if (!asset) return new NextResponse("Not found", { status: 404 });
   try {
     const bytes = await assetStorageForDriver(asset.storageDriver).get(
@@ -23,7 +25,8 @@ export async function GET(
         "x-content-type-options": "nosniff",
       },
     });
-  } catch {
+  } catch (error) {
+    logger.error({ ...errorFields(error), assetId, storageDriver: asset.storageDriver }, "Asset read failed");
     return new NextResponse("Asset unavailable", { status: 503 });
   }
 }

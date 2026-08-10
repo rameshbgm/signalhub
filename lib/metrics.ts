@@ -1,5 +1,5 @@
 import { collectDefaultMetrics, Gauge, Registry } from "prom-client";
-import { collections } from "@/lib/db";
+import { database } from "@/lib/postgres/client";
 
 const globalMetrics = globalThis as unknown as { statusRegistry?: Registry };
 
@@ -26,26 +26,23 @@ function metricsRegistry() {
 export async function applicationMetrics() {
   const registry = metricsRegistry();
   const [pendingNotifications, deadLetters, activeWorkers, queuedPlatformJobs] = await Promise.all([
-    collections.notificationJobs().countDocuments({ status: "PENDING" }),
-    collections.notificationJobs().countDocuments({ status: "DEAD_LETTER" }),
-    collections.workerHeartbeats().countDocuments({
-      status: "READY",
-      lastSeenAt: { $gt: new Date(Date.now() - 30_000) },
-    }),
-    collections.platformJobs().countDocuments({ status: { $in: ["QUEUED", "PROCESSING"] } }),
+    database.selectFrom("notificationJobs").select(({ fn }) => fn.countAll<number>().as("count")).where("status", "=", "PENDING").executeTakeFirstOrThrow(),
+    database.selectFrom("notificationJobs").select(({ fn }) => fn.countAll<number>().as("count")).where("status", "=", "DEAD_LETTER").executeTakeFirstOrThrow(),
+    database.selectFrom("workerHeartbeats").select(({ fn }) => fn.countAll<number>().as("count")).where("status", "=", "READY").where("lastSeenAt", ">", new Date(Date.now() - 30_000)).executeTakeFirstOrThrow(),
+    database.selectFrom("platformJobs").select(({ fn }) => fn.countAll<number>().as("count")).where("status", "in", ["QUEUED", "PROCESSING"]).executeTakeFirstOrThrow(),
   ]);
   return [
     await registry.metrics(),
     "# HELP status_notification_jobs Number of notification jobs by state",
     "# TYPE status_notification_jobs gauge",
-    `status_notification_jobs{state="pending"} ${pendingNotifications}`,
-    `status_notification_jobs{state="dead_letter"} ${deadLetters}`,
+    `status_notification_jobs{state="pending"} ${pendingNotifications.count}`,
+    `status_notification_jobs{state="dead_letter"} ${deadLetters.count}`,
     "# HELP status_active_workers Number of recently ready workers",
     "# TYPE status_active_workers gauge",
-    `status_active_workers ${activeWorkers}`,
+    `status_active_workers ${activeWorkers.count}`,
     "# HELP status_platform_jobs Number of queued or processing platform jobs",
     "# TYPE status_platform_jobs gauge",
-    `status_platform_jobs ${queuedPlatformJobs}`,
+    `status_platform_jobs ${queuedPlatformJobs.count}`,
     "",
   ].join("\n");
 }

@@ -1,11 +1,13 @@
-import { collections } from "@/lib/db";
+import { database } from "@/lib/postgres/client";
 import { smtpConfigured } from "@/lib/smtp";
 
 export async function subscriptionCapabilities() {
-  const worker = await collections.workerHeartbeats().findOne({
-    status: "READY",
-    lastSeenAt: { $gt: new Date(Date.now() - 30_000) },
-  });
+  const worker = await database
+    .selectFrom("workerHeartbeats")
+    .select("id")
+    .where("status", "=", "READY")
+    .where("lastSeenAt", ">", new Date(Date.now() - 30_000))
+    .executeTakeFirst();
   const workerReady = Boolean(worker);
   const smsConfigured = Boolean(
     process.env.TWILIO_ACCOUNT_SID &&

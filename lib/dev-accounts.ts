@@ -1,4 +1,4 @@
-import type { MembershipRole } from "@/lib/db";
+import type { MembershipRole } from "@/lib/postgres/schema";
 
 export type DevelopmentAccount = {
   key: string;

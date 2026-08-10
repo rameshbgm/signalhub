@@ -49,7 +49,10 @@ export function MetricChart({
             tickLine={false}
           />
           <Tooltip
-            formatter={(v: number) => [`${formatMetricValue(v, precision)}${suffix}`, name]}
+            formatter={(value) => {
+              const rawValue = Array.isArray(value) ? value[0] : value;
+              return [`${formatMetricValue(Number(rawValue ?? 0), precision)}${suffix}`, name];
+            }}
             contentStyle={{ borderRadius: 0, border: "1px solid var(--line-bright)", background: "var(--surface-raised)", fontSize: 12, color: "var(--fg)" }}
             labelStyle={{ color: "var(--fg-soft)" }}
           />

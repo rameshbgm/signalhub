@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useTransition, type ReactNode } from "react";
+import { useEffect, useRef, useState, useTransition, type ReactNode } from "react";
 import {
   Button,
   Dialog,
@@ -19,7 +19,6 @@ import {
   KeyboardSensor,
   PointerSensor,
   closestCenter,
-  useDroppable,
   useSensor,
   useSensors,
   type DragEndEvent,
@@ -35,28 +34,41 @@ import { CSS } from "@dnd-kit/utilities";
 import {
   PAGE_TEMPLATE_KEYS,
   PAGE_TEMPLATE_LABELS,
+  PAGE_GRID_COLUMNS,
+  PAGE_THEME_PRESET_KEYS,
+  PAGE_THEME_PRESET_LABELS,
   UPTIME_BAR_SIZES,
   UPTIME_BAR_STYLES,
   UPTIME_ICON_STYLES,
-  movePageDesignBlock,
+  allSurfaceBlocks,
+  applyPageTemplateLayout,
+  designWithThemePreset,
+  pageGridPlacements,
+  resetPageGridBreakpoint,
+  sameStatusPageDesign,
   statusPageDesignSchema,
   templateDesign,
   type PageDesignBlock,
+  type PageDesignBreakpoint,
+  type PageGridPlacement,
   type PageDesignZone,
   type PageSurfaceKey,
   type PageTemplateKey,
   type StatusPageDesign,
+  updatePageGridPlacement,
 } from "@/lib/page-design";
 import {
   createAnnouncement,
   deleteAnnouncement,
   duplicateStatusPage,
-  reorderPageComponents,
   resetLegacyCss,
-  saveDesign,
+  publishDesignDraft,
+  saveDesignDraft,
+  updateAnnouncement,
 } from "@/app/admin/(protected)/pages/[pageId]/design/actions";
 import { COMPONENT_STATUS_COLOR } from "@/lib/status";
 import { coverImageStyle, type CoverImageFit } from "@/lib/cover-image";
+import { AssetUploader } from "@/components/admin/AssetUploader";
 
 type EditorPage = {
   id: string;
@@ -74,6 +86,8 @@ type EditorPage = {
   coverImageCropWidth?: number | null;
   coverImageCropHeight?: number | null;
   supportUrl: string | null;
+  termsUrl: string | null;
+  privacyUrl: string | null;
   publicPath: string;
   isHub: boolean;
   publicAvailable: boolean;
@@ -233,6 +247,7 @@ function describeBlockChanges(
 export function DesignEditor({
   page,
   initialDesign,
+  initialPublishedDesign,
   initialRevision,
   publishedVersion,
   versions,
@@ -241,6 +256,7 @@ export function DesignEditor({
 }: {
   page: EditorPage;
   initialDesign: StatusPageDesign;
+  initialPublishedDesign: StatusPageDesign;
   initialRevision: number;
   publishedVersion: number;
   versions: Array<{ version: number; templateKey: string; savedAt: string; design: StatusPageDesign }>;
@@ -249,7 +265,10 @@ export function DesignEditor({
 }) {
   const router = useRouter();
   const [design, setDesign] = useState(initialDesign);
+  const [undoStack, setUndoStack] = useState<StatusPageDesign[]>([]);
+  const [redoStack, setRedoStack] = useState<StatusPageDesign[]>([]);
   const [savedDesign, setSavedDesign] = useState(() => cloneDesign(initialDesign));
+  const [publishedDesign, setPublishedDesign] = useState(() => cloneDesign(initialPublishedDesign));
   const [revision, setRevision] = useState(initialRevision);
   const revisionRef = useRef(initialRevision);
   const [surface, setSurface] = useState<PageSurfaceKey>("status");
@@ -258,9 +277,14 @@ export function DesignEditor({
   const [saveState, setSaveState] = useState<"SAVED" | "DIRTY" | "SAVING" | "CONFLICT" | "ERROR">("SAVED");
   const [message, setMessage] = useState("");
   const [, startTransition] = useTransition();
-  const [structureGroups, setStructureGroups] = useState(groups);
-  const [structureUngrouped, setStructureUngrouped] = useState(ungrouped);
+  const structureGroups = groups;
+  const structureUngrouped = ungrouped;
   const [branding] = useState(page);
+  const visitorLinks = {
+    supportUrl: design.presentation.supportUrl ?? "",
+    termsUrl: design.presentation.termsUrl ?? "",
+    privacyUrl: design.presentation.privacyUrl ?? "",
+  };
   const [liveVersion, setLiveVersion] = useState(publishedVersion);
   const [resetDialogOpen, setResetDialogOpen] = useState(false);
   const [pendingBlockRemoval, setPendingBlockRemoval] = useState<{
@@ -271,11 +295,9 @@ export function DesignEditor({
   } | null>(null);
   const [templatePreviewKey, setTemplatePreviewKey] = useState<PageTemplateKey>(initialDesign.templateKey);
   const [templatePreviewActive, setTemplatePreviewActive] = useState(false);
-  const [expandedSection, setExpandedSection] = useState<string | null>(null);
-  const compositionSensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
-  );
+  const [expandedSection, setExpandedSection] = useState<string | null>("composition");
+  const [previewVisible, setPreviewVisible] = useState(true);
+  const [addZone, setAddZone] = useState<PageDesignZone>("primary");
 
   const selected = (() => {
     for (const zone of ZONES) {
@@ -286,16 +308,33 @@ export function DesignEditor({
   })();
   const previewDesign = (() => {
     const preview = templatePreviewActive
-      ? templateDesign(templatePreviewKey, design.theme.palette.brand)
+      ? applyPageTemplateLayout(design, templatePreviewKey)
       : cloneDesign(design);
-    if (templatePreviewActive) {
-      preview.theme = structuredClone(design.theme);
-      preview.seo = structuredClone(design.seo);
-    }
     return preview;
   })();
 
   function commit(next: StatusPageDesign) {
+    if (sameStatusPageDesign(design, next)) return;
+    setUndoStack((current) => [...current.slice(-49), cloneDesign(design)]);
+    setRedoStack([]);
+    setDesign(next);
+    setSaveState("DIRTY");
+  }
+
+  function undo() {
+    const previous = undoStack.at(-1);
+    if (!previous) return;
+    setUndoStack((current) => current.slice(0, -1));
+    setRedoStack((current) => [...current, cloneDesign(design)]);
+    setDesign(previous);
+    setSaveState("DIRTY");
+  }
+
+  function redo() {
+    const next = redoStack.at(-1);
+    if (!next) return;
+    setRedoStack((current) => current.slice(0, -1));
+    setUndoStack((current) => [...current, cloneDesign(design)]);
     setDesign(next);
     setSaveState("DIRTY");
   }
@@ -305,21 +344,21 @@ export function DesignEditor({
     setSaveState("SAVING");
     setMessage("");
     const designToSave = cloneDesign(previewDesign);
-    const result = await saveDesign(page.id, designToSave, revisionRef.current);
+    const result = await saveDesignDraft(page.id, designToSave, revisionRef.current);
     if (result.ok) {
       setDesign(designToSave);
       setSavedDesign(cloneDesign(designToSave));
       setTemplatePreviewKey(designToSave.templateKey);
       setTemplatePreviewActive(false);
       if (!findDesignBlock(designToSave, surface, selectedId ?? "")) {
-        const firstBlock = Object.values(designToSave.surfaces[surface]).flat()[0];
+        const firstBlock = allSurfaceBlocks(designToSave, surface)[0];
         setSelectedId(firstBlock?.id ?? null);
       }
       revisionRef.current = result.revision;
       setRevision(result.revision);
       setLiveVersion(result.liveVersion ?? liveVersion);
       setSaveState("SAVED");
-      setMessage(result.unchanged ? "No changes to save" : `${successMessage}. Public page updated.`);
+      setMessage(result.unchanged ? "Draft is up to date" : successMessage);
       router.refresh();
       return true;
     }
@@ -328,54 +367,74 @@ export function DesignEditor({
     return false;
   }
 
-  async function saveSupportingSections() {
-    if (!page.isHub) {
-      const structureResult = await reorderPageComponents(page.id, {
-        groups: structureGroups.map((group) => ({ id: group.id, collapsed: group.collapsed })),
-        components: [
-          ...structureGroups.flatMap((group) => group.components.map((component) => ({ id: component.id, groupId: group.id }))),
-          ...structureUngrouped.map((component) => ({ id: component.id, groupId: null })),
-        ],
-      });
-      if (!structureResult.ok) throw new Error(structureResult.error);
-    }
+  function updateVisitorLink(key: keyof typeof visitorLinks, value: string) {
+    updatePresentation({ [key]: value || null });
   }
 
   async function saveEverything() {
     setMessage("");
-    try {
-      await saveSupportingSections();
-      await saveChanges("All designer sections saved");
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Could not save all designer sections");
-      setSaveState("ERROR");
-    }
+    await saveChanges("Draft saved");
   }
+
+  async function publishChanges() {
+    setMessage("");
+    const saved = await saveChanges("Draft saved");
+    if (!saved) return;
+    setSaveState("SAVING");
+    const result = await publishDesignDraft(page.id, revisionRef.current);
+    if (!result.ok) {
+      setMessage(result.error);
+      setSaveState(result.conflict ? "CONFLICT" : "ERROR");
+      return;
+    }
+    setPublishedDesign(cloneDesign(previewDesign));
+    setLiveVersion(result.liveVersion ?? liveVersion);
+    setSaveState("SAVED");
+    setMessage(result.unchanged ? "No unpublished changes" : `Published version ${result.liveVersion}`);
+    router.refresh();
+  }
+
+  useEffect(() => {
+    if (saveState !== "DIRTY") return;
+    const timer = window.setTimeout(() => { void saveChanges("Draft autosaved"); }, 800);
+    return () => window.clearTimeout(timer);
+    // saveChanges deliberately reads the latest render snapshot.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [design, templatePreviewKey, templatePreviewActive, saveState]);
 
   function addBlock(type: PageDesignBlock["type"]) {
     const next = cloneDesign(design);
-    const alreadyAdded = Object.values(next.surfaces[surface]).flat().some((block) => block.type === type);
+    const alreadyAdded = allSurfaceBlocks(next, surface).some((block) => block.type === type);
     if (alreadyAdded && !REPEATABLE_BLOCK_TYPES.has(type)) {
       setMessage(`${blockLabel(newBlock(type))} is already added to this surface`);
       return;
     }
     const block = newBlock(type);
-    next.surfaces[surface].primary.push(block);
+    next.surfaces[surface][addZone].push(block);
+    next.surfaces[surface].grid.desktop.push({
+      blockId: block.id,
+      order: next.surfaces[surface].grid.desktop.length,
+      column: 1,
+      span: PAGE_GRID_COLUMNS.desktop,
+    });
+    for (const breakpoint of ["tablet", "mobile"] as const) {
+      const placements = next.surfaces[surface].grid[breakpoint];
+      if (placements) placements.push({ blockId: block.id, order: placements.length, column: 1, span: PAGE_GRID_COLUMNS[breakpoint] });
+    }
     commit(next);
     setSelectedId(block.id);
-    setMessage(`${blockLabel(block)} added to the Primary zone`);
+    setExpandedSection("composition");
+    setMessage(`${blockLabel(block)} added to the ${ZONES.find((zone) => zone.key === addZone)?.label} zone`);
   }
 
-  function compositionDragEnd(event: DragEndEvent) {
-    if (!event.over) return;
-    const activeId = String(event.active.id);
-    const overId = String(event.over.id);
-    const result = movePageDesignBlock(design, surface, activeId, overId);
-    if (!result) return;
-    commit(result.design);
-    setSelectedId(activeId);
-    setMessage(`${blockLabel(result.moved)} moved to ${ZONES.find((zone) => zone.key === result.targetZone)?.label}`);
+  function selectBlock(blockId: string) {
+    const current = findDesignBlock(design, surface, blockId);
+    if (!current) return;
+    setSelectedId(blockId);
+    setAddZone(current.zone);
+    setExpandedSection("composition");
   }
+
 
   function updateSelected(updater: (block: PageDesignBlock) => PageDesignBlock) {
     if (!selected) return;
@@ -386,17 +445,11 @@ export function DesignEditor({
     commit(next);
   }
 
-  function moveSelected(zone: PageDesignZone) {
-    if (!selected || selected.zone === zone) return;
-    const next = cloneDesign(design);
-    next.surfaces[surface][selected.zone] = next.surfaces[surface][selected.zone].filter((block) => block.id !== selected.block.id);
-    next.surfaces[surface][zone].push(selected.block);
-    commit(next);
-  }
 
   function requestBlockRemoval(blockId: string) {
     const current = findDesignBlock(design, surface, blockId);
     if (!current) return;
+    setAddZone(current.zone);
     setPendingBlockRemoval({
       blockId,
       changes: describeBlockChanges(savedDesign, surface, current),
@@ -415,9 +468,15 @@ export function DesignEditor({
     }
     next.surfaces[pendingBlockRemoval.surface][current.zone] = next.surfaces[pendingBlockRemoval.surface][current.zone]
       .filter((block) => block.id !== pendingBlockRemoval.blockId);
+    for (const breakpoint of ["desktop", "tablet", "mobile"] as const) {
+      const placements = next.surfaces[pendingBlockRemoval.surface].grid[breakpoint];
+      if (placements) next.surfaces[pendingBlockRemoval.surface].grid[breakpoint] = placements
+        .filter((placement) => placement.blockId !== pendingBlockRemoval.blockId)
+        .map((placement, order) => ({ ...placement, order }));
+    }
     commit(next);
     if (selectedId === pendingBlockRemoval.blockId) setSelectedId(null);
-    setMessage(`${pendingBlockRemoval.label} removed from the draft. Save all to update the public page.`);
+    setMessage(`${pendingBlockRemoval.label} removed from the draft. Publish when ready.`);
     setPendingBlockRemoval(null);
   }
 
@@ -429,7 +488,7 @@ export function DesignEditor({
     setSelectedId(next.surfaces.status.full[0]?.id ?? null);
     setTemplatePreviewKey("CENTERED_SUMMARY");
     setTemplatePreviewActive(false);
-    setMessage("Default design loaded locally. Review it, then Save all to update the public page.");
+    setMessage("Default design loaded into the draft. Review it, then Publish when ready.");
   }
 
   function updateTheme<Key extends keyof StatusPageDesign["theme"]>(key: Key, value: StatusPageDesign["theme"][Key]) {
@@ -438,10 +497,44 @@ export function DesignEditor({
     commit(next);
   }
 
+  function applyThemePreset(key: string) {
+    commit(designWithThemePreset(design, key as StatusPageDesign["theme"]["preset"]));
+  }
+
   function updatePalette(key: keyof StatusPageDesign["theme"]["palette"], value: string) {
     const next = cloneDesign(design);
     next.theme.palette[key] = value;
     commit(next);
+  }
+
+  function updatePresentation(patch: Partial<StatusPageDesign["presentation"]>) {
+    const next = cloneDesign(design);
+    next.presentation = { ...next.presentation, ...patch };
+    commit(statusPageDesignSchema.parse(next));
+  }
+
+  const activeBreakpoint = viewport.toLowerCase() as PageDesignBreakpoint;
+
+  function updateGridPlacement(blockId: string, patch: Partial<Pick<PageGridPlacement, "column" | "span" | "order">>) {
+    commit(updatePageGridPlacement(design, surface, activeBreakpoint, blockId, patch));
+  }
+
+  function resetActiveBreakpoint() {
+    if (activeBreakpoint === "desktop") return;
+    commit(resetPageGridBreakpoint(design, surface, activeBreakpoint));
+    setMessage(`${activeBreakpoint[0].toUpperCase()}${activeBreakpoint.slice(1)} now inherits the desktop layout`);
+  }
+
+  function gridDragEnd(event: DragEndEvent) {
+    if (!event.over || event.active.id === event.over.id) return;
+    const placements = pageGridPlacements(design, surface, activeBreakpoint);
+    const oldIndex = placements.findIndex((placement) => placement.blockId === String(event.active.id));
+    const newIndex = placements.findIndex((placement) => placement.blockId === String(event.over?.id));
+    if (oldIndex < 0 || newIndex < 0) return;
+    const ordered = arrayMove(placements, oldIndex, newIndex).map((placement, order) => ({ ...placement, order }));
+    const next = cloneDesign(design);
+    next.surfaces[surface].grid[activeBreakpoint] = ordered;
+    commit(statusPageDesignSchema.parse(next));
   }
 
   function importFile(file: File) {
@@ -486,41 +579,58 @@ export function DesignEditor({
 
   return (
     <div className="flex h-dvh min-h-0 flex-col overflow-hidden bg-[var(--bg)]">
-      <header className="z-40 flex shrink-0 flex-wrap items-center gap-3 border-b border-[var(--line)] bg-[var(--surface)] px-4 py-3">
-        <Link href={`/organization/pages/${page.id}/appearance`} className="inline-flex min-h-9 items-center border border-[var(--line)] px-3 text-sm font-semibold hover:border-[var(--cyan)]">
+      <header className="sticky top-0 z-50 flex shrink-0 flex-wrap items-center gap-3 border-b border-[var(--line)] bg-[var(--surface)] px-4 py-3 shadow-sm">
+        <Link href={`/organization/pages/${page.id}`} className="inline-flex min-h-9 items-center border border-[var(--line)] px-3 text-sm font-semibold hover:border-[var(--cyan)]">
           ← Back
         </Link>
         <div>
-          <p className="text-xs uppercase tracking-wider text-[var(--fg-dim)]">Advanced designer</p>
+          <p className="text-xs uppercase tracking-wider text-[var(--fg-dim)]">Visual designer</p>
           <h1 className="font-mono text-lg font-semibold">{page.name}</h1>
         </div>
         <span className={`ml-auto text-xs ${saveState === "ERROR" || saveState === "CONFLICT" ? "text-[var(--red)]" : "text-[var(--fg-dim)]"}`}>
           {saveState === "SAVING" ? "Saving…" : saveState === "DIRTY" ? "Unsaved changes" : saveState === "CONFLICT" ? "Editing conflict" : saveState === "ERROR" ? "Save failed" : `Draft r${revision}`}
         </span>
-        <button type="button" data-button-guard="off" onClick={() => void saveEverything()} disabled={saveState === "SAVING" || saveState === "CONFLICT"} className="border border-[var(--cyan)] px-3 py-2 text-sm font-semibold text-[var(--cyan)] disabled:opacity-50">
-          {saveState === "SAVING" ? "Saving…" : "Save all"}
-        </button>
-        <button type="button" onClick={() => startTransition(async () => {
-          const result = await duplicateStatusPage(page.id);
-          if (result.ok) location.href = `/organization/pages/${result.pageId}/design`;
-        })} className="border border-[var(--line)] px-3 py-2 text-sm">Duplicate</button>
-        <Button appearance="secondary" shape="square" type="button" data-button-busy-mode="interaction" onClick={() => setResetDialogOpen(true)}>
-          Reset to default
-        </Button>
-        {page.publicAvailable ? (
-          <Link
-            href={page.publicPath}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex min-h-9 items-center border border-[var(--line)] px-3 text-sm font-semibold hover:border-[var(--cyan)]"
+        <div
+          role="toolbar"
+          aria-label="Designer actions"
+          className="order-last flex w-full items-center gap-2 overflow-x-auto pb-0.5 xl:order-none xl:w-auto xl:pb-0"
+        >
+          <button type="button" onClick={undo} disabled={!undoStack.length} aria-label="Undo design change" className="shrink-0 border border-[var(--line)] px-3 py-2 text-sm disabled:opacity-40">↶</button>
+          <button type="button" onClick={redo} disabled={!redoStack.length} aria-label="Redo design change" className="shrink-0 border border-[var(--line)] px-3 py-2 text-sm disabled:opacity-40">↷</button>
+          <button type="button" data-button-guard="off" onClick={() => void publishChanges()} disabled={saveState === "SAVING" || saveState === "CONFLICT" || sameStatusPageDesign(previewDesign, publishedDesign)} className="shrink-0 bg-[var(--cyan)] px-4 py-2 text-sm font-semibold text-[var(--on-cyan)] disabled:opacity-50">
+            {saveState === "SAVING" ? "Saving…" : "Publish"}
+          </button>
+          <button
+            type="button"
+            data-button-guard="off"
+            onClick={() => setPreviewVisible((visible) => !visible)}
+            aria-pressed={!previewVisible}
+            className="shrink-0 whitespace-nowrap border border-[var(--line)] px-3 py-2 text-sm hover:border-[var(--cyan)]"
           >
-            View live page ↗
-          </Link>
-        ) : (
-          <Link href={`/organization/pages/${page.id}#publish`} className="inline-flex min-h-9 items-center border border-[var(--amber)]/40 px-3 text-sm font-semibold text-[var(--amber)]">
-            Finish setup to view live page
-          </Link>
-        )}
+            {previewVisible ? "Hide preview" : "Show preview"}
+          </button>
+          <button type="button" onClick={() => startTransition(async () => {
+            const result = await duplicateStatusPage(page.id);
+            if (result.ok) router.push(`/organization/pages/${result.pageId}/design`);
+          })} className="shrink-0 border border-[var(--line)] px-3 py-2 text-sm">Duplicate</button>
+          <Button appearance="secondary" shape="square" type="button" data-button-busy-mode="interaction" className="shrink-0 whitespace-nowrap" onClick={() => setResetDialogOpen(true)}>
+            Reset to default
+          </Button>
+          {page.publicAvailable ? (
+            <Link
+              href={page.publicPath}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex min-h-9 shrink-0 items-center whitespace-nowrap border border-[var(--line)] px-3 text-sm font-semibold hover:border-[var(--cyan)]"
+            >
+              View live page ↗
+            </Link>
+          ) : (
+            <Link href={`/organization/pages/${page.id}#publish`} className="inline-flex min-h-9 shrink-0 items-center whitespace-nowrap border border-[var(--amber)]/40 px-3 text-sm font-semibold text-[var(--amber)]">
+              Finish setup to view live page
+            </Link>
+          )}
+        </div>
       </header>
 
       <Dialog open={resetDialogOpen} onOpenChange={(_event, data) => setResetDialogOpen(data.open)}>
@@ -530,7 +640,7 @@ export function DesignEditor({
             <DialogContent className="space-y-3">
               <p>This will replace the current draft&apos;s visual layout, blocks, theme, header and footer configuration, SEO settings, and uptime presentation.</p>
               <p className="font-semibold">It will not delete the page, services, groups, incidents, subscribers, status history, or uploaded assets.</p>
-              <p>The reset stays only in this browser until you choose Save all. Saving updates the public page immediately.</p>
+              <p>The reset is autosaved as a draft. The public page stays unchanged until you choose Publish.</p>
             </DialogContent>
             <DialogActions>
               <Button appearance="secondary" onClick={() => setResetDialogOpen(false)}>Cancel</Button>
@@ -555,7 +665,7 @@ export function DesignEditor({
               ) : (
                 <p>This block has no unsaved changes.</p>
               )}
-              <p>The removal stays in this draft until you choose Save all.</p>
+              <p>The removal is autosaved in this draft and stays private until Publish.</p>
             </DialogContent>
             <DialogActions>
               <Button appearance="secondary" onClick={() => setPendingBlockRemoval(null)}>Cancel</Button>
@@ -573,9 +683,9 @@ export function DesignEditor({
         </div>
       )}
 
-      <div className="grid min-h-0 flex-1 grid-rows-[minmax(16rem,42vh)_minmax(0,1fr)] xl:grid-cols-[minmax(0,1fr)_minmax(24rem,36vw)] xl:grid-rows-1">
-        <main className="row-start-2 min-h-0 min-w-0 overflow-y-auto overscroll-contain bg-[var(--bg)] xl:col-start-1 xl:row-start-1">
-          <div className="mx-auto w-full max-w-7xl space-y-5 p-4 pb-10 lg:p-6 lg:pb-12">
+      <div className={`grid min-h-0 flex-1 ${previewVisible ? "grid-rows-[minmax(13rem,34vh)_minmax(0,1fr)] xl:grid-cols-[minmax(42rem,1.7fr)_minmax(24rem,1fr)] xl:grid-rows-1" : "grid-cols-1 grid-rows-1"}`}>
+        <main className={`${previewVisible ? "row-start-2 xl:col-start-1 xl:row-start-1" : "row-start-1"} min-h-0 min-w-0 overflow-y-auto overscroll-contain bg-[var(--bg)]`}>
+          <div className="mx-auto w-full max-w-[96rem] space-y-5 p-4 pb-10 lg:p-6 lg:pb-12">
             <section className="border border-[var(--line)] bg-[var(--surface)] p-4">
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div>
@@ -595,8 +705,8 @@ export function DesignEditor({
 
             <section className="border border-[var(--line)] bg-[var(--surface)] p-4">
               <div className="mb-4">
-                <h2 className="font-mono text-sm font-semibold">Starting point</h2>
-                <p className="mt-1 text-xs text-[var(--fg-dim)]">Choose a layout starting point. Style presets, brand assets, and visitor appearance live in the page&apos;s Appearance section.</p>
+                <h2 className="font-mono text-sm font-semibold">Starting points</h2>
+                <p className="mt-1 text-xs text-[var(--fg-dim)]">Apply a responsive arrangement without replacing blocks, content, branding, or appearance.</p>
               </div>
             <div className="max-w-xl">
               <div>
@@ -605,10 +715,11 @@ export function DesignEditor({
                   label="Layout"
                   value={templatePreviewKey}
                   onChange={(value) => {
-                    setTemplatePreviewKey(value as PageTemplateKey);
-                    setTemplatePreviewActive(true);
-                    setSaveState("DIRTY");
-                    setMessage("Template preview ready. Save all to update the public page.");
+                    const key = value as PageTemplateKey;
+                    setTemplatePreviewKey(key);
+                    setTemplatePreviewActive(false);
+                    commit(applyPageTemplateLayout(design, key));
+                    setMessage("Starting point applied to the draft. Publish when ready.");
                   }}
                   options={[...PAGE_TEMPLATE_KEYS]}
                 />
@@ -617,13 +728,21 @@ export function DesignEditor({
             </div>
             </section>
 
-            <EditorSection id="composition" title="Page composition" description="Add blocks, then drag them within or between layout zones." open={expandedSection === "composition"} onToggle={setExpandedSection}>
+            <EditorSection id="composition" title="Responsive canvas" description="Add, arrange, and resize blocks on the selected desktop, tablet, or mobile grid." open={expandedSection === "composition"} onToggle={setExpandedSection}>
               <div>
-                <PanelTitle>Add block</PanelTitle>
+                <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
+                  <div>
+                    <h2 className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--fg-dim)]">Add block</h2>
+                    <p className="mt-1 text-xs text-[var(--fg-dim)]">New blocks start full-width and can be resized on the grid.</p>
+                  </div>
+                  {activeBreakpoint !== "desktop" && design.surfaces[surface].grid[activeBreakpoint] && (
+                    <button type="button" onClick={resetActiveBreakpoint} className="border border-[var(--line)] px-3 py-2 text-xs hover:border-[var(--cyan)]">Reset to desktop inheritance</button>
+                  )}
+                </div>
                 <div className="flex flex-wrap gap-1.5">
                   {BLOCK_LIBRARY.filter((item) => item.surfaces.includes(surface)).map((item) => (
                     (() => {
-                      const matchingBlocks = Object.values(design.surfaces[surface]).flat().filter((block) => block.type === item.type);
+                      const matchingBlocks = allSurfaceBlocks(design, surface).filter((block) => block.type === item.type);
                       const existingBlock = matchingBlocks[0];
                       const removeExisting = Boolean(existingBlock) && !REPEATABLE_BLOCK_TYPES.has(item.type);
                       return (
@@ -643,55 +762,103 @@ export function DesignEditor({
                   ))}
                 </div>
               </div>
-              <DndContext sensors={compositionSensors} collisionDetection={closestCenter} onDragEnd={compositionDragEnd}>
-                <div className="mt-4 grid gap-4 lg:grid-cols-3">
-                  {ZONES.map((zone) => (
-                    <SortableZone
-                      key={zone.key}
-                      zone={zone.key}
-                      label={zone.label}
-                      blocks={design.surfaces[surface][zone.key]}
-                      selectedId={selectedId}
-                      onSelect={setSelectedId}
-                      onRemove={requestBlockRemoval}
-                    />
-                  ))}
-                </div>
-              </DndContext>
+              <div className="mt-4 grid items-start gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(18rem,1fr)]">
+                <ResponsiveGridCanvas
+                  design={design}
+                  surface={surface}
+                  breakpoint={activeBreakpoint}
+                  selectedId={selectedId}
+                  onDragEnd={gridDragEnd}
+                  onSelect={selectBlock}
+                  onRemove={requestBlockRemoval}
+                />
+                <aside className="border border-[var(--line)] bg-[var(--surface-raised)] p-4" aria-label="Selected block settings">
+                  {selected ? (
+                    <>
+                      <div className="mb-4 border-b border-[var(--line)] pb-3">
+                        <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--fg-dim)]">Selected block</p>
+                        <div className="mt-1 flex items-center justify-between gap-3">
+                          <h3 className="font-mono text-sm font-semibold">{blockLabel(selected.block)}</h3>
+                          <span className="text-[10px] uppercase text-[var(--fg-dim)]">{activeBreakpoint}</span>
+                        </div>
+                      </div>
+                      <GridPlacementControls
+                        placement={pageGridPlacements(design, surface, activeBreakpoint).find((placement) => placement.blockId === selected.block.id) ?? null}
+                        columns={PAGE_GRID_COLUMNS[activeBreakpoint]}
+                        onChange={(patch) => updateGridPlacement(selected.block.id, patch)}
+                      />
+                      <BlockInspector
+                        block={selected.block}
+                        onUpdate={updateSelected}
+                        onRemove={() => requestBlockRemoval(selected.block.id)}
+                        onSave={() => void saveEverything()}
+                      />
+                    </>
+                  ) : (
+                    <div className="py-8 text-center text-xs text-[var(--fg-dim)]">
+                      Select a block to edit its width, position, visibility, and presentation settings.
+                    </div>
+                  )}
+                </aside>
+              </div>
             </EditorSection>
 
-            {selected && (
-              <EditorSection id="block-settings" title={`${blockLabel(selected.block)} settings`} description="Configure the selected block without losing sight of the page preview." open={expandedSection === "block-settings"} onToggle={setExpandedSection}>
-                <BlockInspector
-                  block={selected.block}
-                  zone={selected.zone}
-                  onUpdate={updateSelected}
-                  onMove={moveSelected}
-                  onRemove={() => requestBlockRemoval(selected.block.id)}
-                  onSave={() => void saveEverything()}
-                />
+            <div className="grid items-start gap-5 xl:grid-cols-2">
+              <EditorSection id="assets" title="Brand assets" description="Stage the logo, favicon, and cover image that will be used after Publish." open={expandedSection === "assets"} onToggle={setExpandedSection}>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <AssetUploader
+                    pageId={page.id}
+                    kind="LOGO"
+                    currentUrl={design.presentation.logoUrl}
+                    label="Logo"
+                    help="Preserves the original aspect ratio."
+                    staged
+                    onStagedChange={({ url }) => updatePresentation({ logoUrl: url })}
+                  />
+                  <AssetUploader
+                    pageId={page.id}
+                    kind="FAVICON"
+                    currentUrl={design.presentation.faviconUrl}
+                    label="Favicon"
+                    help="Shown in supported browsers and feeds after Publish."
+                    staged
+                    onStagedChange={({ url }) => updatePresentation({ faviconUrl: url })}
+                  />
+                  <AssetUploader
+                    pageId={page.id}
+                    kind="COVER"
+                    currentUrl={design.presentation.coverImageUrl}
+                    currentCoverFit={design.presentation.coverImageFit}
+                    currentCoverPositionX={design.presentation.coverImagePositionX}
+                    currentCoverPositionY={design.presentation.coverImagePositionY}
+                    currentCoverCropX={design.presentation.coverImageCropX}
+                    currentCoverCropY={design.presentation.coverImageCropY}
+                    currentCoverCropWidth={design.presentation.coverImageCropWidth}
+                    currentCoverCropHeight={design.presentation.coverImageCropHeight}
+                    label="Cover image"
+                    help="Used by layouts with a wide visual banner."
+                    staged
+                    onStagedChange={({ url, cover }) => updatePresentation({
+                      coverImageUrl: url,
+                      ...(cover ? {
+                        coverImageFit: cover.fit,
+                        coverImagePositionX: cover.positionX,
+                        coverImagePositionY: cover.positionY,
+                        coverImageCropX: cover.crop?.x ?? null,
+                        coverImageCropY: cover.crop?.y ?? null,
+                        coverImageCropWidth: cover.crop?.width ?? null,
+                        coverImageCropHeight: cover.crop?.height ?? null,
+                      } : {}),
+                    })}
+                  />
+                </div>
               </EditorSection>
-            )}
-
-            <div className="grid items-start gap-5 2xl:grid-cols-2">
               <EditorSection id="theme" title="Advanced appearance" description="Typography, spacing, shape, and detailed surface colors." open={expandedSection === "theme"} onToggle={setExpandedSection}>
-                <ThemePanel design={design} updateTheme={updateTheme} updatePalette={updatePalette} onSave={() => void saveEverything()} />
+                <ThemePanel design={design} updateTheme={updateTheme} updatePalette={updatePalette} onPreset={applyThemePreset} onSave={() => void saveEverything()} />
               </EditorSection>
-              <EditorSection id="chrome" title="Header and footer" description="Navigation, visitor actions, footer links, and legal content." open={expandedSection === "chrome"} onToggle={setExpandedSection}>
-                <ChromePanel design={design} onChange={commit} onSave={() => void saveEverything()} />
+              <EditorSection id="chrome" title="Header, footer, and visitor links" description="Configure public navigation, footer content, support, and legal links in one place." open={expandedSection === "chrome"} onToggle={setExpandedSection}>
+                <ChromePanel design={design} visitorLinks={visitorLinks} onVisitorLinkChange={updateVisitorLink} onChange={commit} onSave={() => void saveEverything()} />
               </EditorSection>
-              {!page.isHub && <EditorSection id="services" title="Services and groups" description="Organize how components appear in grouped directory layouts." open={expandedSection === "services"} onToggle={setExpandedSection}>
-                <StructurePanel
-                  pageId={page.id}
-                  groups={structureGroups}
-                  ungrouped={structureUngrouped}
-                  onChange={(nextGroups, nextUngrouped) => {
-                    setStructureGroups(nextGroups);
-                    setStructureUngrouped(nextUngrouped);
-                    setSaveState("DIRTY");
-                  }}
-                />
-              </EditorSection>}
             </div>
 
             <EditorSection id="versions" title="Saved versions" description="Review earlier saved designs and load one into the local draft." open={expandedSection === "versions"} onToggle={setExpandedSection}>
@@ -700,7 +867,7 @@ export function DesignEditor({
           </div>
         </main>
 
-        <aside className="row-start-1 flex min-h-0 flex-col overflow-hidden border-b border-[var(--line)] bg-[var(--surface)] xl:col-start-2 xl:row-start-1 xl:border-b-0 xl:border-l">
+        {previewVisible && <aside className="row-start-1 flex min-h-0 flex-col overflow-hidden border-b border-[var(--line)] bg-[var(--surface)] xl:col-start-2 xl:row-start-1 xl:border-b-0 xl:border-l">
           <div className="shrink-0 border-b border-[var(--line)] p-3 lg:p-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
@@ -730,13 +897,37 @@ export function DesignEditor({
             className="flex min-h-0 flex-1 items-start justify-center overflow-x-hidden overflow-y-auto overscroll-contain bg-[var(--surface-raised)] p-3 [scrollbar-gutter:stable] lg:p-4"
           >
             <div className={`w-full origin-top transition-[max-width] ${viewport === "MOBILE" ? "max-w-xs" : viewport === "TABLET" ? "max-w-xl" : "max-w-none"}`}>
-              <DesignPreview page={branding} design={previewDesign} surface={surface} viewport={viewport} groups={structureGroups} ungrouped={structureUngrouped} />
+              <DesignPreview
+                page={{
+                  ...branding,
+                  logoUrl: previewDesign.presentation.logoUrl,
+                  faviconUrl: previewDesign.presentation.faviconUrl,
+                  coverImageUrl: previewDesign.presentation.coverImageUrl,
+                  coverImageFit: previewDesign.presentation.coverImageFit,
+                  coverImagePositionX: previewDesign.presentation.coverImagePositionX,
+                  coverImagePositionY: previewDesign.presentation.coverImagePositionY,
+                  coverImageCropX: previewDesign.presentation.coverImageCropX,
+                  coverImageCropY: previewDesign.presentation.coverImageCropY,
+                  coverImageCropWidth: previewDesign.presentation.coverImageCropWidth,
+                  coverImageCropHeight: previewDesign.presentation.coverImageCropHeight,
+                  supportUrl: previewDesign.presentation.supportUrl,
+                  termsUrl: previewDesign.presentation.termsUrl,
+                  privacyUrl: previewDesign.presentation.privacyUrl,
+                }}
+                design={previewDesign}
+                surface={surface}
+                viewport={viewport}
+                groups={structureGroups}
+                ungrouped={structureUngrouped}
+                onSelectBlock={selectBlock}
+                onSelectChrome={() => setExpandedSection("chrome")}
+              />
             </div>
           </div>
           <div className="shrink-0 border-t border-[var(--line)] px-4 py-3 text-[10px] text-[var(--fg-dim)]">
-            Changes stay local until Save all. Saving updates the public page immediately.
+            Changes autosave as a draft. Publish when you are ready to update the public page.
           </div>
-        </aside>
+        </aside>}
       </div>
     </div>
   );
@@ -778,7 +969,19 @@ function EditorSection({
   );
 }
 
-function ChromePanel({ design, onChange, onSave }: { design: StatusPageDesign; onChange: (design: StatusPageDesign) => void; onSave: () => void }) {
+function ChromePanel({
+  design,
+  visitorLinks,
+  onVisitorLinkChange,
+  onChange,
+  onSave,
+}: {
+  design: StatusPageDesign;
+  visitorLinks: { supportUrl: string; termsUrl: string; privacyUrl: string };
+  onVisitorLinkChange: (key: "supportUrl" | "termsUrl" | "privacyUrl", value: string) => void;
+  onChange: (design: StatusPageDesign) => void;
+  onSave: () => void;
+}) {
   function updateHeader(mutator: (header: StatusPageDesign["chrome"]["header"]) => void) {
     const next = cloneDesign(design);
     mutator(next.chrome.header);
@@ -817,8 +1020,17 @@ function ChromePanel({ design, onChange, onSave }: { design: StatusPageDesign; o
         />
       </label>
       <Text label="Footer text" value={design.chrome.footer.customText} onChange={(value) => updateFooter((footer) => { footer.customText = value; })} />
+      <fieldset className="mt-4 border border-[var(--line)] p-3">
+        <legend className="px-1 font-mono text-xs font-semibold">Built-in visitor links</legend>
+        <p className="mb-3 text-xs leading-5 text-[var(--fg-dim)]">These links appear in the public footer when the Legal footer item is enabled.</p>
+        <div className="grid gap-3">
+          <VisitorLinkField label="Support URL" value={visitorLinks.supportUrl} allowMailto onChange={(value) => onVisitorLinkChange("supportUrl", value)} />
+          <VisitorLinkField label="Terms of Service URL" value={visitorLinks.termsUrl} onChange={(value) => onVisitorLinkChange("termsUrl", value)} />
+          <VisitorLinkField label="Privacy Policy URL" value={visitorLinks.privacyUrl} onChange={(value) => onVisitorLinkChange("privacyUrl", value)} />
+        </div>
+      </fieldset>
       <label className="mt-3 block text-xs">
-        Footer links <span className="text-[var(--fg-dim)]">(Label | https://…)</span>
+        Additional footer links <span className="text-[var(--fg-dim)]">(Label | https://…)</span>
         <textarea
           rows={3}
           value={design.chrome.footer.links.map((link) => `${link.label} | ${link.url}`).join("\n")}
@@ -842,6 +1054,22 @@ function ChromePanel({ design, onChange, onSave }: { design: StatusPageDesign; o
   );
 }
 
+function VisitorLinkField({ label, value, allowMailto = false, onChange }: { label: string; value: string; allowMailto?: boolean; onChange: (value: string) => void }) {
+  return (
+    <label className="block text-xs text-[var(--fg-soft)]">
+      {label}
+      <input
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        inputMode="url"
+        pattern={allowMailto ? "(?:https?://.+|mailto:.+)" : "https?://.+"}
+        placeholder={allowMailto ? "https://support.example.com or mailto:help@example.com" : "https://example.com"}
+        className="mt-1 w-full border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--fg)] focus:border-[var(--cyan)] focus:outline-none"
+      />
+    </label>
+  );
+}
+
 function parseLinks(value: string) {
   return value
     .split("\n")
@@ -850,48 +1078,124 @@ function parseLinks(value: string) {
     .map(([label, url]) => ({ label: label.slice(0, 80), url }));
 }
 
-function SortableZone({
-  zone,
-  label,
-  blocks,
+function ResponsiveGridCanvas({
+  design,
+  surface,
+  breakpoint,
   selectedId,
+  onDragEnd,
   onSelect,
   onRemove,
 }: {
-  zone: PageDesignZone;
-  label: string;
-  blocks: PageDesignBlock[];
+  design: StatusPageDesign;
+  surface: PageSurfaceKey;
+  breakpoint: PageDesignBreakpoint;
   selectedId: string | null;
+  onDragEnd: (event: DragEndEvent) => void;
   onSelect: (id: string) => void;
   onRemove: (id: string) => void;
 }) {
-  const { setNodeRef, isOver } = useDroppable({ id: `zone-${zone}` });
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+  const blocks = new Map(allSurfaceBlocks(design, surface).map((block) => [block.id, block]));
+  const placements = pageGridPlacements(design, surface, breakpoint).sort((left, right) => left.order - right.order);
+  const inherited = breakpoint !== "desktop" && design.surfaces[surface].grid[breakpoint] === null;
   return (
-    <section ref={setNodeRef} className={`min-h-36 border border-dashed bg-[var(--surface)] p-3 transition-colors ${isOver ? "border-[var(--cyan)] bg-[var(--cyan-soft)]" : "border-[var(--line-bright)]"}`}>
-      <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-[var(--fg-dim)]">{label}</h3>
-      <SortableContext items={blocks.map((block) => block.id)} strategy={verticalListSortingStrategy}>
-        <div className="space-y-2">
-          {blocks.map((block) => <SortableBlock key={block.id} block={block} selected={block.id === selectedId} onSelect={() => onSelect(block.id)} onRemove={() => onRemove(block.id)} />)}
-          {!blocks.length && <p className="py-6 text-center text-xs text-[var(--fg-dim)]">Drop a block here</p>}
-        </div>
-      </SortableContext>
+    <section className="border border-[var(--line)] bg-[var(--bg)] p-3" aria-label={`${breakpoint} responsive layout`}>
+      <div className="mb-3 flex items-center justify-between gap-3 text-xs text-[var(--fg-dim)]">
+        <span>{PAGE_GRID_COLUMNS[breakpoint]} column {breakpoint} grid</span>
+        {inherited && <span className="bg-[var(--cyan-soft)] px-2 py-1 font-semibold text-[var(--cyan)]">Inherited from desktop</span>}
+      </div>
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+        <SortableContext items={placements.map((placement) => placement.blockId)} strategy={verticalListSortingStrategy}>
+          <div
+            className="grid min-h-52 auto-rows-min gap-2 border border-dashed border-[var(--line-bright)] p-2"
+            style={{ gridTemplateColumns: `repeat(${PAGE_GRID_COLUMNS[breakpoint]}, minmax(0, 1fr))` }}
+          >
+            {placements.map((placement) => {
+              const block = blocks.get(placement.blockId);
+              if (!block) return null;
+              return (
+                <SortableGridBlock
+                  key={block.id}
+                  block={block}
+                  placement={placement}
+                  selected={selectedId === block.id}
+                  onSelect={() => onSelect(block.id)}
+                  onRemove={() => onRemove(block.id)}
+                />
+              );
+            })}
+          </div>
+        </SortableContext>
+      </DndContext>
     </section>
   );
 }
 
-function SortableBlock({ block, selected, onSelect, onRemove }: { block: PageDesignBlock; selected: boolean; onSelect: () => void; onRemove: () => void }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: block.id });
+function SortableGridBlock({
+  block,
+  placement,
+  selected,
+  onSelect,
+  onRemove,
+}: {
+  block: PageDesignBlock;
+  placement: PageGridPlacement;
+  selected: boolean;
+  onSelect: () => void;
+  onRemove: () => void;
+}) {
+  const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({ id: block.id });
   return (
     <div
       ref={setNodeRef}
-      style={{ transform: CSS.Transform.toString(transform), transition }}
-      className={`flex w-full items-center gap-2 border px-3 py-2 text-left text-sm ${selected ? "border-[var(--cyan)] bg-[var(--cyan-soft)]" : "border-[var(--line)]"} ${isDragging ? "opacity-50" : ""}`}
+      style={{
+        gridColumn: `${placement.column} / span ${placement.span}`,
+        order: placement.order,
+        transform: CSS.Transform.toString(transform),
+        transition,
+      }}
+      className={`flex min-w-0 items-center gap-2 border p-2 text-xs ${selected ? "border-[var(--cyan)] bg-[var(--cyan-soft)]" : "border-[var(--line)] bg-[var(--surface)]"} ${isDragging ? "z-10 opacity-60 shadow-lg" : ""}`}
     >
-      <button type="button" data-button-guard="off" {...attributes} {...listeners} className="cursor-grab text-[var(--fg-dim)]" aria-label={`Reorder ${blockLabel(block)}`}>⠿</button>
-      <button type="button" data-button-guard="off" onClick={onSelect} className="min-w-0 flex-1 text-left">{blockLabel(block)}</button>
-      {block.hidden && <span className="text-xs text-[var(--fg-dim)]">Hidden</span>}
-      <button type="button" data-button-busy-mode="interaction" onClick={onRemove} aria-label={`Remove ${blockLabel(block)}`} className="px-1 text-base text-[var(--red)]" title={`Remove ${blockLabel(block)}`}>−</button>
+      <button ref={setActivatorNodeRef} type="button" {...attributes} {...listeners} aria-label={`Reorder ${blockLabel(block)}`} className="cursor-grab text-[var(--fg-dim)] active:cursor-grabbing">⠿</button>
+      <button type="button" onClick={onSelect} className="min-w-0 flex-1 truncate text-left font-semibold">{blockLabel(block)}</button>
+      {block.hidden && <span className="text-[10px] text-[var(--fg-dim)]">Hidden</span>}
+      <button type="button" onClick={onRemove} aria-label={`Remove ${blockLabel(block)}`} className="text-[var(--red)]">−</button>
     </div>
+  );
+}
+
+function GridPlacementControls({
+  placement,
+  columns,
+  onChange,
+}: {
+  placement: PageGridPlacement | null;
+  columns: number;
+  onChange: (patch: Partial<Pick<PageGridPlacement, "column" | "span">>) => void;
+}) {
+  if (!placement) return null;
+  return (
+    <fieldset className="mb-4 border border-[var(--line)] bg-[var(--bg)] p-3">
+      <legend className="px-1 font-mono text-xs font-semibold">Grid placement</legend>
+      <div className="grid grid-cols-2 gap-3">
+        <label className="text-xs">Column
+          <input type="number" min={1} max={columns} value={placement.column} onChange={(event) => onChange({ column: Number(event.target.value) })} className="mt-1 w-full border border-[var(--line)] bg-[var(--surface)] px-2 py-1.5" />
+        </label>
+        <label className="text-xs">Width
+          <input type="number" min={1} max={columns - placement.column + 1} value={placement.span} onChange={(event) => onChange({ span: Number(event.target.value) })} className="mt-1 w-full border border-[var(--line)] bg-[var(--surface)] px-2 py-1.5" />
+        </label>
+      </div>
+      <div className="mt-2 grid grid-cols-4 gap-1">
+        <button type="button" onClick={() => onChange({ column: placement.column - 1 })} className="border border-[var(--line)] py-1" aria-label="Move block left">←</button>
+        <button type="button" onClick={() => onChange({ column: placement.column + 1 })} className="border border-[var(--line)] py-1" aria-label="Move block right">→</button>
+        <button type="button" onClick={() => onChange({ span: placement.span - 1 })} className="border border-[var(--line)] py-1" aria-label="Make block narrower">−</button>
+        <button type="button" onClick={() => onChange({ span: placement.span + 1 })} className="border border-[var(--line)] py-1" aria-label="Make block wider">＋</button>
+      </div>
+    </fieldset>
   );
 }
 
@@ -899,15 +1203,26 @@ function ThemePanel({
   design,
   updateTheme,
   updatePalette,
+  onPreset,
   onSave,
 }: {
   design: StatusPageDesign;
   updateTheme: <Key extends keyof StatusPageDesign["theme"]>(key: Key, value: StatusPageDesign["theme"][Key]) => void;
   updatePalette: (key: keyof StatusPageDesign["theme"]["palette"], value: string) => void;
+  onPreset: (key: string) => void;
   onSave: () => void;
 }) {
   return (
     <section>
+      <Select label="Style preset" value={design.theme.preset} onChange={onPreset} options={[...PAGE_THEME_PRESET_KEYS]} labels={PAGE_THEME_PRESET_LABELS} />
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        <label className="text-xs">Brand color
+          <input type="color" value={design.theme.palette.brand} onChange={(event) => updatePalette("brand", event.target.value)} className="mt-1 h-9 w-full border border-[var(--line)] bg-transparent" />
+        </label>
+        <Select label="Visitor appearance" value={design.theme.mode} onChange={(value) => updateTheme("mode", value as StatusPageDesign["theme"]["mode"])} options={["SYSTEM", "LIGHT", "DARK"]} />
+      </div>
+      <Check label="Let visitors switch light/dark" checked={design.theme.allowVisitorMode} onChange={(value) => updateTheme("allowVisitorMode", value)} />
+      <div className="my-4 border-t border-[var(--line)]" />
       <div className="grid grid-cols-2 gap-2">
         <Select label="Type" value={design.theme.typography} onChange={(value) => updateTheme("typography", value as StatusPageDesign["theme"]["typography"])} options={["SYSTEM", "HUMANIST", "GEOMETRIC", "MONO"]} />
         <Select label="Density" value={design.theme.density} onChange={(value) => updateTheme("density", value as StatusPageDesign["theme"]["density"])} options={["COMPACT", "COMFORTABLE", "SPACIOUS"]} />
@@ -934,16 +1249,12 @@ function ThemePanel({
 
 function BlockInspector({
   block,
-  zone,
   onUpdate,
-  onMove,
   onRemove,
   onSave,
 }: {
   block: PageDesignBlock;
-  zone: PageDesignZone;
   onUpdate: (updater: (block: PageDesignBlock) => PageDesignBlock) => void;
-  onMove: (zone: PageDesignZone) => void;
   onRemove: () => void;
   onSave: () => void;
 }) {
@@ -952,8 +1263,7 @@ function BlockInspector({
   }
   return (
     <section>
-      <Select label="Zone" value={zone} onChange={(value) => onMove(value as PageDesignZone)} options={["full", "primary", "sidebar"]} />
-      <label className="mt-3 flex items-center gap-2 text-xs">
+      <label className="flex items-center gap-2 text-xs">
         <input type="checkbox" checked={!block.hidden} onChange={(event) => onUpdate((current) => ({ ...current, hidden: !event.target.checked }))} />
         Visible
       </label>
@@ -971,11 +1281,15 @@ function BlockInspector({
           {block.settings.groupingEnabled && <Select label="Group style" value={block.settings.groupStyle} onChange={(value) => patchSettings({ groupStyle: value })} options={["ACCORDION", "SECTIONS", "CARDS"]} />}
           <Select label="Service style" value={block.settings.componentStyle} onChange={(value) => patchSettings({ componentStyle: value })} options={["ROWS", "PILLS"]} />
           {block.settings.componentStyle === "PILLS" && <Select label="Service columns" value={String(block.settings.componentColumns)} onChange={(value) => patchSettings({ componentColumns: Number(value) })} options={["1", "2", "3"]} />}
-          <Select label="Uptime window" value={String(block.settings.uptimeDays)} onChange={(value) => patchSettings({ uptimeDays: Number(value) })} options={["30", "60", "90"]} />
-          <Select label="Uptime line style" value={block.settings.uptimeStyle} onChange={(value) => patchSettings({ uptimeStyle: value })} options={[...UPTIME_BAR_STYLES]} />
-          <Select label="Uptime segment size" value={block.settings.uptimeSize} onChange={(value) => patchSettings({ uptimeSize: value })} options={[...UPTIME_BAR_SIZES]} />
-          <Select label="Uptime segment icon" value={block.settings.uptimeIcon} onChange={(value) => patchSettings({ uptimeIcon: value })} options={[...UPTIME_ICON_STYLES]} />
-          <Check label="Show uptime" checked={block.settings.showUptime} onChange={(value) => patchSettings({ showUptime: value })} />
+          <fieldset className="space-y-2 border border-[var(--line)] bg-[var(--bg)] p-3">
+            <legend className="px-1 font-mono text-xs font-semibold">Uptime indicators</legend>
+            <p className="text-[10px] text-[var(--fg-dim)]">Use Blocks for thicker indicators; Responsive fits every day into the available width.</p>
+            <Select label="Uptime window" value={String(block.settings.uptimeDays)} onChange={(value) => patchSettings({ uptimeDays: Number(value) })} options={["30", "60", "90"]} />
+            <Select label="Uptime line style" value={block.settings.uptimeStyle} onChange={(value) => patchSettings({ uptimeStyle: value })} options={[...UPTIME_BAR_STYLES]} />
+            <Select label="Uptime segment size" value={block.settings.uptimeSize} onChange={(value) => patchSettings({ uptimeSize: value })} options={[...UPTIME_BAR_SIZES]} />
+            <Select label="Uptime segment icon" value={block.settings.uptimeIcon} onChange={(value) => patchSettings({ uptimeIcon: value })} options={[...UPTIME_ICON_STYLES]} />
+            <Check label="Show uptime" checked={block.settings.showUptime} onChange={(value) => patchSettings({ showUptime: value })} />
+          </fieldset>
           <Check label="Show descriptions" checked={block.settings.showDescriptions} onChange={(value) => patchSettings({ showDescriptions: value })} />
           <Check label="Show legend" checked={block.settings.showLegend} onChange={(value) => patchSettings({ showLegend: value })} />
           <Check label="Show service summary" checked={block.settings.showSummary} onChange={(value) => patchSettings({ showSummary: value })} />
@@ -1011,6 +1325,8 @@ function DesignPreview({
   viewport,
   groups,
   ungrouped,
+  onSelectBlock,
+  onSelectChrome,
 }: {
   page: EditorPage;
   design: StatusPageDesign;
@@ -1018,12 +1334,16 @@ function DesignPreview({
   viewport: "DESKTOP" | "TABLET" | "MOBILE";
   groups: StructureGroup[];
   ungrouped: Array<{ id: string; name: string }>;
+  onSelectBlock?: (id: string) => void;
+  onSelectChrome?: () => void;
 }) {
   const palette = design.theme.mode === "DARK"
     ? { ...design.theme.palette, ...design.theme.darkPalette }
     : design.theme.palette;
-  const configuration = design.surfaces[surface];
-  const sidebarVisible = configuration.sidebar.some((block) => !block.hidden);
+  const breakpoint = viewport.toLowerCase() as PageDesignBreakpoint;
+  const placements = pageGridPlacements(design, surface, breakpoint);
+  const placementByBlock = new Map(placements.map((placement) => [placement.blockId, placement]));
+  const previewBlocks = allSurfaceBlocks(design, surface).filter((block) => !block.hidden && placementByBlock.has(block.id));
   return (
     <div
       className="overflow-hidden border border-[var(--line)] transition-all"
@@ -1034,7 +1354,7 @@ function DesignPreview({
         minHeight: viewport === "MOBILE" ? 540 : 460,
       }}
     >
-      <div className={`flex items-center gap-3 border-b px-5 py-4 ${design.chrome.header.variant === "CENTERED" ? "justify-center" : ""}`} style={{ background: palette.surface, borderColor: `${palette.mutedText}30` }}>
+      <div role="button" tabIndex={0} aria-label="Edit page header" onClick={onSelectChrome} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") onSelectChrome?.(); }} className={`flex cursor-pointer items-center gap-3 border-b px-5 py-4 outline-offset-[-2px] focus:outline focus:outline-2 focus:outline-[var(--cyan)] ${design.chrome.header.variant === "CENTERED" ? "justify-center" : ""}`} style={{ background: palette.surface, borderColor: `${palette.mutedText}30` }}>
         {page.logoUrl ? (
           <span className="relative h-9 w-24"><Image unoptimized src={page.logoUrl} alt="" fill className="object-contain object-left" /></span>
         ) : (
@@ -1071,27 +1391,18 @@ function DesignPreview({
           <h2 className="text-xl font-semibold">{surface === "status" ? page.headline || "Service status" : `${page.name} ${surface}`}</h2>
           {surface === "status" && page.aboutText && <p className="mt-1 text-xs" style={{ color: palette.mutedText }}>{page.aboutText}</p>}
         </div>
-        <div className="space-y-3">
-          {configuration.full.filter((block) => !block.hidden).map((block) => (
-            <PreviewBlock key={block.id} block={block} palette={palette} viewport={viewport} groups={groups} ungrouped={ungrouped} />
-          ))}
+        <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${PAGE_GRID_COLUMNS[breakpoint]}, minmax(0, 1fr))` }}>
+          {previewBlocks.map((block) => {
+            const placement = placementByBlock.get(block.id)!;
+            return (
+              <div key={block.id} role="button" tabIndex={0} aria-label={`Edit ${blockLabel(block)}`} onClick={() => onSelectBlock?.(block.id)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") onSelectBlock?.(block.id); }} style={{ gridColumn: `${placement.column} / span ${placement.span}`, order: placement.order }} className="min-w-0 cursor-pointer outline-offset-2 focus:outline focus:outline-2 focus:outline-[var(--cyan)]">
+                <PreviewBlock block={block} palette={palette} viewport={viewport} groups={groups} ungrouped={ungrouped} />
+              </div>
+            );
+          })}
         </div>
-        {(configuration.primary.length > 0 || configuration.sidebar.length > 0) && (
-          <div className={`grid gap-3 ${viewport !== "MOBILE" && sidebarVisible ? "grid-cols-[minmax(0,2fr)_minmax(12rem,1fr)]" : ""}`}>
-            <div className="space-y-3">
-              {configuration.primary.filter((block) => !block.hidden).map((block) => (
-                <PreviewBlock key={block.id} block={block} palette={palette} viewport={viewport} groups={groups} ungrouped={ungrouped} />
-              ))}
-            </div>
-            <div className="space-y-3">
-              {configuration.sidebar.filter((block) => !block.hidden).map((block) => (
-                <PreviewBlock key={block.id} block={block} palette={palette} viewport={viewport} groups={groups} ungrouped={ungrouped} />
-              ))}
-            </div>
-          </div>
-        )}
       </div>
-      <div className="border-t px-5 py-4 text-[10px]" style={{ borderColor: `${palette.mutedText}30`, color: palette.mutedText }}>
+      <div role="button" tabIndex={0} aria-label="Edit page footer" onClick={onSelectChrome} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") onSelectChrome?.(); }} className="cursor-pointer border-t px-5 py-4 text-[10px] outline-offset-[-2px] focus:outline focus:outline-2 focus:outline-[var(--cyan)]" style={{ borderColor: `${palette.mutedText}30`, color: palette.mutedText }}>
         <div className="mx-auto flex max-w-4xl flex-wrap items-center justify-between gap-3">
           {design.chrome.footer.items.filter((item) => !item.hidden).map((item) => {
             if (item.type === "CUSTOM_TEXT" && design.chrome.footer.customText) {
@@ -1100,7 +1411,9 @@ function DesignPreview({
             if (item.type === "LINKS" && design.chrome.footer.links.length) {
               return <span key={item.id} className="flex flex-wrap gap-3">{design.chrome.footer.links.map((link) => <span key={link.url}>{link.label}</span>)}</span>;
             }
-            if (item.type === "LEGAL" && page.supportUrl) return <span key={item.id}>Support</span>;
+            if (item.type === "LEGAL" && (page.supportUrl || page.termsUrl || page.privacyUrl)) {
+              return <span key={item.id} className="flex flex-wrap gap-3">{page.supportUrl && <span>Support</span>}{page.termsUrl && <span>Terms of Service</span>}{page.privacyUrl && <span>Privacy Policy</span>}</span>;
+            }
             if (item.type === "BRANDING") return <span key={item.id}>Powered by SignalHub</span>;
             if (item.type === "COPYRIGHT") return <span key={item.id}>© {new Date().getFullYear()}</span>;
             return null;
@@ -1292,8 +1605,40 @@ export function PageAnnouncementManager({ pageId, announcements }: { pageId: str
   const [dismissible, setDismissible] = useState(false);
   const [priority, setPriority] = useState("0");
   const [expanded, setExpanded] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [pending, startTransition] = useTransition();
+
+  function startCreate() {
+    setTitle("");
+    setBody("");
+    setSeverity("INFO");
+    setCtaLabel("");
+    setCtaUrl("");
+    setStartsAt(toLocalDateTimeInput(new Date()));
+    setEndsAt("");
+    setDismissible(false);
+    setPriority("0");
+    setEditingId(null);
+    setError("");
+    setExpanded(true);
+  }
+
+  function startEdit(announcement: EditorAnnouncement) {
+    setTitle(announcement.title);
+    setBody(announcement.body);
+    setSeverity(announcement.severity);
+    setCtaLabel(announcement.ctaLabel ?? "");
+    setCtaUrl(announcement.ctaUrl ?? "");
+    setStartsAt(toLocalDateTimeInput(new Date(announcement.startsAt)));
+    setEndsAt(announcement.endsAt ? toLocalDateTimeInput(new Date(announcement.endsAt)) : "");
+    setDismissible(announcement.dismissible);
+    setPriority(String(announcement.priority));
+    setEditingId(announcement.id);
+    setError("");
+    setExpanded(true);
+  }
+
   return (
     <section>
       <div className="space-y-2">
@@ -1309,15 +1654,44 @@ export function PageAnnouncementManager({ pageId, announcements }: { pageId: str
                 {announcement.endsAt ? ` – ${new Date(announcement.endsAt).toLocaleString()}` : " – no end"}
               </p>
             </div>
-            <button type="button" disabled={pending} onClick={() => startTransition(async () => { await deleteAnnouncement(pageId, announcement.id); location.reload(); })} className="text-[var(--red)]">×</button>
+            <div className="flex shrink-0 items-center gap-2">
+              <button type="button" disabled={pending} onClick={() => startEdit(announcement)} className="border border-[var(--cyan)]/40 px-2 py-1 font-semibold text-[var(--cyan)]">Edit</button>
+              <button
+                type="button"
+                disabled={pending}
+                onClick={() => {
+                  if (!window.confirm(`Delete ${announcement.title}? This action cannot be undone.`)) return;
+                  startTransition(async () => {
+                    await deleteAnnouncement(pageId, announcement.id);
+                    location.reload();
+                  });
+                }}
+                className="border border-[var(--red)]/40 px-2 py-1 font-semibold text-[var(--red)]"
+              >
+                Delete
+              </button>
+            </div>
           </div>
         ))}
       </div>
-      <button type="button" data-button-busy-mode="interaction" onClick={() => setExpanded((value) => !value)} className="mt-3 text-xs underline">
-        {expanded ? "Close composer" : "Create announcement"}
+      <button
+        type="button"
+        data-button-busy-mode="interaction"
+        onClick={() => {
+          if (expanded) {
+            setExpanded(false);
+            setEditingId(null);
+          } else {
+            startCreate();
+          }
+        }}
+        className="mt-3 text-xs underline"
+      >
+        {expanded ? (editingId ? "Close editor" : "Close composer") : "Create announcement"}
       </button>
       {expanded && (
         <div className="mt-3 space-y-3 border border-[var(--line)] bg-[var(--surface)] p-3">
+          <h3 className="font-mono text-sm font-semibold">{editingId ? "Edit announcement" : "New announcement"}</h3>
           <Text label="Title" value={title} onChange={setTitle} />
           <label className="block text-xs">
             Message
@@ -1370,7 +1744,7 @@ export function PageAnnouncementManager({ pageId, announcements }: { pageId: str
                   setError("Enter a valid announcement schedule");
                   return;
                 }
-                const result = await createAnnouncement(pageId, {
+                const input = {
                     title,
                     body,
                     severity,
@@ -1380,7 +1754,10 @@ export function PageAnnouncementManager({ pageId, announcements }: { pageId: str
                     endsAt: endDate?.toISOString(),
                     dismissible,
                     priority: Number(priority) || 0,
-                  });
+                  };
+                const result = editingId
+                  ? await updateAnnouncement(pageId, editingId, input)
+                  : await createAnnouncement(pageId, input);
                 if (!result.ok) {
                   setError(result.error);
                   return;
@@ -1389,7 +1766,7 @@ export function PageAnnouncementManager({ pageId, announcements }: { pageId: str
               })}
               className="border border-[var(--line)] bg-[var(--bg)] px-3 py-1.5 text-xs font-medium"
             >
-              {pending ? "Creating…" : "Create"}
+              {pending ? (editingId ? "Saving…" : "Creating…") : (editingId ? "Save changes" : "Create")}
             </button>
           </div>
         </div>
@@ -1406,118 +1783,6 @@ function toLocalDateTimeInput(date: Date) {
   return local.toISOString().slice(0, 16);
 }
 
-function StructurePanel({
-  pageId,
-  groups,
-  ungrouped,
-  onChange,
-}: {
-  pageId: string;
-  groups: StructureGroup[];
-  ungrouped: Array<{ id: string; name: string }>;
-  onChange: (groups: StructureGroup[], ungrouped: Array<{ id: string; name: string }>) => void;
-}) {
-  const [saving, startTransition] = useTransition();
-  const [status, setStatus] = useState("");
-  function moveGroup(index: number, offset: number) {
-    const target = index + offset;
-    if (target < 0 || target >= groups.length) return;
-    onChange(arrayMove(groups, index, target), ungrouped);
-  }
-  function moveComponent(sourceGroupId: string | null, componentId: string, targetGroupId: string | null, offset = 0) {
-    const nextGroups = groups.map((group) => ({ ...group, components: [...group.components] }));
-    let nextUngrouped = [...ungrouped];
-    const source = sourceGroupId ? nextGroups.find((group) => group.id === sourceGroupId)?.components : nextUngrouped;
-    if (!source) return;
-    const sourceIndex = source.findIndex((component) => component.id === componentId);
-    if (sourceIndex < 0) return;
-    if (sourceGroupId === targetGroupId) {
-      const targetIndex = sourceIndex + offset;
-      if (targetIndex < 0 || targetIndex >= source.length) return;
-      const moved = arrayMove(source, sourceIndex, targetIndex);
-      if (sourceGroupId) nextGroups.find((group) => group.id === sourceGroupId)!.components = moved;
-      else nextUngrouped = moved;
-    } else {
-      const [component] = source.splice(sourceIndex, 1);
-      const target = targetGroupId ? nextGroups.find((group) => group.id === targetGroupId)?.components : nextUngrouped;
-      if (!target) return;
-      target.push(component);
-    }
-    onChange(nextGroups, nextUngrouped);
-  }
-  function save() {
-    startTransition(async () => {
-      setStatus("");
-      try {
-        await reorderPageComponents(pageId, {
-          groups: groups.map((group) => ({ id: group.id, collapsed: group.collapsed })),
-          components: [
-            ...groups.flatMap((group) => group.components.map((component) => ({ id: component.id, groupId: group.id }))),
-            ...ungrouped.map((component) => ({ id: component.id, groupId: null })),
-          ],
-        });
-        setStatus("Component groups and order saved");
-      } catch (error) {
-        setStatus(error instanceof Error ? error.message : "Could not save component structure");
-      }
-    });
-  }
-  return (
-    <section>
-      <div className="space-y-1">
-        {groups.map((group, index) => (
-          <div key={group.id} className="border border-[var(--line)] p-2 text-xs">
-            <div className="flex items-center gap-1">
-              <span className="min-w-0 flex-1 truncate font-semibold">{group.name} · {group.components.length}</span>
-              <label className="flex items-center gap-1 text-[10px] text-[var(--fg-dim)]"><input type="checkbox" checked={group.collapsed} onChange={(event) => onChange(groups.map((candidate) => candidate.id === group.id ? { ...candidate, collapsed: event.target.checked } : candidate), ungrouped)} />Collapsed</label>
-              <button type="button" onClick={() => moveGroup(index, -1)} aria-label={`Move ${group.name} up`}>↑</button>
-              <button type="button" onClick={() => moveGroup(index, 1)} aria-label={`Move ${group.name} down`}>↓</button>
-            </div>
-            {group.components.map((component, componentIndex) => (
-              <div key={component.id} className="mt-1 flex items-center gap-1 bg-[var(--bg)] px-1.5 py-1">
-                <span className="min-w-0 flex-1 truncate">{component.name}</span>
-                <button type="button" onClick={() => moveComponent(group.id, component.id, group.id, -1)} aria-label={`Move ${component.name} up`}>↑</button>
-                <button type="button" onClick={() => moveComponent(group.id, component.id, group.id, 1)} aria-label={`Move ${component.name} down`}>↓</button>
-                <FluentSelect
-                  aria-label={`Move ${component.name} to group`}
-                  value={group.id}
-                  onChange={(event) => moveComponent(group.id, component.id, event.target.value || null)}
-                  className="max-w-20 bg-transparent text-[10px]"
-                >
-                  <option value="">None</option>
-                  {groups.map((target) => <option key={target.id} value={target.id}>{target.name}</option>)}
-                </FluentSelect>
-                <span className="sr-only">{componentIndex + 1}</span>
-              </div>
-            ))}
-          </div>
-        ))}
-        {ungrouped.length > 0 && (
-          <div className="border border-[var(--line)] p-2 text-xs">
-            <strong>Ungrouped · {ungrouped.length}</strong>
-            {ungrouped.map((component) => (
-              <div key={component.id} className="mt-1 flex items-center gap-1 bg-[var(--bg)] px-1.5 py-1">
-                <span className="min-w-0 flex-1 truncate">{component.name}</span>
-                <button type="button" onClick={() => moveComponent(null, component.id, null, -1)}>↑</button>
-                <button type="button" onClick={() => moveComponent(null, component.id, null, 1)}>↓</button>
-                <FluentSelect aria-label={`Move ${component.name} to group`} value="" onChange={(event) => moveComponent(null, component.id, event.target.value || null)} className="max-w-20 bg-transparent text-[10px]">
-                  <option value="">None</option>
-                  {groups.map((target) => <option key={target.id} value={target.id}>{target.name}</option>)}
-                </FluentSelect>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-      {status && <p role="status" className="mt-2 text-xs text-[var(--fg-dim)]">{status}</p>}
-      <div className="mt-3 flex flex-wrap items-center gap-3">
-        <button type="button" disabled={saving} onClick={save} className="border border-[var(--cyan)] px-3 py-1.5 text-xs font-semibold text-[var(--cyan)]">{saving ? "Saving…" : "Save groups and components"}</button>
-        <Link href={`/organization/pages/${pageId}/content`} className="text-xs font-semibold text-[var(--cyan)] hover:underline">Edit group and component details</Link>
-      </div>
-    </section>
-  );
-}
-
 function VersionPanel({
   current,
   versions,
@@ -1529,28 +1794,15 @@ function VersionPanel({
 }) {
   return (
     <section>
-      <p className="mb-2 text-xs text-[var(--fg-dim)]">Live version {current}. Restoring loads a local preview; it becomes live only when saved.</p>
-      <div
-        aria-label="Saved design versions"
-        className="max-h-64 space-y-1 overflow-y-auto overscroll-contain pr-1 [scrollbar-gutter:stable]"
-        tabIndex={0}
-      >
+      <p className="mb-2 text-xs text-[var(--fg-dim)]">Live version {current}. Restoring loads the version into the autosaved draft; Publish makes it live.</p>
+      <div aria-label="Saved design versions" className="max-h-64 space-y-1 overflow-y-auto overscroll-contain pr-1 [scrollbar-gutter:stable]" tabIndex={0}>
         {versions.map((version) => (
           <div key={version.version} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 border border-[var(--line)] bg-[var(--surface)] p-2 text-xs">
             <span className="min-w-0">v{version.version} · {PAGE_TEMPLATE_LABELS[version.templateKey as keyof typeof PAGE_TEMPLATE_LABELS] ?? version.templateKey}<br /><span className="text-[var(--fg-dim)]">{new Date(version.savedAt).toLocaleString()}</span></span>
-            <Button
-              appearance="transparent"
-              shape="square"
-              size="small"
-              type="button"
-              onClick={() => onRestore({ version: version.version, design: version.design })}
-              className="sticky right-0 shrink-0 bg-[var(--surface)] px-2 font-semibold underline"
-            >
-              Restore
-            </Button>
+            <Button appearance="transparent" shape="square" size="small" type="button" onClick={() => onRestore({ version: version.version, design: version.design })} className="sticky right-0 shrink-0 bg-[var(--surface)] px-2 font-semibold underline">Restore</Button>
           </div>
         ))}
-        {!versions.length && <p className="text-xs text-[var(--fg-dim)]">Save a design change to start version history.</p>}
+        {!versions.length && <p className="text-xs text-[var(--fg-dim)]">Publish a design change to start version history.</p>}
       </div>
     </section>
   );
@@ -1573,12 +1825,12 @@ function SectionSaveButton({ onClick, children }: { onClick: () => void; childre
   );
 }
 
-function Select({ label, value, onChange, options }: { label: string; value: string; onChange: (value: string) => void; options: string[] }) {
+function Select({ label, value, onChange, options, labels }: { label: string; value: string; onChange: (value: string) => void; options: string[]; labels?: Record<string, string> }) {
   return (
     <div className="block text-xs text-[var(--fg-soft)]">
       {label}
       <FluentSelect aria-label={label} value={value} onChange={(event) => onChange(event.target.value)} className="mt-1 w-full border border-[var(--line)] bg-[var(--bg)] px-2 py-1.5 text-xs text-[var(--fg)]">
-        {options.map((option) => <option key={option} value={option}>{option.toLowerCase().replaceAll("_", " ")}</option>)}
+        {options.map((option) => <option key={option} value={option}>{labels?.[option] ?? option.toLowerCase().replaceAll("_", " ")}</option>)}
       </FluentSelect>
     </div>
   );

@@ -1,38 +1,32 @@
 import { requireSession } from "@/lib/require-session";
 import { FluentSelect } from "@/components/FluentSelect";
-import { collections } from "@/lib/db";
-import { oid, toId } from "@/lib/mongo-utils";
+import { database } from "@/lib/postgres/client";
 import { INCIDENT_STATUSES, INCIDENT_STATUS_LABEL, IMPACTS, IMPACT_LABEL } from "@/lib/status";
 import { createTemplateGroup, createTemplate, deleteTemplate, duplicateTemplate, updateTemplate } from "./actions";
 import { PageSelect } from "@/components/admin/PageSelect";
-import { requireCapability, scopedPageFilter } from "@/lib/admin-guard";
+import { getScopedPages, requireCapability } from "@/lib/admin-guard";
 
 export default async function TemplatesPage({ searchParams }: { searchParams: Promise<{ pageId?: string }> }) {
   const { session, org } = await requireSession();
   await requireCapability("incident.manage");
   const { pageId: pageIdParam } = await searchParams;
-  const pages = (await collections.pages().find(scopedPageFilter(session, org.id, { isHub: false })).sort({ createdAt: 1 }).toArray()).map(toId);
+  const pages = await getScopedPages(session, org.id, { isHub: false });
   const pageId = pageIdParam && pages.some((p) => p.id === pageIdParam) ? pageIdParam : pages[0]?.id;
 
   if (!pageId) {
     return <p className="text-sm text-[var(--fg-dim)]">Create a page first.</p>;
   }
 
-  const [groupDocs, ungroupedTemplateDocs, componentDocs] = await Promise.all([
-    collections.templateGroups().find({ pageId: oid(pageId) }).toArray(),
-    collections.incidentTemplates().find({ pageId: oid(pageId), groupId: null, archivedAt: null }).toArray(),
-    collections.components().find({ pageId: oid(pageId) }).toArray(),
+  const [groupRows, templateRows, components] = await Promise.all([
+    database.selectFrom("templateGroups").selectAll().where("pageId", "=", pageId).execute(),
+    database.selectFrom("incidentTemplates").selectAll()
+      .where("pageId", "=", pageId).where("archivedAt", "is", null).execute(),
+    database.selectFrom("components").selectAll().where("pageId", "=", pageId).execute(),
   ]);
-  const allTemplateDocs = await collections
-    .incidentTemplates()
-    .find({ pageId: oid(pageId), groupId: { $in: groupDocs.map((g) => g._id) }, archivedAt: null })
-    .toArray();
-
-  const ungroupedTemplates = ungroupedTemplateDocs.map(toId);
-  const components = componentDocs.map(toId);
-  const groups = groupDocs.map((g) => ({
-    ...toId(g),
-    templates: allTemplateDocs.filter((t) => t.groupId?.toHexString() === g._id.toHexString()).map(toId),
+  const ungroupedTemplates = templateRows.filter((template) => template.groupId === null);
+  const groups = groupRows.map((group) => ({
+    ...group,
+    templates: templateRows.filter((template) => template.groupId === group.id),
   }));
 
   const boundCreateGroup = createTemplateGroup.bind(null, pageId);

@@ -1,17 +1,12 @@
-import { ensureIndexes } from "@/lib/ensure-indexes";
-import { mongoClient } from "@/lib/db";
+import { closeDatabase } from "@/lib/postgres/client";
 import { runMigrations } from "@/lib/migrations";
+import { migrateJobSchema } from "@/lib/job-schema";
 
-async function main() {
-  await runMigrations();
-  await ensureIndexes();
-  console.log("Database migrations and indexes are up to date.");
-}
-
-main()
-  .then(() => mongoClient.close())
-  .catch(async (error) => {
+runMigrations()
+  .then(() => migrateJobSchema())
+  .then(() => console.log("PostgreSQL and Graphile Worker migrations are up to date."))
+  .catch((error) => {
     console.error(error instanceof Error ? error.message : error);
-    await mongoClient.close().catch(() => undefined);
     process.exitCode = 1;
-  });
+  })
+  .finally(() => closeDatabase());

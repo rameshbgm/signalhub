@@ -1,9 +1,7 @@
 import { requireSession } from "@/lib/require-session";
-import { collections } from "@/lib/db";
-import { toId } from "@/lib/mongo-utils";
 import { PageSelect } from "@/components/admin/PageSelect";
 import { HelpTip } from "@/components/HelpTip";
-import { requireCapability, scopedPageFilter } from "@/lib/admin-guard";
+import { getScopedPages, requireCapability } from "@/lib/admin-guard";
 import { publicPagePath } from "@/lib/public-path";
 
 function escapeHtmlAttribute(value: string) {
@@ -20,7 +18,7 @@ export default async function EmbedPage({ searchParams }: { searchParams: Promis
   const { session, org } = await requireSession();
   await requireCapability("integration.manage");
   const { pageId: pageIdParam } = await searchParams;
-  const pages = (await collections.pages().find(scopedPageFilter(session, org.id)).sort({ createdAt: 1 }).toArray()).map(toId);
+  const pages = await getScopedPages(session, org.id);
   const pageId = pageIdParam && pages.some((p) => p.id === pageIdParam) ? pageIdParam : pages[0]?.id;
   const page = pages.find((p) => p.id === pageId);
 

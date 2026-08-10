@@ -8,7 +8,7 @@ import {
 } from "@/components/admin/IncidentCommunicationForms";
 
 type Component = { id: string; name: string };
-type Template = { id: string; title: string; body: string; defaultComponentIds: string; notifyByDefault?: boolean };
+type Template = { id: string; title: string; body: string; defaultComponentIds: string[]; notifyByDefault?: boolean };
 
 function defaultDateTime(offsetHours: number) {
   const d = new Date(Date.now() + offsetHours * 3600 * 1000);
@@ -36,19 +36,9 @@ export function MaintenanceForm({
   const [sendReminder, setSendReminder] = useState(true);
 
   function applyTemplate(template: Template) {
-    let componentIds: string[] = [];
-    try {
-      const parsed: unknown = JSON.parse(template.defaultComponentIds || "[]");
-      componentIds = Array.isArray(parsed)
-        ? parsed.filter(
-            (id): id is string =>
-              typeof id === "string" &&
-              components.some((component) => component.id === id)
-          )
-        : [];
-    } catch {
-      componentIds = [];
-    }
+    const componentIds = template.defaultComponentIds.filter((id) =>
+      components.some((component) => component.id === id)
+    );
     const componentNames = components
       .filter((component) => componentIds.includes(component.id))
       .map((component) => component.name);

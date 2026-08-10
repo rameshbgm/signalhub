@@ -1,7 +1,7 @@
 name: signalhub
 
 x-signalhub-environment: &signalhub-environment
-  DATABASE_URL: mongodb://mongo:27017/signalhub?replicaSet=rs0
+  DATABASE_URL: postgresql://${POSTGRES_USER:-signalhub}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@postgres:5432/${POSTGRES_DB:-signalhub}
   SESSION_SECRET: ${SESSION_SECRET:?Set SESSION_SECRET in .env}
   ENCRYPTION_KEY: ${ENCRYPTION_KEY:?Set ENCRYPTION_KEY in .env}
   SESSION_SIGNING_KEYS: ${SESSION_SIGNING_KEYS:-}
@@ -52,21 +52,20 @@ x-signalhub-environment: &signalhub-environment
   S3_FORCE_PATH_STYLE: ${S3_FORCE_PATH_STYLE:-false}
 
 services:
-  mongo:
-    image: mongo:8.2
+  postgres:
+    image: postgres:18.4-alpine
     restart: unless-stopped
-    command: ["mongod", "--replSet", "rs0", "--bind_ip_all"]
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-signalhub}
+      POSTGRES_USER: ${POSTGRES_USER:-signalhub}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
     ports:
-      - "127.0.0.1:${MONGO_PORT:-27017}:27017"
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     volumes:
-      - mongo_data:/data/db
-    networks: [database]
+      - postgres_data:/var/lib/postgresql
+    networks: [database, host]
     healthcheck:
-      test:
-        [
-          "CMD-SHELL",
-          "mongosh --host 127.0.0.1 --quiet --eval \"try { quit(rs.status().ok ? 0 : 1) } catch (e) { rs.initiate({_id:'rs0',members:[{_id:0,host:'mongo:27017'}]}); quit(1) }\"",
-        ]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
       timeout: 5s
       retries: 30
@@ -80,7 +79,7 @@ services:
     command: ["node", "dist-runtime/migrate.mjs"]
     environment: *signalhub-environment
     depends_on:
-      mongo:
+      postgres:
         condition: service_healthy
     restart: "no"
     networks: [database]
@@ -97,10 +96,15 @@ services:
       <<: *signalhub-environment
       WORKER_HEALTH_PORT: 8081
       WORKER_POLL_INTERVAL_MS: ${WORKER_POLL_INTERVAL_MS:-1000}
+      WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-10}
+      WORKER_HEARTBEAT_INTERVAL_MS: ${WORKER_HEARTBEAT_INTERVAL_MS:-5000}
+      WORKER_SHUTDOWN_ABORT_TIMEOUT_MS: ${WORKER_SHUTDOWN_ABORT_TIMEOUT_MS:-15000}
       WORKER_MONITOR_CONCURRENCY: ${WORKER_MONITOR_CONCURRENCY:-20}
       WORKER_NOTIFICATION_BATCH: ${WORKER_NOTIFICATION_BATCH:-25}
+      WORKER_AUDIT_DELIVERY_BATCH: ${WORKER_AUDIT_DELIVERY_BATCH:-25}
+      WORKER_PLATFORM_JOB_BATCH: ${WORKER_PLATFORM_JOB_BATCH:-1}
     depends_on:
-      mongo:
+      postgres:
         condition: service_healthy
       migrate:
         condition: service_completed_successfully
@@ -132,7 +136,7 @@ services:
     ports:
       - "127.0.0.1:${STATUS_PORT:-3301}:3000"
     depends_on:
-      mongo:
+      postgres:
         condition: service_healthy
       migrate:
         condition: service_completed_successfully
@@ -158,19 +162,12 @@ services:
     cap_drop: ["ALL"]
     stop_grace_period: 30s
 
-  mailpit:
-    image: axllent/mailpit:v1.27
-    profiles: ["dev-mail"]
-    restart: unless-stopped
-    ports:
-      - "127.0.0.1:${MAILPIT_SMTP_PORT:-1025}:1025"
-      - "127.0.0.1:${MAILPIT_UI_PORT:-8025}:8025"
-
 volumes:
-  mongo_data:
+  postgres_data:
   asset_data:
 
 networks:
   database:
     internal: true
+  host: {}
   egress: {}

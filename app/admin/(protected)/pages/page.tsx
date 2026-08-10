@@ -1,13 +1,12 @@
 import Link from "next/link";
 import { requireSession } from "@/lib/require-session";
-import { collections, type PageDoc } from "@/lib/db";
-import { toId } from "@/lib/mongo-utils";
-import { scopedPageFilter, sessionHasCapability } from "@/lib/admin-guard";
+import { getScopedPages, sessionHasCapability } from "@/lib/admin-guard";
 import { publicPagePath } from "@/lib/public-path";
+import type { PageRow as PageRowData } from "@/lib/postgres/schema";
 
 export default async function PagesListPage() {
   const { session, org } = await requireSession();
-  const pages = (await collections.pages().find(scopedPageFilter(session, org.id)).sort({ createdAt: 1 }).toArray()).map(toId);
+  const pages = await getScopedPages(session, org.id);
   const canConfigure = sessionHasCapability(session, "page.configure");
   const hubs = pages.filter((page) => page.isHub);
   const activeHubIds = new Set(hubs.map((hub) => hub.id));
@@ -42,8 +41,6 @@ export default async function PagesListPage() {
     </div>
   );
 }
-
-type PageRowData = ReturnType<typeof toId<PageDoc>>;
 
 function PageRow({ page, canConfigure, nested = false, relation }: { page: PageRowData; canConfigure: boolean; nested?: boolean; relation?: string }) {
   const state = page.setupCompletedAt === null ? "Draft" : page.publicVisible === false ? "Hidden" : "Published";

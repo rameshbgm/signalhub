@@ -1,11 +1,10 @@
 import { requireSession } from "@/lib/require-session";
 import { FluentSelect } from "@/components/FluentSelect";
-import { collections } from "@/lib/db";
-import { oid, toId } from "@/lib/mongo-utils";
+import { database } from "@/lib/postgres/client";
 import { addSubscriber, importSubscribersCsv, toggleQuarantine, removeSubscriber, retryNotificationJob } from "./actions";
 import { PageSelect } from "@/components/admin/PageSelect";
 import { HelpTip } from "@/components/HelpTip";
-import { requireCapability, scopedPageFilter } from "@/lib/admin-guard";
+import { getScopedPages, requireCapability } from "@/lib/admin-guard";
 
 const CHANNELS = [
   { value: "EMAIL", label: "Email" },
@@ -21,23 +20,19 @@ export default async function SubscribersPage({ searchParams }: { searchParams: 
   const { session, org } = await requireSession();
   await requireCapability("subscriber.manage");
   const { pageId: pageIdParam, channel: channelParam } = await searchParams;
-  const pages = (await collections.pages().find(scopedPageFilter(session, org.id, { isHub: false })).sort({ createdAt: 1 }).toArray()).map(toId);
+  const pages = await getScopedPages(session, org.id, { isHub: false });
   const pageId = pageIdParam && pages.some((p) => p.id === pageIdParam) ? pageIdParam : pages[0]?.id;
 
   if (!pageId) return <p className="text-sm text-[var(--fg-dim)]">Create a page first.</p>;
 
   const channel = CHANNELS.some((c) => c.value === channelParam) ? channelParam! : "EMAIL";
 
-  const allForPage = (await collections.subscribers().find({ pageId: oid(pageId) }).toArray()).map(toId);
+  const allForPage = await database.selectFrom("subscribers").selectAll()
+    .where("pageId", "=", pageId).execute();
   const subscribers = allForPage.filter((s) => s.channel === channel);
-  const deliveryJobs = (
-    await collections
-      .notificationJobs()
-      .find({ pageId: oid(pageId), channel })
-      .sort({ updatedAt: -1 })
-      .limit(20)
-      .toArray()
-  ).map(toId);
+  const deliveryJobs = await database.selectFrom("notificationJobs").selectAll()
+    .where("pageId", "=", pageId).where("channel", "=", channel)
+    .orderBy("updatedAt", "desc").limit(20).execute();
   const pendingDeliveryCount = deliveryJobs.filter((job) => ["PENDING", "PROCESSING"].includes(job.status)).length;
   const failedDeliveries = deliveryJobs.filter((job) => job.status === "DEAD_LETTER");
   const countsByChannel = allForPage.reduce<Record<string, number>>((acc, s) => {

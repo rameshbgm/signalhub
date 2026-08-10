@@ -1,13 +1,12 @@
 import { requireSession } from "@/lib/require-session";
-import { collections } from "@/lib/db";
+import { database } from "@/lib/postgres/client";
 import { PageSelect } from "@/components/admin/PageSelect";
 import { NotificationDestinationManager } from "@/components/admin/NotificationDestinationManager";
 import { WebhookEndpointManager } from "@/components/admin/WebhookEndpointManager";
-import { requireCapability, scopedPageFilter } from "@/lib/admin-guard";
+import { getScopedPages, requireCapability } from "@/lib/admin-guard";
 import { subscriptionCapabilities } from "@/lib/notification-capabilities";
 import { enabledDestinationChannels } from "@/lib/platform-configuration";
 import { secretLabel } from "@/lib/secrets";
-import { toId } from "@/lib/mongo-utils";
 
 export default async function NotificationsPage({
   searchParams,
@@ -17,12 +16,12 @@ export default async function NotificationsPage({
   const { session, org } = await requireSession();
   await requireCapability("integration.manage");
   const requested = (await searchParams).pageId;
-  const pages = await collections.pages().find(scopedPageFilter(session, org.id)).sort({ name: 1 }).toArray();
-  const page = pages.find((item) => item._id.toHexString() === requested) ?? pages[0];
+  const pages = await getScopedPages(session, org.id, { orderBy: "name" });
+  const page = pages.find((item) => item.id === requested) ?? pages[0];
   if (!page) return <p className="text-sm text-[var(--fg-dim)]">Create a page first.</p>;
   const [destinations, endpoints, capabilities, enabledChannels] = await Promise.all([
-    collections.notificationDestinations().find({ pageId: page._id }).sort({ createdAt: 1 }).toArray(),
-    collections.webhookEndpoints().find({ pageId: page._id }).sort({ createdAt: 1 }).toArray(),
+    database.selectFrom("notificationDestinations").selectAll().where("pageId", "=", page.id).orderBy("createdAt", "asc").execute(),
+    database.selectFrom("webhookEndpoints").selectAll().where("pageId", "=", page.id).orderBy("createdAt", "asc").execute(),
     subscriptionCapabilities(),
     enabledDestinationChannels(),
   ]);
@@ -33,7 +32,7 @@ export default async function NotificationsPage({
           <h1 className="font-mono text-2xl font-semibold">Notifications and destinations</h1>
           <p className="mt-1 max-w-2xl text-sm text-[var(--fg-soft)]">Configure visitor subscriptions, verified team integrations, and signed status-event webhooks for this page.</p>
         </div>
-        <div className="w-60"><PageSelect pages={pages.map((item) => ({ id: item._id.toHexString(), name: item.name }))} selected={page._id.toHexString()} basePath="/organization/notifications" /></div>
+        <div className="w-60"><PageSelect pages={pages.map((item) => ({ id: item.id, name: item.name }))} selected={page.id} basePath="/organization/notifications" /></div>
       </div>
       <section>
         <h2 className="font-mono text-lg font-semibold text-[var(--fg)]">Subscriber delivery</h2>
@@ -58,10 +57,10 @@ export default async function NotificationsPage({
         <h2 className="font-mono text-lg font-semibold text-[var(--fg)]">Team and on-call destinations</h2>
         <p className="mb-4 mt-1 text-sm text-[var(--fg-dim)]">Only providers enabled by the platform administrator are offered. Every destination is tested before it is stored.</p>
         <NotificationDestinationManager
-          pageId={page._id.toHexString()}
+          pageId={page.id}
           enabledChannels={enabledChannels}
           initial={destinations.map((destination) => ({
-            id: destination._id.toHexString(),
+            id: destination.id,
             name: destination.name,
             channel: destination.channel,
             active: destination.active,
@@ -76,8 +75,8 @@ export default async function NotificationsPage({
         <h2 className="font-mono text-lg font-semibold text-[var(--fg)]">Signed status-event webhooks</h2>
         <p className="mb-4 mt-1 text-sm text-[var(--fg-dim)]">Connect custom systems through verified HTTPS endpoints with HMAC signatures, retries, and secret rotation.</p>
         <WebhookEndpointManager
-          pageId={page._id.toHexString()}
-          endpoints={endpoints.map(toId).map((endpoint) => ({
+          pageId={page.id}
+          endpoints={endpoints.map((endpoint) => ({
             id: endpoint.id,
             url: endpoint.url,
             secretLabel: secretLabel(endpoint.secretPrefix, endpoint.secretLastFour),

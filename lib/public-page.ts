@@ -1,16 +1,16 @@
-import { ObjectId } from "mongodb";
-import { collections } from "@/lib/db";
-import { oid } from "@/lib/mongo-utils";
+import { sql } from "kysely";
+import { database } from "@/lib/postgres/client";
 
-export async function isPageOrganizationActive(orgId: ObjectId | string) {
-  return Boolean(
-    await collections.organizations().findOne(
-      {
-        _id: typeof orgId === "string" ? oid(orgId) : orgId,
-        suspended: { $ne: true },
-        status: { $nin: ["PROVISIONING", "SUSPENDED", "DELETING"] },
-      },
-      { projection: { _id: 1 } }
-    )
-  );
+export async function isPageOrganizationActive(
+  orgId: string | { toHexString(): string }
+) {
+  const normalizedOrgId = typeof orgId === "string" ? orgId : orgId.toHexString();
+  const organization = await database
+    .selectFrom("organizations")
+    .select("id")
+    .where(sql<boolean>`id::text = ${normalizedOrgId}`)
+    .where("suspended", "=", false)
+    .where("status", "=", "ACTIVE")
+    .executeTakeFirst();
+  return Boolean(organization);
 }

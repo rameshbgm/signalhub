@@ -1,7 +1,7 @@
-import type { PlatformJobDoc } from "@/lib/db";
+import type { PlatformJobRow } from "@/lib/postgres/schema";
 
 type PurgeCancellationState = Pick<
-  PlatformJobDoc,
+  PlatformJobRow,
   "type" | "status" | "attempts" | "startedAt"
 >;
 

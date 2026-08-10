@@ -1,6 +1,5 @@
-import { collections } from "@/lib/db";
-import { oid } from "@/lib/mongo-utils";
-import { normalizedPlatformRole, writePlatformAudit } from "@/lib/platform-policy";
+import { database } from "@/lib/postgres/client";
+import { writePlatformAudit } from "@/lib/platform-policy";
 import { writeActiveTenantAudit } from "@/lib/tenant-audit";
 import { OrganizationMutationBlockedError } from "@/lib/organization-mutation";
 
@@ -21,14 +20,16 @@ export async function writeSupportMutationAudit(
   }
 ) {
   if (!session.supportSessionId) return;
-  const support = await collections.supportSessions().findOne({
-    _id: oid(session.supportSessionId),
-    orgId: oid(session.orgId),
-  });
+  const support = await database.selectFrom("supportSessions")
+    .selectAll()
+    .where("id", "=", session.supportSessionId)
+    .where("orgId", "=", session.orgId)
+    .executeTakeFirst();
   if (!support) throw new Error("Support audit context is no longer available");
-  const platformAdmin = await collections.platformAdmins().findOne({
-    _id: support.platformAdminId,
-  });
+  const platformAdmin = await database.selectFrom("users")
+    .select(["id", "email"])
+    .where("id", "=", support.platformAdminId)
+    .executeTakeFirst();
   if (!platformAdmin) throw new Error("Support actor is no longer available");
   const now = new Date();
   if (!input.tenantAuditExists) {
@@ -38,7 +39,7 @@ export async function writeSupportMutationAudit(
         action: input.action,
         target: input.targetId,
         metadata: input.metadata ?? null,
-        supportSessionId: support._id,
+        supportSessionId: support.id,
         createdAt: now,
       });
     } catch (error) {
@@ -48,9 +49,9 @@ export async function writeSupportMutationAudit(
     }
   }
   await writePlatformAudit({
-    actorId: platformAdmin._id,
+    actorId: platformAdmin.id,
     actorEmail: platformAdmin.email,
-    actorRole: normalizedPlatformRole(platformAdmin),
+    actorRole: "ADMIN",
     action: "SUPPORT_ACTION_PERFORMED",
     targetType: input.targetType,
     targetId: input.targetId,
@@ -58,9 +59,9 @@ export async function writeSupportMutationAudit(
     reason: support.reason,
     metadata: {
       tenantAction: input.action,
-      supportSessionId: support._id.toHexString(),
-      supportMode: support.mode ?? "VIEW",
-      supportScopes: support.scopes ?? [],
+      supportSessionId: support.id,
+      supportMode: support.mode,
+      supportScopes: support.scopes,
       ...(input.metadata ?? {}),
     },
   });

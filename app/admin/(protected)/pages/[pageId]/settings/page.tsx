@@ -3,9 +3,7 @@ import { HelpTip } from "@/components/HelpTip";
 import { PlatformActionForm } from "@/components/platform/PlatformActionForm";
 import { PlatformSubmitButton } from "@/components/platform/PlatformSubmitButton";
 import { assertPageInOrg, requireCapability } from "@/lib/admin-guard";
-import { collections } from "@/lib/db";
-import { oid } from "@/lib/mongo-utils";
-import { activePageFilter } from "@/lib/page-lifecycle";
+import { database } from "@/lib/postgres/client";
 import { pageDesignFor } from "@/lib/page-design";
 import { deletePage, updatePageGeneralSettings } from "../../actions";
 
@@ -13,7 +11,9 @@ export default async function PageSettings({ params }: { params: Promise<{ pageI
   const { pageId } = await params;
   const session = await requireCapability("page.configure", pageId);
   await assertPageInOrg(pageId, session.orgId);
-  const page = await collections.pages().findOne(activePageFilter({ _id: oid(pageId), orgId: oid(session.orgId) }));
+  const page = await database.selectFrom("pages").selectAll()
+    .where("id", "=", pageId).where("orgId", "=", session.orgId)
+    .where("deletedAt", "is", null).executeTakeFirst();
   if (!page) notFound();
   const design = pageDesignFor(page);
   return (
@@ -21,14 +21,11 @@ export default async function PageSettings({ params }: { params: Promise<{ pageI
       <PlatformActionForm action={updatePageGeneralSettings.bind(null, pageId)} successMessage="Page settings saved" className="space-y-5">
         <section className="border border-[var(--line)] bg-[var(--surface)] p-5">
           <h2 className="font-mono font-semibold">Page details</h2>
-          <p className="mt-1 text-sm text-[var(--fg-dim)]">Identity and public copy are managed here, separate from visual layout.</p>
+          <p className="mt-1 text-sm text-[var(--fg-dim)]">Manage the page identity, public copy, and locale here. Visitor links are configured with the public header and footer in the visual designer.</p>
           <div className="mt-4 grid gap-4 sm:grid-cols-2">
             <Field label="Page name"><input name="name" defaultValue={page.name} required maxLength={120} className={inputClass} /></Field>
             <Field label="Headline"><input name="headline" defaultValue={page.headline} maxLength={180} className={inputClass} /></Field>
             <Field label="About text" full><textarea name="aboutText" defaultValue={page.aboutText} maxLength={4000} rows={4} className={inputClass} /></Field>
-            <Field label="Support URL"><input name="supportUrl" defaultValue={page.supportUrl ?? ""} inputMode="url" pattern="(?:https?://.+|mailto:.+)" className={inputClass} /></Field>
-            <Field label="Terms of Service URL"><input name="termsUrl" type="url" defaultValue={page.termsUrl ?? ""} className={inputClass} /></Field>
-            <Field label="Privacy Policy URL"><input name="privacyUrl" type="url" defaultValue={page.privacyUrl ?? ""} className={inputClass} /></Field>
             <Field label="Timezone"><input name="timezone" defaultValue={page.timezone} className={inputClass} /></Field>
             <Field label="Language"><input name="language" defaultValue={page.language} required pattern="[a-z]{2,3}(?:-[A-Z]{2})?" title="Use a language code such as en or en-US" className={inputClass} /></Field>
           </div>
@@ -50,7 +47,7 @@ export default async function PageSettings({ params }: { params: Promise<{ pageI
             <label className="flex items-center gap-2 text-sm text-[var(--fg-soft)]"><input type="checkbox" name="removeBranding" defaultChecked={page.removeBranding} /> Remove &quot;Powered by&quot; branding</label>
             <label className="flex items-center gap-2 text-sm text-[var(--fg-soft)]"><input type="checkbox" name="analyticsEnabled" defaultChecked={page.analyticsEnabled ?? true} /> Privacy-first page analytics</label>
           </div>
-          {page.customCss && <p className="mt-4 border border-[var(--amber)]/30 bg-[var(--amber-soft)] p-3 text-sm text-[var(--amber)]">Legacy custom CSS remains active and frozen. It can be reset from Advanced designer.</p>}
+          {page.customCss && <p className="mt-4 border border-[var(--amber)]/30 bg-[var(--amber-soft)] p-3 text-sm text-[var(--amber)]">Legacy custom CSS remains active and frozen. It can be reset from the visual designer.</p>}
         </section>
 
         <div className="flex justify-end"><PlatformSubmitButton pendingLabel="Saving settings…" className="bg-[var(--cyan)] px-5 py-2.5 text-sm font-semibold text-[var(--on-cyan)]">Save settings</PlatformSubmitButton></div>

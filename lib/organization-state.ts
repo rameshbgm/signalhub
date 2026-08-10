@@ -1,14 +1,19 @@
-import type { OrganizationDoc, OrganizationStatus } from "@/lib/db";
+export type OrganizationStatus = "PROVISIONING" | "ACTIVE" | "SUSPENDED" | "DELETING";
+
+type OrganizationState = {
+  status?: OrganizationStatus | null;
+  suspended?: boolean | null;
+};
 
 export function organizationStatus(
-  organization: Pick<OrganizationDoc, "status" | "suspended">
+  organization: OrganizationState
 ): OrganizationStatus {
   if (organization.status) return organization.status;
   return organization.suspended ? "SUSPENDED" : "ACTIVE";
 }
 
 export function organizationIsActive(
-  organization: Pick<OrganizationDoc, "status" | "suspended">
+  organization: OrganizationState
 ): boolean {
   return organizationStatus(organization) === "ACTIVE";
 }

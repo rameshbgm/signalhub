@@ -1,20 +1,20 @@
 import Link from "next/link";
 import { requireSession } from "@/lib/require-session";
-import { collections } from "@/lib/db";
-import { oid, toId } from "@/lib/mongo-utils";
+import { database } from "@/lib/postgres/client";
 import { MAINTENANCE_STATUS_LABEL, type MaintenanceStatus } from "@/lib/status";
-import { scopedPageFilter, sessionHasCapability } from "@/lib/admin-guard";
+import { getScopedPages, sessionHasCapability } from "@/lib/admin-guard";
 
 export default async function MaintenanceListPage() {
   const { session, org } = await requireSession();
-  const pages = (await collections.pages().find(scopedPageFilter(session, org.id)).toArray()).map(toId);
-  const pageIds = pages.map((p) => oid(p.id));
+  const pages = await getScopedPages(session, org.id);
+  const pageIds = pages.map((p) => p.id);
   const pageNameById = Object.fromEntries(pages.map((p) => [p.id, p.name]));
   const canSchedule = sessionHasCapability(session, "incident.manage");
 
-  const maintenance = (
-    await collections.incidents().find({ pageId: { $in: pageIds }, isMaintenance: true }).sort({ scheduledStart: -1 }).toArray()
-  ).map(toId);
+  const maintenance = pageIds.length
+    ? await database.selectFrom("incidents").selectAll().where("pageId", "in", pageIds)
+      .where("isMaintenance", "=", true).orderBy("scheduledStart", "desc").execute()
+    : [];
 
   return (
     <div>

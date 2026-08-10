@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { PlatformActionForm } from "@/components/platform/PlatformActionForm";
 import { PlatformSubmitButton } from "@/components/platform/PlatformSubmitButton";
 
@@ -27,10 +27,22 @@ export function PageAppearanceForm({
   const [brandColor, setBrandColor] = useState(initialBrandColor);
   const [mode, setMode] = useState(initialMode);
   const [allowVisitorMode, setAllowVisitorMode] = useState(initialAllowVisitorMode);
+  const [savedRevision, setSavedRevision] = useState(0);
   const selected = presets.find((item) => item.key === preset) ?? presets[0];
+  const restoreControlledSelections = useCallback(() => {
+    // React server-action forms reset native controls after a successful action.
+    // Re-render once after that reset so controlled radio values stay in sync.
+    setSavedRevision((revision) => revision + 1);
+  }, []);
 
   return (
-    <PlatformActionForm action={action} successMessage="Appearance saved" className="space-y-6">
+    <PlatformActionForm
+      action={action}
+      successMessage="Appearance saved"
+      onSuccess={restoreControlledSelections}
+      data-appearance-revision={savedRevision}
+      className="space-y-6"
+    >
       <section>
         <div className="flex flex-wrap items-center gap-2">
           <h3 className="font-mono text-sm font-semibold text-[var(--fg)]">Style preset</h3>

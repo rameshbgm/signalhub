@@ -1,6 +1,6 @@
 import type { NextRequest } from "next/server";
-import type { PageDoc } from "@/lib/db";
-import { collections } from "@/lib/db";
+import type { PageRow } from "@/lib/postgres/schema";
+import { database } from "@/lib/postgres/client";
 import { authorizePublicSurface } from "@/lib/feed-access";
 import { getComponentsForPage, getIncidentsForPage } from "@/lib/public-data";
 import {
@@ -8,7 +8,6 @@ import {
   type ComponentStatus,
 } from "@/lib/status";
 import { activeIncidentIndicator } from "@/lib/public-surface-policy";
-import { publicPageFilter } from "@/lib/page-lifecycle";
 
 export async function getPublicSurfaceSummary(
   pageId: string,
@@ -38,13 +37,18 @@ export async function getPublicSurfaceSummary(
  */
 export async function getAuthorizedHubChildren(
   request: NextRequest,
-  hub: PageDoc
+  hub: PageRow
 ) {
-  const childPages = await collections
-    .pages()
-    .find(publicPageFilter({ hubParentId: hub._id, orgId: hub.orgId, isHub: false }))
-    .sort({ createdAt: 1 })
-    .toArray();
+  const childPages = await database
+    .selectFrom("pages")
+    .selectAll()
+    .where("hubParentId", "=", hub.id)
+    .where("orgId", "=", hub.orgId)
+    .where("isHub", "=", false)
+    .where("deletedAt", "is", null)
+    .where("publicVisible", "=", true)
+    .orderBy("createdAt", "asc")
+    .execute();
 
   return (
     await Promise.all(

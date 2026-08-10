@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSession } from "@/lib/auth";
-import { collections } from "@/lib/db";
+import { database } from "@/lib/postgres/client";
 import {
   DEVELOPMENT_ACCOUNTS,
   developmentQuickLoginAllowed,
@@ -39,40 +39,46 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Unknown development account" }, { status: 400 });
   }
 
-  const user = await collections.users().findOne({
-      canonicalUsername: account.username,
-      disabled: { $ne: true },
-    });
+  const user = await database
+    .selectFrom("users")
+    .selectAll()
+    .where("canonicalUsername", "=", account.username)
+    .where("disabled", "=", false)
+    .executeTakeFirst();
     if (!user) {
       return NextResponse.json(
         { error: "Development accounts are not seeded. Run npm run db:seed-roles." },
         { status: 409 }
       );
     }
-    const membership = await collections.memberships().findOne({
-      userId: user._id,
-      role: account.role,
-      status: "ACTIVE",
-    });
+    const membership = await database
+      .selectFrom("memberships")
+      .selectAll()
+      .where("userId", "=", user.id)
+      .where("role", "=", account.role)
+      .where("status", "=", "ACTIVE")
+      .executeTakeFirst();
     if (!membership) {
       return NextResponse.json(
         { error: "Development role membership is unavailable. Rerun the role seed." },
         { status: 409 }
       );
     }
-    const organization = await collections.organizations().findOne({
-      _id: membership.orgId,
-      suspended: { $ne: true },
-      status: { $nin: ["PROVISIONING", "SUSPENDED", "DELETING"] },
-    });
+    const organization = await database
+      .selectFrom("organizations")
+      .select("id")
+      .where("id", "=", membership.orgId)
+      .where("suspended", "=", false)
+      .where("status", "not in", ["PROVISIONING", "SUSPENDED", "DELETING"])
+      .executeTakeFirst();
     if (!organization) {
       return NextResponse.json({ error: "Development organization is unavailable." }, { status: 409 });
     }
   await createSession(
       {
-        userId: user._id.toHexString(),
-        membershipId: membership._id.toHexString(),
-        orgId: membership.orgId.toHexString(),
+        userId: user.id,
+        membershipId: membership.id,
+        orgId: membership.orgId,
         username: user.username,
         email: user.email,
         name: user.name,

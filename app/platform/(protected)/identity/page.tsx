@@ -1,6 +1,6 @@
-import { requirePlatformCapability } from "@/lib/admin-guard";
+import { requirePlatformPageCapability } from "@/lib/platform-page-guard";
 import { FluentSelect } from "@/components/FluentSelect";
-import { collections } from "@/lib/db";
+import { database } from "@/lib/postgres/client";
 import { hasPlatformCapability } from "@/lib/platform-policy";
 import { PlatformActionForm } from "@/components/platform/PlatformActionForm";
 import { ScimTokenManager } from "@/components/platform/ScimTokenManager";
@@ -11,13 +11,13 @@ import {
 } from "./actions";
 
 export default async function IdentityPage() {
-  const session = await requirePlatformCapability("identity.read");
+  const session = await requirePlatformPageCapability("identity.read");
   const canManage = hasPlatformCapability(session.role, "identity.manage");
   const [connections, organizations] = await Promise.all([
-    collections.identityConnections().find({ audience: "ORGANIZATION" }).sort({ createdAt: -1 }).toArray(),
-    collections.organizations().find({ status: "ACTIVE" }).sort({ name: 1 }).toArray(),
+    database.selectFrom("identityConnections").selectAll().where("audience", "=", "ORGANIZATION").orderBy("createdAt", "desc").execute(),
+    database.selectFrom("organizations").selectAll().where("status", "=", "ACTIVE").orderBy("name", "asc").execute(),
   ]);
-  const orgNames = new Map(organizations.map((org) => [org._id.toHexString(), org.name]));
+  const orgNames = new Map(organizations.map((org) => [org.id, org.name]));
 
   return (
     <div className="max-w-5xl space-y-8">
@@ -47,7 +47,7 @@ export default async function IdentityPage() {
             </FluentSelect>
             <FluentSelect aria-label="Organization" name="orgId" className="border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm">
               <option value="">Choose organization</option>
-              {organizations.map((org) => <option key={org._id.toHexString()} value={org._id.toHexString()}>{org.name}</option>)}
+              {organizations.map((org) => <option key={org.id} value={org.id}>{org.name}</option>)}
             </FluentSelect>
             <FluentSelect aria-label="Default role" name="defaultRole" defaultValue="VIEWER" className="border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm">
               <option value="VIEWER">Default: Viewer</option>
@@ -80,7 +80,7 @@ export default async function IdentityPage() {
 
       <section className="space-y-3">
         {connections.map((connection) => (
-          <article key={connection._id.toHexString()} className="border border-[var(--line)] bg-[var(--surface)] p-4">
+          <article key={connection.id} className="border border-[var(--line)] bg-[var(--surface)] p-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <div className="flex items-center gap-2">
@@ -91,7 +91,7 @@ export default async function IdentityPage() {
                   </span>
                 </div>
                 <p className="mt-1 text-xs text-[var(--fg-dim)]">
-                  {orgNames.get(connection.orgId?.toHexString() ?? "") ?? "Unknown organization"}
+                  {orgNames.get(connection.orgId ?? "") ?? "Unknown organization"}
                   {" · "}{connection.slug}
                 </p>
                 <code className="mt-2 block break-all text-[10px] text-[var(--fg-soft)]">
@@ -107,10 +107,10 @@ export default async function IdentityPage() {
               </div>
               {canManage && (
                 <div className="flex flex-wrap gap-2">
-                  <PlatformActionForm action={testIdentityConnection.bind(null, connection._id.toHexString())} successMessage="Connection test passed">
+                  <PlatformActionForm action={testIdentityConnection.bind(null, connection.id)} successMessage="Connection test passed">
                     <button className="border border-[var(--line)] px-2.5 py-1 text-xs">Test</button>
                   </PlatformActionForm>
-                  <PlatformActionForm action={setIdentityConnectionEnabled.bind(null, connection._id.toHexString())} successMessage={connection.enabled ? "Connection disabled" : "Connection enabled"}>
+                  <PlatformActionForm action={setIdentityConnectionEnabled.bind(null, connection.id)} successMessage={connection.enabled ? "Connection disabled" : "Connection enabled"}>
                     <input type="hidden" name="enabled" value={String(!connection.enabled)} />
                     <button className="border border-[var(--line)] px-2.5 py-1 text-xs">{connection.enabled ? "Disable" : "Enable"}</button>
                   </PlatformActionForm>
@@ -122,7 +122,7 @@ export default async function IdentityPage() {
                 <p className="mb-2 text-xs text-[var(--fg-dim)]">
                   SCIM base URL: <code>/api/scim/v2/{connection.slug}</code>
                 </p>
-                <ScimTokenManager connectionId={connection._id.toHexString()} />
+                <ScimTokenManager connectionId={connection.id} />
               </div>
             )}
           </article>

@@ -1,20 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { renderStatusBadge } from "@/lib/badge";
-import { collections } from "@/lib/db";
 import { authorizePublicSurface } from "@/lib/feed-access";
 import {
   getAuthorizedHubChildren,
   getPublicSurfaceSummary,
 } from "@/lib/public-surface";
 import { COMPONENT_STATUS_COLOR, overallBanner } from "@/lib/status";
-import { publicPageFilter } from "@/lib/page-lifecycle";
+import { getPublicPageBySlug } from "@/lib/pages";
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ slug: string }> }
 ) {
   const { slug } = await params;
-  const page = await collections.pages().findOne(publicPageFilter({ slug }));
+  const page = await getPublicPageBySlug(slug);
   if (!page) return new NextResponse("", { status: 404 });
 
   const access = await authorizePublicSurface(request, page);
@@ -34,7 +33,7 @@ export async function GET(
     const summaries = await Promise.all(
       children.map((child) =>
         getPublicSurfaceSummary(
-          child.page._id.toHexString(),
+          child.page.id,
           child.access.visibleComponentIds
         )
       )
@@ -49,7 +48,7 @@ export async function GET(
     }
   } else {
     const summary = await getPublicSurfaceSummary(
-      page._id.toHexString(),
+      page.id,
       access.visibleComponentIds
     );
     if (summary.banner) {

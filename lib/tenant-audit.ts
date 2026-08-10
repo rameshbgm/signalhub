@@ -1,51 +1,55 @@
-import { ObjectId, type ClientSession } from "mongodb";
-import {
-  collections,
-  mongoClient,
-  type AuditLogDoc,
-} from "@/lib/db";
-import { oid } from "@/lib/mongo-utils";
+import { withDatabaseTransaction, type DatabaseTransaction } from "@/lib/postgres/client";
 import { fenceActiveOrganizationMutation } from "@/lib/organization-mutation";
 
+type TenantAuditEntry = {
+  actor: string;
+  action: string;
+  target: string;
+  metadata?: unknown;
+  supportSessionId?: string | null;
+  requestId?: string | null;
+  sourceIp?: string | null;
+  userAgent?: string | null;
+  outcome?: "SUCCESS" | "FAILURE" | null;
+  previousHash?: string | null;
+  entryHash?: string | null;
+  chainSequence?: number | null;
+  createdAt?: Date;
+};
+
 export async function writeActiveTenantAudit(
-  organizationId: string | ObjectId,
-  audit: Omit<AuditLogDoc, "_id" | "orgId">
+  organizationId: string,
+  audit: TenantAuditEntry
 ): Promise<void>;
 export async function writeActiveTenantAudit<T>(
-  organizationId: string | ObjectId,
-  audit: Omit<AuditLogDoc, "_id" | "orgId">,
-  verify: (session: ClientSession) => Promise<T>
+  organizationId: string,
+  audit: TenantAuditEntry,
+  verify: (transaction: DatabaseTransaction) => Promise<T>
 ): Promise<T>;
 export async function writeActiveTenantAudit<T>(
-  organizationId: string | ObjectId,
-  audit: Omit<AuditLogDoc, "_id" | "orgId">,
-  verify?: (session: ClientSession) => Promise<T>
+  organizationId: string,
+  audit: TenantAuditEntry,
+  verify?: (transaction: DatabaseTransaction) => Promise<T>
 ) {
-  const databaseSession = mongoClient.startSession();
-  try {
-    let verified: T | undefined;
-    await databaseSession.withTransaction(async () => {
-      await fenceActiveOrganizationMutation(
-        organizationId,
-        databaseSession
-      );
-      verified = verify
-        ? await verify(databaseSession)
-        : undefined;
-      await collections.auditLogs().insertOne(
-        {
-          _id: new ObjectId(),
-          orgId:
-            organizationId instanceof ObjectId
-              ? organizationId
-              : oid(organizationId),
-          ...audit,
-        },
-        { session: databaseSession }
-      );
-    });
+  return withDatabaseTransaction(async (transaction) => {
+    await fenceActiveOrganizationMutation(organizationId, transaction);
+    const verified = verify ? await verify(transaction) : undefined;
+    await transaction.insertInto("auditLogs").values({
+      orgId: organizationId,
+      actor: audit.actor,
+      action: audit.action,
+      target: audit.target,
+      metadata: audit.metadata ?? null,
+      supportSessionId: audit.supportSessionId ?? null,
+      requestId: audit.requestId ?? null,
+      sourceIp: audit.sourceIp ?? null,
+      userAgent: audit.userAgent ?? null,
+      outcome: audit.outcome ?? null,
+      previousHash: audit.previousHash ?? null,
+      entryHash: audit.entryHash ?? null,
+      chainSequence: audit.chainSequence ?? null,
+      createdAt: audit.createdAt ?? new Date(),
+    }).execute();
     return verified as T;
-  } finally {
-    await databaseSession.endSession();
-  }
+  });
 }

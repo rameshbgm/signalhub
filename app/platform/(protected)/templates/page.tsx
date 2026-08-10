@@ -1,6 +1,6 @@
-import { collections } from "@/lib/db";
+import { database } from "@/lib/postgres/client";
 import { FluentSelect } from "@/components/FluentSelect";
-import { requirePlatformCapability } from "@/lib/admin-guard";
+import { requirePlatformPageCapability } from "@/lib/platform-page-guard";
 import { hasPlatformCapability } from "@/lib/platform-policy";
 import { deleteMonitorTemplate, saveMonitorTemplate } from "./actions";
 import { PlatformActionForm } from "@/components/platform/PlatformActionForm";
@@ -9,8 +9,9 @@ import { PlatformSubmitButton } from "@/components/platform/PlatformSubmitButton
 const TYPES = ["HTTP", "TCP", "ICMP", "TLS", "KEYWORD", "DNS", "HEARTBEAT"];
 
 export default async function PlatformTemplatesPage() {
-  const actor = await requirePlatformCapability("templates.read");
-  const templates = await collections.monitorTemplates().find().sort({ category: 1, name: 1 }).toArray();
+  const actor = await requirePlatformPageCapability("templates.read");
+  const templates = await database.selectFrom("monitorTemplates").selectAll()
+    .orderBy("category").orderBy("name").execute();
   const canManage = hasPlatformCapability(actor.role, "templates.manage");
 
   return (
@@ -31,7 +32,7 @@ export default async function PlatformTemplatesPage() {
 
       <div className="grid gap-3 lg:grid-cols-2">
         {templates.map((template) => (
-          <article key={template._id.toHexString()} className="border border-[var(--line)] bg-[var(--surface)] p-4">
+          <article key={template.id} className="border border-[var(--line)] bg-[var(--surface)] p-4">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <div className="flex flex-wrap items-center gap-2">
@@ -46,9 +47,9 @@ export default async function PlatformTemplatesPage() {
             {canManage && (
               <details className="mt-4 border-t border-[var(--line)] pt-3">
                 <summary className="cursor-pointer text-xs font-semibold text-[var(--cyan)]">Edit template</summary>
-                <TemplateForm template={template} action={saveMonitorTemplate.bind(null, template._id.toHexString())} />
+                <TemplateForm template={template} action={saveMonitorTemplate.bind(null, template.id)} />
                 <PlatformActionForm
-                  action={deleteMonitorTemplate.bind(null, template._id.toHexString())}
+                  action={deleteMonitorTemplate.bind(null, template.id)}
                   successMessage="Monitor template deleted."
                   className="mt-3 flex flex-wrap gap-2 border-t border-[var(--line)] pt-3"
                 >

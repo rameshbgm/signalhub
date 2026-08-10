@@ -1,63 +1,43 @@
-import { ObjectId } from "mongodb";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { apiKeyAllowsPage, authenticateApiKey } from "@/lib/api-auth";
 import { apiError, routeError, validationError } from "@/lib/api-response";
-import { collections } from "@/lib/db";
-import { oid, toId } from "@/lib/mongo-utils";
-import { withTransaction } from "@/lib/cascade";
+import { isDatabaseId } from "@/lib/database-id";
 import { fenceActiveOrganizationMutation } from "@/lib/organization-mutation";
-import { activePageFilter } from "@/lib/page-lifecycle";
+import { database, withDatabaseTransaction } from "@/lib/postgres/client";
 
 const schema = z.object({ value: z.number().finite(), timestamp: z.string().datetime().optional() });
 
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const apiKey = await authenticateApiKey(request, "metrics.write");
     if (!apiKey) return apiError(401, "UNAUTHENTICATED", "A valid API key is required");
     const { id } = await params;
-    const metric = await collections.metrics().findOne({ _id: oid(id) });
-    if (!metric) return apiError(404, "METRIC_NOT_FOUND", "Metric not found");
-    const page = await collections.pages().findOne(activePageFilter({
-      _id: metric.pageId,
-      orgId: oid(apiKey.orgId),
-    }));
-    if (!page || !apiKeyAllowsPage(apiKey, page._id.toHexString())) {
+    if (!isDatabaseId(id)) return apiError(404, "METRIC_NOT_FOUND", "Metric not found");
+    const metric = await database.selectFrom("metrics as metric")
+      .innerJoin("pages as page", "page.id", "metric.pageId")
+      .select(["metric.id", "page.id as pageId"]).where("metric.id", "=", id)
+      .where("page.orgId", "=", apiKey.orgId).where("page.deletedAt", "is", null).executeTakeFirst();
+    if (!metric || !apiKeyAllowsPage(apiKey, metric.pageId)) {
       return apiError(404, "METRIC_NOT_FOUND", "Metric not found");
     }
     const parsed = schema.safeParse(await request.json().catch(() => ({})));
     if (!parsed.success) return validationError(parsed.error);
-    const point = {
-      _id: new ObjectId(),
-      metricId: metric._id,
-      value: parsed.data.value,
-      timestamp: parsed.data.timestamp ? new Date(parsed.data.timestamp) : new Date(),
-    };
-    await withTransaction(async (databaseSession) => {
-      await fenceActiveOrganizationMutation(apiKey.orgId, databaseSession);
-      const currentMetric = await collections.metrics().findOne(
-        { _id: metric._id },
-        { session: databaseSession }
-      );
-      const currentPage = currentMetric
-        ? await collections.pages().findOne(
-            activePageFilter({ _id: currentMetric.pageId, orgId: oid(apiKey.orgId) }),
-            { session: databaseSession }
-          )
-        : null;
-      if (!currentMetric || !currentPage) {
-        throw new Error("Metric is no longer available");
-      }
-      await collections.metricPoints().insertOne(
-        { ...point, metricId: currentMetric._id },
-        { session: databaseSession }
-      );
+    const point = await withDatabaseTransaction(async (transaction) => {
+      await fenceActiveOrganizationMutation(apiKey.orgId, transaction);
+      const current = await transaction.selectFrom("metrics as metric")
+        .innerJoin("pages as page", "page.id", "metric.pageId").select("metric.id")
+        .where("metric.id", "=", metric.id).where("page.orgId", "=", apiKey.orgId)
+        .where("page.deletedAt", "is", null).forShare("metric").executeTakeFirst();
+      if (!current) throw new Error("Metric is no longer available");
+      return transaction.insertInto("metricPoints").values({
+        metricId: current.id,
+        value: parsed.data.value,
+        timestamp: parsed.data.timestamp ? new Date(parsed.data.timestamp) : new Date(),
+      }).returningAll().executeTakeFirstOrThrow();
     });
-    return NextResponse.json({ point: toId(point) }, { status: 201 });
+    return NextResponse.json({ point }, { status: 201 });
   } catch (error) {
-    return routeError(error);
+    return routeError(error, { route: "POST /api/v1/manage/metrics/:id/points" });
   }
 }

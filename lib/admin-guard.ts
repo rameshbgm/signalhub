@@ -1,7 +1,5 @@
-import { collections, type PageDoc } from "@/lib/db";
-import type { Filter } from "mongodb";
 import { getSession } from "@/lib/auth";
-import { oid, toId } from "@/lib/mongo-utils";
+import { database } from "@/lib/postgres/client";
 import {
   roleAtLeast,
   sessionHasCapability,
@@ -14,7 +12,6 @@ import {
   type PlatformCapability,
 } from "@/lib/platform-policy";
 import { AdminAuthError } from "@/lib/admin-auth-error";
-import { activePageFilter } from "@/lib/page-lifecycle";
 
 export { AdminAuthError } from "@/lib/admin-auth-error";
 
@@ -22,19 +19,27 @@ export async function requireOrgSession() {
   const session = await getSession();
   if (!session) throw new AdminAuthError("Not authenticated", 401, "UNAUTHENTICATED");
 
-  const organization = await collections.organizations().findOne({
-    _id: oid(session.orgId),
-  });
+  const organization = await database
+    .selectFrom("organizations")
+    .selectAll()
+    .where("id", "=", session.orgId)
+    .executeTakeFirst();
   if (!organization || !organizationIsActive(organization)) {
     throw new AdminAuthError("Session is no longer authorized", 401, "SESSION_REVOKED");
   }
 
   const [membership, user] = await Promise.all([
-    collections.memberships().findOne({
-      _id: oid(session.membershipId),
-      userId: oid(session.userId),
-    }),
-    collections.users().findOne({ _id: oid(session.userId) }),
+    database
+      .selectFrom("memberships")
+      .selectAll()
+      .where("id", "=", session.membershipId)
+      .where("userId", "=", session.userId)
+      .executeTakeFirst(),
+    database
+      .selectFrom("users")
+      .selectAll()
+      .where("id", "=", session.userId)
+      .executeTakeFirst(),
   ]);
   if (!membership || !user || user.disabled) {
     throw new AdminAuthError("Session is no longer authorized", 401, "SESSION_REVOKED");
@@ -49,7 +54,7 @@ export async function requireOrgSession() {
       "SESSION_REVOKED"
     );
   }
-  if (membership.role !== "ADMIN" && !membership.orgId.equals(oid(session.orgId))) {
+  if (membership.role !== "ADMIN" && membership.orgId !== session.orgId) {
     throw new AdminAuthError("This organization is outside your membership", 403, "PAGE_SCOPE_FORBIDDEN");
   }
 
@@ -58,7 +63,7 @@ export async function requireOrgSession() {
     email: user.email,
     name: user.name,
     role: membership.role,
-    pageIds: membership.pageIds?.map((pageId) => pageId.toHexString()) ?? null,
+    pageIds: membership.pageIds ?? null,
     membershipStatus: membership.status ?? "ACTIVE",
     mustChangePassword: Boolean(user.mustChangePassword),
     mustCompleteProfile: Boolean(user.mustCompleteProfile),
@@ -119,10 +124,13 @@ export async function requireCapability(capability: Capability, pageId?: string)
     throw new AdminAuthError("This page is outside your assigned scope", 403, "PAGE_SCOPE_FORBIDDEN");
   }
   if (pageId) {
-    const activePage = await collections.pages().findOne(
-      activePageFilter({ _id: oid(pageId), orgId: oid(session.orgId) }),
-      { projection: { _id: 1 } }
-    );
+    const activePage = await database
+      .selectFrom("pages")
+      .select("id")
+      .where("id", "=", pageId)
+      .where("orgId", "=", session.orgId)
+      .where("deletedAt", "is", null)
+      .executeTakeFirst();
     if (!activePage) {
       throw new AdminAuthError("Page not found in your organization", 404, "PAGE_NOT_FOUND");
     }
@@ -134,20 +142,24 @@ export { sessionHasCapability } from "@/lib/identity";
 
 export const requireIncidentManager = () => requireOrgRole("INCIDENT_MANAGER");
 
-/**
- * Builds the tenant-and-page boundary for page listings. Admins always
- * see the whole organization; scoped operational roles only see assigned pages.
- */
-export function scopedPageFilter(
+/** Loads active pages while enforcing the tenant member's assigned page scope. */
+export async function getScopedPages(
   session: { role: MembershipRole; pageIds: string[] | null },
   orgId: string,
-  extra: Filter<PageDoc> = {}
-): Filter<PageDoc> {
-  const scopedIds =
-    session.role !== "ADMIN" && session.pageIds !== null
-      ? { _id: { $in: session.pageIds.map(oid) } }
-      : {};
-  return activePageFilter({ orgId: oid(orgId), ...scopedIds, ...extra });
+  options: { isHub?: boolean; orderBy?: "createdAt" | "name" } = {}
+) {
+  let query = database
+    .selectFrom("pages")
+    .selectAll()
+    .where("orgId", "=", orgId)
+    .where("deletedAt", "is", null);
+  if (session.role !== "ADMIN" && session.pageIds !== null) {
+    query = query.where("id", "in", session.pageIds);
+  }
+  if (options.isHub !== undefined) {
+    query = query.where("isHub", "=", options.isHub);
+  }
+  return query.orderBy(options.orderBy ?? "createdAt", "asc").execute();
 }
 
 /** Installation management is a capability of the standard Admin identity. */
@@ -177,37 +189,53 @@ export async function requirePlatformCapability(capability: PlatformCapability) 
 }
 
 export async function assertPageInOrg(pageId: string, orgId: string) {
-  const pageDoc = await collections.pages().findOne(
-    activePageFilter({ _id: oid(pageId), orgId: oid(orgId) })
-  );
+  const pageDoc = await database
+    .selectFrom("pages")
+    .selectAll()
+    .where("id", "=", pageId)
+    .where("orgId", "=", orgId)
+    .where("deletedAt", "is", null)
+    .executeTakeFirst();
   if (!pageDoc) throw new AdminAuthError("Page not found in your organization", 404, "PAGE_NOT_FOUND");
   const session = await getSession();
   if (session?.orgId === orgId) {
-    const membership = await collections.memberships().findOne({
-      _id: oid(session.membershipId),
-      orgId: oid(orgId),
-    });
+    const membership = await database
+      .selectFrom("memberships")
+      .select(["role", "pageIds"])
+      .where("id", "=", session.membershipId)
+      .where("orgId", "=", orgId)
+      .executeTakeFirst();
     if (
       membership &&
       membership.role !== "ADMIN" &&
       membership.pageIds !== null &&
       membership.pageIds !== undefined &&
-      !membership.pageIds.some((assignedPageId) => assignedPageId.equals(pageDoc._id))
+      !membership.pageIds.includes(pageDoc.id)
     ) {
       throw new AdminAuthError("This page is outside your assigned scope", 403, "PAGE_SCOPE_FORBIDDEN");
     }
   }
-  return toId(pageDoc);
+  return pageDoc;
 }
 
 export async function assertComponentInPage(componentId: string, pageId: string) {
-  const doc = await collections.components().findOne({ _id: oid(componentId), pageId: oid(pageId) });
+  const doc = await database
+    .selectFrom("components")
+    .selectAll()
+    .where("id", "=", componentId)
+    .where("pageId", "=", pageId)
+    .executeTakeFirst();
   if (!doc) throw new AdminAuthError("Component not found on this page", 404, "COMPONENT_NOT_FOUND");
-  return toId(doc);
+  return doc;
 }
 
 export async function assertGroupInPage(groupId: string, pageId: string) {
-  const doc = await collections.componentGroups().findOne({ _id: oid(groupId), pageId: oid(pageId) });
+  const doc = await database
+    .selectFrom("componentGroups")
+    .selectAll()
+    .where("id", "=", groupId)
+    .where("pageId", "=", pageId)
+    .executeTakeFirst();
   if (!doc) throw new AdminAuthError("Component group not found on this page", 404, "GROUP_NOT_FOUND");
-  return toId(doc);
+  return doc;
 }

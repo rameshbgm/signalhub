@@ -1,16 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import { collections } from "@/lib/db";
 import { authorizePublicSurface } from "@/lib/feed-access";
 import { absolutePublicPageUrl } from "@/lib/public-url";
 import { pageDesignFor } from "@/lib/page-design";
-import { publicPageFilter } from "@/lib/page-lifecycle";
+import { getPublicPageBySlug } from "@/lib/pages";
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ slug: string }> }
 ) {
   const { slug } = await params;
-  const page = await collections.pages().findOne(publicPageFilter({ slug }));
+  const page = await getPublicPageBySlug(slug);
   if (!page) return new NextResponse("", { status: 404 });
   const access = await authorizePublicSurface(request, page);
   if (!access.ok) return new NextResponse("", { status: 404 });

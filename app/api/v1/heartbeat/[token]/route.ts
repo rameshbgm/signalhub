@@ -1,52 +1,30 @@
 import { NextResponse } from "next/server";
-import { collections } from "@/lib/db";
-import { hashSecret } from "@/lib/secrets";
-import { organizationIsActive } from "@/lib/organization-state";
-import { withTransaction } from "@/lib/cascade";
 import { fenceActiveOrganizationMutation } from "@/lib/organization-mutation";
-import { activePageFilter } from "@/lib/page-lifecycle";
+import { database, withDatabaseTransaction } from "@/lib/postgres/client";
+import { hashSecret } from "@/lib/secrets";
 
-async function heartbeat(
-  _request: Request,
-  { params }: { params: Promise<{ token: string }> }
-) {
+async function heartbeat(_request: Request, { params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
-  const monitor = await collections.monitors().findOne({
-    type: "HEARTBEAT",
-    heartbeatTokenHash: hashSecret(token),
-    enabled: true,
-  });
+  const tokenHash = hashSecret(token);
+  const monitor = await database.selectFrom("monitors as monitor")
+    .innerJoin("pages as page", "page.id", "monitor.pageId")
+    .innerJoin("organizations as organization", "organization.id", "page.orgId")
+    .select(["monitor.id", "monitor.pageId", "organization.id as orgId"])
+    .where("monitor.type", "=", "HEARTBEAT").where("monitor.heartbeatTokenHash", "=", tokenHash)
+    .where("monitor.enabled", "=", true).where("page.deletedAt", "is", null)
+    .where("organization.status", "=", "ACTIVE").where("organization.suspended", "=", false)
+    .executeTakeFirst();
   if (!monitor) return new NextResponse(null, { status: 404 });
-  const page = await collections.pages().findOne(activePageFilter({ _id: monitor.pageId }));
-  const organization = page
-    ? await collections.organizations().findOne({ _id: page.orgId })
-    : null;
-  if (!page || !organization || !organizationIsActive(organization)) {
-    return new NextResponse(null, { status: 403 });
-  }
-  await withTransaction(async (databaseSession) => {
-    await fenceActiveOrganizationMutation(organization._id, databaseSession);
-    const currentPage = await collections.pages().findOne(
-      activePageFilter({ _id: page._id, orgId: organization._id }),
-      { session: databaseSession }
-    );
-    if (!currentPage) throw new Error("Heartbeat monitor is unavailable");
-    const changed = await collections.monitors().updateOne(
-      {
-        _id: monitor._id,
-        pageId: currentPage._id,
-        type: "HEARTBEAT",
-        heartbeatTokenHash: hashSecret(token),
-        enabled: true,
-      },
-      { $set: { lastHeartbeatAt: new Date(), runRequestedAt: new Date() } },
-      { session: databaseSession }
-    );
-    if (!changed.matchedCount) {
-      throw new Error("Heartbeat monitor is unavailable");
-    }
+  await withDatabaseTransaction(async (transaction) => {
+    await fenceActiveOrganizationMutation(monitor.orgId, transaction);
+    const now = new Date();
+    const changed = await transaction.updateTable("monitors").set({ lastHeartbeatAt: now, runRequestedAt: now })
+      .where("id", "=", monitor.id).where("pageId", "=", monitor.pageId)
+      .where("type", "=", "HEARTBEAT").where("heartbeatTokenHash", "=", tokenHash)
+      .where("enabled", "=", true).returning("id").executeTakeFirst();
+    if (!changed) throw new Error("Heartbeat monitor is unavailable");
   });
-  return NextResponse.json({ ok: true, monitorId: monitor._id.toHexString() });
+  return NextResponse.json({ ok: true, monitorId: monitor.id });
 }
 
 export const GET = heartbeat;

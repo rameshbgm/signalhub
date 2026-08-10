@@ -1,12 +1,12 @@
 import { randomBytes } from "node:crypto";
 import { hash as argonHash, verify as argonVerify } from "@node-rs/argon2";
 import { decodeProtectedHeader, SignJWT, jwtVerify } from "jose";
-import { cookies } from "next/headers";
+import { cookies } from "next/headers.js";
 import bcrypt from "bcryptjs";
-import { ObjectId } from "mongodb";
 import { getSessionSigningKeys } from "@/lib/session-secret";
-import { collections } from "@/lib/db";
-import type { AuthSessionDoc } from "@/lib/db";
+import { database } from "@/lib/postgres/client";
+import type { AuthMethod } from "@/lib/postgres/schema";
+import { isDatabaseId, newDatabaseId } from "@/lib/database-id";
 import { hashSecret } from "@/lib/secrets";
 
 const SESSION_COOKIE = "sp_session";
@@ -39,7 +39,7 @@ export type SessionPayload = {
   supportActorName?: string;
   supportMode?: "VIEW" | "OPERATE";
   sessionId?: string;
-  authMethod?: AuthSessionDoc["authMethod"];
+  authMethod?: AuthMethod;
   mfaVerified?: boolean;
 };
 
@@ -47,7 +47,7 @@ export async function createSession(
   payload: SessionPayload,
   options: {
     maxAgeSeconds?: number;
-    authMethod?: AuthSessionDoc["authMethod"];
+    authMethod?: AuthMethod;
     mfaVerified?: boolean;
     ipAddress?: string | null;
     userAgent?: string | null;
@@ -56,12 +56,12 @@ export async function createSession(
   const absoluteSeconds = options.maxAgeSeconds ?? tenantAbsoluteSeconds();
   const idleSeconds = Math.min(tenantIdleSeconds(), absoluteSeconds);
   const now = new Date();
-  const sessionId = new ObjectId();
+  const sessionId = newDatabaseId();
   const verifier = randomBytes(32).toString("base64url");
   const { active } = getSessionSigningKeys();
   const sessionPayload = {
     ...payload,
-    sessionId: sessionId.toHexString(),
+    sessionId,
     sessionVerifier: verifier,
     authMethod: options.authMethod ?? (payload.supportSessionId ? "SUPPORT" : "PASSWORD"),
     mfaVerified: options.mfaVerified ?? true,
@@ -73,14 +73,13 @@ export async function createSession(
     .setExpirationTime(`${absoluteSeconds}s`)
     .sign(active.secret);
 
-  await collections.authSessions().insertOne({
-    _id: sessionId,
+  await database.insertInto("authSessions").values({
+    id: sessionId,
     kind: "TENANT",
     tokenHash: hashSecret(verifier),
-    userId: new ObjectId(payload.userId),
-    membershipId: new ObjectId(payload.membershipId),
-    orgId: new ObjectId(payload.orgId),
-    platformAdminId: null,
+    userId: payload.userId,
+    membershipId: payload.membershipId,
+    orgId: payload.orgId,
     sessionVersion: 1,
     authMethod: sessionPayload.authMethod,
     mfaVerified: sessionPayload.mfaVerified,
@@ -92,7 +91,7 @@ export async function createSession(
     absoluteExpiresAt: new Date(now.getTime() + absoluteSeconds * 1000),
     revokedAt: null,
     revokedReason: null,
-  });
+  }).execute();
 
   const store = await cookies();
   store.set(SESSION_COOKIE, token, {
@@ -109,11 +108,13 @@ export async function destroySession() {
   const token = store.get(SESSION_COOKIE)?.value;
   if (token) {
     const payload = await verifySignedToken(token, "org").catch(() => null);
-    if (typeof payload?.sessionId === "string") {
-      await collections.authSessions().updateOne(
-        { _id: new ObjectId(payload.sessionId), revokedAt: null },
-        { $set: { revokedAt: new Date(), revokedReason: "logout" } }
-      );
+    if (isDatabaseId(payload?.sessionId)) {
+      await database
+        .updateTable("authSessions")
+        .set({ revokedAt: new Date(), revokedReason: "logout" })
+        .where("id", "=", payload.sessionId)
+        .where("revokedAt", "is", null)
+        .execute();
     }
   }
   store.delete(SESSION_COOKIE);
@@ -136,34 +137,39 @@ async function verifySignedToken(token: string, audience: "org") {
 
 async function activeSession(
   payload: Record<string, unknown>,
-  kind: AuthSessionDoc["kind"]
+  kind: "TENANT" | "PLATFORM"
 ) {
   if (
     typeof payload.sessionId !== "string" ||
     typeof payload.sessionVerifier !== "string" ||
-    !ObjectId.isValid(payload.sessionId)
+    !isDatabaseId(payload.sessionId)
   ) {
     return null;
   }
   const now = new Date();
-  const session = await collections.authSessions().findOne({
-    _id: new ObjectId(payload.sessionId),
-    kind,
-    tokenHash: hashSecret(payload.sessionVerifier),
-    revokedAt: null,
-    idleExpiresAt: { $gt: now },
-    absoluteExpiresAt: { $gt: now },
-  });
+  const session = await database
+    .selectFrom("authSessions")
+    .selectAll()
+    .where("id", "=", payload.sessionId)
+    .where("kind", "=", kind)
+    .where("tokenHash", "=", hashSecret(payload.sessionVerifier))
+    .where("revokedAt", "is", null)
+    .where("idleExpiresAt", ">", now)
+    .where("absoluteExpiresAt", ">", now)
+    .executeTakeFirst();
   if (!session) return null;
   if (now.getTime() - session.lastSeenAt.getTime() > 5 * 60_000) {
     const idleSeconds = tenantIdleSeconds();
     const idleExpiresAt = new Date(
       Math.min(session.absoluteExpiresAt.getTime(), now.getTime() + idleSeconds * 1000)
     );
-    await collections.authSessions().updateOne(
-      { _id: session._id, revokedAt: null, idleExpiresAt: { $gt: now } },
-      { $set: { lastSeenAt: now, idleExpiresAt } }
-    );
+    await database
+      .updateTable("authSessions")
+      .set({ lastSeenAt: now, idleExpiresAt })
+      .where("id", "=", session.id)
+      .where("revokedAt", "is", null)
+      .where("idleExpiresAt", ">", now)
+      .execute();
   }
   return session;
 }
@@ -184,9 +190,9 @@ export async function getSession(): Promise<SessionPayload | null> {
     const stored = await activeSession(payload, "TENANT");
     if (
       !stored ||
-      stored.userId?.toHexString() !== payload.userId ||
-      stored.membershipId?.toHexString() !== payload.membershipId ||
-      stored.orgId?.toHexString() !== payload.orgId
+      stored.userId !== payload.userId ||
+      stored.membershipId !== payload.membershipId ||
+      stored.orgId !== payload.orgId
     ) {
       return null;
     }

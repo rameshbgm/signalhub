@@ -2,12 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { createPageAccessSession, verifyPassword } from "@/lib/auth";
 import { apiError, routeError, validationError } from "@/lib/api-response";
-import { collections } from "@/lib/db";
 import { canonicalizeEmail } from "@/lib/identity";
-import { toId } from "@/lib/mongo-utils";
 import { consumeRateLimit, RateLimitError, requestIp } from "@/lib/rate-limit";
 import { isPageOrganizationActive } from "@/lib/public-page";
-import { publicPageFilter } from "@/lib/page-lifecycle";
+import { getPublicPageBySlug } from "@/lib/pages";
+import { database } from "@/lib/postgres/client";
 
 const schema = z.object({
   email: z.string().email().optional(),
@@ -27,12 +26,11 @@ export async function POST(
       windowMs: 15 * 60_000,
     });
 
-    const pageDoc = await collections.pages().findOne(publicPageFilter({ slug }));
-    if (!pageDoc) return apiError(404, "PAGE_NOT_FOUND", "Page not found");
-    if (!(await isPageOrganizationActive(pageDoc.orgId))) {
+    const page = await getPublicPageBySlug(slug);
+    if (!page) return apiError(404, "PAGE_NOT_FOUND", "Page not found");
+    if (!(await isPageOrganizationActive(page.orgId))) {
       return apiError(404, "PAGE_NOT_FOUND", "Page not found");
     }
-    const page = toId(pageDoc);
     if (page.type === "PRIVATE") {
       if (!page.passwordHash || !(await verifyPassword(parsed.data.password, page.passwordHash))) {
         return apiError(401, "ACCESS_DENIED", "Incorrect password");
@@ -43,11 +41,15 @@ export async function POST(
     if (page.type === "AUDIENCE") {
       if (!parsed.data.email) return apiError(400, "EMAIL_REQUIRED", "Email is required");
       const email = canonicalizeEmail(parsed.data.email);
-      const userDoc = await collections.pageAccessUsers().findOne({ pageId: pageDoc._id, email });
-      if (!userDoc || !(await verifyPassword(parsed.data.password, userDoc.passwordHash))) {
+      const user = await database
+        .selectFrom("pageAccessUsers")
+        .selectAll()
+        .where("pageId", "=", page.id)
+        .where("email", "=", email)
+        .executeTakeFirst();
+      if (!user || !(await verifyPassword(parsed.data.password, user.passwordHash))) {
         return apiError(401, "ACCESS_DENIED", "Invalid email or password");
       }
-      const user = toId(userDoc);
       await createPageAccessSession(page.id, { userId: user.id, email: user.email });
       return NextResponse.json({ ok: true });
     }

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { PlatformActionForm } from "@/components/platform/PlatformActionForm";
-import { requirePlatformCapability } from "@/lib/admin-guard";
+import { requirePlatformPageCapability } from "@/lib/platform-page-guard";
 import { hasPlatformCapability } from "@/lib/platform-policy";
 import { subscriptionCapabilities } from "@/lib/notification-capabilities";
 import { enabledDestinationChannels } from "@/lib/platform-configuration";
@@ -20,7 +20,7 @@ const PROVIDER_LABELS: Record<(typeof DESTINATION_CHANNELS)[number], string> = {
 };
 
 export default async function PlatformConfigurationPage() {
-  const actor = await requirePlatformCapability("configuration.read");
+  const actor = await requirePlatformPageCapability("configuration.read");
   const canManage = hasPlatformCapability(actor.role, "configuration.manage");
   const [enabledChannels, capabilities] = await Promise.all([
     enabledDestinationChannels(),

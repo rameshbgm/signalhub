@@ -1,19 +1,21 @@
 import { notFound } from "next/navigation";
 import { PageManagementShell } from "@/components/admin/PageManagementShell";
 import { assertPageInOrg, requireCapability } from "@/lib/admin-guard";
-import { collections } from "@/lib/db";
-import { oid } from "@/lib/mongo-utils";
-import { activePageFilter } from "@/lib/page-lifecycle";
+import { database } from "@/lib/postgres/client";
 import { publicPagePath } from "@/lib/public-path";
 
 export default async function ManagedPageLayout({ children, params }: { children: React.ReactNode; params: Promise<{ pageId: string }> }) {
   const { pageId } = await params;
   const session = await requireCapability("page.configure", pageId);
   await assertPageInOrg(pageId, session.orgId);
-  const page = await collections.pages().findOne(activePageFilter({ _id: oid(pageId), orgId: oid(session.orgId) }));
+  const page = await database.selectFrom("pages").selectAll()
+    .where("id", "=", pageId).where("orgId", "=", session.orgId)
+    .where("deletedAt", "is", null).executeTakeFirst();
   if (!page) notFound();
   const parentHub = page.hubParentId
-    ? await collections.pages().findOne(activePageFilter({ _id: page.hubParentId, orgId: page.orgId, isHub: true }))
+    ? await database.selectFrom("pages").select(["id", "name"])
+      .where("id", "=", page.hubParentId).where("orgId", "=", page.orgId)
+      .where("isHub", "=", true).where("deletedAt", "is", null).executeTakeFirst()
     : null;
 
   return (
@@ -26,7 +28,7 @@ export default async function ManagedPageLayout({ children, params }: { children
       setupCompleted: page.setupCompletedAt !== null,
       publicVisible: page.publicVisible !== false,
       publicPath: publicPagePath(page),
-      parentHub: parentHub ? { id: parentHub._id.toHexString(), name: parentHub.name } : null,
+      parentHub: parentHub ? { id: parentHub.id, name: parentHub.name } : null,
     }}>
       {children}
     </PageManagementShell>

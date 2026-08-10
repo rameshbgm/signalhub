@@ -1,11 +1,10 @@
-import { ObjectId } from "mongodb";
 import { hashPassword } from "@/lib/auth";
-import { collections, mongoClient } from "@/lib/db";
 import { DEVELOPMENT_ACCOUNTS } from "@/lib/dev-accounts";
 import { canonicalizeEmail, canonicalizeUsername } from "@/lib/identity";
 import { newPasswordError } from "@/lib/password-policy";
 import { assertDevelopmentSeedEnabled } from "@/scripts/dev-seed";
 import { pathToFileURL } from "node:url";
+import { closeDatabase, database } from "@/lib/postgres/client";
 
 export async function seedDevelopmentRoleUsers(input: {
   password?: string;
@@ -19,84 +18,107 @@ export async function seedDevelopmentRoleUsers(input: {
   const passwordHash = await hashPassword(password);
   const now = new Date();
 
-  const existingDevelopmentOrganization =
-    (await collections.organizations().findOne({ slug: "acme" })) ??
-    (await collections.organizations().findOne({ slug: "default" }));
-  await collections.organizations().updateOne(
-    existingDevelopmentOrganization ? { _id: existingDevelopmentOrganization._id } : { slug: "acme" },
-    {
-      $set: {
-        name: "Acme Corporation",
-        slug: "acme",
-        contactEmail: "admin@status.test",
-        suspended: false,
-        status: "ACTIVE",
-        statusReason: null,
-        updatedAt: now,
-      },
-      $setOnInsert: {
-        _id: new ObjectId(),
-        statusChangedAt: now,
-        statusChangedBy: null,
-        createdAt: now,
-      },
-    },
-    { upsert: true }
-  );
-  const organization = await collections.organizations().findOne({ slug: "acme" });
-  if (!organization) throw new Error("Unable to create the development organization");
-
-  for (const account of DEVELOPMENT_ACCOUNTS) {
-    const canonicalEmail = canonicalizeEmail(account.email);
-    const canonicalUsername = canonicalizeUsername(account.username);
-      await collections.users().updateOne(
-        { canonicalUsername },
-        {
-          $set: {
-            username: canonicalUsername,
-            canonicalUsername,
-            email: account.email,
-            canonicalEmail,
-            name: account.name,
-            passwordHash,
-            twoFactorEnabled: false,
-            disabled: false,
-            mustChangePassword: false,
-            mustCompleteProfile: false,
-            mfaRequired: false,
-            totpSecretCiphertext: null,
-            pendingTotpSecretCiphertext: null,
-            recoveryCodeHashes: [],
-            mfaEnrolledAt: null,
-            updatedAt: now,
-          },
-          $setOnInsert: {
-            _id: new ObjectId(),
-            sessionVersion: 1,
-            createdAt: now,
-          },
-        },
-        { upsert: true }
-      );
-      const user = await collections.users().findOne({ canonicalUsername });
-      if (!user) throw new Error(`Unable to create ${account.email}`);
-      await collections.memberships().updateOne(
-        { orgId: organization._id, userId: user._id },
-        {
-          $set: {
-            role: account.role,
+  await database.transaction().execute(async (transaction) => {
+    const existingDevelopmentOrganization =
+      (await transaction.selectFrom("organizations").select("id").where("slug", "=", "acme").executeTakeFirst()) ??
+      (await transaction.selectFrom("organizations").select("id").where("slug", "=", "default").executeTakeFirst());
+    const organization = existingDevelopmentOrganization
+      ? await transaction
+          .updateTable("organizations")
+          .set({
+            name: "Acme Corporation",
+            slug: "acme",
+            contactEmail: "admin@status.test",
+            suspended: false,
             status: "ACTIVE",
-            pageIds: null,
-            invitationExpiresAt: null,
-            invitationTokenHash: null,
-            activatedAt: now,
-          },
-          $setOnInsert: { _id: new ObjectId(), createdAt: now },
-        },
-        { upsert: true }
-      );
-      await collections.authSessions().deleteMany({ userId: user._id });
-  }
+            statusReason: null,
+            updatedAt: now,
+          })
+          .where("id", "=", existingDevelopmentOrganization.id)
+          .returningAll()
+          .executeTakeFirstOrThrow()
+      : await transaction
+          .insertInto("organizations")
+          .values({
+            name: "Acme Corporation",
+            slug: "acme",
+            contactEmail: "admin@status.test",
+            suspended: false,
+            status: "ACTIVE",
+            statusReason: null,
+            statusChangedAt: now,
+            statusChangedBy: null,
+            updatedAt: now,
+          })
+          .returningAll()
+          .executeTakeFirstOrThrow();
+
+    for (const account of DEVELOPMENT_ACCOUNTS) {
+      const canonicalEmail = canonicalizeEmail(account.email);
+      const canonicalUsername = canonicalizeUsername(account.username);
+      const user = await transaction
+        .insertInto("users")
+        .values({
+          username: canonicalUsername,
+          canonicalUsername,
+          email: account.email,
+          canonicalEmail,
+          name: account.name,
+          passwordHash,
+          twoFactorEnabled: false,
+          disabled: false,
+          mustChangePassword: false,
+          mustCompleteProfile: false,
+          mfaRequired: false,
+          totpSecretCiphertext: null,
+          pendingTotpSecretCiphertext: null,
+          recoveryCodeHashes: [],
+          mfaEnrolledAt: null,
+          updatedAt: now,
+        })
+        .onConflict((conflict) => conflict.column("canonicalUsername").doUpdateSet({
+          username: canonicalUsername,
+          email: account.email,
+          canonicalEmail,
+          name: account.name,
+          passwordHash,
+          twoFactorEnabled: false,
+          disabled: false,
+          mustChangePassword: false,
+          mustCompleteProfile: false,
+          mfaRequired: false,
+          totpSecretCiphertext: null,
+          pendingTotpSecretCiphertext: null,
+          recoveryCodeHashes: [],
+          mfaEnrolledAt: null,
+          updatedAt: now,
+        }))
+        .returningAll()
+        .executeTakeFirstOrThrow();
+      await transaction
+        .insertInto("memberships")
+        .values({
+          orgId: organization.id,
+          userId: user.id,
+          role: account.role,
+          status: "ACTIVE",
+          pageIds: null,
+          invitationExpiresAt: null,
+          invitationTokenHash: null,
+          activatedAt: now,
+        })
+        .onConflict((conflict) => conflict.columns(["orgId", "userId"]).doUpdateSet({
+          role: account.role,
+          status: "ACTIVE",
+          pageIds: null,
+          invitationExpiresAt: null,
+          invitationTokenHash: null,
+          activatedAt: now,
+        }))
+        .execute();
+      await transaction.deleteFrom("authSessions").where("userId", "=", user.id).execute();
+    }
+  });
 
   console.log(
     `Created ${DEVELOPMENT_ACCOUNTS.length} development role accounts for the unified SignalHub console.`
@@ -110,5 +132,5 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
       console.error(error instanceof Error ? error.message : error);
       process.exitCode = 1;
     })
-    .finally(() => mongoClient.close());
+    .finally(() => closeDatabase());
 }

@@ -1,15 +1,14 @@
-import { ObjectId } from "mongodb";
+import { randomBytes } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { apiError, routeError, validationError } from "@/lib/api-response";
-import { collections } from "@/lib/db";
 import { canonicalizeEmail } from "@/lib/identity";
+import { fenceActiveOrganizationMutation } from "@/lib/organization-mutation";
+import { getPublicPageBySlug } from "@/lib/pages";
+import { database, withDatabaseTransaction } from "@/lib/postgres/client";
+import { isPageOrganizationActive } from "@/lib/public-page";
 import { consumeRateLimit, RateLimitError, requestIp } from "@/lib/rate-limit";
 import { secretMatches } from "@/lib/secrets";
-import { isPageOrganizationActive } from "@/lib/public-page";
-import { withTransaction } from "@/lib/cascade";
-import { fenceActiveOrganizationMutation } from "@/lib/organization-mutation";
-import { publicPageFilter } from "@/lib/page-lifecycle";
 
 const schema = z.object({
   pageSlug: z.string().trim().min(1),
@@ -22,82 +21,46 @@ export async function POST(request: NextRequest) {
   try {
     const parsed = schema.safeParse(await request.json().catch(() => ({})));
     if (!parsed.success) return validationError(parsed.error);
-    await consumeRateLimit(`otp-verify:${parsed.data.pageSlug}`, requestIp(request), {
-      limit: 30,
-      windowMs: 15 * 60_000,
-    });
-    const contact =
-      parsed.data.channel === "EMAIL"
-        ? canonicalizeEmail(parsed.data.contact)
-        : parsed.data.contact.replace(/[\s()-]/g, "");
-    const page = await collections.pages().findOne(publicPageFilter({ slug: parsed.data.pageSlug }));
-    if (!page) return apiError(404, "PAGE_NOT_FOUND", "Page not found");
-    if (!(await isPageOrganizationActive(page.orgId))) {
-      return apiError(404, "PAGE_NOT_FOUND", "Page not found");
-    }
-    const otp = await collections
-      .subscriptionOtps()
-      .find({
-        pageId: page._id.toHexString(),
-        channel: parsed.data.channel,
-        contact,
-        expiresAt: { $gt: new Date() },
-      })
-      .sort({ createdAt: -1 })
-      .limit(1)
-      .next();
+    await consumeRateLimit(`otp-verify:${parsed.data.pageSlug}`, requestIp(request), { limit: 30, windowMs: 15 * 60_000 });
+    const contact = parsed.data.channel === "EMAIL"
+      ? canonicalizeEmail(parsed.data.contact)
+      : parsed.data.contact.replace(/[\s()-]/g, "");
+    const page = await getPublicPageBySlug(parsed.data.pageSlug);
+    if (!page || !(await isPageOrganizationActive(page.orgId))) return apiError(404, "PAGE_NOT_FOUND", "Page not found");
+    const otp = await database.selectFrom("subscriptionOtps").selectAll()
+      .where("pageId", "=", page.id).where("channel", "=", parsed.data.channel)
+      .where("contact", "=", contact).where("expiresAt", ">", new Date())
+      .orderBy("createdAt", "desc").executeTakeFirst();
     if (!otp || otp.attempts >= 5 || !secretMatches(parsed.data.code, otp.codeHash)) {
-      if (otp) {
-        await collections.subscriptionOtps().updateOne({ _id: otp._id }, { $inc: { attempts: 1 } });
-      }
+      if (otp) await database.updateTable("subscriptionOtps").set((expression) => ({ attempts: expression("attempts", "+", 1) }))
+        .where("id", "=", otp.id).execute();
       return apiError(400, "INVALID_OTP", "Invalid or expired verification code");
     }
-
-    await withTransaction(async (databaseSession) => {
-      await fenceActiveOrganizationMutation(page.orgId, databaseSession);
-      const currentPage = await collections.pages().findOne(
-        publicPageFilter({ _id: page._id, orgId: page.orgId, slug: parsed.data.pageSlug }),
-        { session: databaseSession }
-      );
-      const currentOtp = currentPage
-        ? await collections.subscriptionOtps().findOne(
-            {
-              _id: otp._id,
-              pageId: currentPage._id.toHexString(),
-              channel: parsed.data.channel,
-              contact,
-              expiresAt: { $gt: new Date() },
-              attempts: { $lt: 5 },
-            },
-            { session: databaseSession }
-          )
-        : null;
-      if (!currentPage || !currentOtp || !secretMatches(parsed.data.code, currentOtp.codeHash)) {
+    await withDatabaseTransaction(async (transaction) => {
+      await fenceActiveOrganizationMutation(page.orgId, transaction);
+      const currentOtp = await transaction.selectFrom("subscriptionOtps").selectAll()
+        .where("id", "=", otp.id).where("pageId", "=", page.id)
+        .where("expiresAt", ">", new Date()).where("attempts", "<", 5).forUpdate().executeTakeFirst();
+      if (!currentOtp || !secretMatches(parsed.data.code, currentOtp.codeHash)) {
         throw new Error("Verification state changed; request a new code");
       }
-      await collections.subscribers().updateOne(
-        { pageId: currentPage._id, channel: parsed.data.channel, contact },
-        {
-          $set: { verified: true, quarantined: false, componentIds: currentOtp.componentIds },
-          $setOnInsert: {
-            _id: new ObjectId(),
-            pageId: currentPage._id,
-            channel: parsed.data.channel,
-            contact,
-            unsubscribeToken: new ObjectId().toHexString(),
-            createdAt: new Date(),
-          },
-        },
-        { upsert: true, session: databaseSession }
-      );
-      await collections.subscriptionOtps().deleteMany(
-        {
-          pageId: currentPage._id.toHexString(),
-          channel: parsed.data.channel,
-          contact,
-        },
-        { session: databaseSession }
-      );
+      await transaction.insertInto("subscribers").values({
+        pageId: page.id,
+        channel: parsed.data.channel,
+        contact,
+        verified: true,
+        quarantined: false,
+        componentIds: currentOtp.componentIds,
+        eventTypes: [],
+        unsubscribeToken: randomBytes(32).toString("base64url"),
+        createdAt: new Date(),
+      }).onConflict((conflict) => conflict.columns(["pageId", "channel", "contact"]).doUpdateSet({
+        verified: true,
+        quarantined: false,
+        componentIds: currentOtp.componentIds,
+      })).execute();
+      await transaction.deleteFrom("subscriptionOtps").where("pageId", "=", page.id)
+        .where("channel", "=", parsed.data.channel).where("contact", "=", contact).execute();
     });
     return NextResponse.json({ ok: true });
   } catch (error) {
@@ -106,6 +69,6 @@ export async function POST(request: NextRequest) {
       response.headers.set("retry-after", String(error.retryAfterSeconds));
       return response;
     }
-    return routeError(error);
+    return routeError(error, { route: "POST /api/v1/subscribe/verify-otp" });
   }
 }

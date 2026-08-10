@@ -10,7 +10,7 @@ WORKDIR /app
 # Route modules import the database client while Next collects route metadata.
 # These non-secret build-time placeholders prevent that import from requiring a
 # developer .env file; the runtime Compose environment always overrides them.
-ENV DATABASE_URL=mongodb://mongo:27017/status?replicaSet=rs0 \
+ENV DATABASE_URL=postgresql://signalhub:build-time-placeholder@postgres:5432/signalhub \
     SESSION_SECRET=build-time-placeholder \
     ENCRYPTION_KEY=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
 COPY . .

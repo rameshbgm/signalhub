@@ -1,12 +1,10 @@
 import { requireSession } from "@/lib/require-session";
-import { collections } from "@/lib/db";
-import { toId } from "@/lib/mongo-utils";
 import { LogoutButton } from "@/components/admin/LogoutButton";
 import { AdminNav } from "@/components/admin/AdminNav";
 import { OrgSwitcher } from "@/components/admin/OrgSwitcher";
 import { getUserOrganizations } from "@/lib/memberships";
 import { redirect } from "next/navigation";
-import { scopedPageFilter } from "@/lib/admin-guard";
+import { getScopedPages } from "@/lib/admin-guard";
 import { roleCapabilities } from "@/lib/identity";
 import { AdminShell } from "@/components/admin/AdminShell";
 
@@ -15,7 +13,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   if (session.mustChangePassword || session.mustCompleteProfile) redirect("/organization/change-password");
   const capabilities = roleCapabilities(session.role);
   const [pages, userOrganizations] = await Promise.all([
-    collections.pages().find(scopedPageFilter(session, org.id)).sort({ createdAt: 1 }).toArray().then((docs) => docs.map(toId)),
+    getScopedPages(session, org.id),
     getUserOrganizations(session.userId),
   ]);
   const organizations = userOrganizations;

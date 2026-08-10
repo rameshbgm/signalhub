@@ -1,7 +1,14 @@
 import { z } from "zod";
 import { COMPONENT_STATUS_COLOR } from "@/lib/status";
 
-export const PAGE_DESIGN_SCHEMA_VERSION = 1 as const;
+export const PAGE_DESIGN_SCHEMA_VERSION = 2 as const;
+
+export const PAGE_GRID_COLUMNS = {
+  desktop: 12,
+  tablet: 8,
+  mobile: 4,
+} as const;
+export type PageDesignBreakpoint = keyof typeof PAGE_GRID_COLUMNS;
 
 export const UPTIME_BAR_STYLES = ["ROUNDED", "SQUARE", "PILL", "SOLID"] as const;
 export type UptimeBarStyle = (typeof UPTIME_BAR_STYLES)[number];
@@ -83,8 +90,12 @@ export const PAGE_TEMPLATE_LABELS: Record<PageTemplateKey, string> = {
 const hexColor = z.string().regex(/^#[0-9a-f]{6}$/i, "Use a six-digit hex color");
 const httpUrl = z.string().url().refine((value) => /^https?:\/\//i.test(value), "Use an HTTP(S) URL");
 const imageUrl = z.string().refine(
-  (value) => /^https?:\/\//i.test(value) || /^\/api\/assets\/[a-f0-9]{24}$/i.test(value),
+  (value) => /^https?:\/\//i.test(value) || /^\/api\/assets\/[0-9a-f-]{36}$/i.test(value),
   "Use an HTTP(S) or uploaded asset URL"
+);
+const visitorUrl = z.string().refine(
+  (value) => /^https?:\/\//i.test(value) || /^mailto:/i.test(value),
+  "Use an HTTP(S) or email URL"
 );
 const blockId = z.string().min(1).max(80);
 const commonBlock = {
@@ -216,10 +227,24 @@ export const pageDesignBlockSchema = z.discriminatedUnion("type", [
 
 export type PageDesignBlock = z.infer<typeof pageDesignBlockSchema>;
 
+const gridPlacementSchema = z.object({
+  blockId,
+  order: z.number().int().min(0).max(99),
+  column: z.number().int().min(1).max(PAGE_GRID_COLUMNS.desktop),
+  span: z.number().int().min(1).max(PAGE_GRID_COLUMNS.desktop),
+});
+
+const responsiveGridSchema = z.object({
+  desktop: z.array(gridPlacementSchema).max(80),
+  tablet: z.array(gridPlacementSchema).max(80).nullable().default(null),
+  mobile: z.array(gridPlacementSchema).max(80).nullable().default(null),
+});
+
 const surfaceSchema = z.object({
   full: z.array(pageDesignBlockSchema).max(30).default([]),
   primary: z.array(pageDesignBlockSchema).max(30).default([]),
   sidebar: z.array(pageDesignBlockSchema).max(20).default([]),
+  grid: responsiveGridSchema,
 });
 
 const headerItemSchema = z.object({
@@ -234,7 +259,47 @@ const footerItemSchema = z.object({
   hidden: z.boolean().default(false),
 });
 
-export const statusPageDesignSchema = z
+function placementsFromLegacySurface(surface: Record<string, unknown>) {
+  const full = Array.isArray(surface.full) ? surface.full : [];
+  const primary = Array.isArray(surface.primary) ? surface.primary : [];
+  const sidebar = Array.isArray(surface.sidebar) ? surface.sidebar : [];
+  const idOf = (block: unknown) => typeof block === "object" && block !== null && "id" in block
+    ? String((block as { id: unknown }).id)
+    : "";
+  return [
+    ...full.map((block, order) => ({ blockId: idOf(block), order, column: 1, span: 12 })),
+    ...primary.map((block, index) => ({ blockId: idOf(block), order: full.length + index, column: 1, span: sidebar.length ? 8 : 12 })),
+    ...sidebar.map((block, index) => ({ blockId: idOf(block), order: full.length + primary.length + index, column: 9, span: 4 })),
+  ].filter((placement) => placement.blockId);
+}
+
+function migrateDesignInput(input: unknown) {
+  if (!input || typeof input !== "object" || Array.isArray(input)) return input;
+  const design = structuredClone(input) as Record<string, unknown>;
+  const surfaces = design.surfaces;
+  if (!surfaces || typeof surfaces !== "object" || Array.isArray(surfaces)) return design;
+  const nextSurfaces: Record<string, unknown> = {};
+  for (const [key, rawSurface] of Object.entries(surfaces)) {
+    if (!rawSurface || typeof rawSurface !== "object" || Array.isArray(rawSurface)) {
+      nextSurfaces[key] = rawSurface;
+      continue;
+    }
+    const surface = rawSurface as Record<string, unknown>;
+    nextSurfaces[key] = {
+      ...surface,
+      grid: surface.grid ?? {
+        desktop: placementsFromLegacySurface(surface),
+        tablet: null,
+        mobile: null,
+      },
+    };
+  }
+  design.schemaVersion = PAGE_DESIGN_SCHEMA_VERSION;
+  design.surfaces = nextSurfaces;
+  return design;
+}
+
+const statusPageDesignV2Schema = z
   .object({
     schemaVersion: z.literal(PAGE_DESIGN_SCHEMA_VERSION),
     templateKey: z.enum(PAGE_TEMPLATE_KEYS),
@@ -286,6 +351,21 @@ export const statusPageDesignSchema = z
           .default([]),
       }),
     }),
+    presentation: z.object({
+      logoUrl: imageUrl.nullable().default(null),
+      faviconUrl: imageUrl.nullable().default(null),
+      coverImageUrl: imageUrl.nullable().default(null),
+      coverImageFit: z.enum(["COVER", "CONTAIN"]).default("COVER"),
+      coverImagePositionX: z.number().min(0).max(100).default(50),
+      coverImagePositionY: z.number().min(0).max(100).default(50),
+      coverImageCropX: z.number().min(0).max(100).nullable().default(null),
+      coverImageCropY: z.number().min(0).max(100).nullable().default(null),
+      coverImageCropWidth: z.number().min(0).max(100).nullable().default(null),
+      coverImageCropHeight: z.number().min(0).max(100).nullable().default(null),
+      supportUrl: visitorUrl.nullable().default(null),
+      termsUrl: httpUrl.nullable().default(null),
+      privacyUrl: httpUrl.nullable().default(null),
+    }).prefault({}),
     surfaces: z.object({
       status: surfaceSchema,
       history: surfaceSchema,
@@ -319,9 +399,67 @@ export const statusPageDesignSchema = z
     }
   });
 
+export const statusPageDesignSchema = z.preprocess(migrateDesignInput, statusPageDesignV2Schema);
+
 export type StatusPageDesign = z.infer<typeof statusPageDesignSchema>;
 export type PageSurfaceKey = keyof StatusPageDesign["surfaces"];
-export type PageDesignZone = keyof StatusPageDesign["surfaces"]["status"];
+export type PageDesignZone = "full" | "primary" | "sidebar";
+export type PageGridPlacement = z.infer<typeof gridPlacementSchema>;
+
+export function pageGridPlacements(
+  design: StatusPageDesign,
+  surface: PageSurfaceKey,
+  breakpoint: PageDesignBreakpoint
+) {
+  const configured = design.surfaces[surface].grid[breakpoint];
+  if (breakpoint === "desktop" || configured) return configured ?? [];
+  const columns = PAGE_GRID_COLUMNS[breakpoint];
+  return design.surfaces[surface].grid.desktop.map((placement) => {
+    const column = Math.max(1, Math.round(((placement.column - 1) / PAGE_GRID_COLUMNS.desktop) * columns) + 1);
+    const span = Math.max(1, Math.round((placement.span / PAGE_GRID_COLUMNS.desktop) * columns));
+    return {
+      ...placement,
+      column: Math.min(column, columns),
+      span: Math.min(span, columns - Math.min(column, columns) + 1),
+    };
+  });
+}
+
+export function updatePageGridPlacement(
+  design: StatusPageDesign,
+  surface: PageSurfaceKey,
+  breakpoint: PageDesignBreakpoint,
+  blockIdValue: string,
+  patch: Partial<Pick<PageGridPlacement, "column" | "span" | "order">>
+) {
+  const next = structuredClone(design);
+  const columns = PAGE_GRID_COLUMNS[breakpoint];
+  const placements = breakpoint === "desktop"
+    ? next.surfaces[surface].grid.desktop
+    : next.surfaces[surface].grid[breakpoint] ?? pageGridPlacements(next, surface, breakpoint);
+  const index = placements.findIndex((placement) => placement.blockId === blockIdValue);
+  if (index < 0) return next;
+  const current = placements[index];
+  const column = Math.max(1, Math.min(columns, patch.column ?? current.column));
+  const span = Math.max(1, Math.min(columns - column + 1, patch.span ?? current.span));
+  placements[index] = { ...current, ...patch, column, span };
+  const normalized = placements
+    .sort((left, right) => left.order - right.order)
+    .map((placement, order) => ({ ...placement, order }));
+  if (breakpoint === "desktop") next.surfaces[surface].grid.desktop = normalized;
+  else next.surfaces[surface].grid[breakpoint] = normalized;
+  return statusPageDesignSchema.parse(next);
+}
+
+export function resetPageGridBreakpoint(
+  design: StatusPageDesign,
+  surface: PageSurfaceKey,
+  breakpoint: Exclude<PageDesignBreakpoint, "desktop">
+) {
+  const next = structuredClone(design);
+  next.surfaces[surface].grid[breakpoint] = null;
+  return statusPageDesignSchema.parse(next);
+}
 
 export function movePageDesignBlock(
   design: StatusPageDesign,
@@ -393,7 +531,7 @@ function baseDesign(templateKey: PageTemplateKey, brand = "#0f8ca8"): StatusPage
       searchEnabled: false,
     },
   });
-  return {
+  return statusPageDesignSchema.parse({
     schemaVersion: 1,
     templateKey,
     theme: {
@@ -429,6 +567,7 @@ function baseDesign(templateKey: PageTemplateKey, brand = "#0f8ca8"): StatusPage
       header: { variant: "STANDARD", sticky: false, items: standardHeader, links: [] },
       footer: { items: standardFooter, customText: "", links: [] },
     },
+    presentation: {},
     surfaces: {
       status: {
         full: [
@@ -473,7 +612,7 @@ function baseDesign(templateKey: PageTemplateKey, brand = "#0f8ca8"): StatusPage
       embed: { full: [overall("embed-overall-status")], primary: [], sidebar: [] },
     },
     seo: { title: "", description: "", socialImageUrl: null, noIndex: false },
-  };
+  });
 }
 
 export function templateDesign(templateKey: PageTemplateKey, brand = "#0f8ca8"): StatusPageDesign {
@@ -533,6 +672,31 @@ export function templateDesign(templateKey: PageTemplateKey, brand = "#0f8ca8"):
       design.surfaces.status.full[0].settings = { style: "SOLID", showLastUpdated: true, showDescription: false };
       if (components?.type === "COMPONENT_STATUS") components.settings.showUptime = false;
       break;
+  }
+  const statusBlocks = allSurfaceBlocks(design, "status");
+  const place = (type: PageDesignBlock["type"], column: number, span: number) => {
+    const block = statusBlocks.find((candidate) => candidate.type === type);
+    const placement = block && design.surfaces.status.grid.desktop.find((candidate) => candidate.blockId === block.id);
+    if (placement) Object.assign(placement, { column, span });
+  };
+  if (["BANNER_SPOTLIGHT", "UPTIME_TIMELINE", "PRODUCT_GRID"].includes(templateKey)) {
+    place("COMPONENT_STATUS", 1, 12);
+    place("METRICS", 1, 6);
+    place("HISTORY_PREVIEW", 7, 6);
+    place("SUBSCRIBE", 1, 6);
+    place("SCHEDULED_MAINTENANCE", 7, 6);
+  } else if (templateKey === "ILLUSTRATED_HERO") {
+    place("OVERALL_STATUS", 1, 7);
+    place("SUBSCRIBE", 9, 4);
+    place("COMPONENT_STATUS", 1, 12);
+  } else if (templateKey === "DENSE_OPERATIONS") {
+    place("OVERALL_STATUS", 1, 4);
+    place("ANNOUNCEMENTS", 5, 8);
+    place("ACTIVE_INCIDENTS", 1, 6);
+    place("METRICS", 7, 6);
+    place("COMPONENT_STATUS", 1, 12);
+  } else if (templateKey === "MINIMAL_ENTERPRISE") {
+    for (const placement of design.surfaces.status.grid.desktop) Object.assign(placement, { column: 1, span: 12 });
   }
   return statusPageDesignSchema.parse(design);
 }
@@ -656,9 +820,63 @@ export function pageDesignFor(page: {
   themePreset?: string | null;
   themeMode?: string | null;
   allowThemeOverride?: boolean | null;
+  logoUrl?: string | null;
+  faviconUrl?: string | null;
+  coverImageUrl?: string | null;
+  coverImageFit?: "COVER" | "CONTAIN" | null;
+  coverImagePositionX?: number | null;
+  coverImagePositionY?: number | null;
+  coverImageCropX?: number | null;
+  coverImageCropY?: number | null;
+  coverImageCropWidth?: number | null;
+  coverImageCropHeight?: number | null;
+  supportUrl?: string | null;
+  termsUrl?: string | null;
+  privacyUrl?: string | null;
 }) {
+  const storedHasPresentation = Boolean(
+    page.publishedDesign && typeof page.publishedDesign === "object" && "presentation" in page.publishedDesign
+  );
   const parsed = statusPageDesignSchema.safeParse(page.publishedDesign);
-  return parsed.success ? parsed.data : legacyPageDesign(page);
+  const design = parsed.success ? parsed.data : legacyPageDesign(page);
+  return storedHasPresentation ? design : designWithPagePresentation(design, page);
+}
+
+export function designWithPagePresentation(
+  design: StatusPageDesign,
+  page: {
+    logoUrl?: string | null;
+    faviconUrl?: string | null;
+    coverImageUrl?: string | null;
+    coverImageFit?: "COVER" | "CONTAIN" | null;
+    coverImagePositionX?: number | null;
+    coverImagePositionY?: number | null;
+    coverImageCropX?: number | null;
+    coverImageCropY?: number | null;
+    coverImageCropWidth?: number | null;
+    coverImageCropHeight?: number | null;
+    supportUrl?: string | null;
+    termsUrl?: string | null;
+    privacyUrl?: string | null;
+  }
+) {
+  const next = structuredClone(design);
+  next.presentation = {
+    logoUrl: page.logoUrl ?? null,
+    faviconUrl: page.faviconUrl ?? null,
+    coverImageUrl: page.coverImageUrl ?? null,
+    coverImageFit: page.coverImageFit ?? "COVER",
+    coverImagePositionX: page.coverImagePositionX ?? 50,
+    coverImagePositionY: page.coverImagePositionY ?? 50,
+    coverImageCropX: page.coverImageCropX ?? null,
+    coverImageCropY: page.coverImageCropY ?? null,
+    coverImageCropWidth: page.coverImageCropWidth ?? null,
+    coverImageCropHeight: page.coverImageCropHeight ?? null,
+    supportUrl: page.supportUrl ?? null,
+    termsUrl: page.termsUrl ?? null,
+    privacyUrl: page.privacyUrl ?? null,
+  };
+  return statusPageDesignSchema.parse(next);
 }
 
 export function allSurfaceBlocks(design: StatusPageDesign, surface: PageSurfaceKey) {
@@ -667,6 +885,37 @@ export function allSurfaceBlocks(design: StatusPageDesign, surface: PageSurfaceK
     ...design.surfaces[surface].primary,
     ...design.surfaces[surface].sidebar,
   ];
+}
+
+export function applyPageTemplateLayout(design: StatusPageDesign, templateKey: PageTemplateKey) {
+  const template = templateDesign(templateKey, design.theme.palette.brand);
+  const next = structuredClone(design);
+  next.templateKey = templateKey;
+  for (const surface of Object.keys(next.surfaces) as PageSurfaceKey[]) {
+    const currentBlocks = allSurfaceBlocks(next, surface);
+    const templatePlacements = template.surfaces[surface].grid.desktop;
+    const templateOrder = new Map(
+      allSurfaceBlocks(template, surface).map((block, index) => [block.type, index])
+    );
+    const arranged = [...currentBlocks].sort((left, right) =>
+      (templateOrder.get(left.type) ?? 999) - (templateOrder.get(right.type) ?? 999)
+    );
+    next.surfaces[surface].grid.desktop = arranged.map((block, order) => {
+      const templateBlock = allSurfaceBlocks(template, surface).find((candidate) => candidate.type === block.type);
+      const slot = templateBlock
+        ? templatePlacements.find((placement) => placement.blockId === templateBlock.id)
+        : null;
+      return {
+        blockId: block.id,
+        order,
+        column: slot?.column ?? 1,
+        span: slot?.span ?? PAGE_GRID_COLUMNS.desktop,
+      };
+    });
+    next.surfaces[surface].grid.tablet = null;
+    next.surfaces[surface].grid.mobile = null;
+  }
+  return statusPageDesignSchema.parse(next);
 }
 
 function contrastRatio(foreground: string, background: string) {

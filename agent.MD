@@ -1,23 +1,39 @@
-# Agent Guide
+# SignalHub Agent Guide
+
+The authoritative repository instructions are in [`AGENTS.md`](AGENTS.md).
+This compatibility file summarizes setup only; follow `AGENTS.md` whenever the
+two files overlap.
 
 ## Project overview
 
 This repository contains a multi-tenant status-page and incident
 communication platform built with Next.js, TypeScript, Tailwind CSS, and
-MongoDB.
+PostgreSQL 18 or newer. PostgreSQL is the only supported database; do not add
+code, configuration, documentation, or dependencies for another database.
 
 ## Development setup
 
 ```bash
-npm install
-docker compose up -d
+git clone https://github.com/rameshbgm/signalhub.git
+cd signalhub
+npm ci
 cp .env.example .env
-npm run db:migrate
-printf '%s' 'choose-a-long-development-password' | npm run bootstrap -- --password-stdin
+```
+
+Set `POSTGRES_PASSWORD`, `SESSION_SECRET`, and `ENCRYPTION_KEY`, then start the
+complete local topology:
+
+```bash
+docker compose config --quiet
+docker compose up -d --build
+printf '%s' 'choose-a-long-development-password' \
+  | docker compose exec -T web node dist-runtime/bootstrap.mjs --password-stdin
 npm run dev
 ```
 
-The application runs at `http://localhost:3301`.
+Docker Compose serves the application at `http://localhost:3301`. Run
+`npm run dev` only when developing the Next.js process directly; keep the
+PostgreSQL and worker services available as required by the change.
 
 Disposable sample data is optional and must only be loaded into a development or test database:
 
@@ -34,16 +50,19 @@ The seed generates and prints fresh credentials for each run; do not add shared 
 - `app/admin` contains the authenticated management console.
 - `app/api/v1` contains public and management API routes.
 - `components` contains shared React components.
-- `lib` contains authentication, database, billing, notification, access
+- `lib` contains authentication, PostgreSQL access, notification, access
   control, and status-domain logic.
-- `scripts` contains database seed scripts.
+- `db/migrations` contains the PostgreSQL schema and `scripts` contains
+  migration, bootstrap, seed, and operator commands.
 - `worker` contains the TypeScript background runtime for monitoring,
   notifications, exports, audit delivery, and platform jobs.
+- `docs/OPEN_SOURCE_SETUP_GUIDE.md` covers AWS, Azure, GCP, Kubernetes, Docker,
+  and VPS deployment; `public/docs/user-manual.html` is the complete user guide.
 
 ## Working guidelines
 
 - Keep all tenant-owned database operations scoped to the organization.
-- Use the raw MongoDB driver and the collection helpers in `lib/db.ts`.
+- Use Kysely through `lib/postgres/client.ts`; keep SQL relational, indexed, and transactionally safe.
 - Preserve the distinction between public, private, and audience-specific
   pages.
 - Use Server Actions for admin mutations and Route Handlers for APIs.
@@ -51,15 +70,17 @@ The seed generates and prints fresh credentials for each run; do not add shared 
   the server.
 - Do not commit secrets or modify `.env` files unless explicitly requested.
 - Keep changes focused and preserve unrelated work in the repository.
+- Keep README, setup guide, Helm guide, `.env.example`, landing-page links, HTML
+  user manual, and in-app help aligned with the implemented product.
 
 ## Validation
 
 Run the checks relevant to the files changed:
 
 ```bash
-npx tsc --noEmit
+npm run typecheck
 npm run build
 ```
 
-For database-dependent behavior, start MongoDB with Docker and run migrations
+For database-dependent behavior, start PostgreSQL with Docker and run migrations
 before testing. Only load the opt-in sample data when the test requires it.

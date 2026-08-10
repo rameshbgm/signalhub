@@ -1,6 +1,6 @@
-import { db, collections } from "@/lib/db";
+import { sql } from "kysely";
+import { database } from "@/lib/postgres/client";
 import { pruneAuditBefore } from "@/lib/audit-integrity";
-import { auditRetentionCutoff } from "@/lib/audit-retention";
 
 export const RETENTION_BOUNDS = {
   monitorChecksDays: { min: 7, max: 3650 },
@@ -25,16 +25,19 @@ const FALLBACK_RETENTION: EffectiveRetention = {
 function bounded(policy: Partial<EffectiveRetention>): EffectiveRetention {
   return Object.fromEntries(
     Object.entries(RETENTION_BOUNDS).map(([key, bounds]) => {
-      const value = Number(policy[key as keyof EffectiveRetention] ?? FALLBACK_RETENTION[key as keyof EffectiveRetention]);
+      const typedKey = key as keyof EffectiveRetention;
+      const value = Number(policy[typedKey] ?? FALLBACK_RETENTION[typedKey]);
       return [key, Math.min(bounds.max, Math.max(bounds.min, value))];
     })
   ) as EffectiveRetention;
 }
 
-export async function effectiveRetention(orgId?: import("mongodb").ObjectId | null) {
-  const defaults = await collections.retentionPolicies().findOne({ orgId: null });
+export async function effectiveRetention(orgId?: string | null) {
+  const defaults = await database.selectFrom("retentionPolicies").selectAll()
+    .where("orgId", "is", null).executeTakeFirst();
   const override = orgId
-    ? await collections.retentionPolicies().findOne({ orgId })
+    ? await database.selectFrom("retentionPolicies").selectAll()
+        .where("orgId", "=", orgId).executeTakeFirst()
     : null;
   return bounded({ ...defaults, ...override });
 }
@@ -43,100 +46,73 @@ function cutoff(now: Date, days: number) {
   return new Date(now.getTime() - days * 86_400_000);
 }
 
-export async function runRetentionSweep(workerId: string, now = new Date()) {
-  const leases = db.collection<{
-    _id: string;
-    owner: string;
-    leaseExpiresAt: Date;
-    lastCompletedAt?: Date;
-  }>("maintenanceLeases");
-  let lease;
-  try {
-    lease = await leases.findOneAndUpdate(
-      {
-        _id: "retention",
-        $or: [
-          { leaseExpiresAt: { $lte: now } },
-          { leaseExpiresAt: { $exists: false } },
-        ],
-      },
-      {
-        $set: {
-          owner: workerId,
-          leaseExpiresAt: new Date(now.getTime() + 30 * 60_000),
-        },
-        $setOnInsert: { _id: "retention" },
-      },
-      { upsert: true, returnDocument: "after" }
-    );
-  } catch (error) {
-    if (error && typeof error === "object" && "code" in error && error.code === 11000) return false;
-    throw error;
-  }
-  if (!lease || lease.owner !== workerId) return false;
+async function acquireRetentionLease(workerId: string, now: Date) {
+  const expiresAt = new Date(now.getTime() + 30 * 60_000);
+  const result = await sql<{ owner: string }>`
+    INSERT INTO maintenance_leases (id, owner, lease_expires_at)
+    VALUES ('retention', ${workerId}, ${expiresAt})
+    ON CONFLICT (id) DO UPDATE
+      SET owner = EXCLUDED.owner, lease_expires_at = EXCLUDED.lease_expires_at
+      WHERE maintenance_leases.lease_expires_at <= ${now}
+    RETURNING owner
+  `.execute(database);
+  return result.rows[0]?.owner === workerId;
+}
 
-  const organizations = await collections.organizations().find(
-    { status: { $ne: "DELETING" } },
-    { projection: { _id: 1 } }
-  ).toArray();
+export async function runRetentionSweep(workerId: string, now = new Date()) {
+  if (!(await acquireRetentionLease(workerId, now))) return false;
+
+  const organizations = await database.selectFrom("organizations").select("id")
+    .where("status", "!=", "DELETING").execute();
   for (const organization of organizations) {
-    const policy = await effectiveRetention(organization._id);
-    const pages = await collections.pages().find(
-      { orgId: organization._id },
-      { projection: { _id: 1 } }
-    ).toArray();
-    const pageIds = pages.map((page) => page._id);
-    const pageIdStrings = pageIds.map((pageId) => pageId.toHexString());
-    const monitors = await collections.monitors().find(
-      { pageId: { $in: pageIds } },
-      { projection: { _id: 1 } }
-    ).toArray();
-    await Promise.all([
-      collections.monitorChecks().deleteMany({
-        monitorId: { $in: monitors.map((monitor) => monitor._id) },
-        checkedAt: { $lt: cutoff(now, policy.monitorChecksDays) },
-      }),
-      collections.analyticsDaily().deleteMany({
-        pageId: { $in: pageIds },
-        updatedAt: { $lt: cutoff(now, policy.analyticsDays) },
-      }),
-      collections.notificationLogs().deleteMany({
-        pageId: { $in: pageIdStrings },
-        createdAt: { $lt: cutoff(now, policy.notificationLogsDays) },
-      }),
-      collections.notificationJobs().deleteMany({
-        pageId: { $in: pageIds },
-        status: { $in: ["SENT", "DEAD_LETTER"] },
-        updatedAt: { $lt: cutoff(now, policy.notificationLogsDays) },
-      }),
-      pruneAuditBefore(auditRetentionCutoff(now), organization._id),
-    ]);
-    const expiredIncidents = await collections.incidents().find(
-      {
-        pageId: { $in: pageIds },
-        status: "RESOLVED",
-        resolvedAt: { $lt: cutoff(now, policy.resolvedIncidentsDays) },
-      },
-      { projection: { _id: 1 } }
-    ).limit(5_000).toArray();
+    const policy = await effectiveRetention(organization.id);
+    const pages = await database.selectFrom("pages").select("id")
+      .where("orgId", "=", organization.id).execute();
+    const pageIds = pages.map((page) => page.id);
+    if (!pageIds.length) {
+      await pruneAuditBefore(cutoff(now, policy.auditLogsDays), organization.id);
+      continue;
+    }
+    const monitors = await database.selectFrom("monitors").select("id")
+      .where("pageId", "in", pageIds).execute();
+    const monitorIds = monitors.map((monitor) => monitor.id);
+
+    const deletes: Array<Promise<unknown>> = [
+      database.deleteFrom("analyticsDaily")
+        .where("pageId", "in", pageIds)
+        .where("updatedAt", "<", cutoff(now, policy.analyticsDays)).execute(),
+      database.deleteFrom("notificationLogs")
+        .where("pageId", "in", pageIds)
+        .where("createdAt", "<", cutoff(now, policy.notificationLogsDays)).execute(),
+      database.deleteFrom("notificationJobs")
+        .where("pageId", "in", pageIds)
+        .where("status", "in", ["SENT", "DEAD_LETTER"])
+        .where("updatedAt", "<", cutoff(now, policy.notificationLogsDays)).execute(),
+      pruneAuditBefore(cutoff(now, policy.auditLogsDays), organization.id),
+    ];
+    if (monitorIds.length) {
+      deletes.push(database.deleteFrom("monitorChecks")
+        .where("monitorId", "in", monitorIds)
+        .where("checkedAt", "<", cutoff(now, policy.monitorChecksDays)).execute());
+    }
+    await Promise.all(deletes);
+
+    const expiredIncidents = await database.selectFrom("incidents").select("id")
+      .where("pageId", "in", pageIds)
+      .where("status", "=", "RESOLVED")
+      .where("resolvedAt", "<", cutoff(now, policy.resolvedIncidentsDays))
+      .limit(5_000).execute();
     if (expiredIncidents.length) {
-      const ids = expiredIncidents.map((incident) => incident._id);
-      await Promise.all([
-        collections.incidentUpdates().deleteMany({ incidentId: { $in: ids } }),
-        collections.incidentComponents().deleteMany({ incidentId: { $in: ids } }),
-      ]);
-      await collections.incidents().deleteMany({ _id: { $in: ids } });
+      await database.deleteFrom("incidents")
+        .where("id", "in", expiredIncidents.map((incident) => incident.id)).execute();
     }
   }
-  await pruneAuditBefore(auditRetentionCutoff(now));
-  await leases.updateOne(
-    { _id: "retention", owner: workerId },
-    {
-      $set: {
-        lastCompletedAt: new Date(),
-        leaseExpiresAt: new Date(Date.now() + 60 * 60_000),
-      },
-    }
-  );
+
+  const platformPolicy = await effectiveRetention(null);
+  await pruneAuditBefore(cutoff(now, platformPolicy.auditLogsDays));
+  await database.updateTable("maintenanceLeases").set({
+    lastCompletedAt: new Date(),
+    leaseExpiresAt: new Date(Date.now() + 60 * 60_000),
+  }).where("id", "=", "retention").where("owner", "=", workerId).execute();
   return true;
 }

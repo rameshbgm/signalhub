@@ -1,9 +1,7 @@
 import Link from "next/link";
 import { NewPageBasicsForm } from "@/components/admin/NewPageBasicsForm";
 import { requireCapability } from "@/lib/admin-guard";
-import { collections } from "@/lib/db";
-import { activePageFilter } from "@/lib/page-lifecycle";
-import { oid, toId } from "@/lib/mongo-utils";
+import { database } from "@/lib/postgres/client";
 import { createPage } from "../actions";
 
 export default async function NewPage({
@@ -13,10 +11,9 @@ export default async function NewPage({
 }) {
   const session = await requireCapability("page.configure");
   const { hubParentId = "" } = await searchParams;
-  const hubs = (await collections.pages().find(activePageFilter({
-    orgId: oid(session.orgId),
-    isHub: true,
-  })).sort({ createdAt: 1 }).toArray()).map(toId);
+  const hubs = await database.selectFrom("pages").select(["id", "name"])
+    .where("orgId", "=", session.orgId).where("isHub", "=", true)
+    .where("deletedAt", "is", null).orderBy("createdAt", "asc").execute();
   const validInitialHub = hubs.some((hub) => hub.id === hubParentId) ? hubParentId : "";
 
   return (

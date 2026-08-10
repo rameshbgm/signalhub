@@ -1,29 +1,28 @@
-import { ObjectId, type ClientSession } from "mongodb";
-import {
-  collections,
-  type PlatformAuditLogDoc,
-  type PlatformRole,
-} from "@/lib/db";
+import { newDatabaseId } from "@/lib/database-id";
+import { database, type DatabaseExecutor } from "@/lib/postgres/client";
 export {
   hasPlatformCapability,
   normalizedPlatformRole,
   platformAdminIsActive,
   type PlatformCapability,
+  type PlatformRole,
 } from "@/lib/platform-roles";
+import type { PlatformRole } from "@/lib/platform-roles";
 
 export async function writePlatformAudit(input: {
-  actorId?: ObjectId | null;
+  actorId?: string | null;
   actorEmail: string;
   actorRole: PlatformRole | "SYSTEM";
   action: string;
   targetType: string;
   targetId: string;
-  organizationId?: ObjectId | null;
+  organizationId?: string | null;
   reason?: string | null;
   metadata?: Record<string, unknown> | null;
-}, options: { session?: ClientSession } = {}) {
-  const entry: PlatformAuditLogDoc = {
-    _id: new ObjectId(),
+}, options: { executor?: DatabaseExecutor } = {}) {
+  const executor = options.executor ?? database;
+  const entry = {
+    id: newDatabaseId(),
     actorId: input.actorId ?? null,
     actorEmail: input.actorEmail,
     actorRole: input.actorRole,
@@ -33,11 +32,11 @@ export async function writePlatformAudit(input: {
     organizationId: input.organizationId ?? null,
     reason: input.reason ?? null,
     metadata: input.metadata ?? null,
+    previousHash: null,
+    entryHash: null,
+    chainSequence: null,
     createdAt: new Date(),
   };
-  await collections.platformAuditLogs().insertOne(
-    entry,
-    options.session ? { session: options.session } : undefined
-  );
+  await executor.insertInto("platformAuditLogs").values(entry).execute();
   return entry;
 }

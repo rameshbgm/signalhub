@@ -3,21 +3,28 @@ import { notFound } from "next/navigation";
 import { PlatformActionForm } from "@/components/platform/PlatformActionForm";
 import { PlatformSubmitButton } from "@/components/platform/PlatformSubmitButton";
 import { assertPageInOrg, requireCapability } from "@/lib/admin-guard";
-import { collections } from "@/lib/db";
-import { oid } from "@/lib/mongo-utils";
-import { activePageFilter } from "@/lib/page-lifecycle";
+import { database } from "@/lib/postgres/client";
 import { finishPageSetup, setPagePublicVisibility } from "../actions";
 
 export default async function PageOverview({ params }: { params: Promise<{ pageId: string }> }) {
   const { pageId } = await params;
   const session = await requireCapability("page.configure", pageId);
   await assertPageInOrg(pageId, session.orgId);
-  const page = await collections.pages().findOne(activePageFilter({ _id: oid(pageId), orgId: oid(session.orgId) }));
+  const page = await database.selectFrom("pages").selectAll()
+    .where("id", "=", pageId).where("orgId", "=", session.orgId)
+    .where("deletedAt", "is", null).executeTakeFirst();
   if (!page) notFound();
 
   const [visibleServices, memberPages] = await Promise.all([
-    page.isHub ? Promise.resolve(0) : collections.components().countDocuments({ pageId: page._id, visible: true }),
-    page.isHub ? collections.pages().countDocuments(activePageFilter({ orgId: page.orgId, hubParentId: page._id, isHub: false })) : Promise.resolve(0),
+    page.isHub ? Promise.resolve(0) : database.selectFrom("components")
+      .select(({ fn }) => fn.countAll<number>().as("count"))
+      .where("pageId", "=", page.id).where("visible", "=", true)
+      .executeTakeFirstOrThrow().then((row) => Number(row.count)),
+    page.isHub ? database.selectFrom("pages")
+      .select(({ fn }) => fn.countAll<number>().as("count"))
+      .where("orgId", "=", page.orgId).where("hubParentId", "=", page.id)
+      .where("isHub", "=", false).where("deletedAt", "is", null)
+      .executeTakeFirstOrThrow().then((row) => Number(row.count)) : Promise.resolve(0),
   ]);
   const draft = page.setupCompletedAt === null;
   const canPublish = page.isHub || visibleServices > 0;
@@ -44,7 +51,7 @@ export default async function PageOverview({ params }: { params: Promise<{ pageI
           <span className="font-mono text-xs text-[var(--fg-dim)]">{page.isHub ? `${memberPages} status page${memberPages === 1 ? "" : "s"}` : `${visibleServices} visible service${visibleServices === 1 ? "" : "s"}`}</span>
         </div>
         <div className="mt-5 grid gap-3 sm:grid-cols-2">
-          <ChecklistItem href={`/organization/pages/${pageId}/settings`} done title="Page details" description="Name, public copy, locale, and legal links." />
+          <ChecklistItem href={`/organization/pages/${pageId}/settings`} done title="Page details" description="Name, public copy, and locale." />
           <ChecklistItem href={`/organization/pages/${pageId}/content`} done={page.isHub || visibleServices > 0} title={page.isHub ? "Status pages" : "Services"} description={page.isHub ? "Add status pages now or after publishing." : "At least one visible service is required to publish."} />
           <ChecklistItem href={`/organization/pages/${pageId}/appearance`} done title="Appearance" description="Logo, cover image, style, and brand color." optional />
           <ChecklistItem href={`/organization/pages/${pageId}/notifications`} done title="Notifications" description="Subscriber channels, team destinations, and webhooks." optional />

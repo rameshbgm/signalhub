@@ -1,6 +1,6 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
 
 :root {
   --bg: #f4f5f7;
@@ -500,4 +500,39 @@ select option {
   opacity: 1;
   visibility: visible;
   transform: translateY(0);
+}
+/* Responsive page-designer grid. Natural block height keeps operational content
+   readable while column/span/order can vary at each editor breakpoint. */
+.page-responsive-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--page-block-gap);
+}
+
+.page-responsive-grid-item {
+  min-width: 0;
+  grid-column: var(--grid-mobile-column);
+  order: var(--grid-mobile-order);
+}
+
+@media (min-width: 640px) {
+  .page-responsive-grid {
+    grid-template-columns: repeat(8, minmax(0, 1fr));
+  }
+
+  .page-responsive-grid-item {
+    grid-column: var(--grid-tablet-column);
+    order: var(--grid-tablet-order);
+  }
+}
+
+@media (min-width: 1024px) {
+  .page-responsive-grid {
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+  }
+
+  .page-responsive-grid-item {
+    grid-column: var(--grid-desktop-column);
+    order: var(--grid-desktop-order);
+  }
 }

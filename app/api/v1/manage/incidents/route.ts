@@ -1,44 +1,46 @@
 import { NextRequest, NextResponse } from "next/server";
 import { apiKeyAllowsPage, authenticateApiKey } from "@/lib/api-auth";
 import { apiError, routeError, validationError } from "@/lib/api-response";
-import { collections } from "@/lib/db";
 import { createIncident, createIncidentInputSchema } from "@/lib/domain/incidents";
-import { oid, toId } from "@/lib/mongo-utils";
+import { database } from "@/lib/postgres/client";
 
 export async function GET(request: NextRequest) {
   try {
     const apiKey = await authenticateApiKey(request, "incidents.read");
     if (!apiKey) return apiError(401, "UNAUTHENTICATED", "A valid API key is required");
     const pageId = request.nextUrl.searchParams.get("pageId");
-    const pages = await collections
-      .pages()
-      .find({
-        orgId: oid(apiKey.orgId),
-        ...(pageId ? { _id: oid(pageId) } : {}),
-        ...(apiKey.pageIds?.length ? { _id: { $in: apiKey.pageIds } } : {}),
-      })
-      .toArray();
+    let pageQuery = database
+      .selectFrom("pages")
+      .select("id")
+      .where("orgId", "=", apiKey.orgId)
+      .where("deletedAt", "is", null);
+    if (pageId) pageQuery = pageQuery.where("id", "=", pageId);
+    if (apiKey.pageIds?.length) pageQuery = pageQuery.where("id", "in", apiKey.pageIds);
+    const pages = await pageQuery.execute();
     if (pageId && !pages.length) return apiError(404, "PAGE_NOT_FOUND", "Page not found");
-    const incidentDocs = await collections
-      .incidents()
-      .find({ pageId: { $in: pages.map((page) => page._id) } })
-      .sort({ createdAt: -1 })
-      .limit(100)
-      .toArray();
-    const incidentIds = incidentDocs.map((incident) => incident._id);
+    const incidentDocs = pages.length
+      ? await database
+          .selectFrom("incidents")
+          .selectAll()
+          .where("pageId", "in", pages.map((page) => page.id))
+          .orderBy("createdAt", "desc")
+          .limit(100)
+          .execute()
+      : [];
+    const incidentIds = incidentDocs.map((incident) => incident.id);
     const [updates, links] = await Promise.all([
       incidentIds.length
-        ? collections.incidentUpdates().find({ incidentId: { $in: incidentIds } }).sort({ createdAt: 1 }).toArray()
+        ? database.selectFrom("incidentUpdates").selectAll().where("incidentId", "in", incidentIds).orderBy("createdAt", "asc").execute()
         : Promise.resolve([]),
       incidentIds.length
-        ? collections.incidentComponents().find({ incidentId: { $in: incidentIds } }).toArray()
+        ? database.selectFrom("incidentComponents").selectAll().where("incidentId", "in", incidentIds).execute()
         : Promise.resolve([]),
     ]);
     return NextResponse.json({
       incidents: incidentDocs.map((incident) => ({
-        ...toId(incident),
-        updates: updates.filter((update) => update.incidentId.equals(incident._id)).map(toId),
-        components: links.filter((link) => link.incidentId.equals(incident._id)).map(toId),
+        ...incident,
+        updates: updates.filter((update) => update.incidentId === incident.id),
+        components: links.filter((link) => link.incidentId === incident.id),
       })),
     });
   } catch (error) {

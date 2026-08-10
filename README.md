@@ -13,6 +13,7 @@ The public project landing page is [signalhub.at](https://signalhub.at).
 
 [Enterprise overview deck](docs/status-enterprise-deck.html) ·
 [Complete setup guide](docs/OPEN_SOURCE_SETUP_GUIDE.md) ·
+[HTML user manual](public/docs/user-manual.html) ·
 [Security policy](SECURITY.md) ·
 [Helm chart](deploy/helm/status/README.md)
 
@@ -20,14 +21,14 @@ The public project landing page is [signalhub.at](https://signalhub.at).
 
 - **Own the data:** incident history, subscriber contacts, monitoring results,
   audit evidence, identity mappings, and operational metadata remain in your
-  MongoDB and object storage.
+  PostgreSQL and object storage.
 - **Own the infrastructure:** deploy on a controlled Docker host, Kubernetes,
   private cloud, sovereign cloud, or an isolated network.
 - **Reduce external dependencies:** the communication channel used during an
   outage does not need to depend on another vendor's application control plane.
 - **Control identity and access:** OIDC, SAML, SCIM 2.0, MFA, fixed RBAC,
   page-scoped roles, scoped API keys, CIDR policies, and a local break-glass
-  Owner are built in.
+  Admin are built in.
 - **Create verifiable evidence:** tenant and platform audits are sealed into
   SHA-256 chains, exportable, and deliverable to a SIEM over signed HTTPS.
 - **Avoid license-driven scaling costs:** Apache-2.0 permits internal use,
@@ -77,7 +78,7 @@ The public project landing page is [signalhub.at](https://signalhub.at).
 - View-only or explicitly scoped operate-mode support access.
 - Global templates, lifecycle jobs, diagnostics, retention defaults, and
   platform audit.
-- Owner-safety invariants for destructive and administrator workflows.
+- Administrator safeguards for destructive and installation-wide workflows.
 
 ### Enterprise identity
 
@@ -115,7 +116,7 @@ The public project landing page is [signalhub.at](https://signalhub.at).
                          └──────┬───────────┬───────┘
                                 │           │
               ┌─────────────────▼──┐    ┌──▼────────────────────┐
-              │ MongoDB replica set │    │ S3-compatible storage │
+              │ highly available PostgreSQL cluster │    │ S3-compatible storage │
               │ source of truth     │    │ assets and exports     │
               └─────────────────▲──┘    └──▲────────────────────┘
                                 │           │
@@ -129,9 +130,10 @@ The public project landing page is [signalhub.at](https://signalhub.at).
                           SMTP/SMS  Webhooks   SIEM/OTLP
 ```
 
-The web tier is stateless apart from signed cookies backed by revocable MongoDB
-session records. The worker owns asynchronous and scheduled operations.
-MongoDB replica-set transactions protect authorization and lifecycle changes.
+The web tier is stateless apart from signed cookies backed by revocable PostgreSQL
+session records. Graphile Worker owns distributed asynchronous and scheduled
+operations, while SignalHub's relational job tables retain auditable domain state.
+PostgreSQL transactions atomically protect lifecycle changes and wake queued work.
 S3-compatible storage is required when assets must be shared by multiple
 application replicas.
 
@@ -146,7 +148,8 @@ application replicas.
   absolute timeout, device metadata, and revocation state.
 - Disabling an identity, changing privileged role state, deprovisioning a SCIM
   identity, changing a password, or using logout revokes relevant sessions.
-- Platform administration requires MFA; retain a local break-glass Owner.
+- Retain a tested local break-glass Admin and require MFA according to the
+  organization's identity policy.
 
 ### Authorization
 
@@ -154,19 +157,16 @@ Tenant roles:
 
 | Role | Core scope |
 | --- | --- |
-| Owner | All organization capabilities and owner-only safeguards |
-| Admin | Full tenant administration |
+| Admin | All organization and installation-administration capabilities |
 | Incident Manager | Incident lifecycle, subscribers, analytics, and audit |
 | Responder | Incident updates, monitors, components, and analytics |
 | Viewer | Read-only analytics and audit |
 
-Platform roles:
+Installation administration:
 
-| Role | Core scope |
+| Identity | Core scope |
 | --- | --- |
-| Owner | All platform, identity, administrator, and purge capabilities |
-| Operator | Platform operations without administrator management or irreversible purge |
-| Auditor | Read-only platform oversight |
+| Organization Admin | Organizations, global users, operations, templates, configuration, identity, and platform audit under `/organization/platform` |
 
 API credentials are separate from human sessions and can be restricted by
 capability, page, expiration, and source CIDR.
@@ -186,14 +186,31 @@ capability, page, expiration, and source CIDR.
   uses read-only root filesystems.
 
 Read [SECURITY.md](SECURITY.md) and the
-[production checklist](docs/OPEN_SOURCE_SETUP_GUIDE.md#19-production-readiness-checklist)
+[production checklist](docs/OPEN_SOURCE_SETUP_GUIDE.md#21-production-readiness-checklist)
 before exposing an instance.
+
+## Choose a deployment path
+
+| Environment | Start here |
+| --- | --- |
+| AWS | [AWS blueprint](docs/OPEN_SOURCE_SETUP_GUIDE.md#61-aws) |
+| Microsoft Azure | [Azure blueprint](docs/OPEN_SOURCE_SETUP_GUIDE.md#62-microsoft-azure) |
+| Google Cloud | [GCP blueprint](docs/OPEN_SOURCE_SETUP_GUIDE.md#63-google-cloud-platform) |
+| Any Linux VPS or on-premises VM | [VPS blueprint](docs/OPEN_SOURCE_SETUP_GUIDE.md#64-other-clouds-and-vps-providers) |
+| Kubernetes on any provider | [Kubernetes and Helm](docs/OPEN_SOURCE_SETUP_GUIDE.md#9-kubernetes-and-helm-installation) |
+| Docker on one host | [Docker Compose](docs/OPEN_SOURCE_SETUP_GUIDE.md#7-docker-compose-installation) |
+
+Every path starts by cloning or forking the repository, verifying the locked
+source tree, building one immutable runtime image, and providing PostgreSQL.
+See [Clone, verify, and build](docs/OPEN_SOURCE_SETUP_GUIDE.md#4-clone-verify-and-build-signalhub).
 
 ## Production quick start with Docker Compose
 
-### 1. Configure
+### 1. Clone and configure
 
 ```bash
+git clone https://github.com/rameshbgm/signalhub.git
+cd signalhub
 cp .env.example .env
 openssl rand -base64 48
 openssl rand -base64 48
@@ -204,6 +221,7 @@ Set the generated values independently:
 ```dotenv
 SESSION_SECRET=<first-random-value>
 ENCRYPTION_KEY=<second-random-value>
+POSTGRES_PASSWORD=<independent-database-password>
 NEXT_PUBLIC_APP_URL=https://signalhub.at
 ALLOW_PUBLIC_SIGNUP=false
 REQUIRE_WORKER=true
@@ -217,7 +235,7 @@ docker compose up -d --build
 docker compose ps
 ```
 
-The migration service waits for the MongoDB replica set, applies idempotent
+The migration service waits for the highly available PostgreSQL cluster, applies idempotent
 migrations, and exits before web and worker startup.
 
 ### 3. Bootstrap
@@ -244,7 +262,7 @@ TLS reverse proxy.
 The production Helm chart deploys web and worker replicas, a pre-upgrade
 migration Job, probes, disruption budgets, optional autoscaling, topology
 spread, restricted security contexts, and NetworkPolicy. It intentionally does
-not bundle production MongoDB or object storage.
+not bundle production PostgreSQL or object storage.
 
 Create an externally managed Secret containing at least:
 
@@ -290,7 +308,8 @@ The canonical variable list is [`.env.example`](.env.example).
 | Observability | `METRICS_TOKEN`, `LOG_LEVEL`, `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_EXPORTER_OTLP_HEADERS` |
 
 Enterprise OIDC, SAML, SCIM, role mappings, and audit sinks are managed through
-the platform console because their credentials are encrypted in the database.
+the installation area at `/organization/platform` because their credentials
+are encrypted in the database.
 
 ## Operator CLI
 
@@ -341,18 +360,18 @@ npm run statusctl -- audit --org <organization-id>
 
 ## Backups and recovery
 
-Create a checksummed archive when MongoDB Database Tools are installed:
+Create a checksummed archive when PostgreSQL client tools are installed:
 
 ```bash
-npm run signalhubctl -- backup --output signal-backup.archive.gz
-npm run statusctl -- backup --output signal-backup.archive.gz
+npm run signalhubctl -- backup --output signal-backup.dump
+npm run statusctl -- backup --output signal-backup.dump
 ```
 
 Verify it without changing data:
 
 ```bash
-npm run signalhubctl -- restore --archive signal-backup.archive.gz
-npm run statusctl -- restore --archive signal-backup.archive.gz
+npm run signalhubctl -- restore --archive signal-backup.dump
+npm run statusctl -- restore --archive signal-backup.dump
 ```
 
 Back up local uploads separately, or enable versioning and snapshots on the
@@ -369,7 +388,7 @@ npm run bootstrap -- --password-stdin
 npm run dev
 ```
 
-Run the worker separately:
+Run the Graphile Worker process separately:
 
 ```bash
 npm run worker:dev
@@ -424,7 +443,7 @@ keyless Cosign signatures.
 | Dynamic badge | `/api/v1/badge/:slug` |
 | SCIM 2.0 | `/api/scim/v2/:connection/*` |
 | OpenAPI 3.1 | `/api/openapi` |
-| Platform console | `/platform` |
+| Installation administration | `/organization/platform` |
 
 API failures use:
 
@@ -459,6 +478,7 @@ incident response.
 
 - [Enterprise HTML deck](docs/status-enterprise-deck.html)
 - [Open-source enterprise setup guide](docs/OPEN_SOURCE_SETUP_GUIDE.md)
+- [Standalone HTML user manual](public/docs/user-manual.html)
 - [Security policy](SECURITY.md)
 - [Contribution guide](CONTRIBUTING.md)
 - [Helm chart guide](deploy/helm/status/README.md)

@@ -6,7 +6,7 @@ import { useEffect, useState, type ReactNode } from "react";
 
 export function AdminShell({ sidebar, children }: { sidebar: ReactNode; children: ReactNode }) {
   const pathname = usePathname();
-  const designer = /^\/organization\/pages\/[^/]+\/design\/?$/.test(pathname);
+  const designer = /^\/organization\/pages\/[^/]+\/(?:appearance|design)\/?$/.test(pathname);
   const [navigationPath, setNavigationPath] = useState<string | null>(null);
   const navigationOpen = navigationPath === pathname;
 

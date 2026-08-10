@@ -16,7 +16,8 @@ describe("global monitor template attachments", () => {
 
   it("propagates global master edits and blocks deletion while attached", () => {
     const actions = readFileSync("app/platform/(protected)/templates/actions.ts", "utf8");
-    expect(actions).toContain("{ templateId: id }");
+    expect(actions).toContain('.where("templateId", "=", templateId)');
+    expect(actions).toContain("enqueueJobSweep(transaction, JOB_TASKS.monitors)");
     expect(actions).toContain("Remove this template from");
   });
 });

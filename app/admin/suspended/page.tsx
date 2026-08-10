@@ -1,8 +1,7 @@
 import { redirect } from "next/navigation";
 import { LogoutButton } from "@/components/admin/LogoutButton";
 import { getSession } from "@/lib/auth";
-import { collections } from "@/lib/db";
-import { oid } from "@/lib/mongo-utils";
+import { database } from "@/lib/postgres/client";
 import { organizationStatus } from "@/lib/organization-state";
 
 export default async function OrgSuspendedPage() {
@@ -12,14 +11,12 @@ export default async function OrgSuspendedPage() {
   const session = await getSession();
   if (!session) redirect("/login");
   const [membership, user, organization] = await Promise.all([
-    collections.memberships().findOne({
-      _id: oid(session.membershipId),
-      userId: oid(session.userId),
-      orgId: oid(session.orgId),
-      status: { $ne: "REVOKED" },
-    }),
-    collections.users().findOne({ _id: oid(session.userId), disabled: { $ne: true } }),
-    collections.organizations().findOne({ _id: oid(session.orgId) }),
+    database.selectFrom("memberships").select("id")
+      .where("id", "=", session.membershipId).where("userId", "=", session.userId)
+      .where("orgId", "=", session.orgId).where("status", "!=", "REVOKED").executeTakeFirst(),
+    database.selectFrom("users").select("id")
+      .where("id", "=", session.userId).where("disabled", "=", false).executeTakeFirst(),
+    database.selectFrom("organizations").selectAll().where("id", "=", session.orgId).executeTakeFirst(),
   ]);
   if (!membership || !user || !organization) redirect("/login");
   if (organizationStatus(organization) !== "SUSPENDED") redirect("/organization");

@@ -1,6 +1,4 @@
-import { ObjectId, type ClientSession } from "mongodb";
-import { collections } from "@/lib/db";
-import { oid } from "@/lib/mongo-utils";
+import type { DatabaseTransaction } from "@/lib/postgres/client";
 
 export class OrganizationMutationBlockedError extends Error {
   constructor() {
@@ -13,34 +11,27 @@ export class OrganizationMutationBlockedError extends Error {
  * Establishes a durable ordering between an organization mutation and a
  * lifecycle transition.
  *
- * This must run inside the same MongoDB transaction as the tenant writes. The
+ * This must run inside the same PostgreSQL transaction as the tenant writes. The
  * organization-row update conflicts with suspension or deletion, while the
  * predicate prevents a transaction retried after that conflict from writing
- * into an inactive organization. The second branch preserves legacy
- * organizations that predate the explicit status field.
+ * into an inactive organization.
  */
 export async function fenceActiveOrganizationMutation(
-  organizationId: string | ObjectId,
-  session: ClientSession
+  organizationId: string,
+  transaction: DatabaseTransaction
 ): Promise<void> {
-  const result = await collections.organizations().updateOne(
-    {
-      _id:
-        organizationId instanceof ObjectId
-          ? organizationId
-          : oid(organizationId),
-      $or: [
-        { status: "ACTIVE" },
-        {
-          status: { $exists: false },
-          suspended: { $ne: true },
-        },
-      ],
-    },
-    { $inc: { mutationRevision: 1 } },
-    { session }
-  );
-  if (result.matchedCount !== 1) {
+  const result = await transaction
+    .updateTable("organizations")
+    .set((expression) => ({
+      mutationRevision: expression("mutationRevision", "+", 1),
+      updatedAt: new Date(),
+    }))
+    .where("id", "=", organizationId)
+    .where("status", "=", "ACTIVE")
+    .where("suspended", "=", false)
+    .returning("id")
+    .executeTakeFirst();
+  if (!result) {
     throw new OrganizationMutationBlockedError();
   }
 }

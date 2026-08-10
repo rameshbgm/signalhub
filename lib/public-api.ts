@@ -1,13 +1,13 @@
-import type { PageDoc } from "@/lib/db";
+import type { PageRow } from "@/lib/postgres/schema";
 import { getComponentsForPage, getIncidentsForPage } from "@/lib/public-data";
 import { publicPagePath } from "@/lib/public-path";
 
 export async function buildStatusPayload(
-  page: PageDoc,
+  page: PageRow,
   visibleComponentIds: string[] | null,
   publicUrl?: string
 ) {
-  const pageId = page._id.toHexString();
+  const pageId = page.id;
   const [{ allVisible, banner }, incidents] = await Promise.all([
     getComponentsForPage(pageId, visibleComponentIds),
     getIncidentsForPage(pageId, visibleComponentIds),

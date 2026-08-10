@@ -1,7 +1,5 @@
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
-import { collections } from "@/lib/db";
-import { toId } from "@/lib/mongo-utils";
 import { checkPageAccess } from "@/lib/access";
 import { getIncidentsForPage } from "@/lib/public-data";
 import { PublicHeader, PublicFooter } from "@/components/public/PublicChrome";
@@ -15,14 +13,14 @@ import { PageSurfaceLayout } from "@/components/public/PageSurfaceLayout";
 import type { PageDesignBlock } from "@/lib/page-design";
 import { AnnouncementList } from "@/components/public/AnnouncementList";
 import { SubscribeModal } from "@/components/public/SubscribeModal";
-import { publicPageFilter } from "@/lib/page-lifecycle";
+import { getActivePageAnnouncements, getPublicPageBySlug } from "@/lib/pages";
 
 export default async function HistoryPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const pageDoc = await collections.pages().findOne(publicPageFilter({ slug }));
+  const pageDoc = await getPublicPageBySlug(slug);
   if (!pageDoc) notFound();
-  const page = toId(pageDoc);
-  const design = pageDesignFor(pageDoc);
+  const page = pageDoc!;
+  const design = pageDesignFor(page);
   const basePath = publicPagePath(page);
 
   const access = await checkPageAccess(page);
@@ -33,13 +31,7 @@ export default async function HistoryPage({ params }: { params: Promise<{ slug: 
 
   const incidents = await getIncidentsForPage(page.id, access.visibleComponentIds);
   const incidentPageSlug = page.slug;
-  const now = new Date();
-  const announcementDocs = await collections.pageAnnouncements().find({
-    pageId: pageDoc._id,
-    startsAt: { $lte: now },
-    $or: [{ endsAt: null }, { endsAt: { $gt: now } }],
-    surfaces: "HISTORY",
-  }).sort({ priority: -1, startsAt: -1 }).toArray();
+  const announcementDocs = await getActivePageAnnouncements(page.id, "HISTORY");
 
   const byMonth = new Map<string, typeof incidents>();
   for (const inc of incidents) {
@@ -71,7 +63,7 @@ export default async function HistoryPage({ params }: { params: Promise<{ slug: 
       );
     }
     if (block.type === "ANNOUNCEMENTS") {
-      return <AnnouncementList pageId={page.id} maxItems={block.settings.maxItems} announcements={announcementDocs.map((announcement) => ({ id: announcement._id.toHexString(), title: announcement.title, body: announcement.body, severity: announcement.severity, ctaLabel: announcement.ctaLabel, ctaUrl: announcement.ctaUrl, dismissible: announcement.dismissible }))} />;
+      return <AnnouncementList pageId={page.id} maxItems={block.settings.maxItems} announcements={announcementDocs.map((announcement) => ({ id: announcement.id, title: announcement.title, body: announcement.body, severity: announcement.severity, ctaLabel: announcement.ctaLabel, ctaUrl: announcement.ctaUrl, dismissible: announcement.dismissible }))} />;
     }
     if (block.type === "RICH_TEXT") {
       return <article className={`page-panel border border-[var(--line)] bg-[var(--surface)] p-[var(--page-block-padding)] ${block.settings.align === "CENTER" ? "text-center" : ""}`}>{block.settings.heading && <h2 className="text-xl font-semibold">{block.settings.heading}</h2>}<p className="mt-2 whitespace-pre-wrap text-sm text-[var(--fg-soft)]">{block.settings.body}</p></article>;

@@ -1,8 +1,7 @@
 import net from "node:net";
 import tls from "node:tls";
 import { spawn } from "node:child_process";
-import type { WithId } from "mongodb";
-import type { MonitorDoc } from "@/lib/db";
+import type { MonitorRow } from "@/lib/postgres/schema";
 import { validateHttpTarget, validateNetworkHost } from "@/lib/target-validation";
 import { decryptSecret } from "@/lib/encryption";
 import { resolve4, resolve6, resolveCname, resolveMx, resolveNs, resolveTxt } from "node:dns/promises";
@@ -64,7 +63,7 @@ async function limitedResponseText(response: Response) {
   }
 }
 
-async function httpCheck(monitor: WithId<MonitorDoc>, allowPrivate: boolean): Promise<CheckResult> {
+async function httpCheck(monitor: MonitorRow, allowPrivate: boolean): Promise<CheckResult> {
   const started = Date.now();
   try {
     let url = await validateHttpTarget(monitor.target, { allowPrivate });
@@ -113,7 +112,7 @@ async function httpCheck(monitor: WithId<MonitorDoc>, allowPrivate: boolean): Pr
   }
 }
 
-async function tcpCheck(monitor: WithId<MonitorDoc>, allowPrivate: boolean): Promise<CheckResult> {
+async function tcpCheck(monitor: MonitorRow, allowPrivate: boolean): Promise<CheckResult> {
   const started = Date.now();
   try {
     const host = await validateNetworkHost(monitor.target, allowPrivate);
@@ -137,7 +136,7 @@ async function tcpCheck(monitor: WithId<MonitorDoc>, allowPrivate: boolean): Pro
   }
 }
 
-async function tlsCheck(monitor: WithId<MonitorDoc>, allowPrivate: boolean): Promise<CheckResult> {
+async function tlsCheck(monitor: MonitorRow, allowPrivate: boolean): Promise<CheckResult> {
   const started = Date.now();
   try {
     const target = monitor.target.includes("://") ? new URL(monitor.target) : null;
@@ -174,7 +173,7 @@ async function tlsCheck(monitor: WithId<MonitorDoc>, allowPrivate: boolean): Pro
   }
 }
 
-async function icmpCheck(monitor: WithId<MonitorDoc>, allowPrivate: boolean): Promise<CheckResult> {
+async function icmpCheck(monitor: MonitorRow, allowPrivate: boolean): Promise<CheckResult> {
   const started = Date.now();
   try {
     if (process.env.MONITOR_ENABLE_ICMP !== "true") {
@@ -206,7 +205,7 @@ async function icmpCheck(monitor: WithId<MonitorDoc>, allowPrivate: boolean): Pr
   }
 }
 
-async function dnsCheck(monitor: WithId<MonitorDoc>): Promise<CheckResult> {
+async function dnsCheck(monitor: MonitorRow): Promise<CheckResult> {
   const started = Date.now();
   try {
     const recordType = monitor.dnsRecordType ?? "A";
@@ -227,7 +226,7 @@ async function dnsCheck(monitor: WithId<MonitorDoc>): Promise<CheckResult> {
   }
 }
 
-function heartbeatCheck(monitor: WithId<MonitorDoc>): CheckResult {
+function heartbeatCheck(monitor: MonitorRow): CheckResult {
   const last = monitor.lastHeartbeatAt?.getTime() ?? 0;
   const maximumAge = (monitor.intervalSec + (monitor.heartbeatGraceSec ?? 60)) * 1000;
   const age = Date.now() - last;
@@ -241,7 +240,7 @@ function heartbeatCheck(monitor: WithId<MonitorDoc>): CheckResult {
       };
 }
 
-export async function runCheck(monitor: WithId<MonitorDoc>) {
+export async function runCheck(monitor: MonitorRow) {
   const allowPrivate = process.env.MONITOR_ALLOW_PRIVATE_TARGETS === "true";
   if (monitor.type === "HTTP" || monitor.type === "KEYWORD") return httpCheck(monitor, allowPrivate);
   if (monitor.type === "TCP") return tcpCheck(monitor, allowPrivate);

@@ -1,11 +1,11 @@
 import { requireSession } from "@/lib/require-session";
+import { sql } from "kysely";
 import { FluentSelect } from "@/components/FluentSelect";
-import { collections } from "@/lib/db";
-import { oid, toId } from "@/lib/mongo-utils";
+import { database } from "@/lib/postgres/client";
 import { addMonitorTemplate, removeMonitorTemplate, toggleMonitorEnabled, deleteMonitor, runMonitorNow, updateMonitor } from "./actions";
 import { PageSelect } from "@/components/admin/PageSelect";
 import { HeartbeatTokenManager } from "@/components/admin/HeartbeatTokenManager";
-import { scopedPageFilter, sessionHasCapability } from "@/lib/admin-guard";
+import { getScopedPages, sessionHasCapability } from "@/lib/admin-guard";
 
 function relativeTime(date: Date | null): string {
   if (!date) return "never";
@@ -19,27 +19,33 @@ function relativeTime(date: Date | null): string {
 export default async function MonitorsPage({ searchParams }: { searchParams: Promise<{ pageId?: string }> }) {
   const { session, org } = await requireSession();
   const { pageId: pageIdParam } = await searchParams;
-  const pages = (await collections.pages().find(scopedPageFilter(session, org.id, { isHub: false })).sort({ createdAt: 1 }).toArray()).map(toId);
+  const pages = await getScopedPages(session, org.id, { isHub: false });
   const pageId = pageIdParam && pages.some((p) => p.id === pageIdParam) ? pageIdParam : pages[0]?.id;
   if (!pageId) return <p className="text-sm text-[var(--fg-dim)]">Create a page first.</p>;
 
-  const monitorDocs = await collections.monitors().find({ pageId: oid(pageId) }).sort({ createdAt: -1 }).toArray();
-  const monitors = monitorDocs.map(toId);
-  const templates = (await collections.monitorTemplates().find({ enabled: true }).sort({ category: 1, name: 1 }).toArray()).map(toId);
+  const monitors = await database.selectFrom("monitors").selectAll()
+    .where("pageId", "=", pageId).orderBy("createdAt", "desc").execute();
+  const templates = await database.selectFrom("monitorTemplates").selectAll()
+    .where("enabled", "=", true).orderBy("category").orderBy("name").execute();
   const attachedByTemplate = new Map<string, (typeof monitors)[number]>(
     monitors.filter((monitor) => monitor.templateId).map((monitor) => [String(monitor.templateId), monitor])
   );
-  const checkRows = await Promise.all(
-    monitorDocs.map((monitor) =>
-      collections.monitorChecks().find({ monitorId: monitor._id }).sort({ checkedAt: -1 }).limit(10).toArray()
-    )
-  );
-  const checksByMonitor = new Map(
-    monitorDocs.map((monitor, index) => [monitor._id.toHexString(), checkRows[index]])
-  );
-  const components = (await collections.components().find({ pageId: oid(pageId) }).toArray()).map(toId);
+  const monitorIds = monitors.map((monitor) => monitor.id);
+  const rankedChecks = database.selectFrom("monitorChecks").selectAll()
+    .select(sql<number>`row_number() over (partition by monitor_id order by checked_at desc)`.as("rank"))
+    .$if(monitorIds.length > 0, (query) => query.where("monitorId", "in", monitorIds));
+  const checks = monitorIds.length
+    ? await database.selectFrom(rankedChecks.as("rankedChecks")).selectAll()
+        .where("rank", "<=", 10).execute()
+    : [];
+  const checksByMonitor = new Map(monitors.map((monitor) => [
+    monitor.id,
+    checks.filter((check) => check.monitorId === monitor.id),
+  ]));
+  const components = await database.selectFrom("components").selectAll().where("pageId", "=", pageId).execute();
   const componentsById = new Map(components.map((c) => [c.id, c.name]));
-  const latestHeartbeat = await collections.workerHeartbeats().find().sort({ lastSeenAt: -1 }).limit(1).next();
+  const latestHeartbeat = await database.selectFrom("workerHeartbeats").selectAll()
+    .orderBy("lastSeenAt", "desc").executeTakeFirst();
   // Server-render timestamp used only to classify a persisted heartbeat.
   // eslint-disable-next-line react-hooks/purity
   const renderedAt = Date.now();
@@ -192,7 +198,7 @@ export default async function MonitorsPage({ searchParams }: { searchParams: Pro
                     </thead>
                     <tbody>
                       {(checksByMonitor.get(m.id) ?? []).map((check) => (
-                        <tr key={check._id.toHexString()} className="border-t border-[var(--line)]">
+                        <tr key={check.id} className="border-t border-[var(--line)]">
                           <td className="py-1.5 font-mono">{new Date(check.checkedAt).toLocaleString()}</td>
                           <td className={check.ok ? "text-[var(--green)]" : "text-[var(--red)]"}>{check.ok ? "Up" : "Down"}</td>
                           <td>{check.latencyMs === null ? "—" : `${check.latencyMs} ms`}</td>
@@ -213,7 +219,7 @@ export default async function MonitorsPage({ searchParams }: { searchParams: Pro
       </div>
 
       <p className="text-xs text-[var(--fg-dim)]">
-        Checks run in the compiled TypeScript worker with Mongo-backed leases. Docker Compose supervises it separately from the web process,
+        Checks run in the compiled TypeScript worker with PostgreSQL-backed leases. Docker Compose supervises it separately from the web process,
         so multiple worker replicas can safely share the queue.
       </p>
     </div>

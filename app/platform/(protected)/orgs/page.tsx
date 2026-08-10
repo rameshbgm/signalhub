@@ -1,11 +1,11 @@
-import { collections, db } from "@/lib/db";
+import { database, verifyDatabaseConnection } from "@/lib/postgres/client";
 import {
   suspendOrg,
   unsuspendOrg,
   deleteOrgAsPlatform,
   cancelOrganizationPurge,
 } from "./actions";
-import { requirePlatformCapability } from "@/lib/admin-guard";
+import { requirePlatformPageCapability } from "@/lib/platform-page-guard";
 import {
   inspectMigrationState,
   LATEST_MIGRATION_ID,
@@ -26,64 +26,44 @@ export default async function PlatformOrgsPage({
 }: {
   searchParams: Promise<{ error?: string; q?: string }>;
 }) {
-  const actor = await requirePlatformCapability("organizations.read");
+  const actor = await requirePlatformPageCapability("organizations.read");
   const query = (await searchParams).q?.trim() ?? "";
   // eslint-disable-next-line react-hooks/purity
   const renderedAt = Date.now();
-  const databaseOk = await db
-    .command({ ping: 1 }, { timeoutMS: 2_000 })
+  const databaseOk = await verifyDatabaseConnection()
     .then(() => true)
     .catch(() => false);
   const [migrationState, latestHeartbeat, deadLetters, queuedDeliveries, smtp] =
     await Promise.all([
       inspectMigrationState(),
-      collections.workerHeartbeats().find().sort({ lastSeenAt: -1 }).limit(1).next(),
-      collections.notificationJobs().countDocuments({ status: "DEAD_LETTER" }),
-      collections
-        .notificationJobs()
-        .countDocuments({ status: { $in: ["PENDING", "PROCESSING"] } }),
+      database.selectFrom("workerHeartbeats").selectAll().orderBy("lastSeenAt", "desc").executeTakeFirst(),
+      countNotificationJobs(["DEAD_LETTER"]),
+      countNotificationJobs(["PENDING", "PROCESSING"]),
       verifySmtp(),
     ]);
-  const orgDocs = await collections
-    .organizations()
-    .find(
-      query
-        ? {
-            $or: [
-              { name: { $regex: query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), $options: "i" } },
-              { slug: { $regex: query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), $options: "i" } },
-              {
-                contactEmail: {
-                  $regex: query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
-                  $options: "i",
-                },
-              },
-            ],
-          }
-        : {}
-    )
-    .sort({ createdAt: -1 })
-    .limit(200)
-    .toArray();
+  let organizationsQuery = database.selectFrom("organizations").selectAll();
+  if (query) {
+    const pattern = `%${query}%`;
+    organizationsQuery = organizationsQuery.where((expression) => expression.or([
+      expression("name", "ilike", pattern),
+      expression("slug", "ilike", pattern),
+      expression("contactEmail", "ilike", pattern),
+    ]));
+  }
+  const orgDocs = await organizationsQuery.orderBy("createdAt", "desc").limit(200).execute();
   const memberships = orgDocs.length
-    ? await collections
-        .memberships()
-        .find({ orgId: { $in: orgDocs.map((organization) => organization._id) } })
-        .toArray()
+    ? await database.selectFrom("memberships").selectAll()
+        .where("orgId", "in", orgDocs.map((organization) => organization.id)).execute()
     : [];
   const purgeJobs = orgDocs.length
-    ? await collections
-        .platformJobs()
-        .find({
-          organizationId: { $in: orgDocs.map((organization) => organization._id) },
-          type: "PURGE_ORGANIZATION",
-        })
-        .sort({ createdAt: -1 })
-        .toArray()
+    ? await database.selectFrom("platformJobs").selectAll()
+        .where("organizationId", "in", orgDocs.map((organization) => organization.id))
+        .where("type", "=", "PURGE_ORGANIZATION")
+        .orderBy("createdAt", "desc").execute()
     : [];
   const latestPurgeJobByOrganization = new Map<string, (typeof purgeJobs)[number]>();
   for (const job of purgeJobs) {
-    const organizationId = job.organizationId.toHexString();
+    const organizationId = job.organizationId;
     if (!latestPurgeJobByOrganization.has(organizationId)) {
       latestPurgeJobByOrganization.set(organizationId, job);
     }
@@ -188,13 +168,13 @@ export default async function PlatformOrgsPage({
 
         <div className="space-y-3">
           {orgDocs.map((organization) => {
-            const id = organization._id.toHexString();
+            const id = organization.id;
             const status = organizationStatus(organization);
             const purgeJob = latestPurgeJobByOrganization.get(id);
             const purgeCanBeCancelled =
               organizationPurgeCanBeCancelled(purgeJob);
             const orgMemberships = memberships.filter((membership) =>
-              membership.orgId.equals(organization._id)
+              membership.orgId === organization.id
             );
             return (
               <article key={id} className="border border-[var(--line)] bg-[var(--surface)] p-4">
@@ -385,4 +365,13 @@ function StatusPill({ status }: { status: string }) {
       {status}
     </span>
   );
+}
+
+async function countNotificationJobs(
+  statuses: Array<"PENDING" | "PROCESSING" | "DEAD_LETTER">
+) {
+  const row = await database.selectFrom("notificationJobs")
+    .select(({ fn }) => fn.countAll<number>().as("count"))
+    .where("status", "in", statuses).executeTakeFirstOrThrow();
+  return Number(row.count);
 }

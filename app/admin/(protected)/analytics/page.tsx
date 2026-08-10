@@ -1,7 +1,7 @@
 import { requireSession } from "@/lib/require-session";
-import { collections } from "@/lib/db";
+import { database } from "@/lib/postgres/client";
 import { PageSelect } from "@/components/admin/PageSelect";
-import { scopedPageFilter } from "@/lib/admin-guard";
+import { getScopedPages } from "@/lib/admin-guard";
 
 export default async function AnalyticsPage({
   searchParams,
@@ -10,10 +10,11 @@ export default async function AnalyticsPage({
 }) {
   const { session, org } = await requireSession();
   const requested = (await searchParams).pageId;
-  const pages = await collections.pages().find(scopedPageFilter(session, org.id)).sort({ name: 1 }).toArray();
-  const selected = pages.find((page) => page._id.toHexString() === requested) ?? pages[0];
+  const pages = await getScopedPages(session, org.id, { orderBy: "name" });
+  const selected = pages.find((page) => page.id === requested) ?? pages[0];
   if (!selected) return <p className="text-sm text-[var(--fg-dim)]">Create a page first.</p>;
-  const rows = await collections.analyticsDaily().find({ pageId: selected._id }).sort({ date: -1 }).limit(30).toArray();
+  const rows = await database.selectFrom("analyticsDaily").selectAll()
+    .where("pageId", "=", selected.id).orderBy("date", "desc").limit(30).execute();
   const totals = rows.reduce(
     (sum, row) => ({
       views: sum.views + (row.views ?? 0),
@@ -32,7 +33,7 @@ export default async function AnalyticsPage({
           <p className="mt-1 text-sm text-[var(--fg-soft)]">Cookie-free, aggregate activity stored on your infrastructure.</p>
         </div>
         <div className="w-60">
-          <PageSelect pages={pages.map((page) => ({ id: page._id.toHexString(), name: page.name }))} selected={selected._id.toHexString()} basePath="/organization/analytics" />
+          <PageSelect pages={pages.map((page) => ({ id: page.id, name: page.name }))} selected={selected.id} basePath="/organization/analytics" />
         </div>
       </div>
       <div className="grid gap-3 sm:grid-cols-4">
@@ -55,7 +56,7 @@ export default async function AnalyticsPage({
           </thead>
           <tbody>
             {rows.map((row) => (
-              <tr key={row._id} className="border-b border-[var(--line)] last:border-0">
+              <tr key={row.id} className="border-b border-[var(--line)] last:border-0">
                 <td className="p-3 font-mono">{row.date}</td><td>{row.views ?? 0}</td><td>{row.incidentViews ?? 0}</td><td>{row.subscriptionStarts ?? 0}</td><td>{row.subscriptionCompletions ?? 0}</td>
               </tr>
             ))}

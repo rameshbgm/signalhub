@@ -1,7 +1,6 @@
 import { requireSession } from "@/lib/require-session";
 import { FluentSelect } from "@/components/FluentSelect";
-import { collections } from "@/lib/db";
-import { oid, toId } from "@/lib/mongo-utils";
+import { database } from "@/lib/postgres/client";
 import {
   createMetric,
   pushMetricPoint,
@@ -10,30 +9,30 @@ import {
   updateMetricDecimals,
 } from "./actions";
 import { PageSelect } from "@/components/admin/PageSelect";
-import { scopedPageFilter, sessionHasCapability } from "@/lib/admin-guard";
+import { getScopedPages, sessionHasCapability } from "@/lib/admin-guard";
 import { formatMetricValue, metricDecimals } from "@/lib/status";
 
 export default async function MetricsPage({ searchParams }: { searchParams: Promise<{ pageId?: string }> }) {
   const { session, org } = await requireSession();
   const { pageId: pageIdParam } = await searchParams;
-  const pages = (await collections.pages().find(scopedPageFilter(session, org.id, { isHub: false })).sort({ createdAt: 1 }).toArray()).map(toId);
+  const pages = await getScopedPages(session, org.id, { isHub: false });
   const pageId = pageIdParam && pages.some((p) => p.id === pageIdParam) ? pageIdParam : pages[0]?.id;
   if (!pageId) return <p className="text-sm text-[var(--fg-dim)]">Create a page first.</p>;
 
-  const metricDocs = await collections.metrics().find({ pageId: oid(pageId) }).toArray();
-  const metricIds = metricDocs.map((m) => m._id);
-  const latestPoints = await Promise.all(
-    metricIds.map((id) =>
-      collections.metricPoints().find({ metricId: id }).sort({ timestamp: -1 }).limit(1).next()
-    )
-  );
-  const latestByMetric = new Map(metricIds.map((id, i) => [id.toHexString(), latestPoints[i]]));
-  const metrics = metricDocs.map((m) => ({
-    ...toId(m),
-    points: latestByMetric.get(m._id.toHexString()) ? [toId(latestByMetric.get(m._id.toHexString())!)] : [],
+  const metricRows = await database.selectFrom("metrics").selectAll().where("pageId", "=", pageId).execute();
+  const metricIds = metricRows.map((metric) => metric.id);
+  const latestPoints = metricIds.length
+    ? await database.selectFrom("metricPoints").selectAll()
+        .distinctOn("metricId").where("metricId", "in", metricIds)
+        .orderBy("metricId").orderBy("timestamp", "desc").execute()
+    : [];
+  const latestByMetric = new Map(latestPoints.map((point) => [point.metricId, point]));
+  const metrics = metricRows.map((metric) => ({
+    ...metric,
+    points: latestByMetric.has(metric.id) ? [latestByMetric.get(metric.id)!] : [],
   }));
 
-  const components = (await collections.components().find({ pageId: oid(pageId) }).toArray()).map(toId);
+  const components = await database.selectFrom("components").selectAll().where("pageId", "=", pageId).execute();
   const boundCreate = createMetric.bind(null, pageId);
   const canManage = sessionHasCapability(session, "monitor.manage");
 

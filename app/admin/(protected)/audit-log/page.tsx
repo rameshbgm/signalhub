@@ -1,7 +1,6 @@
 import { requireSession } from "@/lib/require-session";
 import { FluentSelect } from "@/components/FluentSelect";
-import { collections } from "@/lib/db";
-import { oid } from "@/lib/mongo-utils";
+import { database } from "@/lib/postgres/client";
 import { requireCapability } from "@/lib/admin-guard";
 import Link from "next/link";
 import { auditRetentionCutoff } from "@/lib/audit-retention";
@@ -18,28 +17,35 @@ export default async function AuditLogPage({
   const query = parameters.q?.trim() ?? "";
   const action = parameters.action?.trim() ?? "";
   const page = Math.max(1, Number(parameters.page ?? 1));
-  const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const filter = {
-    orgId: oid(org.id),
-    createdAt: { $gte: auditRetentionCutoff() },
-    ...(query ? { $or: [
-      { actor: { $regex: escaped, $options: "i" } },
-      { target: { $regex: escaped, $options: "i" } },
-    ] } : {}),
-    ...(action ? { action } : {}),
+  const cutoff = auditRetentionCutoff();
+  const filteredLogs = () => {
+    let statement = database.selectFrom("auditLogs")
+      .where("orgId", "=", org.id).where("createdAt", ">=", cutoff);
+    if (query) {
+      const pattern = `%${query.replace(/[%_\\]/g, "\\$&")}%`;
+      statement = statement.where((expression) => expression.or([
+        expression("actor", "ilike", pattern),
+        expression("target", "ilike", pattern),
+      ]));
+    }
+    if (action) statement = statement.where("action", "=", action);
+    return statement;
   };
   const pageSize = 100;
   const logs = (
-    await collections.auditLogs().find(filter).sort({ createdAt: -1 }).skip((page - 1) * pageSize).limit(pageSize).toArray()
+    await filteredLogs().selectAll().orderBy("createdAt", "desc").offset((page - 1) * pageSize).limit(pageSize).execute()
   ).map((entry) => ({
-    id: entry._id.toHexString(), actor: entry.actor, action: entry.action,
+    id: entry.id, actor: entry.actor, action: entry.action,
     target: entry.target, createdAt: entry.createdAt.toISOString(),
     metadata: entry.metadata ? JSON.parse(JSON.stringify(entry.metadata)) as Record<string, unknown> : null,
   }));
-  const [total, actions] = await Promise.all([
-    collections.auditLogs().countDocuments(filter),
-    collections.auditLogs().distinct("action", { orgId: oid(org.id), createdAt: { $gte: auditRetentionCutoff() } }),
+  const [totalRow, actions] = await Promise.all([
+    filteredLogs().select((expression) => expression.fn.countAll<number>().as("count")).executeTakeFirstOrThrow(),
+    database.selectFrom("auditLogs").select("action").distinct()
+      .where("orgId", "=", org.id).where("createdAt", ">=", cutoff).execute(),
   ]);
+  const total = Number(totalRow.count);
+  const actionValues = actions.map((entry) => entry.action);
 
   return (
     <div className="mx-auto w-full max-w-6xl space-y-5">
@@ -54,7 +60,7 @@ export default async function AuditLogPage({
         <input name="q" defaultValue={query} placeholder="Actor or target" className="border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-xs" />
         <FluentSelect aria-label="Filter by action" name="action" defaultValue={action} className="border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-xs">
           <option value="">All actions</option>
-          {actions.sort().map((value) => <option key={value} value={value}>{value}</option>)}
+          {actionValues.sort().map((value) => <option key={value} value={value}>{value}</option>)}
         </FluentSelect>
         <button className="border border-[var(--cyan)]/40 px-3 py-2 text-xs font-semibold text-[var(--cyan)]">Filter</button>
       </form>

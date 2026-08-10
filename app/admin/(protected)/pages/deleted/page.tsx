@@ -1,16 +1,14 @@
 import Link from "next/link";
-import { collections } from "@/lib/db";
-import { oid, toId } from "@/lib/mongo-utils";
+import { database } from "@/lib/postgres/client";
 import { requireCapability } from "@/lib/admin-guard";
-import { deletedPageFilter } from "@/lib/page-lifecycle";
 import { PlatformSubmitButton } from "@/components/platform/PlatformSubmitButton";
 import { restorePage } from "../actions";
 
 export default async function DeletedPagesPage() {
   const session = await requireCapability("page.configure");
-  const pages = (await collections.pages().find(
-    deletedPageFilter({ orgId: oid(session.orgId) })
-  ).sort({ deletedAt: -1 }).toArray()).map(toId);
+  const pages = await database.selectFrom("pages").selectAll()
+    .where("orgId", "=", session.orgId).where("deletedAt", "is not", null)
+    .orderBy("deletedAt", "desc").execute();
 
   return (
     <div className="mx-auto w-full max-w-6xl space-y-6">

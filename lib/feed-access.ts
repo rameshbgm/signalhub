@@ -1,6 +1,6 @@
 import type { NextRequest } from "next/server";
-import type { PageDoc } from "@/lib/db";
-import { collections } from "@/lib/db";
+import type { PageRow } from "@/lib/postgres/schema";
+import { database } from "@/lib/postgres/client";
 import { hashSecret } from "@/lib/secrets";
 import { isPageOrganizationActive } from "@/lib/public-page";
 
@@ -10,7 +10,7 @@ export type SurfaceAccess =
 
 export async function authorizePublicSurface(
   request: NextRequest,
-  page: PageDoc
+  page: PageRow
 ): Promise<SurfaceAccess> {
   if (!(await isPageOrganizationActive(page.orgId))) return { ok: false };
   if (page.type === "PUBLIC") {
@@ -25,19 +25,26 @@ export async function authorizePublicSurface(
   if (!token) return { ok: false };
 
   const now = new Date();
-  const record = await collections.feedTokens().findOne({
-    pageId: page._id,
-    tokenHash: hashSecret(token),
-    revokedAt: null,
-    $or: [{ expiresAt: null }, { expiresAt: { $gt: now } }],
-  });
+  const record = await database
+    .selectFrom("feedTokens")
+    .selectAll()
+    .where("pageId", "=", page.id)
+    .where("tokenHash", "=", hashSecret(token))
+    .where("revokedAt", "is", null)
+    .where((expression) => expression.or([
+      expression("expiresAt", "is", null),
+      expression("expiresAt", ">", now),
+    ]))
+    .executeTakeFirst();
   if (!record) return { ok: false };
-  await collections
-    .feedTokens()
-    .updateOne({ _id: record._id }, { $set: { lastUsedAt: now } });
+  await database
+    .updateTable("feedTokens")
+    .set({ lastUsedAt: now })
+    .where("id", "=", record.id)
+    .execute();
   return {
     ok: true,
-    visibleComponentIds: record.componentIds?.map((id) => id.toHexString()) ?? null,
-    tokenId: record._id.toHexString(),
+    visibleComponentIds: record.componentIds ?? null,
+    tokenId: record.id,
   };
 }

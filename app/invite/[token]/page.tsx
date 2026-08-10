@@ -1,8 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { collections } from "@/lib/db";
+import { database } from "@/lib/postgres/client";
 import { hashSecret } from "@/lib/secrets";
-import { organizationIsActive } from "@/lib/organization-state";
 import { passwordMinimumLength } from "@/lib/password-policy";
 import { InviteAcceptanceForm } from "./InviteAcceptanceForm";
 
@@ -12,26 +11,19 @@ export default async function InvitationPage({
   params: Promise<{ token: string }>;
 }) {
   const { token } = await params;
-  const membership = await collections.memberships().findOne({
-    invitationTokenHash: hashSecret(token),
-    status: "INVITED",
-    invitationExpiresAt: { $gt: new Date() },
-  });
-  if (!membership) notFound();
-  const [organization, user] = await Promise.all([
-    collections.organizations().findOne({ _id: membership.orgId }),
-    collections.users().findOne({ _id: membership.userId }),
-  ]);
-  if (!organization || !organizationIsActive(organization) || !user || user.disabled) {
-    notFound();
-  }
+  const invite = await database.selectFrom("memberships as membership")
+    .innerJoin("organizations as organization", "organization.id", "membership.orgId")
+    .innerJoin("users as user", "user.id", "membership.userId")
+    .select(["organization.name as organizationName", "organization.status", "organization.suspended",
+      "user.id as userId", "user.email", "user.disabled", "user.passwordHash", "user.oidcIssuer", "user.oidcSubject"])
+    .where("membership.invitationTokenHash", "=", hashSecret(token)).where("membership.status", "=", "INVITED")
+    .where("membership.invitationExpiresAt", ">", new Date()).executeTakeFirst();
+  if (!invite || invite.status !== "ACTIVE" || invite.suspended || invite.disabled) notFound();
   if (
-    !user.passwordHash &&
-    (user.oidcIssuer ||
-      user.oidcSubject ||
-      (await collections
-        .memberships()
-        .countDocuments({ userId: user._id })) !== 1)
+    !invite.passwordHash &&
+    (invite.oidcIssuer || invite.oidcSubject ||
+      Number((await database.selectFrom("memberships").select((expression) => expression.fn.countAll<number>().as("count"))
+        .where("userId", "=", invite.userId).executeTakeFirstOrThrow()).count) !== 1)
   ) {
     notFound();
   }
@@ -46,14 +38,14 @@ export default async function InvitationPage({
           Organization invitation
         </p>
         <h1 className="mt-2 font-mono text-2xl font-semibold text-[var(--fg)]">
-          Join {organization.name}
+          Join {invite.organizationName}
         </h1>
         <p className="mt-2 text-sm text-[var(--fg-soft)]">
-          Continue as {user.email}. This invitation expires 48 hours after it was issued.
+          Continue as {invite.email}. This invitation expires 48 hours after it was issued.
         </p>
         <InviteAcceptanceForm
           token={token}
-          hasPassword={Boolean(user.passwordHash)}
+          hasPassword={Boolean(invite.passwordHash)}
           passwordMinimum={passwordMinimumLength()}
         />
       </section>

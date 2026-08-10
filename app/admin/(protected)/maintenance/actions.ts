@@ -3,19 +3,18 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { assertPageInOrg, requireCapability } from "@/lib/admin-guard";
-import { collections } from "@/lib/db";
+import { database } from "@/lib/postgres/client";
 import {
   createMaintenance as createMaintenanceDomain,
   deleteMaintenance as deleteMaintenanceDomain,
   transitionMaintenance,
 } from "@/lib/domain/maintenance";
-import { oid } from "@/lib/mongo-utils";
 import { MAINTENANCE_STATUSES, type MaintenanceStatus } from "@/lib/status";
 import { writeSupportMutationAudit } from "@/lib/support-audit";
 import { writeActiveTenantAudit } from "@/lib/tenant-audit";
 
 async function pageSlug(pageId: string) {
-  return (await collections.pages().findOne({ _id: oid(pageId) }))?.slug;
+  return (await database.selectFrom("pages").select("slug").where("id", "=", pageId).executeTakeFirst())?.slug;
 }
 
 export async function createMaintenance(formData: FormData) {
@@ -41,7 +40,7 @@ export async function createMaintenance(formData: FormData) {
     actor: session.email,
     action: "CREATE_MAINTENANCE",
     target: maintenance.id,
-    supportSessionId: session.supportSessionId ? oid(session.supportSessionId) : null,
+    supportSessionId: session.supportSessionId ?? null,
     createdAt: new Date(),
   });
   await writeSupportMutationAudit(session, {
@@ -58,9 +57,10 @@ export async function createMaintenance(formData: FormData) {
 
 export async function setMaintenanceStatus(incidentId: string, formData: FormData) {
   const session = await requireCapability("incident.update");
-  const incident = await collections.incidents().findOne({ _id: oid(incidentId), isMaintenance: true });
+  const incident = await database.selectFrom("incidents").select(["id", "pageId"])
+    .where("id", "=", incidentId).where("isMaintenance", "=", true).executeTakeFirst();
   if (!incident) throw new Error("Maintenance not found");
-  await assertPageInOrg(incident.pageId.toHexString(), session.orgId);
+  await assertPageInOrg(incident.pageId, session.orgId);
   const status = String(formData.get("maintenanceStatus") ?? "") as MaintenanceStatus;
   if (!MAINTENANCE_STATUSES.includes(status)) throw new Error("Invalid maintenance status");
   const body = String(formData.get("body") ?? "").trim();
@@ -75,37 +75,33 @@ export async function setMaintenanceStatus(incidentId: string, formData: FormDat
     action: "UPDATE_MAINTENANCE",
     targetType: "maintenance",
     targetId: incidentId,
-    metadata: { pageId: incident.pageId.toHexString(), status },
+    metadata: { pageId: incident.pageId, status },
   });
   revalidatePath(`/organization/incidents/${incidentId}`);
-  revalidatePath(`/${await pageSlug(incident.pageId.toHexString())}`);
+  revalidatePath(`/${await pageSlug(incident.pageId)}`);
 }
 
 export async function deleteMaintenance(incidentId: string) {
   const session = await requireCapability("incident.manage");
-  const incident = await collections.incidents().findOne({
-    _id: oid(incidentId),
-    isMaintenance: true,
-  });
+  const incident = await database.selectFrom("incidents").select(["id", "pageId"])
+    .where("id", "=", incidentId).where("isMaintenance", "=", true).executeTakeFirst();
   if (!incident) throw new Error("Maintenance not found");
-  await assertPageInOrg(incident.pageId.toHexString(), session.orgId);
-  const slug = await pageSlug(incident.pageId.toHexString());
+  await assertPageInOrg(incident.pageId, session.orgId);
+  const slug = await pageSlug(incident.pageId);
   const deleted = await deleteMaintenanceDomain(session.orgId, incidentId);
   if (!deleted) throw new Error("Maintenance not found");
   await writeActiveTenantAudit(session.orgId, {
     actor: session.email,
     action: "DELETE_MAINTENANCE",
     target: incidentId,
-    supportSessionId: session.supportSessionId
-      ? oid(session.supportSessionId)
-      : null,
+    supportSessionId: session.supportSessionId ?? null,
     createdAt: new Date(),
   });
   await writeSupportMutationAudit(session, {
     action: "DELETE_MAINTENANCE",
     targetType: "maintenance",
     targetId: incidentId,
-    metadata: { pageId: incident.pageId.toHexString() },
+    metadata: { pageId: incident.pageId },
     tenantAuditExists: true,
   });
   revalidatePath("/organization/maintenance");

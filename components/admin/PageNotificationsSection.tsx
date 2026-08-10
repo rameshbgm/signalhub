@@ -1,5 +1,4 @@
-import { collections } from "@/lib/db";
-import { oid, toId } from "@/lib/mongo-utils";
+import { database } from "@/lib/postgres/client";
 import { subscriptionCapabilities } from "@/lib/notification-capabilities";
 import { enabledDestinationChannels } from "@/lib/platform-configuration";
 import { secretLabel } from "@/lib/secrets";
@@ -8,12 +7,12 @@ import { WebhookEndpointManager } from "@/components/admin/WebhookEndpointManage
 
 export async function PageNotificationsSection({ pageId }: { pageId: string }) {
   const [endpointDocs, destinations, capabilities, enabledChannels] = await Promise.all([
-    collections.webhookEndpoints().find({ pageId: oid(pageId) }).toArray(),
-    collections.notificationDestinations().find({ pageId: oid(pageId) }).sort({ createdAt: 1 }).toArray(),
+    database.selectFrom("webhookEndpoints").selectAll().where("pageId", "=", pageId).execute(),
+    database.selectFrom("notificationDestinations").selectAll().where("pageId", "=", pageId).orderBy("createdAt").execute(),
     subscriptionCapabilities(),
     enabledDestinationChannels(),
   ]);
-  const endpoints = endpointDocs.map(toId);
+  const endpoints = endpointDocs;
 
   const subscriberChannels = [
     { label: "Email", ready: capabilities.email.enabled, state: capabilities.email.reason ?? "Available" },
@@ -59,7 +58,7 @@ export async function PageNotificationsSection({ pageId }: { pageId: string }) {
           pageId={pageId}
           enabledChannels={enabledChannels}
           initial={destinations.map((destination) => ({
-            id: destination._id.toHexString(),
+            id: destination.id,
             name: destination.name,
             channel: destination.channel,
             active: destination.active,

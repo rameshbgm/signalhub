@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-process.env.DATABASE_URL ??= "mongodb://127.0.0.1:27017/status-unit-tests";
+process.env.DATABASE_URL ??= "postgresql://signalhub:signalhub@127.0.0.1:5432/status_unit_tests";
 
 const maintenance = await import("../lib/domain/maintenance");
 const communications = await import(

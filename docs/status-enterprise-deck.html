@@ -1277,7 +1277,7 @@
             <g transform="translate(355 448)">
               <rect class="node-card" width="132" height="72" rx="17"/>
               <circle cx="22" cy="24" r="6" fill="#b9ff66"/>
-              <text class="node-label" x="38" y="27">MongoDB</text>
+              <text class="node-label" x="38" y="27">PostgreSQL</text>
               <text class="node-sub" x="20" y="48">SOURCE OF TRUTH</text>
             </g>
             <g transform="translate(103 430)">
@@ -1399,7 +1399,7 @@
           </div>
           <div class="compare-row" role="row">
             <div class="compare-cell" role="rowheader"><span class="compare-label">Data</span><strong>Custody and location</strong></div>
-            <div class="compare-cell signalhub" role="cell"><strong>Your MongoDB, S3, and keys</strong>You choose location, retention, and backup policy</div>
+            <div class="compare-cell signalhub" role="cell"><strong>Your PostgreSQL, S3, and keys</strong>You choose location, retention, and backup policy</div>
             <div class="compare-cell" role="cell">Vendor-managed application and data plane</div>
             <div class="compare-cell" role="cell">Vendor-managed data plane</div>
             <div class="compare-cell" role="cell">Vendor-managed data plane</div>
@@ -1435,7 +1435,7 @@
         <p class="eyebrow reveal">What stays yours</p>
         <h2 class="reveal" style="--order:1">The product is open. The operating choices are yours.</h2>
         <div class="bento">
-          <article class="bento-card dark reveal"><p class="bento-kicker">Data plane</p><strong class="metric">MongoDB + S3</strong><p>Incidents, subscribers, monitor results, audit events, identities, assets, exports, and retention live where you place them.</p></article>
+          <article class="bento-card dark reveal"><p class="bento-kicker">Data plane</p><strong class="metric">PostgreSQL + S3</strong><p>Incidents, subscribers, monitor results, audit events, identities, assets, exports, and retention live where you place them.</p></article>
           <article class="bento-card reveal" style="--order:1"><p class="bento-kicker">Security plane</p><strong class="metric">Keys + policy</strong><p>Session signing, encrypted secrets, allowlists, identity assurance, local recovery, and rotation remain operator controlled.</p></article>
           <article class="bento-card reveal" style="--order:2"><p class="bento-kicker">License</p><strong class="metric">Apache-2.0</strong><p>Inspect, modify, run, and redistribute without a feature key or license server.</p></article>
           <article class="bento-card reveal" style="--order:3"><p class="bento-kicker">Operations plane</p><strong class="metric">SLOs + runbooks</strong><p>Choose scaling, upgrades, maintenance windows, observability, SIEM routing, backup frequency, and recovery objectives.</p></article>
@@ -1449,7 +1449,7 @@
         <div class="arch-copy">
           <p class="eyebrow reveal">Production architecture</p>
           <h2 class="reveal" style="--order:1">Simple enough to understand. Strong enough to operate.</h2>
-          <p class="lead reveal" style="--order:2">Stateless web replicas serve people and APIs. Durable workers handle monitoring and delivery. MongoDB transactions protect the source of truth.</p>
+          <p class="lead reveal" style="--order:2">Stateless web replicas serve people and APIs. Durable workers handle monitoring and delivery. PostgreSQL transactions protect the source of truth.</p>
         </div>
         <div class="arch-stack">
           <article class="arch-card reveal">
@@ -1462,7 +1462,7 @@
           </article>
           <article class="arch-card reveal" style="--order:2">
             <span class="arch-icon"><svg viewBox="0 0 24 24"><ellipse cx="12" cy="6" rx="7" ry="3" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M5 6v6c0 1.7 3.1 3 7 3s7-1.3 7-3V6M5 12v6c0 1.7 3.1 3 7 3s7-1.3 7-3v-6" fill="none" stroke="currentColor" stroke-width="1.7"/></svg></span>
-            <div><strong>MongoDB replica set</strong><span>Transactional authorization, lifecycle, audit, and platform records</span></div><b class="arch-state">DURABLE</b>
+            <div><strong>highly available PostgreSQL cluster</strong><span>Transactional authorization, lifecycle, audit, and platform records</span></div><b class="arch-state">DURABLE</b>
           </article>
           <article class="arch-card reveal" style="--order:3">
             <span class="arch-icon"><svg viewBox="0 0 24 24"><path d="M12 3v5M12 16v5M3 12h5M16 12h5M5.6 5.6 9 9m6 6 3.4 3.4M18.4 5.6 15 9m-6 6-3.4 3.4" fill="none" stroke="currentColor" stroke-width="1.7"/><circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="1.7"/></svg></span>
@@ -1483,7 +1483,7 @@
         <p class="lead light-copy reveal" style="--order:2">Self-hosting gives you control. SignalHub gives that control a clear structure, from identity to runtime.</p>
         <div class="security-grid">
           <article class="security-card reveal"><span class="security-number">01</span><h3>Identity</h3><p>Argon2id, TOTP, recovery codes, OIDC, SAML, SCIM, verified email, and identity-provider MFA assurance.</p></article>
-          <article class="security-card reveal" style="--order:1"><span class="security-number">02</span><h3>Authorization</h3><p>Fixed tenant and platform roles, page scopes, API capabilities, expiration, CIDRs, and owner-safety rules.</p></article>
+          <article class="security-card reveal" style="--order:1"><span class="security-number">02</span><h3>Authorization</h3><p>Fixed organization roles, page scopes, API capabilities, expiration, CIDRs, and administrative safeguards.</p></article>
           <article class="security-card reveal" style="--order:2"><span class="security-number">03</span><h3>Sessions</h3><p>Signed keyrings plus database-backed idle, absolute, device, MFA, version, and revocation state.</p></article>
           <article class="security-card reveal" style="--order:3"><span class="security-number">04</span><h3>Secrets</h3><p>AES-256-GCM versioned encryption, hashing for bearer credentials, one-time display, and rotation tooling.</p></article>
           <article class="security-card reveal" style="--order:4"><span class="security-number">05</span><h3>Runtime</h3><p>Non-root containers, dropped capabilities, read-only filesystems, probes, network policy, and private target controls.</p></article>
@@ -1592,7 +1592,7 @@
           <h3>Required tools</h3>
           <ul>
             <li>Docker Engine with Compose v2, or Kubernetes 1.27 or newer with Helm 3.</li>
-            <li>MongoDB 8 configured as a replica set. SignalHub uses transactions.</li>
+            <li>PostgreSQL 18 with durable storage and high availability. SignalHub uses ACID transactions and row locks.</li>
             <li>Node.js 22 for local development and operator commands.</li>
             <li>A DNS name, TLS termination, and a trusted reverse proxy or ingress.</li>
             <li>Two independent high-entropy secrets for sessions and encrypted data.</li>
@@ -1610,7 +1610,7 @@ openssl rand -hex 32</pre></div>
         <section class="guide-panel" data-guide-panel="compose">
           <p class="eyebrow light">02 · Docker Compose</p>
           <h2>Run a pilot on one controlled host.</h2>
-          <p>Compose starts MongoDB, the migration job, web replicas, and the durable worker. Keep the application port bound to loopback and publish it through a TLS reverse proxy.</p>
+          <p>Compose starts PostgreSQL, the migration job, web replicas, and the durable worker. Keep the application port bound to loopback and publish it through a TLS reverse proxy.</p>
           <h3>Minimum production values</h3>
           <div class="guide-code"><button class="copy" type="button">Copy</button><pre>SESSION_SECRET=&lt;independent-random-value&gt;
 ENCRYPTION_KEY=&lt;independent-64-character-hex-value&gt;
@@ -1637,11 +1637,11 @@ docker compose logs --tail=100 web worker migrate</pre></div>
         <section class="guide-panel" data-guide-panel="kubernetes">
           <p class="eyebrow light">03 · Kubernetes and Helm</p>
           <h2>Scale web and worker workloads independently.</h2>
-          <p>Use an external MongoDB replica set, S3-compatible storage, and an externally managed Secret. The chart includes migration hooks, probes, disruption budgets, autoscaling options, topology spread, and NetworkPolicy.</p>
+          <p>Use an external highly available PostgreSQL cluster, S3-compatible storage, and an externally managed Secret. The chart includes migration hooks, probes, disruption budgets, autoscaling options, topology spread, and NetworkPolicy.</p>
           <h3>Create the namespace and secret</h3>
           <div class="guide-code"><button class="copy" type="button">Copy</button><pre>kubectl create namespace signalhub
 kubectl -n signalhub create secret generic signalhub-production \
-  --from-literal=DATABASE_URL='mongodb://user:password@mongo-a,mongo-b,mongo-c/signalhub?replicaSet=rs0' \
+  --from-literal=DATABASE_URL='postgresql://signalhub:&lt;password&gt;@postgres-primary.example.net:5432/signalhub?sslmode=require' \
   --from-literal=SESSION_SECRET='&lt;session-secret&gt;' \
   --from-literal=ENCRYPTION_KEY='&lt;encryption-key&gt;' \
   --from-literal=METRICS_TOKEN='&lt;metrics-token&gt;' \
@@ -1713,7 +1713,7 @@ npm run signalhubctl -- restore --archive signalhub.archive.gz
 npm run signalhubctl -- rotate-encryption-key</pre></div>
           <h3>Recovery exercise</h3>
           <ol>
-            <li>Restore the MongoDB archive into an isolated environment.</li>
+            <li>Restore the PostgreSQL archive into an isolated environment.</li>
             <li>Restore or attach a point-in-time copy of assets.</li>
             <li>Run migrations with the target application release.</li>
             <li>Start one worker and one web process.</li>
@@ -1728,7 +1728,7 @@ npm run signalhubctl -- rotate-encryption-key</pre></div>
           <div class="guide-check"><b>✓</b><div><strong>Secrets are externalized</strong><span>Signing and encryption rotation has been tested.</span></div></div>
           <div class="guide-check"><b>✓</b><div><strong>Identity is exercised</strong><span>SSO, SCIM, MFA, group mapping, deprovisioning, and break-glass recovery work.</span></div></div>
           <div class="guide-check"><b>✓</b><div><strong>The network is bounded</strong><span>TLS, proxy trust, administrator CIDRs, ingress, and egress policy are reviewed.</span></div></div>
-          <div class="guide-check"><b>✓</b><div><strong>Dependencies are healthy</strong><span>MongoDB replica set, shared assets, workers, and notification providers are monitored.</span></div></div>
+          <div class="guide-check"><b>✓</b><div><strong>Dependencies are healthy</strong><span>highly available PostgreSQL cluster, shared assets, workers, and notification providers are monitored.</span></div></div>
           <div class="guide-check"><b>✓</b><div><strong>Failure is tested</strong><span>Worker loss, provider loss, identity outage, and rollback are exercised.</span></div></div>
           <div class="guide-check"><b>✓</b><div><strong>Restore is proven</strong><span>Database and assets restore together within the target recovery objectives.</span></div></div>
           <div class="guide-check"><b>✓</b><div><strong>Signals are centralized</strong><span>Logs, metrics, traces, health, queues, dead letters, and SIEM delivery have alerts.</span></div></div>

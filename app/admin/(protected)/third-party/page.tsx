@@ -1,6 +1,5 @@
 import { requireSession } from "@/lib/require-session";
-import { collections } from "@/lib/db";
-import { toId } from "@/lib/mongo-utils";
+import { database } from "@/lib/postgres/client";
 import { HelpTip } from "@/components/HelpTip";
 import { requireCapability } from "@/lib/admin-guard";
 import Link from "next/link";
@@ -8,9 +7,8 @@ import Link from "next/link";
 export default async function ThirdPartyCatalogPage() {
   await requireSession();
   await requireCapability("integration.manage");
-  const providers = (
-    await collections.monitorTemplates().find({ enabled: true }).sort({ category: 1, name: 1 }).toArray()
-  ).map(toId);
+  const providers = await database.selectFrom("monitorTemplates").selectAll()
+    .where("enabled", "=", true).orderBy("category", "asc").orderBy("name", "asc").execute();
   const byCategory = new Map<string, typeof providers>();
   for (const p of providers) {
     if (!byCategory.has(p.category)) byCategory.set(p.category, []);

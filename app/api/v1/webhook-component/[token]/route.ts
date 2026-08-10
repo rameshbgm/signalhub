@@ -1,14 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { collections } from "@/lib/db";
-import { toId } from "@/lib/mongo-utils";
+import { database } from "@/lib/postgres/client";
 import { COMPONENT_STATUSES } from "@/lib/status";
 import { setComponentStatus } from "@/lib/component-status";
 import { z } from "zod";
 import { hashSecret } from "@/lib/secrets";
 import { apiError, routeError, validationError } from "@/lib/api-response";
 import { consumeRateLimit, RateLimitError, requestIp } from "@/lib/rate-limit";
-import { organizationIsActive } from "@/lib/organization-state";
-import { activePageFilter } from "@/lib/page-lifecycle";
 
 /**
  * Per-component automation endpoint (token in the URL is the credential).
@@ -25,19 +22,17 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
   try {
     await consumeRateLimit("automation", requestIp(req), { limit: 120, windowMs: 60_000 });
     const { token } = await params;
-    const componentDoc = await collections.components().findOne({ automationTokenHash: hashSecret(token) });
-    if (!componentDoc) return apiError(404, "INVALID_AUTOMATION_TOKEN", "Invalid automation token");
-    const page = await collections.pages().findOne(activePageFilter({ _id: componentDoc.pageId }));
-    const organization = page
-      ? await collections.organizations().findOne({ _id: page.orgId })
-      : null;
-    if (!page || !organization || !organizationIsActive(organization)) {
-      return apiError(403, "ORGANIZATION_INACTIVE", "This organization is not active");
-    }
-    const component = toId(componentDoc);
+    const component = await database.selectFrom("components as component")
+      .innerJoin("pages as page", "page.id", "component.pageId")
+      .innerJoin("organizations as organization", "organization.id", "page.orgId")
+      .select(["component.id", "component.name"])
+      .where("component.automationTokenHash", "=", hashSecret(token))
+      .where("page.deletedAt", "is", null).where("organization.status", "=", "ACTIVE")
+      .where("organization.suspended", "=", false).executeTakeFirst();
+    if (!component) return apiError(404, "INVALID_AUTOMATION_TOKEN", "Invalid automation token");
     const parsed = schema.safeParse(await req.json().catch(() => ({})));
     if (!parsed.success) return validationError(parsed.error);
-    await setComponentStatus(componentDoc._id, parsed.data.status, { isMaintenance: false });
+    await setComponentStatus(component.id, parsed.data.status, { isMaintenance: false });
     return NextResponse.json({ ok: true, component: component.name, status: parsed.data.status });
   } catch (error) {
     if (error instanceof RateLimitError) {
@@ -45,6 +40,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
       response.headers.set("retry-after", String(error.retryAfterSeconds));
       return response;
     }
-    return routeError(error);
+    return routeError(error, { route: "POST /api/v1/webhook-component/:token" });
   }
 }

@@ -14,17 +14,17 @@ export type MigrationInspection = Readonly<{
 }>;
 
 export function evaluateMigrationState(
-  appliedMigrations: ReadonlyArray<{ _id: string; checksum: string }>,
+  appliedMigrations: ReadonlyArray<{ id: string; checksum: string }>,
   manifest: readonly MigrationManifestEntry[]
 ): MigrationInspection {
   const appliedById = new Map(
-    appliedMigrations.map((migration) => [migration._id, migration.checksum])
+    appliedMigrations.map((migration) => [migration.id, migration.checksum])
   );
   const expectedIds = new Set(manifest.map((migration) => migration.id));
   const missingIds: string[] = [];
   const checksumMismatchIds: string[] = [];
   const unexpectedIds = appliedMigrations
-    .map((migration) => migration._id)
+    .map((migration) => migration.id)
     .filter((id) => !expectedIds.has(id))
     .sort();
   let verifiedCount = 0;

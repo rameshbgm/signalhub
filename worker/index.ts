@@ -1,25 +1,31 @@
 import http from "node:http";
 import os from "node:os";
 import { randomBytes } from "node:crypto";
-import { ObjectId } from "mongodb";
+import {
+  Logger as GraphileLogger,
+  parseCronItems,
+  run,
+  type Runner,
+} from "graphile-worker";
 import packageJson from "@/package.json";
-import { collections, db, mongoClient } from "@/lib/db";
-import { runMaintenanceTransitions } from "@/lib/domain/maintenance";
-import { drainNotificationJobs, verifySmtp } from "@/worker/notifications";
-import { runDueMonitors } from "@/worker/monitors";
-import { drainPlatformJobs } from "@/worker/platform-jobs";
+import {
+  closeDatabase,
+  database,
+  postgresPool,
+  verifyDatabaseConnection,
+} from "@/lib/postgres/client";
+import { JOB_TASKS, type SignalHubJobTask } from "@/lib/jobs";
 import { applicationMetrics } from "@/lib/metrics";
-import { log } from "@/lib/logger";
+import { errorFields, log, logger } from "@/lib/logger";
 import { hashSecret, secretMatches } from "@/lib/secrets";
-import { runRetentionSweep } from "@/lib/retention";
-import { drainDataExportJobs } from "@/worker/exports";
-import { sealAuditEntries } from "@/lib/audit-integrity";
 import { startTelemetry, stopTelemetry } from "@/lib/telemetry";
-import { drainAuditDeliveryJobs } from "@/worker/audit-delivery";
+import { verifySmtp } from "@/worker/notifications";
+import { signalHubTaskList } from "@/worker/tasks";
 
 const workerId =
   process.env.WORKER_ID ??
   `${os.hostname()}-${process.pid}-${randomBytes(4).toString("hex")}`;
+
 const state = {
   live: true,
   ready: false,
@@ -29,30 +35,45 @@ const state = {
   smtp: { configured: Boolean(process.env.SMTP_HOST), ok: false },
 };
 
-function delay(milliseconds: number) {
-  return new Promise<void>((resolve) => setTimeout(resolve, milliseconds));
-}
+const CONTINUOUS_TASKS: SignalHubJobTask[] = [
+  JOB_TASKS.monitors,
+  JOB_TASKS.notifications,
+  JOB_TASKS.exports,
+  JOB_TASKS.auditDelivery,
+  JOB_TASKS.platformJobs,
+  JOB_TASKS.maintenance,
+];
+
+const graphileLogger = new GraphileLogger((scope) => (level, message, metadata) => {
+  const mappedLevel = level === "warning" ? "warn" : level === "info" ? "debug" : level;
+  log(mappedLevel, message, {
+    component: "graphile-worker",
+    graphile: scope,
+    ...(metadata ?? {}),
+  });
+});
 
 async function heartbeat(status: "STARTING" | "READY" | "STOPPING") {
   const now = new Date();
-  await collections.workerHeartbeats().updateOne(
-    { workerId },
-    {
-      $set: {
-        lastSeenAt: now,
-        status,
-        version: packageJson.version,
-        lastLoopAt: state.lastLoopAt,
-        lastError: state.lastError,
-      },
-      $setOnInsert: {
-        _id: new ObjectId(),
-        workerId,
-        startedAt: now,
-      },
-    },
-    { upsert: true }
-  );
+  await database
+    .insertInto("workerHeartbeats")
+    .values({
+      workerId,
+      startedAt: now,
+      lastSeenAt: now,
+      status,
+      version: packageJson.version,
+      lastLoopAt: state.lastLoopAt,
+      lastError: state.lastError,
+    })
+    .onConflict((conflict) => conflict.column("workerId").doUpdateSet({
+      lastSeenAt: now,
+      status,
+      version: packageJson.version,
+      lastLoopAt: state.lastLoopAt,
+      lastError: state.lastError,
+    }))
+    .execute();
 }
 
 function healthServer() {
@@ -78,7 +99,7 @@ function healthServer() {
     }
     if (request.url === "/ready") {
       try {
-        await db.command({ ping: 1 });
+        await verifyDatabaseConnection();
         response.statusCode = state.ready && !state.stopping ? 200 : 503;
       } catch {
         response.statusCode = 503;
@@ -99,96 +120,161 @@ function healthServer() {
   });
 }
 
-async function main() {
-  await startTelemetry("signalhub-worker");
-  await db.command({ ping: 1 });
-  await heartbeat("STARTING");
-  state.smtp = await verifySmtp();
-  const server = healthServer();
-  const port = Number(process.env.WORKER_HEALTH_PORT ?? 8081);
+async function seedContinuousTasks(runner: Runner) {
+  await Promise.all(CONTINUOUS_TASKS.map((task) => runner.addJob(task, {}, {
+    queueName: task,
+    jobKey: `signalhub:${task}`,
+    jobKeyMode: "replace",
+    maxAttempts: 25,
+  })));
+}
+
+async function closeServer(server: http.Server | null) {
+  if (!server?.listening) return;
   await new Promise<void>((resolve, reject) => {
-    server.once("error", reject);
-    server.listen(port, "0.0.0.0", resolve);
+    server.close((error) => error ? reject(error) : resolve());
   });
+}
 
-  let lastMaintenanceRun = 0;
-  let lastHeartbeat = 0;
-  let lastRetentionAttempt = 0;
-  let lastAuditSeal = 0;
-  let failures = 0;
-  let platformJobDrain: Promise<void> | null = null;
-  let platformJobError: string | null = null;
-  state.ready = true;
-  await heartbeat("READY");
+async function main() {
+  let runner: Runner | null = null;
+  let server: http.Server | null = null;
+  let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
+  let heartbeatUpdate = Promise.resolve();
 
-  const stop = () => {
+  await startTelemetry("signalhub-worker");
+  try {
+    await verifyDatabaseConnection();
+    await heartbeat("STARTING");
+    state.smtp = await verifySmtp();
+
+    server = healthServer();
+    const port = Number(process.env.WORKER_HEALTH_PORT ?? 8081);
+    await new Promise<void>((resolve, reject) => {
+      server!.once("error", reject);
+      server!.listen(port, "0.0.0.0", resolve);
+    });
+
+    const tasks = signalHubTaskList({
+      workerId,
+      onTaskRun(task) {
+        state.lastLoopAt = new Date();
+        state.lastError = null;
+        logger.debug({ workerId, task }, "Graphile task started");
+      },
+    });
+    const parsedCronItems = parseCronItems([
+      {
+        task: JOB_TASKS.auditSeal,
+        match: "* * * * *",
+        options: {
+          queueName: JOB_TASKS.auditSeal,
+          jobKey: `signalhub:cron:${JOB_TASKS.auditSeal}`,
+          jobKeyMode: "replace",
+          backfillPeriod: 0,
+        },
+      },
+      {
+        task: JOB_TASKS.retention,
+        match: "0 * * * *",
+        options: {
+          queueName: JOB_TASKS.retention,
+          jobKey: `signalhub:cron:${JOB_TASKS.retention}`,
+          jobKeyMode: "replace",
+          backfillPeriod: 0,
+        },
+      },
+    ]);
+
+    runner = await run({
+      pgPool: postgresPool,
+      taskList: tasks,
+      parsedCronItems,
+      concurrency: Number(process.env.WORKER_CONCURRENCY ?? 10),
+      pollInterval: Number(process.env.WORKER_POLL_INTERVAL_MS ?? 1_000),
+      gracefulShutdownAbortTimeout: Number(
+        process.env.WORKER_SHUTDOWN_ABORT_TIMEOUT_MS ?? 15_000
+      ),
+      noHandleSignals: true,
+      logger: graphileLogger,
+    });
+
+    runner.events.on("job:error", ({ job, error }) => {
+      state.lastError = error instanceof Error ? error.message : "Graphile job failed";
+      logger.error(
+        { ...errorFields(error), workerId, graphileJobId: job.id },
+        "Graphile job execution failed"
+      );
+    });
+    runner.events.on("pool:fatalError", ({ error, action }) => {
+      state.lastError = error instanceof Error ? error.message : "Graphile worker pool failed";
+      logger.error(
+        { ...errorFields(error), workerId, action },
+        "Graphile worker pool encountered a fatal error"
+      );
+    });
+
+    await seedContinuousTasks(runner);
+    state.ready = true;
+    await heartbeat("READY");
+    logger.info(
+      {
+        workerId,
+        concurrency: Number(process.env.WORKER_CONCURRENCY ?? 10),
+        healthPort: port,
+      },
+      "SignalHub Graphile worker is ready"
+    );
+
+    heartbeatTimer = setInterval(() => {
+      heartbeatUpdate = heartbeatUpdate
+        .then(() => heartbeat("READY"))
+        .catch((error) => {
+          state.lastError = error instanceof Error ? error.message : "Worker heartbeat failed";
+          logger.error({ ...errorFields(error), workerId }, "Worker heartbeat failed");
+        });
+    }, Number(process.env.WORKER_HEARTBEAT_INTERVAL_MS ?? 5_000));
+    heartbeatTimer.unref();
+
+    let resolveStop!: (signal: string) => void;
+    const stopRequested = new Promise<string>((resolve) => {
+      resolveStop = resolve;
+    });
+    const requestStop = (signal: string) => {
+      if (state.stopping) return;
+      state.stopping = true;
+      state.ready = false;
+      logger.info({ workerId, signal }, "Worker shutdown requested");
+      resolveStop(signal);
+    };
+    process.once("SIGTERM", () => requestStop("SIGTERM"));
+    process.once("SIGINT", () => requestStop("SIGINT"));
+
+    await Promise.race([
+      stopRequested,
+      runner.promise.then(() => {
+        if (!state.stopping) throw new Error("Graphile runner stopped unexpectedly");
+        return "runner-stopped";
+      }),
+    ]);
+  } finally {
     state.stopping = true;
     state.ready = false;
-  };
-  process.once("SIGTERM", stop);
-  process.once("SIGINT", stop);
-
-  while (!state.stopping) {
-    try {
-      const now = Date.now();
-      const tasks: Promise<unknown>[] = [
-        runDueMonitors(workerId, Number(process.env.WORKER_MONITOR_CONCURRENCY ?? 20)),
-        drainNotificationJobs(workerId, Number(process.env.WORKER_NOTIFICATION_BATCH ?? 25)),
-        drainDataExportJobs(workerId, 1),
-        drainAuditDeliveryJobs(workerId, 25),
-      ];
-      // Organization purges can be much slower than a monitor/delivery cycle.
-      // Keep one drain in flight without holding up those tenant workloads.
-      if (!platformJobDrain) {
-        platformJobDrain = drainPlatformJobs(
-          workerId,
-          Number(process.env.WORKER_PLATFORM_JOB_BATCH ?? 1)
-        )
-          .then(() => {
-            platformJobError = null;
-          })
-          .catch((error) => {
-            platformJobError =
-              error instanceof Error ? error.message : "Platform job drain failed";
-          })
-          .finally(() => {
-            platformJobDrain = null;
-          });
-      }
-      if (now - lastMaintenanceRun >= 10_000) {
-        tasks.push(runMaintenanceTransitions(new Date(now)));
-        lastMaintenanceRun = now;
-      }
-      if (now - lastHeartbeat >= 5_000) {
-        tasks.push(heartbeat("READY"));
-        lastHeartbeat = now;
-      }
-      if (now - lastRetentionAttempt >= 60 * 60_000) {
-        tasks.push(runRetentionSweep(workerId, new Date(now)));
-        lastRetentionAttempt = now;
-      }
-      if (now - lastAuditSeal >= 60_000) {
-        tasks.push(sealAuditEntries());
-        lastAuditSeal = now;
-      }
-      await Promise.all(tasks);
-      state.lastLoopAt = new Date();
-      state.lastError = platformJobError;
-      failures = 0;
-      await delay(Number(process.env.WORKER_POLL_INTERVAL_MS ?? 1_000));
-    } catch (error) {
-      failures += 1;
-      state.lastError = error instanceof Error ? error.message : "Worker loop failed";
-      const backoff = Math.min(30_000, 1_000 * 2 ** Math.min(failures, 5));
-      await delay(backoff);
-    }
+    if (heartbeatTimer) clearInterval(heartbeatTimer);
+    await heartbeatUpdate;
+    await heartbeat("STOPPING").catch((error) => {
+      logger.error({ ...errorFields(error), workerId }, "Failed to record stopping heartbeat");
+    });
+    await runner?.stop("SignalHub worker shutdown").catch((error) => {
+      logger.error({ ...errorFields(error), workerId }, "Graphile worker shutdown failed");
+    });
+    await closeServer(server).catch((error) => {
+      logger.error({ ...errorFields(error), workerId }, "Worker health server shutdown failed");
+    });
+    state.live = false;
+    await closeDatabase();
+    await stopTelemetry();
   }
-
-  await platformJobDrain;
-  await heartbeat("STOPPING").catch(() => undefined);
-  await new Promise<void>((resolve) => server.close(() => resolve()));
-  await mongoClient.close();
-  await stopTelemetry();
 }
 
 main().catch((error) => {

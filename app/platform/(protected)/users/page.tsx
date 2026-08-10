@@ -1,5 +1,5 @@
-import { collections } from "@/lib/db";
-import { requirePlatformCapability } from "@/lib/admin-guard";
+import { database } from "@/lib/postgres/client";
+import { requirePlatformPageCapability } from "@/lib/platform-page-guard";
 import { hasPlatformCapability } from "@/lib/platform-policy";
 import { disableUser, reactivateUser } from "./actions";
 import { PlatformActionForm } from "@/components/platform/PlatformActionForm";
@@ -10,38 +10,27 @@ export default async function PlatformUsersPage({
 }: {
   searchParams: Promise<{ q?: string }>;
 }) {
-  const actor = await requirePlatformCapability("users.read");
+  const actor = await requirePlatformPageCapability("users.read");
   const query = (await searchParams).q?.trim() ?? "";
-  const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const users = await collections
-    .users()
-    .find(
-      query
-        ? {
-            $or: [
-              { email: { $regex: escaped, $options: "i" } },
-              { name: { $regex: escaped, $options: "i" } },
-            ],
-          }
-        : {}
-    )
-    .sort({ createdAt: -1 })
-    .limit(200)
-    .toArray();
+  let usersQuery = database.selectFrom("users").selectAll();
+  if (query) {
+    const pattern = `%${query}%`;
+    usersQuery = usersQuery.where((expression) => expression.or([
+      expression("email", "ilike", pattern),
+      expression("name", "ilike", pattern),
+    ]));
+  }
+  const users = await usersQuery.orderBy("createdAt", "desc").limit(200).execute();
   const memberships = users.length
-    ? await collections
-        .memberships()
-        .find({ userId: { $in: users.map((user) => user._id) } })
-        .toArray()
+    ? await database.selectFrom("memberships").selectAll()
+        .where("userId", "in", users.map((user) => user.id)).execute()
     : [];
   const organizations = memberships.length
-    ? await collections
-        .organizations()
-        .find({ _id: { $in: memberships.map((membership) => membership.orgId) } })
-        .toArray()
+    ? await database.selectFrom("organizations").select(["id", "name"])
+        .where("id", "in", memberships.map((membership) => membership.orgId)).execute()
     : [];
   const orgName = new Map(
-    organizations.map((organization) => [organization._id.toHexString(), organization.name])
+    organizations.map((organization) => [organization.id, organization.name])
   );
   const canMutate = hasPlatformCapability(actor.role, "users.disable");
 
@@ -79,21 +68,21 @@ export default async function PlatformUsersPage({
           <tbody className="divide-y divide-[var(--line)]">
             {users.map((user) => {
               const userMemberships = memberships.filter((membership) =>
-                membership.userId.equals(user._id)
+                membership.userId === user.id
               );
               return (
-                <tr key={user._id.toHexString()} className="align-top">
+                <tr key={user.id} className="align-top">
                   <td className="px-4 py-3">
                     <p className="font-semibold text-[var(--fg)]">{user.name}</p>
                     <p className="text-xs text-[var(--fg-dim)]">{user.email}</p>
-                    <p className="mt-1 font-mono text-[10px] text-[var(--fg-dim)]">{user._id.toHexString()}</p>
+                    <p className="mt-1 font-mono text-[10px] text-[var(--fg-dim)]">{user.id}</p>
                   </td>
                   <td className="px-4 py-3">
                     {userMemberships.length ? (
                       <ul className="space-y-1 text-xs text-[var(--fg-soft)]">
                         {userMemberships.map((membership) => (
-                          <li key={membership._id.toHexString()}>
-                            {orgName.get(membership.orgId.toHexString()) ?? "Deleted organization"} · {membership.role} · {membership.status ?? "ACTIVE"}
+                          <li key={membership.id}>
+                            {orgName.get(membership.orgId) ?? "Deleted organization"} · {membership.role} · {membership.status}
                           </li>
                         ))}
                       </ul>
@@ -113,7 +102,7 @@ export default async function PlatformUsersPage({
                       <PlatformActionForm
                         action={(user.disabled ? reactivateUser : disableUser).bind(
                           null,
-                          user._id.toHexString()
+                          user.id
                         )}
                         successMessage={
                           user.disabled

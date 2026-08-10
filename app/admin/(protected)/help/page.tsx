@@ -20,6 +20,9 @@ export default async function HelpCenterPage({ searchParams }: { searchParams: P
       <div>
         <h1 className="font-mono text-2xl font-semibold text-[var(--fg)]">Help Center</h1>
         <p className="mt-1.5 text-sm text-[var(--fg-soft)]">Task-focused guidance for operators, administrators, and developers.</p>
+        <a href="/docs/user-manual.html" target="_blank" rel="noreferrer" className="mt-3 inline-flex text-sm font-semibold text-[var(--cyan)] hover:underline">
+          Open the complete HTML user manual ↗
+        </a>
         <form className="mt-5 flex gap-2" action="/organization/help">
           <input
             type="search"

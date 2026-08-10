@@ -1,11 +1,11 @@
 import Link from "next/link";
-import { collections, db } from "@/lib/db";
-import { requirePlatformCapability } from "@/lib/admin-guard";
+import { database, verifyDatabaseConnection } from "@/lib/postgres/client";
+import { requirePlatformPageCapability } from "@/lib/platform-page-guard";
 import { organizationStatus } from "@/lib/organization-state";
 import { inspectMigrationState } from "@/lib/migrations";
 
 export default async function PlatformOverviewPage() {
-  await requirePlatformCapability("overview.read");
+  await requirePlatformPageCapability("overview.read");
   // eslint-disable-next-line react-hooks/purity
   const now = Date.now();
   const [
@@ -17,12 +17,15 @@ export default async function PlatformOverviewPage() {
     databaseOk,
     migrationState,
   ] = await Promise.all([
-    collections.organizations().find({}, { projection: { status: 1, suspended: 1 } }).toArray(),
-    collections.users().countDocuments({ disabled: { $ne: true } }),
-    collections.platformJobs().countDocuments({ status: { $in: ["QUEUED", "PROCESSING"] } }),
-    collections.notificationJobs().countDocuments({ status: "DEAD_LETTER" }),
-    collections.workerHeartbeats().find().sort({ lastSeenAt: -1 }).limit(1).next(),
-    db.command({ ping: 1 }, { timeoutMS: 2_000 }).then(() => true).catch(() => false),
+    database.selectFrom("organizations").select(["status", "suspended"]).execute(),
+    database.selectFrom("users").select(({ fn }) => fn.countAll<number>().as("count"))
+      .where("disabled", "=", false).executeTakeFirstOrThrow().then((row) => Number(row.count)),
+    database.selectFrom("platformJobs").select(({ fn }) => fn.countAll<number>().as("count"))
+      .where("status", "in", ["QUEUED", "PROCESSING"]).executeTakeFirstOrThrow().then((row) => Number(row.count)),
+    database.selectFrom("notificationJobs").select(({ fn }) => fn.countAll<number>().as("count"))
+      .where("status", "=", "DEAD_LETTER").executeTakeFirstOrThrow().then((row) => Number(row.count)),
+    database.selectFrom("workerHeartbeats").selectAll().orderBy("lastSeenAt", "desc").executeTakeFirst(),
+    verifyDatabaseConnection().then(() => true).catch(() => false),
     inspectMigrationState(),
   ]);
   const activeOrganizations = organizations.filter(

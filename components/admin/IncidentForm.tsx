@@ -16,7 +16,7 @@ type Template = {
   body: string;
   defaultStatus: string;
   defaultImpact: string;
-  defaultComponentIds: string;
+  defaultComponentIds: string[];
   notifyByDefault?: boolean;
 };
 
@@ -41,19 +41,9 @@ export function IncidentForm({
   const [notify, setNotify] = useState(true);
 
   function applyTemplate(t: Template) {
-    let ids: string[] = [];
-    try {
-      const parsed: unknown = JSON.parse(t.defaultComponentIds || "[]");
-      ids = Array.isArray(parsed)
-        ? parsed.filter(
-            (id): id is string =>
-              typeof id === "string" &&
-              components.some((component) => component.id === id)
-          )
-        : [];
-    } catch {
-      ids = [];
-    }
+    const ids = t.defaultComponentIds.filter((id) =>
+      components.some((component) => component.id === id)
+    );
     const next: Record<string, string> = {};
     ids.forEach((id) => (next[id] = "MAJOR_OUTAGE"));
     const componentNames = components

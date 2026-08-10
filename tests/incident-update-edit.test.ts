@@ -34,9 +34,9 @@ describe("incident timeline update editing", () => {
     const end = source.indexOf("\nexport async function ", start + 1);
     const action = source.slice(start, end < 0 ? undefined : end);
 
-    expect(action).toContain("withTransaction(");
+    expect(action).toContain("withDatabaseTransaction(");
     expect(action).toContain("fenceActiveOrganizationMutation(");
-    expect(action).toContain("newest?._id.equals(update._id)");
+    expect(action).toContain("newest?.id === update.id");
     expect(action).toContain("reconcileComponents(");
     expect(action).toContain('revalidatePath(`/${result.slug}`, "layout")');
   });

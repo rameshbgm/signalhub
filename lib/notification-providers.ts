@@ -1,4 +1,4 @@
-import type { NotificationDestinationDoc } from "@/lib/db";
+import type { NotificationDestinationRow } from "@/lib/postgres/schema";
 import { decryptSecret } from "@/lib/encryption";
 
 type Message = { subject: string; body: string; eventType: string };
@@ -34,7 +34,7 @@ async function post(
   return response.status;
 }
 
-function config(destination: NotificationDestinationDoc) {
+function config(destination: NotificationDestinationRow) {
   const parsed: unknown = JSON.parse(decryptSecret(destination.configCiphertext));
   if (!parsed || typeof parsed !== "object") throw new Error("Destination configuration is invalid");
   return parsed as Record<string, string>;
@@ -46,7 +46,7 @@ function required(value: string | undefined, label: string) {
 }
 
 export async function deliverDestination(
-  destination: NotificationDestinationDoc,
+  destination: NotificationDestinationRow,
   message: Message
 ) {
   const values = config(destination);

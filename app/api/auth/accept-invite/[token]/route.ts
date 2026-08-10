@@ -1,176 +1,84 @@
-import { ObjectId } from "mongodb";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { createSession, hashPassword, verifyPassword } from "@/lib/auth";
 import { apiError, routeError, validationError } from "@/lib/api-response";
-import { collections, mongoClient } from "@/lib/db";
-import { organizationIsActive } from "@/lib/organization-state";
-import {
-  fenceActiveOrganizationMutation,
-  OrganizationMutationBlockedError,
-} from "@/lib/organization-mutation";
+import { fenceActiveOrganizationMutation, OrganizationMutationBlockedError } from "@/lib/organization-mutation";
+import { newPasswordError } from "@/lib/password-policy";
+import { database, withDatabaseTransaction } from "@/lib/postgres/client";
 import { consumeRateLimit, RateLimitError, requestIp } from "@/lib/rate-limit";
 import { hashSecret } from "@/lib/secrets";
-import { newPasswordError } from "@/lib/password-policy";
 
 const schema = z.object({ password: z.string().min(1).max(1024) });
-
 class InvitationIdentityConflictError extends Error {}
 
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ token: string }> }
-) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ token: string }> }) {
   try {
     const { token } = await params;
     const tokenHash = hashSecret(token);
     await Promise.all([
-      consumeRateLimit("accept-invite-ip", requestIp(request), {
-        limit: 20,
-        windowMs: 15 * 60_000,
-      }),
-      consumeRateLimit("accept-invite-token", tokenHash, {
-        limit: 8,
-        windowMs: 15 * 60_000,
-      }),
+      consumeRateLimit("accept-invite-ip", requestIp(request), { limit: 20, windowMs: 15 * 60_000 }),
+      consumeRateLimit("accept-invite-token", tokenHash, { limit: 8, windowMs: 15 * 60_000 }),
     ]);
     const parsed = schema.safeParse(await request.json().catch(() => ({})));
     if (!parsed.success) return validationError(parsed.error);
-    const membership = await collections.memberships().findOne({
-      invitationTokenHash: tokenHash,
-      status: "INVITED",
-      invitationExpiresAt: { $gt: new Date() },
-    });
-    if (!membership) {
-      return apiError(404, "INVITATION_INVALID", "This invitation is invalid or expired");
-    }
-    const [user, organization] = await Promise.all([
-      collections.users().findOne({ _id: membership.userId }),
-      collections.organizations().findOne({ _id: membership.orgId }),
-    ]);
-    if (!user || user.disabled || !organization || !organizationIsActive(organization)) {
+    const invite = await database.selectFrom("memberships as membership")
+      .innerJoin("users as user", "user.id", "membership.userId")
+      .innerJoin("organizations as organization", "organization.id", "membership.orgId")
+      .selectAll("membership").select([
+        "user.username", "user.email", "user.name", "user.passwordHash", "user.disabled",
+        "user.oidcIssuer", "user.oidcSubject", "organization.status as orgStatus", "organization.suspended",
+      ]).where("membership.invitationTokenHash", "=", tokenHash).where("membership.status", "=", "INVITED")
+      .where("membership.invitationExpiresAt", ">", new Date()).executeTakeFirst();
+    if (!invite) return apiError(404, "INVITATION_INVALID", "This invitation is invalid or expired");
+    if (invite.disabled || invite.orgStatus !== "ACTIVE" || invite.suspended) {
       return apiError(403, "INVITATION_UNAVAILABLE", "This invitation is no longer available");
     }
-    const existingPasswordHash = user.passwordHash;
+    const existingPasswordHash = invite.passwordHash;
     if (existingPasswordHash) {
-      if (!(await verifyPassword(parsed.data.password, existingPasswordHash))) {
-        return apiError(401, "INVALID_CREDENTIALS", "The password is incorrect");
-      }
-    } else if (newPasswordError(parsed.data.password, [user.name, user.email])) {
-      return apiError(
-        400,
-        "PASSWORD_POLICY_FAILED",
-        newPasswordError(parsed.data.password, [user.name, user.email])!
-      );
+      if (!(await verifyPassword(parsed.data.password, existingPasswordHash))) return apiError(401, "INVALID_CREDENTIALS", "The password is incorrect");
+    } else {
+      const policyError = newPasswordError(parsed.data.password, [invite.name, invite.email]);
+      if (policyError) return apiError(400, "PASSWORD_POLICY_FAILED", policyError);
     }
-    const newPasswordHash = existingPasswordHash
-      ? null
-      : await hashPassword(parsed.data.password);
+    const newPasswordHash = existingPasswordHash ? null : await hashPassword(parsed.data.password);
     const now = new Date();
-    const databaseSession = mongoClient.startSession();
-    try {
-      await databaseSession.withTransaction(async () => {
-        await fenceActiveOrganizationMutation(
-          membership.orgId,
-          databaseSession
-        );
-        const currentUser = await collections.users().findOne(
-          { _id: user._id, disabled: { $ne: true } },
-          { session: databaseSession }
-        );
-        if (!currentUser) {
-          throw new InvitationIdentityConflictError(
-            "The invited identity is no longer available"
-          );
+    await withDatabaseTransaction(async (transaction) => {
+      await fenceActiveOrganizationMutation(invite.orgId, transaction);
+      const membership = await transaction.selectFrom("memberships").selectAll()
+        .where("id", "=", invite.id).where("invitationTokenHash", "=", tokenHash)
+        .where("status", "=", "INVITED").where("invitationExpiresAt", ">", now).forUpdate().executeTakeFirst();
+      const user = await transaction.selectFrom("users").selectAll()
+        .where("id", "=", invite.userId).where("disabled", "=", false).forUpdate().executeTakeFirst();
+      if (!membership || !user) throw new InvitationIdentityConflictError("The invited identity is no longer available");
+      if (existingPasswordHash) {
+        if (user.passwordHash !== existingPasswordHash) throw new InvitationIdentityConflictError("The account password changed; reopen the invitation and confirm the current password");
+      } else {
+        const membershipCount = await transaction.selectFrom("memberships")
+          .select((expression) => expression.fn.countAll<number>().as("count"))
+          .where("userId", "=", user.id).executeTakeFirstOrThrow();
+        if (user.passwordHash || user.oidcIssuer || user.oidcSubject || Number(membershipCount.count) !== 1) {
+          throw new InvitationIdentityConflictError("This existing identity must authenticate through its current account before joining another organization");
         }
-        if (existingPasswordHash) {
-          if (currentUser.passwordHash !== existingPasswordHash) {
-            throw new InvitationIdentityConflictError(
-              "The account password changed; reopen the invitation and confirm the current password"
-            );
-          }
-        } else {
-          const identityMembershipCount = await collections
-            .memberships()
-            .countDocuments(
-              { userId: user._id },
-              { session: databaseSession }
-            );
-          if (
-            currentUser.passwordHash ||
-            currentUser.oidcIssuer ||
-            currentUser.oidcSubject ||
-            identityMembershipCount !== 1
-          ) {
-            throw new InvitationIdentityConflictError(
-              "This existing identity must authenticate through its current account before joining another organization"
-            );
-          }
-          const passwordSet = await collections.users().updateOne(
-            {
-              _id: user._id,
-              passwordHash: null,
-              disabled: { $ne: true },
-              oidcIssuer: { $in: [null] },
-              oidcSubject: { $in: [null] },
-            },
-            {
-              $set: {
-                passwordHash: newPasswordHash!,
-                mustChangePassword: false,
-                updatedAt: now,
-              },
-            },
-            { session: databaseSession }
-          );
-          if (passwordSet.modifiedCount !== 1) {
-            throw new InvitationIdentityConflictError(
-              "The invited identity changed; reopen the invitation and try again"
-            );
-          }
-        }
-        const accepted = await collections.memberships().updateOne(
-          {
-            _id: membership._id,
-            invitationTokenHash: tokenHash,
-            status: "INVITED",
-            invitationExpiresAt: { $gt: now },
-          },
-          {
-            $set: {
-              status: "ACTIVE",
-              activatedAt: now,
-              invitationExpiresAt: null,
-              invitationTokenHash: null,
-            },
-          },
-          { session: databaseSession }
-        );
-        if (!accepted.modifiedCount) throw new Error("Invitation was already used");
-        await collections.auditLogs().insertOne(
-          {
-            _id: new ObjectId(),
-            orgId: membership.orgId,
-            actor: user.email,
-            action: "ORGANIZATION_INVITATION_ACCEPTED",
-            target: membership._id.toHexString(),
-            metadata: null,
-            createdAt: now,
-          },
-          { session: databaseSession }
-        );
-      });
-    } finally {
-      await databaseSession.endSession();
-    }
+        const passwordSet = await transaction.updateTable("users").set({
+          passwordHash: newPasswordHash!, mustChangePassword: false, updatedAt: now,
+        }).where("id", "=", user.id).where("passwordHash", "is", null)
+          .where("disabled", "=", false).where("oidcIssuer", "is", null).where("oidcSubject", "is", null)
+          .returning("id").executeTakeFirst();
+        if (!passwordSet) throw new InvitationIdentityConflictError("The invited identity changed; reopen the invitation and try again");
+      }
+      const accepted = await transaction.updateTable("memberships").set({
+        status: "ACTIVE", activatedAt: now, invitationExpiresAt: null, invitationTokenHash: null,
+      }).where("id", "=", membership.id).where("status", "=", "INVITED")
+        .returning("id").executeTakeFirst();
+      if (!accepted) throw new Error("Invitation was already used");
+      await transaction.insertInto("auditLogs").values({
+        orgId: membership.orgId, actor: user.email, action: "ORGANIZATION_INVITATION_ACCEPTED",
+        target: membership.id, metadata: null, createdAt: now,
+      }).execute();
+    });
     await createSession({
-      userId: user._id.toHexString(),
-      membershipId: membership._id.toHexString(),
-      orgId: membership.orgId.toHexString(),
-      username: user.username,
-      email: user.email,
-      name: user.name,
-      role: membership.role,
+      userId: invite.userId, membershipId: invite.id, orgId: invite.orgId,
+      username: invite.username, email: invite.email, name: invite.name, role: invite.role,
     });
     return NextResponse.json({ ok: true });
   } catch (error) {
@@ -179,16 +87,8 @@ export async function POST(
       response.headers.set("retry-after", String(error.retryAfterSeconds));
       return response;
     }
-    if (error instanceof InvitationIdentityConflictError) {
-      return apiError(409, "INVITATION_IDENTITY_CONFLICT", error.message);
-    }
-    if (error instanceof OrganizationMutationBlockedError) {
-      return apiError(
-        403,
-        "INVITATION_UNAVAILABLE",
-        "This invitation is no longer available"
-      );
-    }
-    return routeError(error);
+    if (error instanceof InvitationIdentityConflictError) return apiError(409, "INVITATION_IDENTITY_CONFLICT", error.message);
+    if (error instanceof OrganizationMutationBlockedError) return apiError(403, "INVITATION_UNAVAILABLE", "This invitation is no longer available");
+    return routeError(error, { route: "POST /api/auth/accept-invite/:token" });
   }
 }

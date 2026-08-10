@@ -1,27 +1,21 @@
 import { randomBytes } from "node:crypto";
-import { ObjectId, type ClientSession } from "mongodb";
-import { collections } from "@/lib/db";
+import type { Insertable } from "kysely";
+import type { DatabaseTransaction } from "@/lib/postgres/client";
+import type { WebhookEndpointTable } from "@/lib/postgres/schema";
+import { newDatabaseId } from "@/lib/database-id";
 import { encryptSecret } from "@/lib/encryption";
-import { oid, toId } from "@/lib/mongo-utils";
 import { hashSecret } from "@/lib/secrets";
 import { validateHttpTarget } from "@/lib/target-validation";
 import { generateWebhookSecret } from "@/lib/tokens";
 
-export async function prepareVerifiedWebhookEndpoint(
-  pageId: string,
-  rawUrl: string
-) {
+export async function prepareVerifiedWebhookEndpoint(pageId: string, rawUrl: string) {
   const url = String(rawUrl).trim();
   await validateHttpTarget(url, { httpsOnly: true, allowPrivate: false });
-
   const challenge = randomBytes(24).toString("base64url");
   const response = await fetch(url, {
     method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "user-agent": "Status-Webhook-Verifier/1.0",
-    },
-    body: JSON.stringify({ type: "status.webhook.verify", challenge }),
+    headers: { "content-type": "application/json", "user-agent": "SignalHub-Webhook-Verifier/1.0" },
+    body: JSON.stringify({ type: "signalhub.webhook.verify", challenge }),
     signal: AbortSignal.timeout(5_000),
     redirect: "manual",
   });
@@ -34,20 +28,15 @@ export async function prepareVerifiedWebhookEndpoint(
     // The structured failure below is intentionally generic.
   }
   if (
-    !response.ok ||
-    !echoed ||
-    typeof echoed !== "object" ||
-    !("challenge" in echoed) ||
-    (echoed as { challenge?: unknown }).challenge !== challenge
+    !response.ok || !echoed || typeof echoed !== "object" ||
+    !("challenge" in echoed) || (echoed as { challenge?: unknown }).challenge !== challenge
   ) {
     throw new Error("Webhook verification failed: endpoint must echo the HTTPS challenge");
   }
-
   const secret = generateWebhookSecret();
-  const endpointId = new ObjectId();
-  const document = {
-    _id: endpointId,
-    pageId: oid(pageId),
+  const document: Insertable<WebhookEndpointTable> & { id: string } = {
+    id: newDatabaseId(),
+    pageId,
     url,
     secretHash: secret.hash,
     secretCiphertext: encryptSecret(secret.token),
@@ -58,38 +47,26 @@ export async function prepareVerifiedWebhookEndpoint(
     verificationTokenHash: hashSecret(challenge),
     createdAt: new Date(),
   };
-  return {
-    document,
-    result: { endpoint: toId(document), secret: secret.token },
-  };
+  return { document, result: { endpoint: document, secret: secret.token } };
 }
 
 export async function insertVerifiedWebhookEndpoint(
   prepared: Awaited<ReturnType<typeof prepareVerifiedWebhookEndpoint>>,
-  session: ClientSession
+  transaction: DatabaseTransaction
 ) {
-  await collections.webhookEndpoints().insertOne(prepared.document, {
-    session,
-  });
-  return prepared.result;
+  const endpoint = await transaction.insertInto("webhookEndpoints")
+    .values(prepared.document).returningAll().executeTakeFirstOrThrow();
+  return { endpoint, secret: prepared.result.secret };
 }
 
-export async function rotateWebhookEndpointSecret(
-  endpointId: string,
-  session?: ClientSession
-) {
+export async function rotateWebhookEndpointSecret(endpointId: string, transaction: DatabaseTransaction) {
   const secret = generateWebhookSecret();
-  const result = await collections.webhookEndpoints().updateOne(
-    { _id: oid(endpointId), active: true },
-    {
-      $set: {
-        secretHash: secret.hash,
-        secretCiphertext: encryptSecret(secret.token),
-        secretPrefix: secret.prefix,
-        secretLastFour: secret.lastFour,
-      },
-    },
-    { session }
-  );
-  return result.matchedCount ? secret : null;
+  const result = await transaction.updateTable("webhookEndpoints").set({
+    secretHash: secret.hash,
+    secretCiphertext: encryptSecret(secret.token),
+    secretPrefix: secret.prefix,
+    secretLastFour: secret.lastFour,
+  }).where("id", "=", endpointId).where("active", "=", true)
+    .returning("id").executeTakeFirst();
+  return result ? secret : null;
 }

@@ -1,4 +1,5 @@
-import type { ClientSession } from "mongodb";
+import { sql } from "kysely";
+import type { DatabaseTransaction } from "@/lib/postgres/client";
 
 type MembershipAdminState = {
   role: string;
@@ -27,29 +28,11 @@ export function transitionRemovesActiveAdmin(
  */
 export async function withOrganizationAdminInvariantTransaction<T>(
   _organizationId: string,
-  work: (session: ClientSession) => Promise<T>
+  work: (transaction: DatabaseTransaction) => Promise<T>
 ): Promise<T> {
-  const { db, mongoClient } = await import("./db");
-  const locks = db.collection<{ _id: string; revision: number; createdAt: Date; updatedAt?: Date }>("identityInvariantLocks");
-  await locks.updateOne(
-    { _id: "active-admin" },
-    { $setOnInsert: { revision: 0, createdAt: new Date() } },
-    { upsert: true }
-  );
-  const databaseSession = mongoClient.startSession();
-  let result: T;
-  try {
-    await databaseSession.withTransaction(async () => {
-      const acquired = await locks.updateOne(
-        { _id: "active-admin" },
-        { $inc: { revision: 1 }, $set: { updatedAt: new Date() } },
-        { session: databaseSession }
-      );
-      if (!acquired.matchedCount) throw new Error("Admin invariant lock is unavailable");
-      result = await work(databaseSession);
-    });
-  } finally {
-    await databaseSession.endSession();
-  }
-  return result!;
+  const { withDatabaseTransaction } = await import("@/lib/postgres/client");
+  return withDatabaseTransaction(async (transaction) => {
+    await sql`select pg_advisory_xact_lock(hashtext('signalhub:active-admin'))`.execute(transaction);
+    return work(transaction);
+  });
 }

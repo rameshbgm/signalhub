@@ -6,8 +6,7 @@ import {
 } from "./actions";
 import { TeamMemberCreateForm } from "@/components/admin/TeamMemberCreateForm";
 import { getOrganizationMembers } from "@/lib/memberships";
-import { collections } from "@/lib/db";
-import { oid, toId } from "@/lib/mongo-utils";
+import { database } from "@/lib/postgres/client";
 import { MEMBERSHIP_ROLES } from "@/lib/identity";
 import { requireCapability } from "@/lib/admin-guard";
 
@@ -16,7 +15,11 @@ export default async function TeamPage() {
   await requireCapability("team.manage");
   const [members, pages] = await Promise.all([
     getOrganizationMembers(org.id),
-    collections.pages().find({ orgId: oid(org.id) }).sort({ name: 1 }).toArray().then((docs) => docs.map(toId)),
+    database.selectFrom("pages").selectAll()
+      .where("orgId", "=", org.id)
+      .where("deletedAt", "is", null)
+      .orderBy("name")
+      .execute(),
   ]);
 
   return (

@@ -3,10 +3,9 @@ import { z } from "zod";
 import { apiKeyAllowsPage, authenticateApiKey } from "@/lib/api-auth";
 import { apiError, routeError, validationError } from "@/lib/api-response";
 import { setComponentStatus } from "@/lib/component-status";
-import { collections } from "@/lib/db";
-import { oid, toId } from "@/lib/mongo-utils";
+import { isDatabaseId } from "@/lib/database-id";
+import { database } from "@/lib/postgres/client";
 import { COMPONENT_STATUSES } from "@/lib/status";
-import { activePageFilter } from "@/lib/page-lifecycle";
 
 const schema = z.object({ status: z.enum(COMPONENT_STATUSES) });
 
@@ -18,21 +17,22 @@ export async function PATCH(
     const apiKey = await authenticateApiKey(request, "components.write");
     if (!apiKey) return apiError(401, "UNAUTHENTICATED", "A valid API key is required");
     const { id } = await params;
-    const component = await collections.components().findOne({ _id: oid(id) });
+    if (!isDatabaseId(id)) return apiError(404, "COMPONENT_NOT_FOUND", "Component not found");
+    const component = await database.selectFrom("components as component")
+      .innerJoin("pages as page", "page.id", "component.pageId")
+      .select(["component.id", "page.id as pageId"])
+      .where("component.id", "=", id).where("page.orgId", "=", apiKey.orgId)
+      .where("page.deletedAt", "is", null).executeTakeFirst();
     if (!component) return apiError(404, "COMPONENT_NOT_FOUND", "Component not found");
-    const page = await collections.pages().findOne(activePageFilter({
-      _id: component.pageId,
-      orgId: oid(apiKey.orgId),
-    }));
-    if (!page || !apiKeyAllowsPage(apiKey, page._id.toHexString())) {
+    if (!apiKeyAllowsPage(apiKey, component.pageId)) {
       return apiError(404, "COMPONENT_NOT_FOUND", "Component not found");
     }
     const parsed = schema.safeParse(await request.json().catch(() => ({})));
     if (!parsed.success) return validationError(parsed.error);
-    await setComponentStatus(component._id, parsed.data.status);
-    const updated = await collections.components().findOne({ _id: component._id });
-    return NextResponse.json({ component: toId(updated!) });
+    await setComponentStatus(component.id, parsed.data.status);
+    const updated = await database.selectFrom("components").selectAll().where("id", "=", component.id).executeTakeFirstOrThrow();
+    return NextResponse.json({ component: updated });
   } catch (error) {
-    return routeError(error);
+    return routeError(error, { route: "PATCH /api/v1/manage/components/:id" });
   }
 }

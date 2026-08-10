@@ -1,7 +1,5 @@
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
-import { collections } from "@/lib/db";
-import { toId } from "@/lib/mongo-utils";
 import { overallBanner, COMPONENT_STATUS_COLOR } from "@/lib/status";
 import { PublicHeader, PublicFooter } from "@/components/public/PublicChrome";
 import { StatusBanner } from "@/components/public/StatusBanner";
@@ -19,11 +17,11 @@ import { AnnouncementList } from "@/components/public/AnnouncementList";
 import type { PageDesignBlock } from "@/lib/page-design";
 import type { Metadata } from "next";
 import { publicFaviconMetadata } from "@/lib/public-favicon";
-import { publicPageFilter } from "@/lib/page-lifecycle";
+import { getActivePageAnnouncements, getPublicHubChildren, getPublicPageBySlug } from "@/lib/pages";
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params;
-  const hub = await collections.pages().findOne(publicPageFilter({ slug, isHub: true }));
+  const hub = await getPublicPageBySlug(slug, { isHub: true });
   if (!hub) return {};
   const design = pageDesignFor(hub);
   return {
@@ -37,10 +35,10 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 
 export default async function HubPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const hubDoc = await collections.pages().findOne(publicPageFilter({ slug }));
+  const hubDoc = await getPublicPageBySlug(slug);
   if (!hubDoc || !hubDoc.isHub) notFound();
-  const hub = toId(hubDoc);
-  const design = pageDesignFor(hubDoc);
+  const hub = hubDoc!;
+  const design = pageDesignFor(hub);
   const hubAccess = await checkPageAccess(hub);
   if (!hubAccess.ok) {
     if (hubAccess.reason === "unavailable") notFound();
@@ -50,15 +48,10 @@ export default async function HubPage({ params }: { params: Promise<{ slug: stri
       )}`
     );
   }
-  const candidateChildren = await collections
-    .pages()
-    .find(publicPageFilter({ hubParentId: hubDoc._id, orgId: hubDoc.orgId, isHub: false }))
-    .sort({ createdAt: 1 })
-    .toArray();
+  const candidateChildren = await getPublicHubChildren(hub.id, hub.orgId);
   const childData = (
     await Promise.all(
-      candidateChildren.map(async (childDoc) => {
-        const child = toId(childDoc);
+      candidateChildren.map(async (child) => {
         const access = await checkPageAccess(child);
         if (!access.ok) return null;
         const summary = await getPublicSurfaceSummary(child.id, access.visibleComponentIds);
@@ -89,17 +82,9 @@ export default async function HubPage({ params }: { params: Promise<{ slug: stri
     (incident) => incident.isMaintenance && incident.maintenanceStatus === "SCHEDULED"
   );
   const now = new Date();
-  const announcementDocs = await collections.pageAnnouncements()
-    .find({
-      pageId: hubDoc._id,
-      startsAt: { $lte: now },
-      $or: [{ endsAt: null }, { endsAt: { $gt: now } }],
-      surfaces: "HUB",
-    })
-    .sort({ priority: -1, startsAt: -1 })
-    .toArray();
+  const announcementDocs = await getActivePageAnnouncements(hub.id, "HUB", now);
   const announcements = announcementDocs.map((announcement) => ({
-    id: announcement._id.toHexString(),
+    id: announcement.id,
     title: announcement.title,
     body: announcement.body,
     severity: announcement.severity,

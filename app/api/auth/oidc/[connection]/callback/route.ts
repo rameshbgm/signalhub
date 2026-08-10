@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { errorFields, logger } from "@/lib/logger";
 import { createSession } from "@/lib/auth";
-import { collections } from "@/lib/db";
+import { database } from "@/lib/postgres/client";
 import {
   connectionMfaSatisfied,
   findEnabledConnection,
@@ -56,20 +57,21 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     });
     if (!result) return loginError(request, "oidc_no_membership");
     const organization = result.membership.role === "ADMIN"
-      ? await collections.organizations().find({ suspended: { $ne: true }, status: "ACTIVE" }).sort({ createdAt: 1 }).limit(1).next()
-      : await collections.organizations().findOne({ _id: result.membership.orgId });
+      ? await database.selectFrom("organizations").selectAll().where("suspended", "=", false)
+        .where("status", "=", "ACTIVE").orderBy("createdAt", "asc").executeTakeFirst()
+      : await database.selectFrom("organizations").selectAll().where("id", "=", result.membership.orgId).executeTakeFirst();
     if (!organization || !organizationIsActive(organization)) return loginError(request, "oidc_no_active_organization");
-    await writeActiveTenantAudit(organization._id, {
+    await writeActiveTenantAudit(organization.id, {
       actor: result.user.username,
       action: "LOGIN",
       target: "session",
-      metadata: { method: "oidc", connectionId: connection._id.toHexString(), issuer: identity.issuer },
+      metadata: { method: "oidc", connectionId: connection.id, issuer: identity.issuer },
       createdAt: new Date(),
     });
     await createSession({
-      userId: result.user._id.toHexString(),
-      membershipId: result.membership._id.toHexString(),
-      orgId: organization._id.toHexString(),
+      userId: result.user.id,
+      membershipId: result.membership.id,
+      orgId: organization.id,
       username: result.user.username,
       email: result.user.email,
       name: result.user.name,
@@ -84,7 +86,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     response.cookies.delete(OIDC_TRANSACTION_COOKIE);
     return response;
   } catch (error) {
-    console.error("Enterprise OIDC callback failed", error);
+    logger.error({ ...errorFields(error), connection: slug }, "Enterprise OIDC callback failed");
     return loginError(request, "oidc_failed");
   }
 }

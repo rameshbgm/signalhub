@@ -15,6 +15,7 @@ login-credentials.txt
 *.db-journal
 npm-debug.log*
 .DS_Store
+.idea/
 next-env.d.ts
 .playwright-mcp
 data/uploads/

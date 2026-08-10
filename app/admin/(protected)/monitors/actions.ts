@@ -2,13 +2,13 @@
 
 import { revalidatePath } from "next/cache";
 import { assertPageInOrg, requireCapability } from "@/lib/admin-guard";
-import { collections } from "@/lib/db";
+import { deleteMonitorCascade } from "@/lib/cascade";
 import { createMonitor as createMonitorDomain, type MonitorInput } from "@/lib/domain/monitors";
-import { deleteMonitorCascade, withTransaction } from "@/lib/cascade";
-import { oid } from "@/lib/mongo-utils";
-import { validateHttpTarget, validateNetworkHost } from "@/lib/target-validation";
-import { writeSupportMutationAudit } from "@/lib/support-audit";
 import { fenceActiveOrganizationMutation } from "@/lib/organization-mutation";
+import { database, withDatabaseTransaction } from "@/lib/postgres/client";
+import { writeSupportMutationAudit } from "@/lib/support-audit";
+import { validateHttpTarget, validateNetworkHost } from "@/lib/target-validation";
+import { enqueueJobSweep, JOB_TASKS } from "@/lib/jobs";
 
 function string(formData: FormData, key: string, fallback = "") {
   return String(formData.get(key) ?? fallback);
@@ -71,8 +71,10 @@ export async function addMonitorTemplate(pageId: string, templateId: string, for
   const session = await requireCapability("monitor.manage", pageId);
   await assertPageInOrg(pageId, session.orgId);
   const [template, existing] = await Promise.all([
-    collections.monitorTemplates().findOne({ _id: oid(templateId), enabled: true }),
-    collections.monitors().findOne({ pageId: oid(pageId), templateId: oid(templateId) }),
+    database.selectFrom("monitorTemplates").selectAll()
+      .where("id", "=", templateId).where("enabled", "=", true).executeTakeFirst(),
+    database.selectFrom("monitors").select("id")
+      .where("pageId", "=", pageId).where("templateId", "=", templateId).executeTakeFirst(),
   ]);
   if (!template) throw new Error("Global monitor template is unavailable");
   if (existing) throw new Error("This global monitor is already shown on the page");
@@ -121,119 +123,90 @@ export async function addMonitorTemplate(pageId: string, templateId: string, for
   revalidatePath("/organization/monitors");
 }
 
+async function monitorContext(monitorId: string) {
+  const monitor = await database.selectFrom("monitors").selectAll().where("id", "=", monitorId).executeTakeFirst();
+  if (!monitor) throw new Error("Monitor not found");
+  return monitor;
+}
+
 export async function removeMonitorTemplate(monitorId: string) {
-  const monitor = await collections.monitors().findOne({ _id: oid(monitorId), templateId: { $ne: null } });
-  if (!monitor) throw new Error("Attached global monitor not found");
-  const pageId = monitor.pageId.toHexString();
-  const session = await requireCapability("monitor.manage", pageId);
-  await assertPageInOrg(pageId, session.orgId);
-  await deleteMonitorCascade(monitorId, session.orgId, pageId);
+  const monitor = await monitorContext(monitorId);
+  if (!monitor.templateId) throw new Error("Attached global monitor not found");
+  const session = await requireCapability("monitor.manage", monitor.pageId);
+  await assertPageInOrg(monitor.pageId, session.orgId);
+  await deleteMonitorCascade(monitorId, session.orgId, monitor.pageId);
   await writeSupportMutationAudit(session, {
     action: "REMOVE_GLOBAL_MONITOR_FROM_PAGE",
     targetType: "monitor",
     targetId: monitorId,
-    metadata: { pageId, templateId: monitor.templateId?.toHexString() },
+    metadata: { pageId: monitor.pageId, templateId: monitor.templateId },
   });
   revalidatePath("/organization/monitors");
 }
 
 export async function toggleMonitorEnabled(monitorId: string) {
-  const monitor = await collections.monitors().findOne({ _id: oid(monitorId) });
-  if (!monitor) throw new Error("Monitor not found");
-  const pageId = monitor.pageId.toHexString();
-  const session = await requireCapability("monitor.manage", pageId);
-  await assertPageInOrg(pageId, session.orgId);
-  let wasEnabled = monitor.enabled;
-  await withTransaction(async (databaseSession) => {
-    await fenceActiveOrganizationMutation(session.orgId, databaseSession);
-    const page = await collections.pages().findOne(
-      { _id: monitor.pageId, orgId: oid(session.orgId) },
-      { session: databaseSession }
-    );
-    if (!page) throw new Error("Page not found in your organization");
-    const currentMonitor = await collections.monitors().findOne(
-      { _id: monitor._id, pageId: page._id },
-      { session: databaseSession }
-    );
-    if (!currentMonitor) throw new Error("Monitor not found");
-    wasEnabled = currentMonitor.enabled;
-    const changed = await collections.monitors().updateOne(
-      { _id: currentMonitor._id, pageId: page._id, enabled: wasEnabled },
-      { $set: { enabled: !wasEnabled, leaseOwner: null, leaseExpiresAt: null } },
-      { session: databaseSession }
-    );
-    if (!changed.modifiedCount) {
-      throw new Error("Monitor state changed; reload and retry");
-    }
+  const monitor = await monitorContext(monitorId);
+  const session = await requireCapability("monitor.manage", monitor.pageId);
+  await assertPageInOrg(monitor.pageId, session.orgId);
+  const wasEnabled = await withDatabaseTransaction(async (transaction) => {
+    await fenceActiveOrganizationMutation(session.orgId, transaction);
+    const current = await transaction.selectFrom("monitors").select(["id", "enabled"])
+      .where("id", "=", monitor.id).where("pageId", "=", monitor.pageId).forUpdate().executeTakeFirst();
+    if (!current) throw new Error("Monitor not found");
+    await transaction.updateTable("monitors").set({
+      enabled: !current.enabled,
+      runRequestedAt: current.enabled ? null : new Date(),
+      leaseOwner: null,
+      leaseExpiresAt: null,
+    }).where("id", "=", current.id).execute();
+    if (!current.enabled) await enqueueJobSweep(transaction, JOB_TASKS.monitors);
+    return current.enabled;
   });
   await writeSupportMutationAudit(session, {
     action: wasEnabled ? "DISABLE_MONITOR" : "ENABLE_MONITOR",
     targetType: "monitor",
     targetId: monitorId,
-    metadata: { pageId },
+    metadata: { pageId: monitor.pageId },
   });
   revalidatePath("/organization/monitors");
 }
 
 export async function deleteMonitor(monitorId: string) {
-  const monitor = await collections.monitors().findOne({ _id: oid(monitorId) });
-  if (!monitor) throw new Error("Monitor not found");
-  const pageId = monitor.pageId.toHexString();
-  const session = await requireCapability("monitor.manage", pageId);
-  await assertPageInOrg(pageId, session.orgId);
-  await deleteMonitorCascade(monitorId, session.orgId, pageId);
+  const monitor = await monitorContext(monitorId);
+  const session = await requireCapability("monitor.manage", monitor.pageId);
+  await assertPageInOrg(monitor.pageId, session.orgId);
+  await deleteMonitorCascade(monitorId, session.orgId, monitor.pageId);
   await writeSupportMutationAudit(session, {
-    action: "DELETE_MONITOR",
-    targetType: "monitor",
-    targetId: monitorId,
-    metadata: { pageId },
+    action: "DELETE_MONITOR", targetType: "monitor", targetId: monitorId,
+    metadata: { pageId: monitor.pageId },
   });
   revalidatePath("/organization/monitors");
 }
 
 export async function runMonitorNow(monitorId: string) {
-  const monitor = await collections.monitors().findOne({ _id: oid(monitorId) });
-  if (!monitor) throw new Error("Monitor not found");
-  const pageId = monitor.pageId.toHexString();
-  const session = await requireCapability("monitor.manage", pageId);
-  await assertPageInOrg(pageId, session.orgId);
-  await withTransaction(async (databaseSession) => {
-    await fenceActiveOrganizationMutation(session.orgId, databaseSession);
-    const page = await collections.pages().findOne(
-      { _id: monitor.pageId, orgId: oid(session.orgId) },
-      { session: databaseSession }
-    );
-    if (!page) throw new Error("Page not found in your organization");
-    const currentMonitor = await collections.monitors().findOne(
-      { _id: monitor._id, pageId: page._id },
-      { session: databaseSession }
-    );
-    if (!currentMonitor) throw new Error("Monitor not found");
-    const changed = await collections.monitors().updateOne(
-      { _id: currentMonitor._id, pageId: page._id },
-      { $set: { runRequestedAt: new Date(), leaseOwner: null, leaseExpiresAt: null } },
-      { session: databaseSession }
-    );
-    if (!changed.matchedCount) {
-      throw new Error("Monitor state changed; reload and retry");
-    }
+  const monitor = await monitorContext(monitorId);
+  const session = await requireCapability("monitor.manage", monitor.pageId);
+  await assertPageInOrg(monitor.pageId, session.orgId);
+  await withDatabaseTransaction(async (transaction) => {
+    await fenceActiveOrganizationMutation(session.orgId, transaction);
+    const changed = await transaction.updateTable("monitors").set({
+      runRequestedAt: new Date(), leaseOwner: null, leaseExpiresAt: null,
+    }).where("id", "=", monitor.id).where("pageId", "=", monitor.pageId)
+      .returning("id").executeTakeFirst();
+    if (!changed) throw new Error("Monitor state changed; reload and retry");
+    await enqueueJobSweep(transaction, JOB_TASKS.monitors);
   });
   await writeSupportMutationAudit(session, {
-    action: "RUN_MONITOR_NOW",
-    targetType: "monitor",
-    targetId: monitorId,
-    metadata: { pageId },
+    action: "RUN_MONITOR_NOW", targetType: "monitor", targetId: monitorId,
+    metadata: { pageId: monitor.pageId },
   });
   revalidatePath("/organization/monitors");
 }
 
 export async function updateMonitor(monitorId: string, formData: FormData) {
-  const monitor = await collections.monitors().findOne({ _id: oid(monitorId) });
-  if (!monitor) throw new Error("Monitor not found");
-  const pageId = monitor.pageId.toHexString();
-  const session = await requireCapability("monitor.manage", pageId);
-  await assertPageInOrg(pageId, session.orgId);
-
+  const monitor = await monitorContext(monitorId);
+  const session = await requireCapability("monitor.manage", monitor.pageId);
+  await assertPageInOrg(monitor.pageId, session.orgId);
   const name = string(formData, "name").trim();
   const target = string(formData, "target").trim();
   const componentId = optionalString(formData, "componentId");
@@ -242,29 +215,16 @@ export async function updateMonitor(monitorId: string, formData: FormData) {
   const failThreshold = Number(formData.get("failThreshold"));
   const recoverThreshold = Number(formData.get("recoverThreshold"));
   const groupName = optionalString(formData, "groupName");
-  const tags = [...new Set(
-    string(formData, "tags").split(",").map((tag) => tag.trim()).filter(Boolean)
-  )];
-
+  const tags = [...new Set(string(formData, "tags").split(",").map((tag) => tag.trim()).filter(Boolean))];
   if (!name || name.length > 200) throw new Error("Monitor name is required");
   if (!target || target.length > 2_048) throw new Error("Monitor target is required");
-  if (!Number.isInteger(intervalSec) || intervalSec < 10 || intervalSec > 86_400) {
-    throw new Error("Interval must be between 10 and 86400 seconds");
-  }
-  if (!Number.isInteger(timeoutMs) || timeoutMs < 100 || timeoutMs > 60_000) {
-    throw new Error("Timeout must be between 100 and 60000 milliseconds");
-  }
-  if (![failThreshold, recoverThreshold].every((value) => Number.isInteger(value) && value >= 1 && value <= 20)) {
-    throw new Error("Thresholds must be between 1 and 20");
-  }
-  if (tags.length > 20 || tags.some((tag) => tag.length > 50)) {
-    throw new Error("Use no more than 20 tags of 50 characters each");
-  }
+  if (!Number.isInteger(intervalSec) || intervalSec < 10 || intervalSec > 86_400) throw new Error("Interval must be between 10 and 86400 seconds");
+  if (!Number.isInteger(timeoutMs) || timeoutMs < 100 || timeoutMs > 60_000) throw new Error("Timeout must be between 100 and 60000 milliseconds");
+  if (![failThreshold, recoverThreshold].every((value) => Number.isInteger(value) && value >= 1 && value <= 20)) throw new Error("Thresholds must be between 1 and 20");
+  if (tags.length > 20 || tags.some((tag) => tag.length > 50)) throw new Error("Use no more than 20 tags of 50 characters each");
   if (componentId) {
-    const component = await collections.components().findOne({
-      _id: oid(componentId),
-      pageId: monitor.pageId,
-    });
+    const component = await database.selectFrom("components").select("id")
+      .where("id", "=", componentId).where("pageId", "=", monitor.pageId).executeTakeFirst();
     if (!component) throw new Error("Component not found on this page");
   }
   const allowPrivate = process.env.MONITOR_ALLOW_PRIVATE_TARGETS === "true";
@@ -274,55 +234,19 @@ export async function updateMonitor(monitorId: string, formData: FormData) {
     const hostname = monitor.type === "TLS" && target.includes("://") ? new URL(target).hostname : target;
     await validateNetworkHost(hostname, allowPrivate);
   }
-
-  await withTransaction(async (databaseSession) => {
-    await fenceActiveOrganizationMutation(session.orgId, databaseSession);
-    const page = await collections.pages().findOne(
-      { _id: monitor.pageId, orgId: oid(session.orgId) },
-      { session: databaseSession }
-    );
-    if (!page) throw new Error("Page not found in your organization");
-    const currentMonitor = await collections.monitors().findOne(
-      { _id: monitor._id, pageId: page._id },
-      { session: databaseSession }
-    );
-    if (!currentMonitor) throw new Error("Monitor not found");
-    if (componentId) {
-      const component = await collections.components().findOne(
-        { _id: oid(componentId), pageId: page._id },
-        { session: databaseSession }
-      );
-      if (!component) throw new Error("Component not found on this page");
-    }
-    const changed = await collections.monitors().updateOne(
-      { _id: currentMonitor._id, pageId: page._id },
-      {
-        $set: {
-          name,
-          target,
-          componentId: componentId ? oid(componentId) : null,
-          intervalSec,
-          timeoutMs,
-          failThreshold,
-          recoverThreshold,
-          groupName,
-          tags,
-          runRequestedAt: new Date(),
-          leaseOwner: null,
-          leaseExpiresAt: null,
-        },
-      },
-      { session: databaseSession }
-    );
-    if (!changed.matchedCount) {
-      throw new Error("Monitor state changed; reload and retry");
-    }
+  await withDatabaseTransaction(async (transaction) => {
+    await fenceActiveOrganizationMutation(session.orgId, transaction);
+    const changed = await transaction.updateTable("monitors").set({
+      name, target, componentId, intervalSec, timeoutMs, failThreshold, recoverThreshold,
+      groupName, tags, runRequestedAt: new Date(), leaseOwner: null, leaseExpiresAt: null,
+    }).where("id", "=", monitor.id).where("pageId", "=", monitor.pageId)
+      .returning("id").executeTakeFirst();
+    if (!changed) throw new Error("Monitor state changed; reload and retry");
+    await enqueueJobSweep(transaction, JOB_TASKS.monitors);
   });
   await writeSupportMutationAudit(session, {
-    action: "UPDATE_MONITOR",
-    targetType: "monitor",
-    targetId: monitorId,
-    metadata: { pageId },
+    action: "UPDATE_MONITOR", targetType: "monitor", targetId: monitorId,
+    metadata: { pageId: monitor.pageId },
   });
   revalidatePath("/organization/monitors");
 }

@@ -1,35 +1,31 @@
 import { requireSession } from "@/lib/require-session";
-import { collections } from "@/lib/db";
-import { oid, toId } from "@/lib/mongo-utils";
+import { database } from "@/lib/postgres/client";
 import { PageSelect } from "@/components/admin/PageSelect";
 import { ApiKeyActions, ApiKeyCreator } from "@/components/admin/ApiKeyManager";
 import { secretLabel } from "@/lib/secrets";
 import { WebhookEndpointManager } from "@/components/admin/WebhookEndpointManager";
 import { FeedTokenManager } from "@/components/admin/FeedTokenManager";
-import { requireCapability, scopedPageFilter } from "@/lib/admin-guard";
+import { getScopedPages, requireCapability } from "@/lib/admin-guard";
 
 export default async function ApiKeysPage({ searchParams }: { searchParams: Promise<{ pageId?: string }> }) {
   const { session, org } = await requireSession();
   await requireCapability("integration.manage");
   const { pageId: pageIdParam } = await searchParams;
-  const keys = (await collections.apiKeys().find({ orgId: oid(org.id), revokedAt: null }).sort({ createdAt: 1 }).toArray()).map(toId);
-  const pages = (await collections.pages().find(scopedPageFilter(session, org.id)).sort({ createdAt: 1 }).toArray()).map(toId);
+  const keys = await database.selectFrom("apiKeys").selectAll().where("orgId", "=", org.id)
+    .where("revokedAt", "is", null).orderBy("createdAt", "asc").execute();
+  const pages = await getScopedPages(session, org.id);
   const pageId = pageIdParam && pages.some((p) => p.id === pageIdParam) ? pageIdParam : pages[0]?.id;
   const webhookEndpoints = pageId
-    ? (await collections.webhookEndpoints().find({ pageId: oid(pageId) }).toArray()).map(toId)
+    ? await database.selectFrom("webhookEndpoints").selectAll().where("pageId", "=", pageId).execute()
     : [];
   const selectedPage = pages.find((page) => page.id === pageId);
   const feedTokens = pageId
-    ? (
-        await collections
-          .feedTokens()
-          .find({ pageId: oid(pageId), revokedAt: null })
-          .sort({ createdAt: -1 })
-          .toArray()
-      ).map(toId)
+    ? await database.selectFrom("feedTokens").selectAll().where("pageId", "=", pageId)
+      .where("revokedAt", "is", null).orderBy("createdAt", "desc").execute()
     : [];
   const pageComponents = pageId
-    ? (await collections.components().find({ pageId: oid(pageId), visible: true }).sort({ order: 1 }).toArray()).map(toId)
+    ? await database.selectFrom("components").selectAll().where("pageId", "=", pageId)
+      .where("visible", "=", true).orderBy("order", "asc").execute()
     : [];
 
   return (

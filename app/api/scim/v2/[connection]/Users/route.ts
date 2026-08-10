@@ -1,15 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import {
-  authenticateScim,
-  parseScimPagination,
-  provisionScimUser,
-  scimError,
-  scimList,
-  scimUserResource,
-} from "@/lib/scim";
-import { collections } from "@/lib/db";
 import { canonicalizeUsername } from "@/lib/identity";
+import { database } from "@/lib/postgres/client";
+import { authenticateScim, parseScimPagination, provisionScimUser, scimError, scimList, scimUserResource } from "@/lib/scim";
 
 const userSchema = z.object({
   externalId: z.string().trim().max(255).optional(),
@@ -20,106 +13,64 @@ const userSchema = z.object({
   name: z.object({ formatted: z.string().trim().max(255).optional() }).optional(),
 });
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ connection: string }> }
-) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ connection: string }> }) {
   const { connection: slug } = await params;
   const connection = await authenticateScim(request, slug);
-  if (!connection) return scimError(401, "A valid SCIM bearer token is required");
+  if (!connection || !connection.orgId) return scimError(401, "A valid SCIM bearer token is required");
   const { startIndex, count, skip } = parseScimPagination(request);
   const filter = request.nextUrl.searchParams.get("filter");
   const match = filter?.match(/^userName\s+eq\s+"([^"]+)"$/i);
   if (filter && !match) return scimError(400, "Only the userName eq filter is supported", "invalidFilter");
-  const matchedUser = match
-    ? await collections.users().findOne({ canonicalUsername: canonicalizeUsername(match[1]) })
-    : null;
-  const identities = await collections
-    .externalIdentities()
-    .find({
-      connectionId: connection._id,
-      userId: { $ne: null },
-      ...(match ? { userId: matchedUser?._id ?? null } : {}),
-    })
-    .sort({ createdAt: 1 })
-    .skip(skip)
-    .limit(count)
-    .toArray();
-  const totalResults = await collections.externalIdentities().countDocuments({
-    connectionId: connection._id,
-    userId: { $ne: null },
-    ...(match ? { userId: matchedUser?._id ?? null } : {}),
-  });
-  const userIds = identities.flatMap((identity) => identity.userId ? [identity.userId] : []);
-  const [users, memberships] = await Promise.all([
-    collections.users().find({ _id: { $in: userIds } }).toArray(),
-    collections.memberships().find({
-      orgId: connection.orgId!,
-      userId: { $in: userIds },
-    }).toArray(),
+  let query = database.selectFrom("externalIdentities as identity")
+    .innerJoin("users as user", "user.id", "identity.userId")
+    .leftJoin("memberships as membership", (join) => join
+      .onRef("membership.userId", "=", "user.id").on("membership.orgId", "=", connection.orgId!))
+    .where("identity.connectionId", "=", connection.id).where("identity.userId", "is not", null);
+  if (match) query = query.where("user.canonicalUsername", "=", canonicalizeUsername(match[1]));
+  const [rows, totalRow] = await Promise.all([
+    query.select([
+      "identity.id", "identity.subject", "identity.version", "identity.createdAt", "identity.updatedAt",
+      "user.username", "user.email", "user.name", "user.disabled", "membership.status as membershipStatus",
+    ]).orderBy("identity.createdAt", "asc").offset(skip).limit(count).execute(),
+    query.select((expression) => expression.fn.countAll<number>().as("count")).executeTakeFirstOrThrow(),
   ]);
-  const resources = identities.flatMap((identity) => {
-    const user = users.find((item) => item._id.equals(identity.userId!));
-    if (!user) return [];
-    const membership = memberships.find((item) => item.userId.equals(user._id));
-    return [scimUserResource({
-      id: identity._id.toHexString(),
-      externalId: identity.subject,
-      username: user.username,
-      email: user.email,
-      name: user.name,
-      active: !user.disabled && membership?.status === "ACTIVE",
-      version: identity.version ?? 1,
-      createdAt: identity.createdAt,
-      updatedAt: identity.updatedAt,
-    })];
-  });
-  return NextResponse.json(scimList(resources, totalResults, startIndex));
+  const resources = rows.map((row) => scimUserResource({
+    id: row.id, externalId: row.subject, username: row.username, email: row.email, name: row.name,
+    active: !row.disabled && row.membershipStatus === "ACTIVE", version: row.version,
+    createdAt: row.createdAt, updatedAt: row.updatedAt,
+  }));
+  return NextResponse.json(scimList(resources, Number(totalRow.count), startIndex));
 }
 
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ connection: string }> }
-) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ connection: string }> }) {
   const { connection: slug } = await params;
   const connection = await authenticateScim(request, slug);
   if (!connection) return scimError(401, "A valid SCIM bearer token is required");
   const parsed = userSchema.safeParse(await request.json().catch(() => ({})));
   if (!parsed.success) return scimError(400, parsed.error.issues[0]?.message ?? "Invalid user", "invalidValue");
-  const existingUser = await collections.users().findOne({ canonicalUsername: canonicalizeUsername(parsed.data.userName) });
-  const existing = parsed.data.externalId
-    ? await collections.externalIdentities().findOne({ connectionId: connection._id, subject: parsed.data.externalId })
-    : existingUser
-      ? await collections.externalIdentities().findOne({ connectionId: connection._id, userId: existingUser._id })
-      : null;
+  const canonicalUsername = canonicalizeUsername(parsed.data.userName);
+  const existing = await database.selectFrom("externalIdentities as identity")
+    .leftJoin("users as user", "user.id", "identity.userId").select("identity.id")
+    .where("identity.connectionId", "=", connection.id)
+    .where((expression) => parsed.data.externalId
+      ? expression("identity.subject", "=", parsed.data.externalId)
+      : expression("user.canonicalUsername", "=", canonicalUsername))
+    .executeTakeFirst();
   if (existing) return scimError(409, "User already exists", "uniqueness");
   try {
     const result = await provisionScimUser({
-      connection,
-      externalId: parsed.data.externalId,
-      userName: parsed.data.userName,
+      connection, externalId: parsed.data.externalId, userName: parsed.data.userName,
       email: parsed.data.emails.find((email) => email.primary)?.value ?? parsed.data.emails[0].value,
-      displayName: parsed.data.displayName ?? parsed.data.name?.formatted,
-      active: parsed.data.active,
+      displayName: parsed.data.displayName ?? parsed.data.name?.formatted, active: parsed.data.active,
     });
     const resource = scimUserResource({
-      id: result.identity._id.toHexString(),
-      externalId: result.identity.subject,
-      username: result.user.username,
-      email: result.user.email,
-      name: result.user.name,
-      active: result.active,
-      version: result.version,
-      createdAt: result.identity.createdAt,
-      updatedAt: result.identity.updatedAt,
+      id: result.identity.id, externalId: result.identity.subject, username: result.user.username,
+      email: result.user.email, name: result.user.name, active: result.active, version: result.version,
+      createdAt: result.identity.createdAt, updatedAt: result.identity.updatedAt,
     });
-    return NextResponse.json(resource, {
-      status: 201,
-      headers: {
-        location: `/api/scim/v2/${encodeURIComponent(slug)}/Users/${result.identity._id.toHexString()}`,
-        etag: resource.meta.version,
-      },
-    });
+    return NextResponse.json(resource, { status: 201, headers: {
+      location: `/api/scim/v2/${encodeURIComponent(slug)}/Users/${result.identity.id}`, etag: resource.meta.version,
+    }});
   } catch (error) {
     return scimError(400, error instanceof Error ? error.message : "Provisioning failed", "invalidValue");
   }

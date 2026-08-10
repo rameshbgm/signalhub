@@ -42,6 +42,8 @@ export function AssetUploader({
   currentCoverCropY,
   currentCoverCropWidth,
   currentCoverCropHeight,
+  staged = false,
+  onStagedChange,
 }: {
   pageId: string;
   kind: "LOGO" | "FAVICON" | "COVER";
@@ -55,6 +57,11 @@ export function AssetUploader({
   currentCoverCropY?: number | null;
   currentCoverCropWidth?: number | null;
   currentCoverCropHeight?: number | null;
+  staged?: boolean;
+  onStagedChange?: (value: {
+    url: string | null;
+    cover?: { fit: CoverImageFit; positionX: number; positionY: number; crop: CoverImageCrop | null };
+  }) => void;
 }) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -93,7 +100,7 @@ export function AssetUploader({
 
     try {
       const response = await fetchWithTimeout(
-        `/api/admin/pages/${pageId}/assets`,
+        `/api/admin/pages/${pageId}/assets${staged ? "?stage=1" : ""}`,
         { method: "POST", body },
         60_000
       );
@@ -111,8 +118,11 @@ export function AssetUploader({
         setCoverPositionX(cover.positionX);
         setCoverPositionY(cover.positionY);
         setCoverCrop(null);
+        onStagedChange?.({ url: data.asset.url, cover: { fit: cover.fit, positionX: cover.positionX, positionY: cover.positionY, crop: null } });
+      } else {
+        onStagedChange?.({ url: data.asset.url });
       }
-      router.refresh();
+      if (!staged) router.refresh();
       setMessage(
         data.asset.width && data.asset.height
           ? `Saved at ${data.asset.width}×${data.asset.height}px`
@@ -129,6 +139,13 @@ export function AssetUploader({
 
   async function remove() {
     if (loading) return;
+    if (staged) {
+      setPreview("");
+      if (inputRef.current) inputRef.current.value = "";
+      onStagedChange?.({ url: null });
+      setMessage("Removed from draft");
+      return;
+    }
     setLoading(true);
     setMessageIsError(false);
     setMessage(null);
@@ -157,6 +174,11 @@ export function AssetUploader({
 
   async function saveFraming() {
     if (!isCover || !preview || busy) return;
+    if (staged) {
+      onStagedChange?.({ url: preview, cover: { fit: coverFit, positionX: coverPositionX, positionY: coverPositionY, crop: coverCrop } });
+      setMessage("Cover framing saved to draft");
+      return;
+    }
     setSavingFraming(true);
     setMessageIsError(false);
     setMessage(null);

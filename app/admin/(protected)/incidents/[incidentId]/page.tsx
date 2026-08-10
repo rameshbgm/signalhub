@@ -1,7 +1,6 @@
 import { notFound } from "next/navigation";
 import { requireSession } from "@/lib/require-session";
-import { collections } from "@/lib/db";
-import { oid, toId } from "@/lib/mongo-utils";
+import { database } from "@/lib/postgres/client";
 import { IMPACT_LABEL, type Impact } from "@/lib/status";
 import { editIncidentUpdate, postIncidentUpdate, deleteIncident, savePostmortem } from "../actions";
 import { deleteMaintenance, setMaintenanceStatus } from "../../maintenance/actions";
@@ -18,29 +17,31 @@ import { IncidentTimelineEditor } from "@/components/admin/IncidentTimelineEdito
 export default async function IncidentDetailPage({ params }: { params: Promise<{ incidentId: string }> }) {
   const { incidentId } = await params;
   const { session, org } = await requireSession();
-  const incidentDoc = await collections.incidents().findOne({ _id: oid(incidentId) });
-  if (!incidentDoc) notFound();
-  const pageDoc = await collections.pages().findOne({ _id: incidentDoc.pageId });
-  if (!pageDoc || pageDoc.orgId.toHexString() !== org.id) notFound();
-  await assertPageInOrg(pageDoc._id.toHexString(), org.id);
+  const incidentRow = await database.selectFrom("incidents").selectAll().where("id", "=", incidentId).executeTakeFirst();
+  if (!incidentRow) notFound();
+  const pageRow = await database.selectFrom("pages").selectAll().where("id", "=", incidentRow.pageId).executeTakeFirst();
+  if (!pageRow || pageRow.orgId !== org.id) notFound();
+  await assertPageInOrg(pageRow.id, org.id);
   const canUpdate = sessionHasCapability(session, "incident.update");
   const canManage = sessionHasCapability(session, "incident.manage");
 
-  const [updateDocs, linkDocs, templateDocs] = await Promise.all([
-    collections.incidentUpdates().find({ incidentId: incidentDoc._id }).sort({ createdAt: 1 }).toArray(),
-    collections.incidentComponents().find({ incidentId: incidentDoc._id }).toArray(),
-    collections.incidentTemplates().find({ pageId: incidentDoc.pageId, archivedAt: null }).toArray(),
+  const [updates, links, templates] = await Promise.all([
+    database.selectFrom("incidentUpdates").selectAll().where("incidentId", "=", incidentRow.id).orderBy("createdAt").execute(),
+    database.selectFrom("incidentComponents").selectAll().where("incidentId", "=", incidentRow.id).execute(),
+    database.selectFrom("incidentTemplates").selectAll().where("pageId", "=", incidentRow.pageId)
+      .where("archivedAt", "is", null).execute(),
   ]);
-  const componentDocs = linkDocs.length
-    ? await collections.components().find({ _id: { $in: linkDocs.map((l) => l.componentId) } }).toArray()
+  const components = links.length
+    ? await database.selectFrom("components").selectAll()
+        .where("id", "in", links.map((link) => link.componentId)).execute()
     : [];
-  const componentById = new Map(componentDocs.map((c) => [c._id.toHexString(), toId(c)]));
+  const componentById = new Map(components.map((component) => [component.id, component]));
 
   const incident = {
-    ...toId(incidentDoc),
-    updates: updateDocs.map(toId),
-    components: linkDocs.map((l) => ({ ...toId(l), component: componentById.get(l.componentId.toHexString())! })),
-    page: toId(pageDoc),
+    ...incidentRow,
+    updates,
+    components: links.map((link) => ({ ...link, component: componentById.get(link.componentId)! })),
+    page: pageRow,
   };
 
   const boundPostUpdate = postIncidentUpdate.bind(null, incidentId);
@@ -107,7 +108,7 @@ export default async function IncidentDetailPage({ params }: { params: Promise<{
             incidentName={incident.name}
             pageName={incident.page.name}
             componentNames={incident.components.map((component) => component.component.name)}
-            templates={templateDocs.filter((template) => ["UPDATE", "RESOLUTION"].includes(template.kind ?? "")).map(toId)}
+            templates={templates.filter((template) => ["UPDATE", "RESOLUTION"].includes(template.kind))}
           />
         </div>
       )}
@@ -123,9 +124,9 @@ export default async function IncidentDetailPage({ params }: { params: Promise<{
             componentNames={incident.components.map(
               (component) => component.component.name
             )}
-            templates={templateDocs
+            templates={templates
               .filter((template) => template.kind === "MAINTENANCE")
-              .map(toId)}
+            }
           />
           <p className="text-xs text-[var(--fg-dim)] mt-2">
             Auto-transition is {incident.autoTransition ? "on" : "off"}: this window will {incident.autoTransition ? "" : "not "}
@@ -147,7 +148,7 @@ export default async function IncidentDetailPage({ params }: { params: Promise<{
             componentNames={incident.components.map(
               (component) => component.component.name
             )}
-            templates={templateDocs.filter((template) => template.kind === "POSTMORTEM").map(toId)}
+            templates={templates.filter((template) => template.kind === "POSTMORTEM")}
           />
         </div>
       )}

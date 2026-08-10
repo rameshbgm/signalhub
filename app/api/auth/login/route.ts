@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { sql } from "kysely";
 import { z } from "zod";
 import { AdminAuthError } from "@/lib/admin-auth-error";
 import {
@@ -8,18 +9,19 @@ import {
   verifyPassword,
 } from "@/lib/auth";
 import { apiError, routeError, validationError } from "@/lib/api-response";
-import { collections } from "@/lib/db";
 import { canonicalizeUsername } from "@/lib/identity";
-import { oid } from "@/lib/mongo-utils";
+import { database } from "@/lib/postgres/client";
 import { consumeRateLimit, RateLimitError, requestIp } from "@/lib/rate-limit";
 import { writeActiveTenantAudit } from "@/lib/tenant-audit";
 import { decryptSecret } from "@/lib/encryption";
 import { hashRecoveryCode, verifyTotp } from "@/lib/totp";
 
+const databaseIdPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 const schema = z.object({
   username: z.string().trim().min(3).max(64),
   password: z.string().min(1).max(1024),
-  orgId: z.string().regex(/^[a-f\d]{24}$/i).optional(),
+  orgId: z.string().regex(databaseIdPattern).optional(),
   code: z.string().trim().optional(),
   recoveryCode: z.string().trim().optional(),
 });
@@ -35,10 +37,15 @@ export async function POST(request: NextRequest) {
       consumeRateLimit("login-account", canonicalUsername, { limit: 8, windowMs: 15 * 60_000 }),
     ]);
 
-    const user = await collections.users().findOne({ canonicalUsername });
+    const user = await database
+      .selectFrom("users")
+      .selectAll()
+      .where("canonicalUsername", "=", canonicalUsername)
+      .executeTakeFirst();
     if (!user?.passwordHash || user.disabled || !(await verifyPassword(parsed.data.password, user.passwordHash))) {
       return apiError(401, "INVALID_CREDENTIALS", "Invalid User ID or password");
     }
+
     let mfaVerified = !user.mfaRequired;
     if (user.totpSecretCiphertext) {
       if (!parsed.data.code && !parsed.data.recoveryCode) {
@@ -52,54 +59,65 @@ export async function POST(request: NextRequest) {
         ? verifyTotp(decryptSecret(user.totpSecretCiphertext), parsed.data.code)
         : Boolean(
             (usedRecoveryHash = hashRecoveryCode(parsed.data.recoveryCode ?? "")) &&
-            (user.recoveryCodeHashes ?? []).includes(usedRecoveryHash)
+            user.recoveryCodeHashes.includes(usedRecoveryHash)
           );
       if (!mfaVerified) {
         return apiError(401, "INVALID_MFA_CODE", "The authenticator or recovery code is invalid");
       }
       if (usedRecoveryHash) {
-        const consumed = await collections.users().updateOne(
-          { _id: user._id, recoveryCodeHashes: usedRecoveryHash },
-          { $pull: { recoveryCodeHashes: usedRecoveryHash }, $set: { updatedAt: new Date() } }
-        );
-        if (!consumed.modifiedCount) {
+        const consumed = await database
+          .updateTable("users")
+          .set({
+            recoveryCodeHashes: sql<string[]>`array_remove(recovery_code_hashes, ${usedRecoveryHash})`,
+            updatedAt: new Date(),
+          })
+          .where("id", "=", user.id)
+          .where(sql<boolean>`${usedRecoveryHash} = any(recovery_code_hashes)`)
+          .returning("id")
+          .executeTakeFirst();
+        if (!consumed) {
           return apiError(401, "RECOVERY_CODE_USED", "That recovery code has already been used");
         }
       }
     }
 
-    const requestedOrgId = parsed.data.orgId ? oid(parsed.data.orgId) : null;
-    const memberships = await collections
-      .memberships()
-      .find({
-        userId: user._id,
-        status: "ACTIVE",
-      })
-      .sort({ createdAt: 1 })
-      .toArray();
+    const memberships = await database
+      .selectFrom("memberships")
+      .selectAll()
+      .where("userId", "=", user.id)
+      .where("status", "=", "ACTIVE")
+      .orderBy("createdAt", "asc")
+      .execute();
     if (!memberships.length) {
       return apiError(403, "NO_MEMBERSHIP", "This account does not belong to an organization");
     }
 
     const globalAdminMembership = memberships.find((item) => item.role === "ADMIN");
-    const organizations = await collections
-      .organizations()
-      .find({
-        ...(globalAdminMembership ? {} : { _id: { $in: memberships.map((membership) => membership.orgId) } }),
-        suspended: { $ne: true },
-        status: { $nin: ["PROVISIONING", "SUSPENDED", "DELETING"] },
-      })
-      .toArray();
-    const allowedOrgIds = new Set(organizations.map((organization) => organization._id.toHexString()));
-    const targetOrganization = requestedOrgId
-      ? organizations.find((organization) => organization._id.equals(requestedOrgId))
-      : organizations.find((organization) => globalAdminMembership?.orgId.equals(organization._id)) ?? organizations[0];
-    const membership = globalAdminMembership ?? memberships.find((item) => targetOrganization && item.orgId.equals(targetOrganization._id));
-    if (!membership || !targetOrganization || (!globalAdminMembership && !allowedOrgIds.has(targetOrganization._id.toHexString()))) {
+    let organizationQuery = database
+      .selectFrom("organizations")
+      .selectAll()
+      .where("suspended", "=", false)
+      .where("status", "=", "ACTIVE");
+    if (!globalAdminMembership) {
+      organizationQuery = organizationQuery.where(
+        "id",
+        "in",
+        memberships.map((membership) => membership.orgId)
+      );
+    }
+    const organizations = await organizationQuery.orderBy("createdAt", "asc").execute();
+    const targetOrganization = parsed.data.orgId
+      ? organizations.find((organization) => organization.id === parsed.data.orgId)
+      : organizations.find((organization) => globalAdminMembership?.orgId === organization.id) ?? organizations[0];
+    const membership = globalAdminMembership ?? memberships.find(
+      (item) => targetOrganization && item.orgId === targetOrganization.id
+    );
+    if (!membership || !targetOrganization) {
       return apiError(403, "ORGANIZATION_SUSPENDED", "No active organization is available for this account");
     }
+
     const authorized = await writeActiveTenantAudit(
-      targetOrganization._id,
+      targetOrganization.id,
       {
         actor: user.username,
         action: "LOGIN",
@@ -107,24 +125,22 @@ export async function POST(request: NextRequest) {
         metadata: { method: "password" },
         createdAt: new Date(),
       },
-      async (databaseSession) => {
-        const currentUser = await collections.users().findOne(
-          {
-            _id: user._id,
-            canonicalUsername,
-            passwordHash: user.passwordHash,
-            disabled: { $ne: true },
-          },
-          { session: databaseSession }
-        );
-        const currentMembership = await collections.memberships().findOne(
-          {
-            _id: membership._id,
-            userId: user._id,
-            status: "ACTIVE",
-          },
-          { session: databaseSession }
-        );
+      async (transaction) => {
+        const currentUser = await transaction
+          .selectFrom("users")
+          .selectAll()
+          .where("id", "=", user.id)
+          .where("canonicalUsername", "=", canonicalUsername)
+          .where("passwordHash", "=", user.passwordHash)
+          .where("disabled", "=", false)
+          .executeTakeFirst();
+        const currentMembership = await transaction
+          .selectFrom("memberships")
+          .selectAll()
+          .where("id", "=", membership.id)
+          .where("userId", "=", user.id)
+          .where("status", "=", "ACTIVE")
+          .executeTakeFirst();
         if (!currentUser || !currentMembership) {
           throw new AdminAuthError(
             "Login authorization changed. Sign in again.",
@@ -135,17 +151,20 @@ export async function POST(request: NextRequest) {
         return { user: currentUser, membership: currentMembership };
       }
     );
+
     if (authorized.user.passwordHash && passwordNeedsRehash(authorized.user.passwordHash)) {
       const upgradedHash = await hashPassword(parsed.data.password);
-      await collections.users().updateOne(
-        { _id: authorized.user._id, passwordHash: authorized.user.passwordHash },
-        { $set: { passwordHash: upgradedHash, updatedAt: new Date() } }
-      );
+      await database
+        .updateTable("users")
+        .set({ passwordHash: upgradedHash, updatedAt: new Date() })
+        .where("id", "=", authorized.user.id)
+        .where("passwordHash", "=", authorized.user.passwordHash)
+        .execute();
     }
     await createSession({
-      userId: authorized.user._id.toHexString(),
-      membershipId: authorized.membership._id.toHexString(),
-      orgId: targetOrganization._id.toHexString(),
+      userId: authorized.user.id,
+      membershipId: authorized.membership.id,
+      orgId: targetOrganization.id,
       username: authorized.user.username,
       email: authorized.user.email,
       name: authorized.user.name,
@@ -159,13 +178,13 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       ok: true,
-      organizationId: targetOrganization._id.toHexString(),
+      organizationId: targetOrganization.id,
       organizations: organizations.map((organization) => ({
-        id: organization._id.toHexString(),
+        id: organization.id,
         name: organization.name,
       })),
-      mustChangePassword: Boolean(authorized.user.mustChangePassword),
-      mustCompleteProfile: Boolean(authorized.user.mustCompleteProfile),
+      mustChangePassword: authorized.user.mustChangePassword,
+      mustCompleteProfile: authorized.user.mustCompleteProfile,
       mfaEnrollmentRequired: Boolean(authorized.user.mfaRequired && !authorized.user.totpSecretCiphertext),
     });
   } catch (error) {

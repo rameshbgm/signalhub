@@ -1,9 +1,10 @@
 import { createHash } from "node:crypto";
-import { ObjectId, type Document } from "mongodb";
-import { collections, mongoClient } from "@/lib/db";
+import { database, withDatabaseTransaction, type DatabaseTransaction } from "@/lib/postgres/client";
+import { enqueueJobSweep, JOB_TASKS } from "@/lib/jobs";
+
+type AuditEntry = Record<string, unknown> & { id: string };
 
 function canonical(value: unknown): unknown {
-  if (value instanceof ObjectId) return value.toHexString();
   if (value instanceof Date) return value.toISOString();
   if (Array.isArray(value)) return value.map(canonical);
   if (value && typeof value === "object") {
@@ -17,7 +18,7 @@ function canonical(value: unknown): unknown {
   return value;
 }
 
-function entryHash(previousHash: string | null, entry: Document) {
+function calculateEntryHash(previousHash: string | null, entry: AuditEntry) {
   return createHash("sha256")
     .update(previousHash ?? "GENESIS")
     .update("\n")
@@ -25,199 +26,163 @@ function entryHash(previousHash: string | null, entry: Document) {
     .digest("hex");
 }
 
-async function sealScope(scope: string, organizationId?: ObjectId) {
-  const session = mongoClient.startSession();
-  try {
-    let sealed = 0;
-    await session.withTransaction(async () => {
-      const state = await collections.auditChainStates().findOne({ _id: scope }, { session });
-      let previousHash = state?.latestHash ?? null;
-      let sequence = state?.sequence ?? 0;
-      const entries = organizationId
-        ? await collections.auditLogs().find(
-            { orgId: organizationId, entryHash: { $in: [null, undefined] } },
-            { session }
-          ).sort({ createdAt: 1, _id: 1 }).limit(500).toArray()
-        : await collections.platformAuditLogs().find(
-            { entryHash: { $in: [null, undefined] } },
-            { session }
-          ).sort({ createdAt: 1, _id: 1 }).limit(500).toArray();
-      const sinks = entries.length
-        ? await collections.auditSinks().find(
-            { enabled: true, orgId: organizationId ?? null },
-            { session }
-          ).toArray()
-        : [];
-      for (const entry of entries) {
-        sequence += 1;
-        const hash = entryHash(previousHash, entry);
-        const target = organizationId ? collections.auditLogs() : collections.platformAuditLogs();
-        const updated = await target.updateOne(
-          { _id: entry._id, entryHash: { $in: [null, undefined] } },
-          { $set: { previousHash, entryHash: hash, chainSequence: sequence } },
-          { session }
-        );
-        if (!updated.modifiedCount) throw new Error("Audit chain changed while sealing");
-        for (const sink of sinks) {
-          const deduplicationKey = `${sink._id.toHexString()}:${entry._id.toHexString()}`;
-          const now = new Date();
-          await collections.auditDeliveryJobs().updateOne(
-            { deduplicationKey },
-            {
-              $setOnInsert: {
-                _id: new ObjectId(),
-                sinkId: sink._id,
-                deduplicationKey,
-                payload: {
-                  scope,
-                  entry: canonical(entry) as Record<string, unknown>,
-                  previousHash,
-                  entryHash: hash,
-                  chainSequence: sequence,
-                },
-                status: "PENDING",
-                attempts: 0,
-                maxAttempts: 8,
-                nextAttemptAt: now,
-                leaseOwner: null,
-                leaseExpiresAt: null,
-                lastError: null,
-                responseStatus: null,
-                createdAt: now,
-                updatedAt: now,
-                sentAt: null,
-              },
-            },
-            { upsert: true, session }
-          );
-        }
-        previousHash = hash;
-        sealed += 1;
+async function lockedChainState(transaction: DatabaseTransaction, scope: string) {
+  await transaction.insertInto("auditChainStates")
+    .values({ id: scope, latestHash: null, sequence: 0, retainedSequence: null, retainedPreviousHash: null })
+    .onConflict((conflict) => conflict.column("id").doNothing())
+    .execute();
+  return transaction.selectFrom("auditChainStates")
+    .selectAll()
+    .where("id", "=", scope)
+    .forUpdate()
+    .executeTakeFirstOrThrow();
+}
+
+async function sealScope(scope: string, organizationId?: string) {
+  return withDatabaseTransaction(async (transaction) => {
+    const state = await lockedChainState(transaction, scope);
+    let previousHash = state.latestHash;
+    let sequence = Number(state.sequence);
+    const entries = organizationId
+      ? await transaction.selectFrom("auditLogs").selectAll()
+          .where("orgId", "=", organizationId).where("entryHash", "is", null)
+          .orderBy("createdAt").orderBy("id").limit(500).forUpdate().execute()
+      : await transaction.selectFrom("platformAuditLogs").selectAll()
+          .where("entryHash", "is", null)
+          .orderBy("createdAt").orderBy("id").limit(500).forUpdate().execute();
+    if (!entries.length) return 0;
+
+    const sinksQuery = transaction.selectFrom("auditSinks").select(["id"])
+      .where("enabled", "=", true);
+    const sinks = organizationId
+      ? await sinksQuery.where("orgId", "=", organizationId).execute()
+      : await sinksQuery.where("orgId", "is", null).execute();
+
+    for (const rawEntry of entries) {
+      const entry = rawEntry as unknown as AuditEntry;
+      sequence += 1;
+      const hash = calculateEntryHash(previousHash, entry);
+      const updated = organizationId
+        ? await transaction.updateTable("auditLogs")
+            .set({ previousHash, entryHash: hash, chainSequence: sequence })
+            .where("id", "=", entry.id).where("entryHash", "is", null)
+            .returning("id").executeTakeFirst()
+        : await transaction.updateTable("platformAuditLogs")
+            .set({ previousHash, entryHash: hash, chainSequence: sequence })
+            .where("id", "=", entry.id).where("entryHash", "is", null)
+            .returning("id").executeTakeFirst();
+      if (!updated) throw new Error("Audit chain changed while sealing");
+
+      for (const sink of sinks) {
+        const deduplicationKey = `${sink.id}:${entry.id}`;
+        await transaction.insertInto("auditDeliveryJobs").values({
+          sinkId: sink.id,
+          deduplicationKey,
+          payload: { scope, entry: canonical(entry), previousHash, entryHash: hash, chainSequence: sequence },
+          status: "PENDING",
+          attempts: 0,
+          maxAttempts: 8,
+          nextAttemptAt: new Date(),
+          leaseOwner: null,
+          leaseExpiresAt: null,
+          lastError: null,
+          responseStatus: null,
+          sentAt: null,
+        }).onConflict((conflict) => conflict.column("deduplicationKey").doNothing()).execute();
       }
-      if (entries.length) {
-        await collections.auditChainStates().updateOne(
-          { _id: scope },
-          { $set: { latestHash: previousHash, sequence, updatedAt: new Date() } },
-          { upsert: true, session }
-        );
-      }
-    });
-    return sealed;
-  } finally {
-    await session.endSession();
-  }
+      previousHash = hash;
+    }
+
+    await transaction.updateTable("auditChainStates")
+      .set({ latestHash: previousHash, sequence, updatedAt: new Date() })
+      .where("id", "=", scope)
+      .execute();
+    if (sinks.length) {
+      await enqueueJobSweep(transaction, JOB_TASKS.auditDelivery);
+    }
+    return entries.length;
+  });
 }
 
 export async function sealAuditEntries() {
   let sealed = await sealScope("platform");
-  const orgIds = await collections.auditLogs().distinct("orgId", {
-    entryHash: { $in: [null, undefined] },
-  });
-  for (const orgId of orgIds) {
-    sealed += await sealScope(`organization:${orgId.toHexString()}`, orgId);
+  const organizations = await database.selectFrom("auditLogs")
+    .select("orgId").where("entryHash", "is", null).groupBy("orgId").execute();
+  for (const organization of organizations) {
+    sealed += await sealScope(`organization:${organization.orgId}`, organization.orgId);
   }
   return sealed;
 }
 
-export async function verifyAuditScope(organizationId?: ObjectId) {
-  const scope = organizationId ? `organization:${organizationId.toHexString()}` : "platform";
-  const state = await collections.auditChainStates().findOne({ _id: scope });
+export async function verifyAuditScope(organizationId?: string) {
+  const scope = organizationId ? `organization:${organizationId}` : "platform";
+  const state = await database.selectFrom("auditChainStates").selectAll()
+    .where("id", "=", scope).executeTakeFirst();
   const entries = organizationId
-    ? await collections.auditLogs().find(
-        { orgId: organizationId, entryHash: { $type: "string" } }
-      ).sort({ chainSequence: 1 }).toArray()
-    : await collections.platformAuditLogs().find(
-        { entryHash: { $type: "string" } }
-      ).sort({ chainSequence: 1 }).toArray();
-  let previousHash: string | null = state?.retainedPreviousHash ?? null;
-  let expectedSequence = state?.retainedSequence ?? 1;
-  for (const entry of entries) {
+    ? await database.selectFrom("auditLogs").selectAll()
+        .where("orgId", "=", organizationId).where("entryHash", "is not", null)
+        .orderBy("chainSequence").execute()
+    : await database.selectFrom("platformAuditLogs").selectAll()
+        .where("entryHash", "is not", null).orderBy("chainSequence").execute();
+  let previousHash = state?.retainedPreviousHash ?? null;
+  let expectedSequence = Number(state?.retainedSequence ?? 1);
+  for (const rawEntry of entries) {
+    const entry = rawEntry as unknown as AuditEntry & {
+      chainSequence: number | null;
+      previousHash: string | null;
+      entryHash: string | null;
+    };
     if (
-      entry.chainSequence !== expectedSequence ||
+      Number(entry.chainSequence) !== expectedSequence ||
       entry.previousHash !== previousHash ||
-      entry.entryHash !== entryHash(previousHash, entry)
+      entry.entryHash !== calculateEntryHash(previousHash, entry)
     ) {
-      return {
-        valid: false,
-        checked: expectedSequence - 1,
-        failedId: entry._id.toHexString(),
-        unsealed: 0,
-      };
+      return { valid: false, checked: expectedSequence - 1, failedId: entry.id, unsealed: 0 };
     }
     previousHash = entry.entryHash;
     expectedSequence += 1;
   }
-  const unsealed = organizationId
-    ? await collections.auditLogs().countDocuments({
-        orgId: organizationId,
-        entryHash: { $in: [null, undefined] },
-      })
-    : await collections.platformAuditLogs().countDocuments({
-        entryHash: { $in: [null, undefined] },
-      });
-  const stateMatches =
-    !state ||
-    (previousHash === state.latestHash && expectedSequence - 1 === state.sequence);
+  const unsealedRow = organizationId
+    ? await database.selectFrom("auditLogs").select(({ fn }) => fn.countAll<number>().as("count"))
+        .where("orgId", "=", organizationId).where("entryHash", "is", null).executeTakeFirstOrThrow()
+    : await database.selectFrom("platformAuditLogs").select(({ fn }) => fn.countAll<number>().as("count"))
+        .where("entryHash", "is", null).executeTakeFirstOrThrow();
+  const stateMatches = !state || (
+    previousHash === state.latestHash && expectedSequence - 1 === Number(state.sequence)
+  );
   return {
     valid: stateMatches,
     checked: entries.length,
     failedId: stateMatches ? null : "chain-tail",
-    unsealed,
+    unsealed: Number(unsealedRow.count),
   };
 }
 
-export async function pruneAuditBefore(before: Date, organizationId?: ObjectId) {
-  const scope = organizationId ? `organization:${organizationId.toHexString()}` : "platform";
-  const session = mongoClient.startSession();
-  try {
-    let removed = 0;
-    await session.withTransaction(async () => {
-      const lastRemoved = organizationId
-        ? await collections.auditLogs().findOne(
-            {
-              orgId: organizationId,
-              createdAt: { $lt: before },
-              entryHash: { $type: "string" },
-              chainSequence: { $gt: 0 },
-            },
-            { session, sort: { chainSequence: -1 } }
-          )
-        : await collections.platformAuditLogs().findOne(
-            {
-              createdAt: { $lt: before },
-              entryHash: { $type: "string" },
-              chainSequence: { $gt: 0 },
-            },
-            { session, sort: { chainSequence: -1 } }
-          );
-      if (!lastRemoved?.entryHash || !lastRemoved.chainSequence) return;
-      const result = organizationId
-        ? await collections.auditLogs().deleteMany(
-            {
-              orgId: organizationId,
-              chainSequence: { $lte: lastRemoved.chainSequence },
-            },
-            { session }
-          )
-        : await collections.platformAuditLogs().deleteMany(
-            { chainSequence: { $lte: lastRemoved.chainSequence } },
-            { session }
-          );
-      removed = result.deletedCount;
-      await collections.auditChainStates().updateOne(
-        { _id: scope },
-        {
-          $set: {
-            retainedSequence: lastRemoved.chainSequence + 1,
-            retainedPreviousHash: lastRemoved.entryHash,
-            updatedAt: new Date(),
-          },
-        },
-        { upsert: true, session }
-      );
-    });
-    return removed;
-  } finally {
-    await session.endSession();
-  }
+export async function pruneAuditBefore(before: Date, organizationId?: string) {
+  const scope = organizationId ? `organization:${organizationId}` : "platform";
+  return withDatabaseTransaction(async (transaction) => {
+    await lockedChainState(transaction, scope);
+    const lastRemoved = organizationId
+      ? await transaction.selectFrom("auditLogs").select(["entryHash", "chainSequence"])
+          .where("orgId", "=", organizationId).where("createdAt", "<", before)
+          .where("entryHash", "is not", null).where("chainSequence", ">", 0)
+          .orderBy("chainSequence", "desc").executeTakeFirst()
+      : await transaction.selectFrom("platformAuditLogs").select(["entryHash", "chainSequence"])
+          .where("createdAt", "<", before).where("entryHash", "is not", null)
+          .where("chainSequence", ">", 0).orderBy("chainSequence", "desc").executeTakeFirst();
+    if (!lastRemoved?.entryHash || !lastRemoved.chainSequence) return 0;
+
+    const result = organizationId
+      ? await transaction.deleteFrom("auditLogs")
+          .where("orgId", "=", organizationId)
+          .where("chainSequence", "<=", lastRemoved.chainSequence).executeTakeFirst()
+      : await transaction.deleteFrom("platformAuditLogs")
+          .where("chainSequence", "<=", lastRemoved.chainSequence).executeTakeFirst();
+    await transaction.updateTable("auditChainStates").set({
+      retainedSequence: Number(lastRemoved.chainSequence) + 1,
+      retainedPreviousHash: lastRemoved.entryHash,
+      updatedAt: new Date(),
+    }).where("id", "=", scope).execute();
+    return Number(result.numDeletedRows);
+  });
 }

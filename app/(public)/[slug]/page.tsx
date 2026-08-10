@@ -1,6 +1,4 @@
 import { notFound, redirect } from "next/navigation";
-import { collections } from "@/lib/db";
-import { toId } from "@/lib/mongo-utils";
 import { checkPageAccess } from "@/lib/access";
 import { getComponentsForPage, getIncidentsForPage, getMetricsForPage, splitActiveAndPast } from "@/lib/public-data";
 import { PublicHeader, PublicFooter } from "@/components/public/PublicChrome";
@@ -19,11 +17,11 @@ import { PageDesignShell } from "@/components/public/PageDesignShell";
 import { PageSurfaceLayout } from "@/components/public/PageSurfaceLayout";
 import { AnnouncementList } from "@/components/public/AnnouncementList";
 import { publicFaviconMetadata } from "@/lib/public-favicon";
-import { publicPageFilter } from "@/lib/page-lifecycle";
+import { getActivePageAnnouncements, getPublicPageById, getPublicPageBySlug } from "@/lib/pages";
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params;
-  const page = await collections.pages().findOne(publicPageFilter({ slug }));
+  const page = await getPublicPageBySlug(slug);
   if (!page) return {};
   const design = pageDesignFor(page);
   return {
@@ -37,11 +35,11 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 
 export default async function PublicStatusPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const pageDoc = await collections.pages().findOne(publicPageFilter({ slug }));
+  const pageDoc = await getPublicPageBySlug(slug);
   if (!pageDoc) notFound();
   if (pageDoc.isHub) redirect(`/hub/${encodeURIComponent(pageDoc.slug)}`);
-  const hubParentDoc = pageDoc.hubParentId ? await collections.pages().findOne(publicPageFilter({ _id: pageDoc.hubParentId })) : null;
-  const page = { ...toId(pageDoc), hubParent: hubParentDoc ? toId(hubParentDoc) : null };
+  const hubParent = pageDoc.hubParentId ? await getPublicPageById(pageDoc.hubParentId) : null;
+  const page = { ...pageDoc, hubParent };
   const design = pageDesignFor(pageDoc);
   const basePath = publicPagePath(page);
 
@@ -60,17 +58,9 @@ export default async function PublicStatusPage({ params }: { params: Promise<{ s
 
   const metrics = await getMetricsForPage(page.id, access.visibleComponentIds);
   const now = new Date();
-  const announcementDocs = await collections.pageAnnouncements()
-    .find({
-      pageId: pageDoc._id,
-      startsAt: { $lte: now },
-      $or: [{ endsAt: null }, { endsAt: { $gt: now } }],
-      surfaces: "STATUS",
-    })
-    .sort({ priority: -1, startsAt: -1 })
-    .toArray();
+  const announcementDocs = await getActivePageAnnouncements(page.id, "STATUS", now);
   const announcements = announcementDocs.map((announcement) => ({
-    id: announcement._id.toHexString(),
+    id: announcement.id,
     title: announcement.title,
     body: announcement.body,
     severity: announcement.severity,

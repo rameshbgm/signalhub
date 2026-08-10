@@ -23,7 +23,7 @@ jobs:
       - run: npm test
       - run: npm run build
         env:
-          DATABASE_URL: mongodb://127.0.0.1:27017/signalhub-build
+          DATABASE_URL: postgresql://signalhub:signalhub@127.0.0.1:5432/signalhub_build
           SESSION_SECRET: 012345678901234567890123456789012345678901234567
           ENCRYPTION_KEY: 012345678901234567890123456789012345678901234567
       - run: npm audit --omit=dev --audit-level=high
@@ -39,8 +39,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: azure/setup-helm@v4
-      - run: helm lint deploy/helm/status --set secrets.databaseUrl=mongodb://example/status --set secrets.sessionSecret=01234567890123456789012345678901 --set secrets.encryptionKey=01234567890123456789012345678901
-      - run: helm template ci deploy/helm/status --set secrets.databaseUrl=mongodb://example/status --set secrets.sessionSecret=01234567890123456789012345678901 --set secrets.encryptionKey=01234567890123456789012345678901 > /dev/null
+      - run: helm lint deploy/helm/status --set secrets.databaseUrl=postgresql://signalhub:signalhub@postgres.example:5432/signalhub --set secrets.sessionSecret=01234567890123456789012345678901 --set secrets.encryptionKey=01234567890123456789012345678901
+      - run: helm template ci deploy/helm/status --set secrets.databaseUrl=postgresql://signalhub:signalhub@postgres.example:5432/signalhub --set secrets.sessionSecret=01234567890123456789012345678901 --set secrets.encryptionKey=01234567890123456789012345678901 > /dev/null
 
   e2e:
     runs-on: ubuntu-latest
