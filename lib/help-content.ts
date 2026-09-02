@@ -427,14 +427,14 @@ export const HELP_CATEGORIES: HelpCategory[] = [
     articles: [
       {
         slug: "designer-and-saving",
-        title: "Designer, saving, and versions",
-        summary: "Build responsive page layouts, autosave drafts, publish deliberately, restore versions, and reset defaults.",
+        title: "Appearance and publishing",
+        summary: "Choose a simple layout, add brand assets, autosave a private draft, and publish deliberately.",
         body: [
           {
-            heading: "Workspace layout",
+            heading: "Everyday appearance",
             paragraphs: [
-              "Appearance opens one visual designer for starting points, responsive block layout, brand assets, theme controls, header/footer presentation, and saved versions.",
-              "The live canvas stays visible beside the tool panel. Use the surface and viewport controls to review status, history, incident, access, hub, and embed layouts at desktop, tablet, or mobile sizes.",
+              "Appearance keeps page styling focused on three choices: layout, style, and brand assets.",
+              "Choose Standard for most status pages, Banner for a cover-led page, or Compact when service detail needs less space. Existing tailored layouts stay unchanged until you select a new layout.",
             ],
           },
           {
@@ -445,24 +445,10 @@ export const HELP_CATEGORIES: HelpCategory[] = [
             ],
           },
           {
-            heading: "Blocks and composition",
+            heading: "Brand assets",
             paragraphs: [
-              "The Add block library keeps reusable Rich text and Link cards available. New blocks enter the responsive canvas full-width and are selected for configuration.",
-              "The desktop canvas uses 12 columns, tablet uses 8, and mobile uses 4. Smaller layouts inherit desktop until edited; drag to reorder and use the placement controls to change column or width.",
-            ],
-          },
-          {
-            heading: "Templates and advanced appearance",
-            paragraphs: [
-              "Starting points rearrange existing blocks across surfaces without replacing block content, branding, theme, visitor links, or search settings.",
-              "Theme combines style presets, brand color, visitor light/dark behavior, typography, density, width, radius, shadow, and detailed surface colors.",
-            ],
-          },
-          {
-            heading: "Versions and reset",
-            paragraphs: [
-              "Each page retains its 30 newest published design versions. Restore loads a version into the autosaved draft rather than immediately replacing the live page.",
-              "Reset to default first shows a warning. It does not delete services, groups, incidents, subscribers, or status history. Nothing public changes until you Publish.",
+              "Add a logo, site icon, and optional cover image. New cover images display in full by default.",
+              "Choose a style preset and brand color to match your organization. Existing specialized page settings remain active but are not edited from this screen.",
             ],
           },
         ],

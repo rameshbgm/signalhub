@@ -15,6 +15,14 @@ export function PageSurfaceLayout({
   renderBlock: (block: PageDesignBlock) => ReactNode;
 }) {
   const blocks = allSurfaceBlocks(design, surface);
+  // These content-led layouts keep the optional subscription action after the
+  // operational content instead of competing with incident history.
+  const subscriptionAfterContent = new Set(["GROUPED_DIRECTORY", "ILLUSTRATED_HERO"]);
+  const trailingSubscriptions = subscriptionAfterContent.has(design.templateKey)
+    ? blocks.filter((block) => block.type === "SUBSCRIBE" && block.settings.style === "PANEL")
+    : [];
+  const trailingSubscriptionIds = new Set(trailingSubscriptions.map((block) => block.id));
+  const gridBlocks = blocks.filter((block) => !trailingSubscriptionIds.has(block.id));
   const desktop = new Map(pageGridPlacements(design, surface, "desktop").map((placement) => [placement.blockId, placement]));
   const tablet = new Map(pageGridPlacements(design, surface, "tablet").map((placement) => [placement.blockId, placement]));
   const mobile = new Map(pageGridPlacements(design, surface, "mobile").map((placement) => [placement.blockId, placement]));
@@ -22,7 +30,7 @@ export function PageSurfaceLayout({
     <main className={`${contentWidthClass(design)} mx-auto w-full flex-1 px-4 py-8 sm:py-12`}>
       {intro}
       <div className="page-responsive-grid">
-        {blocks.map((block) => {
+        {gridBlocks.map((block) => {
           const desktopPlacement = desktop.get(block.id);
           const tabletPlacement = tablet.get(block.id);
           const mobilePlacement = mobile.get(block.id);
@@ -42,6 +50,11 @@ export function PageSurfaceLayout({
           );
         })}
       </div>
+      {trailingSubscriptions.map((block) => (
+        <aside key={block.id} data-page-block={block.type} className="mx-auto mt-[var(--page-block-gap)] w-full max-w-2xl">
+          {block.hidden ? null : renderBlock(block)}
+        </aside>
+      ))}
     </main>
   );
 }

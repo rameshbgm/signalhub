@@ -61,4 +61,22 @@ describe("public support link placement", () => {
     expect(header).toContain("object-contain");
     expect(header).not.toContain("background-image");
   });
+
+  it("renders published designer assets even when legacy page fields are absent", () => {
+    const design = templateDesign("ILLUSTRATED_HERO");
+    design.presentation.logoUrl = "/api/assets/published-logo";
+    design.presentation.coverImageUrl = "/api/assets/published-cover";
+    design.presentation.coverImageFit = "CONTAIN";
+    const header = renderToStaticMarkup(
+      <PublicHeader
+        name="Status"
+        allowThemeOverride={false}
+        design={design}
+      />,
+    );
+
+    expect(header).toContain('src="/api/assets/published-logo"');
+    expect(header).toContain('src="/api/assets/published-cover"');
+    expect(header).toContain('alt="Status cover image"');
+  });
 });

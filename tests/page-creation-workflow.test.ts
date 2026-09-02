@@ -52,7 +52,7 @@ describe("unified page creation workflow", () => {
     const notifications = source("components/admin/PageNotificationsSection.tsx");
     for (const label of ["Overview", "Content", "Appearance", "Access", "Notifications", "Settings"]) expect(shell).toContain(label);
     expect(overview).toContain("Incident readiness");
-    expect(appearance).toContain("DesignEditor");
+    expect(appearance).toContain("SimpleAppearanceEditor");
     expect(shell).toContain("Services & groups");
     expect(shell).toContain("Status pages");
     expect(access).toContain("Audience-specific access");

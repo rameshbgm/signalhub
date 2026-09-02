@@ -158,14 +158,16 @@ export default async function PublicStatusPage({ params }: { params: Promise<{ s
       case "SUBSCRIBE":
         return (
           <section className={block.settings.style === "PANEL" ? "page-panel border border-[var(--line)] bg-[var(--surface)] p-[var(--page-block-padding)]" : ""}>
-            {block.settings.style !== "BUTTON" && <h2 className="mb-3 font-semibold">{block.settings.heading}</h2>}
-            <SubscribeModal
-              pageSlug={page.slug}
-              brandColor={design.theme.palette.brand}
-              feedsEnabled={page.type === "PUBLIC"}
-              feedBasePath={basePath ? undefined : "/feed"}
-              components={allComponentsFlat.map((component) => ({ id: component.id, name: component.name }))}
-            />
+            <div className={block.settings.style === "PANEL" ? "flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between" : ""}>
+              {block.settings.style !== "BUTTON" && <h2 className={block.settings.style === "PANEL" ? "min-w-0 font-semibold" : "mb-3 font-semibold"}>{block.settings.heading}</h2>}
+              <SubscribeModal
+                pageSlug={page.slug}
+                brandColor={design.theme.palette.brand}
+                feedsEnabled={page.type === "PUBLIC"}
+                feedBasePath={basePath ? undefined : "/feed"}
+                components={allComponentsFlat.map((component) => ({ id: component.id, name: component.name }))}
+              />
+            </div>
           </section>
         );
       case "LINK_CARDS":

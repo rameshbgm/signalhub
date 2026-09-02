@@ -182,8 +182,10 @@ export default async function HubPage({ params }: { params: Promise<{ slug: stri
       case "SUBSCRIBE":
         return (
           <section className={block.settings.style === "PANEL" ? "page-panel border border-[var(--line)] bg-[var(--surface)] p-[var(--page-block-padding)]" : ""}>
-            {block.settings.style !== "BUTTON" && <h2 className="mb-3 font-semibold">{block.settings.heading}</h2>}
-            <SubscribeModal pageSlug={hub.slug} brandColor={design.theme.palette.brand} feedsEnabled={hub.type === "PUBLIC"} components={[]} />
+            <div className={block.settings.style === "PANEL" ? "flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between" : ""}>
+              {block.settings.style !== "BUTTON" && <h2 className={block.settings.style === "PANEL" ? "min-w-0 font-semibold" : "mb-3 font-semibold"}>{block.settings.heading}</h2>}
+              <SubscribeModal pageSlug={hub.slug} brandColor={design.theme.palette.brand} feedsEnabled={hub.type === "PUBLIC"} components={[]} />
+            </div>
           </section>
         );
       case "LINK_CARDS":

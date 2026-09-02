@@ -43,6 +43,7 @@ export function AssetUploader({
   currentCoverCropWidth,
   currentCoverCropHeight,
   staged = false,
+  simple = false,
   onStagedChange,
 }: {
   pageId: string;
@@ -58,6 +59,7 @@ export function AssetUploader({
   currentCoverCropWidth?: number | null;
   currentCoverCropHeight?: number | null;
   staged?: boolean;
+  simple?: boolean;
   onStagedChange?: (value: {
     url: string | null;
     cover?: { fit: CoverImageFit; positionX: number; positionY: number; crop: CoverImageCrop | null };
@@ -302,11 +304,11 @@ export function AssetUploader({
           <div className="space-y-3">
             <div className="flex max-h-[32rem] justify-center overflow-hidden border border-[var(--line)] bg-[var(--bg)] p-2">
               <div
-                className={`relative inline-block max-h-[30rem] max-w-full select-none overflow-hidden touch-none ${coverFit === "COVER" ? "cursor-crosshair" : ""}`}
-                onPointerDown={startCrop}
-                onPointerMove={updateCrop}
-                onPointerUp={finishCrop}
-                onPointerCancel={finishCrop}
+                className={`relative inline-block max-h-[30rem] max-w-full overflow-hidden ${simple ? "" : "select-none touch-none"} ${!simple && coverFit === "COVER" ? "cursor-crosshair" : ""}`}
+                onPointerDown={simple ? undefined : startCrop}
+                onPointerMove={simple ? undefined : updateCrop}
+                onPointerUp={simple ? undefined : finishCrop}
+                onPointerCancel={simple ? undefined : finishCrop}
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
@@ -323,7 +325,7 @@ export function AssetUploader({
                     setCoverCrop((current) => current ?? defaultBannerCrop(dimensions.width, dimensions.height));
                   }}
                 />
-                {coverFit === "COVER" && coverCrop && (
+                {!simple && coverFit === "COVER" && coverCrop && (
                   <span
                     data-crop-selection
                     role="group"
@@ -352,7 +354,7 @@ export function AssetUploader({
                 )}
               </div>
             </div>
-            {coverFit === "COVER" && coverCrop && (
+            {!simple && coverFit === "COVER" && coverCrop && (
               <div>
                 <p className="mb-1 text-xs font-medium text-[var(--fg-soft)]">Published banner preview</p>
                 <div
@@ -369,41 +371,47 @@ export function AssetUploader({
                 />
               </div>
             )}
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-              <label className="text-xs text-[var(--fg-soft)]">
-                Image display
-                <select
-                  value={coverFit}
-                  onChange={(event) => {
-                    const fit = event.target.value as CoverImageFit;
-                    setCoverFit(fit);
-                    if (fit === "COVER" && !coverCrop && imageDimensions.width > 0) {
-                      setCoverCrop(defaultBannerCrop(imageDimensions.width, imageDimensions.height));
-                    }
-                  }}
-                  disabled={busy}
-                  className="mt-1 min-w-52 border border-[var(--line)] bg-[var(--bg)] px-2 py-2 text-sm text-[var(--fg)]"
-                >
-                  <option value="CONTAIN">Show full image</option>
-                  <option value="COVER">Fill frame (crop)</option>
-                </select>
-              </label>
-              {coverFit === "COVER" && imageDimensions.width > 0 && (
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={() => setCoverCrop(defaultBannerCrop(imageDimensions.width, imageDimensions.height))}
-                  className="w-fit border border-[var(--line)] px-3 py-2 text-xs font-semibold text-[var(--fg-soft)] disabled:opacity-50"
-                >
-                  Reset crop
-                </button>
-              )}
-            </div>
-            <p className="text-xs text-[var(--fg-dim)]">
-              {coverFit === "COVER"
-                ? "Drag inside the frame to reposition it, drag a corner to resize it, or drag outside the frame to draw a new 16:5 banner selection."
-                : "The public page shows the complete image without cropping and caps its height responsively."}
-            </p>
+            {simple ? (
+              <p className="text-xs text-[var(--fg-dim)]">New cover images are shown in full by default.</p>
+            ) : (
+              <>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                  <label className="text-xs text-[var(--fg-soft)]">
+                    Image display
+                    <select
+                      value={coverFit}
+                      onChange={(event) => {
+                        const fit = event.target.value as CoverImageFit;
+                        setCoverFit(fit);
+                        if (fit === "COVER" && !coverCrop && imageDimensions.width > 0) {
+                          setCoverCrop(defaultBannerCrop(imageDimensions.width, imageDimensions.height));
+                        }
+                      }}
+                      disabled={busy}
+                      className="mt-1 min-w-52 border border-[var(--line)] bg-[var(--bg)] px-2 py-2 text-sm text-[var(--fg)]"
+                    >
+                      <option value="CONTAIN">Show full image</option>
+                      <option value="COVER">Fill frame (crop)</option>
+                    </select>
+                  </label>
+                  {coverFit === "COVER" && imageDimensions.width > 0 && (
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => setCoverCrop(defaultBannerCrop(imageDimensions.width, imageDimensions.height))}
+                      className="w-fit border border-[var(--line)] px-3 py-2 text-xs font-semibold text-[var(--fg-soft)] disabled:opacity-50"
+                    >
+                      Reset crop
+                    </button>
+                  )}
+                </div>
+                <p className="text-xs text-[var(--fg-dim)]">
+                  {coverFit === "COVER"
+                    ? "Drag inside the frame to reposition it, drag a corner to resize it, or drag outside the frame to draw a new 16:5 banner selection."
+                    : "The public page shows the complete image without cropping and caps its height responsively."}
+                </p>
+              </>
+            )}
           </div>
         ) : (
           <div className="flex aspect-[16/5] w-full items-center justify-center border border-dashed border-[var(--line)] text-xs text-[var(--fg-dim)]">
@@ -428,7 +436,7 @@ export function AssetUploader({
       />
       {preview && (
         <div className="flex flex-wrap gap-2">
-          {isCover && (
+          {isCover && !simple && (
             <button type="button" disabled={busy} onClick={() => void saveFraming()} className="border border-[var(--cyan)] px-3 py-1.5 text-xs font-semibold text-[var(--cyan)] disabled:opacity-50">
               {savingFraming ? "Saving framing…" : "Save cover framing"}
             </button>

@@ -46,19 +46,31 @@ export function PublicHeader({
   subscribeSlot?: ReactNode;
 }) {
   const header = design?.chrome.header;
+  // Published designer values are the source of truth for the public chrome.
+  // Page columns remain a fallback for pages created before the designer.
+  const presentation = design?.presentation;
+  const effectiveLogoUrl = presentation?.logoUrl ?? logoUrl;
+  const effectiveCoverImageUrl = presentation?.coverImageUrl ?? coverImageUrl;
+  const effectiveCoverImageFit = presentation?.coverImageFit ?? coverImageFit;
+  const effectiveCoverImagePositionX = presentation?.coverImagePositionX ?? coverImagePositionX;
+  const effectiveCoverImagePositionY = presentation?.coverImagePositionY ?? coverImagePositionY;
+  const effectiveCoverImageCropX = presentation?.coverImageCropX ?? coverImageCropX;
+  const effectiveCoverImageCropY = presentation?.coverImageCropY ?? coverImageCropY;
+  const effectiveCoverImageCropWidth = presentation?.coverImageCropWidth ?? coverImageCropWidth;
+  const effectiveCoverImageCropHeight = presentation?.coverImageCropHeight ?? coverImageCropHeight;
   const effectiveThemeMode = design?.theme.mode ?? themeMode;
   const effectiveThemeOverride = design?.theme.allowVisitorMode ?? allowThemeOverride;
   const headerVariant = header?.variant ?? (layout === "COVER" ? "HERO" : layout === "MINIMAL" ? "MINIMAL" : "STANDARD");
   const visibleItems = header?.items.filter((item) => !item.hidden) ?? standardHeaderItems();
-  const showCompleteCover = Boolean(coverImageUrl && coverImageFit !== "COVER");
-  const coverBanner = coverImageUrl ? (
+  const showCompleteCover = Boolean(effectiveCoverImageUrl && effectiveCoverImageFit !== "COVER");
+  const coverBanner = effectiveCoverImageUrl ? (
     showCompleteCover ? (
       <div className="relative aspect-[16/5] overflow-hidden border-b border-[var(--line)] bg-[var(--surface-raised)]">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={coverImageUrl} alt="" aria-hidden="true" className="absolute inset-0 h-full w-full scale-105 object-cover opacity-25 blur-lg" />
+        <img src={effectiveCoverImageUrl} alt="" aria-hidden="true" className="absolute inset-0 h-full w-full scale-105 object-cover opacity-25 blur-lg" />
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src={coverImageUrl}
+          src={effectiveCoverImageUrl}
           alt={`${name} cover image`}
           className="relative h-full w-full object-contain"
         />
@@ -68,14 +80,14 @@ export function PublicHeader({
         role="img"
         aria-label={`${name} cover image`}
         className="h-36 border-b border-[var(--line)] bg-[var(--surface-raised)] sm:h-52"
-        style={coverImageStyle(coverImageUrl, {
-          fit: coverImageFit,
-          positionX: coverImagePositionX,
-          positionY: coverImagePositionY,
-          cropX: coverImageCropX,
-          cropY: coverImageCropY,
-          cropWidth: coverImageCropWidth,
-          cropHeight: coverImageCropHeight,
+        style={coverImageStyle(effectiveCoverImageUrl, {
+          fit: effectiveCoverImageFit,
+          positionX: effectiveCoverImagePositionX,
+          positionY: effectiveCoverImagePositionY,
+          cropX: effectiveCoverImageCropX,
+          cropY: effectiveCoverImageCropY,
+          cropWidth: effectiveCoverImageCropWidth,
+          cropHeight: effectiveCoverImageCropHeight,
         })}
       />
     )
@@ -84,8 +96,8 @@ export function PublicHeader({
     <div className={`flex flex-1 items-center gap-4 text-sm font-medium ${headerVariant === "CENTERED" ? "justify-center text-center flex-wrap" : ""}`}>
       {visibleItems.map((item) => {
         if (item.type === "LOGO") {
-          return logoUrl ? (
-            <Image key={item.id} unoptimized src={logoUrl} alt={name} width={160} height={40} className="max-h-10 w-auto max-w-44 object-contain object-left" />
+          return effectiveLogoUrl ? (
+            <Image key={item.id} unoptimized src={effectiveLogoUrl} alt={name} width={160} height={40} sizes="(max-width: 639px) 128px, 176px" className="max-h-10 w-auto max-w-32 object-contain object-left sm:max-w-44" />
           ) : null;
         }
         if (item.type === "TITLE") return <span key={item.id} className="font-mono font-semibold text-lg text-[var(--fg)]">{name}</span>;
@@ -118,13 +130,13 @@ export function PublicHeader({
   }
 
   if (headerVariant === "HERO") {
-    if (coverImageUrl && showCompleteCover) {
+    if (effectiveCoverImageUrl && showCompleteCover) {
       return (
         <header className="relative overflow-hidden border-b border-[var(--line)] bg-[var(--bg)]">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={coverImageUrl} alt="" aria-hidden="true" className="absolute inset-0 h-full w-full scale-105 object-cover opacity-25 blur-lg" />
+          <img src={effectiveCoverImageUrl} alt="" aria-hidden="true" className="absolute inset-0 h-full w-full scale-105 object-cover opacity-25 blur-lg" />
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={coverImageUrl} alt={`${name} cover image`} className="relative aspect-[16/5] h-auto w-full object-contain" />
+          <img src={effectiveCoverImageUrl} alt={`${name} cover image`} className="relative aspect-[16/5] h-auto w-full object-contain" />
           <div className="absolute inset-0 bg-gradient-to-b from-slate-950/60 to-slate-950/80" aria-hidden="true" />
           <div className="absolute inset-0 flex items-center">
             <div className={`${design ? contentWidthClass(design) : "max-w-4xl"} mx-auto w-full px-4 sm:px-6`}>
@@ -138,16 +150,16 @@ export function PublicHeader({
     return (
       <header
         className="relative grain overflow-hidden border-b border-[var(--line)] bg-[var(--bg)]"
-        style={coverImageUrl ? coverImageStyle(
-          coverImageUrl,
+        style={effectiveCoverImageUrl ? coverImageStyle(
+          effectiveCoverImageUrl,
           {
-            fit: coverImageFit,
-            positionX: coverImagePositionX,
-            positionY: coverImagePositionY,
-            cropX: coverImageCropX,
-            cropY: coverImageCropY,
-            cropWidth: coverImageCropWidth,
-            cropHeight: coverImageCropHeight,
+            fit: effectiveCoverImageFit,
+            positionX: effectiveCoverImagePositionX,
+            positionY: effectiveCoverImagePositionY,
+            cropX: effectiveCoverImageCropX,
+            cropY: effectiveCoverImageCropY,
+            cropWidth: effectiveCoverImageCropWidth,
+            cropHeight: effectiveCoverImageCropHeight,
           },
           "linear-gradient(rgba(10,14,20,0.7),rgba(10,14,20,0.85))"
         ) : {}}
