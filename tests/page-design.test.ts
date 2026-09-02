@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { PageDesignShell } from "../components/public/PageDesignShell";
 import {
   PAGE_TEMPLATE_KEYS,
+  PAGE_TEMPLATE_PICKER_KEYS,
   PAGE_THEME_PRESET_KEYS,
   allSurfaceBlocks,
   applyPageTemplateLayout,
@@ -42,6 +43,17 @@ describe("status page design", () => {
       expect(statusPageDesignSchema.parse(design).templateKey).toBe(key);
       expect(design.theme.palette.brand).toBe("#123456");
     }
+  });
+
+  it("keeps the editor picker focused on distinct template starting points", () => {
+    expect(PAGE_TEMPLATE_PICKER_KEYS).toEqual([
+      "CENTERED_SUMMARY",
+      "UPTIME_TIMELINE",
+      "ILLUSTRATED_HERO",
+      "GROUPED_DIRECTORY",
+      "PRODUCT_GRID",
+      "DENSE_OPERATIONS",
+    ]);
   });
 
   it("normalizes legacy zone designs into schema-v2 responsive placements", () => {

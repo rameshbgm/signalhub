@@ -33,23 +33,9 @@ export async function writeActiveTenantAudit<T>(
 ) {
   return withDatabaseTransaction(async (transaction) => {
     await fenceActiveOrganizationMutation(organizationId, transaction);
-    const verified = verify ? await verify(transaction) : undefined;
-    await transaction.insertInto("auditLogs").values({
-      orgId: organizationId,
-      actor: audit.actor,
-      action: audit.action,
-      target: audit.target,
-      metadata: audit.metadata ?? null,
-      supportSessionId: audit.supportSessionId ?? null,
-      requestId: audit.requestId ?? null,
-      sourceIp: audit.sourceIp ?? null,
-      userAgent: audit.userAgent ?? null,
-      outcome: audit.outcome ?? null,
-      previousHash: audit.previousHash ?? null,
-      entryHash: audit.entryHash ?? null,
-      chainSequence: audit.chainSequence ?? null,
-      createdAt: audit.createdAt ?? new Date(),
-    }).execute();
-    return verified as T;
+    // Kept as a transaction helper during the tenant-audit retirement so
+    // callers retain their organization lifecycle fence.
+    void audit;
+    return verify ? verify(transaction) : undefined as T;
   });
 }

@@ -107,15 +107,6 @@ async function main() {
   await database.transaction().execute(async (transaction) => {
     const organization = await transaction.selectFrom("organizations").selectAll()
       .where("slug", "=", "acme").executeTakeFirstOrThrow();
-    const admin = await transaction.selectFrom("memberships as membership")
-      .innerJoin("users as user", "user.id", "membership.userId")
-      .select(["user.id", "user.email"])
-      .where("membership.orgId", "=", organization.id)
-      .where("membership.role", "=", "ADMIN")
-      .where("membership.status", "=", "ACTIVE")
-      .orderBy("membership.createdAt")
-      .executeTakeFirstOrThrow();
-
     await transaction.deleteFrom("pages").where("orgId", "=", organization.id)
       .where("slug", "in", SAMPLE_PAGE_SLUGS).execute();
 
@@ -284,15 +275,6 @@ async function main() {
       createdAt: new Date(),
     }).execute();
 
-    await transaction.insertInto("auditLogs").values({
-      orgId: organization.id,
-      actor: admin.email,
-      action: "SEED_DEVELOPMENT_DATA",
-      target: organization.id,
-      metadata: { pages: SAMPLE_PAGE_SLUGS },
-      supportSessionId: null,
-      createdAt: new Date(),
-    }).execute();
   });
 
   printGeneratedSecrets("Development sample seed", [

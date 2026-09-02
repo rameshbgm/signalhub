@@ -7,7 +7,6 @@ export const RETENTION_BOUNDS = {
   analyticsDays: { min: 30, max: 3650 },
   notificationLogsDays: { min: 7, max: 3650 },
   resolvedIncidentsDays: { min: 30, max: 3650 },
-  auditLogsDays: { min: 365, max: 3650 },
 } as const;
 
 export type EffectiveRetention = {
@@ -19,8 +18,9 @@ const FALLBACK_RETENTION: EffectiveRetention = {
   analyticsDays: 395,
   notificationLogsDays: 90,
   resolvedIncidentsDays: 730,
-  auditLogsDays: 2555,
 };
+
+const PLATFORM_AUDIT_RETENTION_DAYS = 2555;
 
 function bounded(policy: Partial<EffectiveRetention>): EffectiveRetention {
   return Object.fromEntries(
@@ -69,10 +69,7 @@ export async function runRetentionSweep(workerId: string, now = new Date()) {
     const pages = await database.selectFrom("pages").select("id")
       .where("orgId", "=", organization.id).execute();
     const pageIds = pages.map((page) => page.id);
-    if (!pageIds.length) {
-      await pruneAuditBefore(cutoff(now, policy.auditLogsDays), organization.id);
-      continue;
-    }
+    if (!pageIds.length) continue;
     const monitors = await database.selectFrom("monitors").select("id")
       .where("pageId", "in", pageIds).execute();
     const monitorIds = monitors.map((monitor) => monitor.id);
@@ -88,7 +85,6 @@ export async function runRetentionSweep(workerId: string, now = new Date()) {
         .where("pageId", "in", pageIds)
         .where("status", "in", ["SENT", "DEAD_LETTER"])
         .where("updatedAt", "<", cutoff(now, policy.notificationLogsDays)).execute(),
-      pruneAuditBefore(cutoff(now, policy.auditLogsDays), organization.id),
     ];
     if (monitorIds.length) {
       deletes.push(database.deleteFrom("monitorChecks")
@@ -108,8 +104,7 @@ export async function runRetentionSweep(workerId: string, now = new Date()) {
     }
   }
 
-  const platformPolicy = await effectiveRetention(null);
-  await pruneAuditBefore(cutoff(now, platformPolicy.auditLogsDays));
+  await pruneAuditBefore(cutoff(now, PLATFORM_AUDIT_RETENTION_DAYS));
   await database.updateTable("maintenanceLeases").set({
     lastCompletedAt: new Date(),
     leaseExpiresAt: new Date(Date.now() + 60 * 60_000),

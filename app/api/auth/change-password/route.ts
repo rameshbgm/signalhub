@@ -41,10 +41,6 @@ export async function POST(request: NextRequest) {
         .where("userId", "=", user.id).where("revokedAt", "is", null).execute();
       await transaction.updateTable("memberships").set({ invitationExpiresAt: null, activatedAt: now })
         .where("id", "=", membership.id).where("status", "=", "ACTIVE").execute();
-      await transaction.insertInto("auditLogs").values({
-        orgId: membership.orgId, actor: user.username, action: "INITIAL_ACCOUNT_SETUP_COMPLETED",
-        target: user.id, metadata: { communicationEmail: email }, createdAt: now,
-      }).execute();
     });
     await destroySession();
     return NextResponse.json({ ok: true, signInRequired: true });

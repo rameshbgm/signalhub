@@ -12,7 +12,6 @@ const GROUPS = [
       { href: "/organization/pages", label: "Pages", icon: "▦" },
       { href: "/organization/pages/deleted", label: "Deleted Pages", icon: "⌫", capability: "page.configure" },
       { href: "/organization/analytics", label: "Analytics", icon: "↗", capability: "analytics.view" },
-      { href: "/organization/audit-log", label: "Audit Log", icon: "≣", capability: "audit.view" },
       { href: "/organization/help", label: "Help Center", icon: "?" },
     ],
   },

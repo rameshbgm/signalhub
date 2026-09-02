@@ -20,10 +20,6 @@ CREATE INDEX memberships_active_admin_user_idx
   ON memberships (user_id)
   WHERE role = 'ADMIN' AND status = 'ACTIVE';
 
-CREATE INDEX audit_logs_unsealed_idx
-  ON audit_logs (org_id, created_at, id)
-  WHERE entry_hash IS NULL;
-
 CREATE INDEX platform_audit_logs_unsealed_idx
   ON platform_audit_logs (created_at, id)
   WHERE entry_hash IS NULL;
@@ -47,7 +43,6 @@ CREATE INDEX organizations_status_changed_by_idx ON organizations (status_change
 CREATE INDEX platform_jobs_requested_by_idx ON platform_jobs (requested_by);
 CREATE INDEX organization_tombstones_requested_by_idx ON organization_tombstones (requested_by);
 CREATE INDEX api_keys_created_by_idx ON api_keys (created_by) WHERE created_by IS NOT NULL;
-CREATE INDEX audit_logs_support_session_idx ON audit_logs (support_session_id) WHERE support_session_id IS NOT NULL;
 CREATE INDEX identity_connections_created_by_idx ON identity_connections (created_by);
 CREATE INDEX identity_connections_org_idx ON identity_connections (org_id) WHERE org_id IS NOT NULL;
 CREATE INDEX external_identities_user_idx ON external_identities (user_id) WHERE user_id IS NOT NULL;

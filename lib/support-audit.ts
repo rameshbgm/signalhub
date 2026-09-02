@@ -1,7 +1,5 @@
 import { database } from "@/lib/postgres/client";
 import { writePlatformAudit } from "@/lib/platform-policy";
-import { writeActiveTenantAudit } from "@/lib/tenant-audit";
-import { OrganizationMutationBlockedError } from "@/lib/organization-mutation";
 
 type SupportAwareSession = {
   orgId: string;
@@ -31,23 +29,6 @@ export async function writeSupportMutationAudit(
     .where("id", "=", support.platformAdminId)
     .executeTakeFirst();
   if (!platformAdmin) throw new Error("Support actor is no longer available");
-  const now = new Date();
-  if (!input.tenantAuditExists) {
-    try {
-      await writeActiveTenantAudit(support.orgId, {
-        actor: platformAdmin.email,
-        action: input.action,
-        target: input.targetId,
-        metadata: input.metadata ?? null,
-        supportSessionId: support.id,
-        createdAt: now,
-      });
-    } catch (error) {
-      // The platform audit is retained after purge. If lifecycle cleanup won
-      // the race, omit only the tenant copy so it cannot become an orphan.
-      if (!(error instanceof OrganizationMutationBlockedError)) throw error;
-    }
-  }
   await writePlatformAudit({
     actorId: platformAdmin.id,
     actorEmail: platformAdmin.email,

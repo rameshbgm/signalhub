@@ -19,14 +19,6 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
       await fenceActiveOrganizationMutation(session.orgId, transaction);
       const rotated = await rotateWebhookEndpointSecret(id, transaction);
       if (!rotated) return null;
-      await transaction.insertInto("auditLogs").values({
-        orgId: session.orgId,
-        actor: session.email,
-        action: "ROTATE_WEBHOOK_SECRET",
-        target: id,
-        supportSessionId: session.supportSessionId ?? null,
-        createdAt: new Date(),
-      }).execute();
       return rotated;
     });
     if (!secret) return apiError(404, "WEBHOOK_NOT_FOUND", "Webhook endpoint not found");

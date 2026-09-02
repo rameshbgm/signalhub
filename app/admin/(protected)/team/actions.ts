@@ -72,15 +72,12 @@ async function audit(
   metadata: unknown,
   now = new Date()
 ) {
-  await transaction.insertInto("auditLogs").values({
-    orgId: session.orgId,
-    actor: session.email,
-    action,
-    target,
-    metadata,
-    supportSessionId: session.supportSessionId ?? null,
-    createdAt: now,
-  }).execute();
+  void transaction;
+  void session;
+  void action;
+  void target;
+  void metadata;
+  void now;
 }
 
 function scopedPages(role: MembershipRole, pageIds: string[]) {

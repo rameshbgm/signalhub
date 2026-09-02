@@ -26,14 +26,6 @@ export async function POST(request: NextRequest) {
         .where("deletedAt", "is", null).forShare().executeTakeFirst();
       if (!page) throw new Error("Page not found in your organization");
       const created = await insertVerifiedWebhookEndpoint(prepared, transaction);
-      await transaction.insertInto("auditLogs").values({
-        orgId: session.orgId,
-        actor: session.email,
-        action: "CREATE_WEBHOOK_ENDPOINT",
-        target: created.endpoint.id,
-        supportSessionId: session.supportSessionId ?? null,
-        createdAt: new Date(),
-      }).execute();
       return created;
     });
     return NextResponse.json(result, { status: 201 });

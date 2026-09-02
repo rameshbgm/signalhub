@@ -71,10 +71,6 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       }).where("id", "=", membership.id).where("status", "=", "INVITED")
         .returning("id").executeTakeFirst();
       if (!accepted) throw new Error("Invitation was already used");
-      await transaction.insertInto("auditLogs").values({
-        orgId: membership.orgId, actor: user.email, action: "ORGANIZATION_INVITATION_ACCEPTED",
-        target: membership.id, metadata: null, createdAt: now,
-      }).execute();
     });
     await createSession({
       userId: invite.userId, membershipId: invite.id, orgId: invite.orgId,

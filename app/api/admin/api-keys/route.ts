@@ -47,12 +47,6 @@ export async function POST(request: NextRequest) {
         allowedCidrs: parsed.data.allowedCidrs,
         legacyFullAccess: false,
       }).returning("id").executeTakeFirstOrThrow();
-      await transaction.insertInto("auditLogs").values({
-        orgId: session.orgId, actor: session.email, action: "CREATE_API_KEY", target: parsed.data.name,
-        supportSessionId: session.supportSessionId ?? null,
-        metadata: { scopes: parsed.data.scopes, pageIds, expiresAt: parsed.data.expiresAt, allowedCidrs: parsed.data.allowedCidrs },
-        createdAt: new Date(),
-      }).execute();
       return created;
     });
     return NextResponse.json({ id: key.id, token: secret.token, prefix: secret.prefix, lastFour: secret.lastFour }, { status: 201 });

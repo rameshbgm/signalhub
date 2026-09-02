@@ -32,7 +32,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import {
-  PAGE_TEMPLATE_KEYS,
+  PAGE_TEMPLATE_PICKER_KEYS,
   PAGE_TEMPLATE_LABELS,
   PAGE_GRID_COLUMNS,
   PAGE_THEME_PRESET_KEYS,
@@ -721,7 +721,11 @@ export function DesignEditor({
                     commit(applyPageTemplateLayout(design, key));
                     setMessage("Starting point applied to the draft. Publish when ready.");
                   }}
-                  options={[...PAGE_TEMPLATE_KEYS]}
+                  options={[
+                    ...((PAGE_TEMPLATE_PICKER_KEYS as readonly PageTemplateKey[]).includes(templatePreviewKey)
+                      ? PAGE_TEMPLATE_PICKER_KEYS
+                      : [templatePreviewKey, ...PAGE_TEMPLATE_PICKER_KEYS]),
+                  ]}
                 />
                 <p className="mt-2 text-xs text-[var(--fg-dim)]">{PAGE_TEMPLATE_LABELS[templatePreviewKey]} changes page composition while preserving SEO and the selected theme.</p>
               </div>
@@ -1173,27 +1177,34 @@ function GridPlacementControls({
   columns,
   onChange,
 }: {
-  placement: PageGridPlacement | null;
+  placement?: PageGridPlacement | null;
   columns: number;
   onChange: (patch: Partial<Pick<PageGridPlacement, "column" | "span">>) => void;
 }) {
-  if (!placement) return null;
+  // A draft saved by an earlier designer version can lack placement values.
+  // Keep the editor usable so that draft can be reset or replaced instead of
+  // crashing while React is rendering the selected block.
+  if (!placement || !Number.isFinite(placement.column) || !Number.isFinite(placement.span)) {
+    return <p className="mb-4 text-xs text-[var(--fg-dim)]">Grid placement is unavailable for this block. Reset this breakpoint or select another block.</p>;
+  }
+  const column = Math.max(1, Math.min(columns, Math.trunc(placement.column)));
+  const span = Math.max(1, Math.min(columns - column + 1, Math.trunc(placement.span)));
   return (
     <fieldset className="mb-4 border border-[var(--line)] bg-[var(--bg)] p-3">
       <legend className="px-1 font-mono text-xs font-semibold">Grid placement</legend>
       <div className="grid grid-cols-2 gap-3">
         <label className="text-xs">Column
-          <input type="number" min={1} max={columns} value={placement.column} onChange={(event) => onChange({ column: Number(event.target.value) })} className="mt-1 w-full border border-[var(--line)] bg-[var(--surface)] px-2 py-1.5" />
+          <input type="number" min={1} max={columns} value={column} onChange={(event) => onChange({ column: Number(event.target.value) })} className="mt-1 w-full border border-[var(--line)] bg-[var(--surface)] px-2 py-1.5" />
         </label>
         <label className="text-xs">Width
-          <input type="number" min={1} max={columns - placement.column + 1} value={placement.span} onChange={(event) => onChange({ span: Number(event.target.value) })} className="mt-1 w-full border border-[var(--line)] bg-[var(--surface)] px-2 py-1.5" />
+          <input type="number" min={1} max={columns - column + 1} value={span} onChange={(event) => onChange({ span: Number(event.target.value) })} className="mt-1 w-full border border-[var(--line)] bg-[var(--surface)] px-2 py-1.5" />
         </label>
       </div>
       <div className="mt-2 grid grid-cols-4 gap-1">
-        <button type="button" onClick={() => onChange({ column: placement.column - 1 })} className="border border-[var(--line)] py-1" aria-label="Move block left">←</button>
-        <button type="button" onClick={() => onChange({ column: placement.column + 1 })} className="border border-[var(--line)] py-1" aria-label="Move block right">→</button>
-        <button type="button" onClick={() => onChange({ span: placement.span - 1 })} className="border border-[var(--line)] py-1" aria-label="Make block narrower">−</button>
-        <button type="button" onClick={() => onChange({ span: placement.span + 1 })} className="border border-[var(--line)] py-1" aria-label="Make block wider">＋</button>
+        <button type="button" onClick={() => onChange({ column: column - 1 })} className="border border-[var(--line)] py-1" aria-label="Move block left">←</button>
+        <button type="button" onClick={() => onChange({ column: column + 1 })} className="border border-[var(--line)] py-1" aria-label="Move block right">→</button>
+        <button type="button" onClick={() => onChange({ span: span - 1 })} className="border border-[var(--line)] py-1" aria-label="Make block narrower">−</button>
+        <button type="button" onClick={() => onChange({ span: span + 1 })} className="border border-[var(--line)] py-1" aria-label="Make block wider">＋</button>
       </div>
     </fieldset>
   );

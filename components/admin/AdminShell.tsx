@@ -6,7 +6,7 @@ import { useEffect, useState, type ReactNode } from "react";
 
 export function AdminShell({ sidebar, children }: { sidebar: ReactNode; children: ReactNode }) {
   const pathname = usePathname();
-  const designer = /^\/organization\/pages\/[^/]+\/(?:appearance|design)\/?$/.test(pathname);
+  const focusedFlow = pathname === "/organization/pages/new" || /^\/organization\/pages\/[^/]+\/setup\//.test(pathname);
   const [navigationPath, setNavigationPath] = useState<string | null>(null);
   const navigationOpen = navigationPath === pathname;
 
@@ -26,8 +26,8 @@ export function AdminShell({ sidebar, children }: { sidebar: ReactNode; children
   }, [navigationOpen]);
 
   return (
-    <div className={`min-h-screen bg-[var(--bg)] text-[var(--fg)] ${designer ? "block" : "lg:flex"}`}>
-      {!designer && (
+    <div className={`min-h-screen bg-[var(--bg)] text-[var(--fg)] ${focusedFlow ? "block" : "lg:flex"}`}>
+      {!focusedFlow && (
         <>
           <header className="sticky top-0 z-40 flex h-14 items-center justify-between border-b border-[var(--line)] bg-[var(--surface)]/95 px-4 backdrop-blur lg:hidden">
             <Link href="/organization" className="font-mono text-sm font-semibold tracking-tight text-[var(--fg)]">
@@ -75,7 +75,7 @@ export function AdminShell({ sidebar, children }: { sidebar: ReactNode; children
         </>
       )}
       <main className="app-console-main min-w-0 flex-1 overflow-x-clip">
-        <div className={designer ? "" : "mx-auto w-full max-w-[96rem] p-4 sm:p-6 [&>*]:mx-auto"}>{children}</div>
+        <div className={focusedFlow ? "" : "mx-auto w-full max-w-[96rem] p-4 sm:p-6 [&>*]:mx-auto"}>{children}</div>
       </main>
     </div>
   );

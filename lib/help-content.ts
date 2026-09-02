@@ -87,20 +87,6 @@ export const HELP_CATEGORIES: HelpCategory[] = [
           },
         ],
       },
-      {
-        slug: "audit-log",
-        title: "Audit Log",
-        summary: "A read-only history of every admin action taken in your organization.",
-        body: [
-          {
-            heading: "What's recorded",
-            paragraphs: [
-              "Every meaningful admin action — creating or deleting a page, changing settings, creating or removing a user, switching organizations, or revoking an API key — writes one entry here with who did it and when.",
-              "The log shows the 200 most recent entries, newest first. It cannot be edited or deleted from the UI.",
-            ],
-          },
-        ],
-      },
     ],
   },
   {
@@ -356,9 +342,9 @@ export const HELP_CATEGORIES: HelpCategory[] = [
             paragraphs: [],
             list: [
               "ADMIN — every organization capability, including team, pages, integrations, organization settings, and installation administration.",
-              "INCIDENT MANAGER — incident lifecycle, subscriber management, analytics, and audit.",
+              "INCIDENT MANAGER — incident lifecycle, subscriber management, and analytics.",
               "RESPONDER — incidents, maintenance, monitors, metrics, and component status.",
-              "VIEWER — read-only analytics and audit access.",
+              "VIEWER — read-only analytics access.",
             ],
           },
           {
@@ -390,7 +376,7 @@ export const HELP_CATEGORIES: HelpCategory[] = [
           {
             heading: "Sessions and incident response",
             paragraphs: [
-              "Review active sessions, revoke suspicious or stale sessions, rotate affected API and webhook secrets, and use the Audit Log to reconstruct administrative changes. Organization suspension immediately fences tenant mutations and automation.",
+              "Review active sessions, revoke suspicious or stale sessions, and rotate affected API and webhook secrets. Organization suspension immediately fences tenant mutations and automation.",
             ],
           },
         ],

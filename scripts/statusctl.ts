@@ -108,10 +108,8 @@ async function restore() {
 
 async function audit() {
   if (process.argv.includes("--seal")) await sealAuditEntries();
-  const org = flag("--org");
-  if (org && !isDatabaseId(org)) throw new Error("--org must be a valid organization ID");
-  const result = await verifyAuditScope(org);
-  console.log(JSON.stringify({ scope: org ?? "platform", ...result }, null, 2));
+  const result = await verifyAuditScope();
+  console.log(JSON.stringify({ scope: "platform", ...result }, null, 2));
   if (!result.valid || result.unsealed) process.exitCode = 1;
 }
 

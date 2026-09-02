@@ -68,6 +68,17 @@ export const PAGE_TEMPLATE_KEYS = [
   "MINIMAL_ENTERPRISE",
 ] as const;
 
+// Keep every historical template valid for saved designs, but only offer
+// clearly distinct starting points in the editor picker.
+export const PAGE_TEMPLATE_PICKER_KEYS = [
+  "CENTERED_SUMMARY",
+  "UPTIME_TIMELINE",
+  "ILLUSTRATED_HERO",
+  "GROUPED_DIRECTORY",
+  "PRODUCT_GRID",
+  "DENSE_OPERATIONS",
+] as const satisfies readonly PageTemplateKey[];
+
 export const PAGE_DESIGN_VERSION_HISTORY_LIMIT = 30;
 
 export type PageTemplateKey = (typeof PAGE_TEMPLATE_KEYS)[number];

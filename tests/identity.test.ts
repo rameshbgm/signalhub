@@ -3,7 +3,7 @@ import { hasCapability, roleCapabilities } from "../lib/identity";
 
 describe("organization roles", () => {
   it("keeps read-only viewers out of mutation capabilities", () => {
-    expect(roleCapabilities("VIEWER")).toEqual(["analytics.view", "audit.view"]);
+    expect(roleCapabilities("VIEWER")).toEqual(["analytics.view"]);
     expect(hasCapability("VIEWER", "incident.update")).toBe(false);
     expect(hasCapability("VIEWER", "page.configure")).toBe(false);
   });

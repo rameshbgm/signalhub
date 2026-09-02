@@ -182,27 +182,6 @@ CREATE TABLE api_keys (
 
 CREATE INDEX api_keys_org_active_idx ON api_keys (org_id, revoked_at, expires_at);
 
-CREATE TABLE audit_logs (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  org_id uuid NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
-  actor text NOT NULL,
-  action text NOT NULL,
-  target text NOT NULL,
-  metadata jsonb,
-  support_session_id uuid REFERENCES support_sessions(id) ON DELETE SET NULL,
-  request_id text,
-  source_ip text,
-  user_agent text,
-  outcome text CHECK (outcome IN ('SUCCESS', 'FAILURE')),
-  previous_hash text,
-  entry_hash text,
-  chain_sequence bigint,
-  created_at timestamptz NOT NULL DEFAULT now()
-);
-
-CREATE INDEX audit_logs_org_created_idx ON audit_logs (org_id, created_at DESC);
-CREATE INDEX audit_logs_org_sequence_idx ON audit_logs (org_id, chain_sequence);
-
 CREATE TABLE identity_connections (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   name text NOT NULL,
@@ -286,7 +265,6 @@ CREATE TABLE retention_policies (
   analytics_days integer NOT NULL,
   notification_logs_days integer NOT NULL,
   resolved_incidents_days integer NOT NULL,
-  audit_logs_days integer NOT NULL,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
   updated_by uuid NOT NULL REFERENCES users(id) ON DELETE RESTRICT

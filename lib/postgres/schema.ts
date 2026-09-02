@@ -228,7 +228,6 @@ export interface RetentionPolicyTable {
   analyticsDays: number;
   notificationLogsDays: number;
   resolvedIncidentsDays: number;
-  auditLogsDays: number;
   createdAt: GeneratedTimestamp;
   updatedAt: GeneratedTimestamp;
   updatedBy: string;
@@ -293,6 +292,18 @@ export interface PageTable {
   designPublishedAt: NullableTimestamp;
   publicVisible: Generated<boolean>;
   setupCompletedAt: NullableTimestamp;
+  onboardingStep: Generated<"WELCOME" | "COMPONENTS" | "LOGO" | "NOTIFICATIONS" | "INVITE_TEAM" | "INCIDENTS" | "COMPLETE">;
+  organizationName: Generated<string>;
+  companyUrl: string | null;
+  defaultSmsCountryCode: Generated<string>;
+  googleAnalyticsId: string | null;
+  noindex: Generated<boolean>;
+  headerHtml: string | null;
+  footerHtml: string | null;
+  emailLogoUrl: string | null;
+  emailFromName: string | null;
+  emailReplyTo: string | null;
+  emailFooter: string | null;
   deletedAt: NullableTimestamp;
   deletedBy: string | null;
   createdAt: GeneratedTimestamp;
@@ -340,27 +351,15 @@ export interface ComponentTable {
   manualStatus: Generated<string>;
   isThirdParty: Generated<boolean>;
   thirdPartyProvider: string | null;
+  sourceType: Generated<"MANUAL" | "STATUSPAGE">;
+  externalStatusUrl: string | null;
+  externalComponentId: string | null;
+  externalLinkUrl: string | null;
+  externalLastSyncedAt: NullableTimestamp;
+  externalLastError: string | null;
   automationTokenHash: string;
   automationTokenPrefix: string;
   automationTokenLastFour: string;
-  createdAt: GeneratedTimestamp;
-}
-
-export interface AuditLogTable {
-  id: Generated<string>;
-  orgId: string;
-  actor: string;
-  action: string;
-  target: string;
-  metadata: unknown | null;
-  supportSessionId: string | null;
-  requestId: string | null;
-  sourceIp: string | null;
-  userAgent: string | null;
-  outcome: "SUCCESS" | "FAILURE" | null;
-  previousHash: string | null;
-  entryHash: string | null;
-  chainSequence: number | null;
   createdAt: GeneratedTimestamp;
 }
 
@@ -430,6 +429,8 @@ export interface IncidentTable {
   autoTransition: Generated<boolean>;
   reminderMinutesBefore: number | null;
   reminderSentAt: NullableTimestamp;
+  nextReminderAt: NullableTimestamp;
+  reminderIntervalMinutes: number | null;
   notifySubscribers: Generated<boolean>;
   postmortemBody: string | null;
   postmortemPublishedAt: NullableTimestamp;
@@ -552,6 +553,10 @@ export interface SubscriberTable {
   contact: string;
   componentIds: Generated<string[]>;
   eventTypes: Generated<string[]>;
+  incidentIds: Generated<string[]>;
+  contactCiphertext: string | null;
+  contactHash: string | null;
+  displayContact: string | null;
   verified: Generated<boolean>;
   quarantined: Generated<boolean>;
   unsubscribeToken: string;
@@ -787,6 +792,24 @@ export interface DataExportJobTable {
   completedAt: NullableTimestamp;
 }
 
+export interface AssetDeletionJobTable {
+  id: Generated<string>;
+  orgId: string | null;
+  storageDriver: "LOCAL" | "S3";
+  storageKey: string;
+  sourceType: "PAGE_ASSET" | "DATA_EXPORT";
+  sourceId: string | null;
+  status: Generated<"QUEUED" | "PROCESSING" | "SUCCEEDED" | "FAILED">;
+  attempts: Generated<number>;
+  maxAttempts: Generated<number>;
+  nextAttemptAt: GeneratedTimestamp;
+  leaseOwner: string | null;
+  leaseExpiresAt: NullableTimestamp;
+  lastError: string | null;
+  createdAt: GeneratedTimestamp;
+  completedAt: NullableTimestamp;
+}
+
 export interface AuditSinkTable {
   id: Generated<string>;
   name: string;
@@ -845,7 +868,6 @@ export interface SignalHubDatabase {
   platformJobs: PlatformJobTable;
   organizationTombstones: OrganizationTombstoneTable;
   apiKeys: ApiKeyTable;
-  auditLogs: AuditLogTable;
   identityConnections: IdentityConnectionTable;
   externalIdentities: ExternalIdentityTable;
   scimTokens: ScimTokenTable;
@@ -853,6 +875,7 @@ export interface SignalHubDatabase {
   samlRequests: SamlRequestTable;
   retentionPolicies: RetentionPolicyTable;
   dataExportJobs: DataExportJobTable;
+  assetDeletionJobs: AssetDeletionJobTable;
   auditChainStates: AuditChainStateTable;
   auditSinks: AuditSinkTable;
   auditDeliveryJobs: AuditDeliveryJobTable;

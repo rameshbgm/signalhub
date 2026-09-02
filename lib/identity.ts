@@ -17,7 +17,6 @@ export const CAPABILITIES = [
   "integration.manage",
   "team.manage",
   "analytics.view",
-  "audit.view",
 ] as const;
 export type Capability = (typeof CAPABILITIES)[number];
 
@@ -29,7 +28,6 @@ const ROLE_CAPABILITIES: Record<MembershipRole, ReadonlySet<Capability>> = {
     "component.update",
     "subscriber.manage",
     "analytics.view",
-    "audit.view",
   ]),
   RESPONDER: new Set([
     "incident.update",
@@ -37,7 +35,7 @@ const ROLE_CAPABILITIES: Record<MembershipRole, ReadonlySet<Capability>> = {
     "component.update",
     "analytics.view",
   ]),
-  VIEWER: new Set(["analytics.view", "audit.view"]),
+  VIEWER: new Set(["analytics.view"]),
 };
 
 export function canonicalizeEmail(email: string): string {

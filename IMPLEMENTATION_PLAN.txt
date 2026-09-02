@@ -1,0 +1,202 @@
+SignalHub implementation plan — complete Atlassian Statuspage reference scan
+
+Purpose and constraints
+Build SignalHub around the customer-status communication model observed in
+Atlassian Statuspage, without copying Atlassian branding, copy, or proprietary
+assets. SignalHub remains self-hosted and PostgreSQL-only. Atlassian billing and
+licensing are out of scope; every product/administrative capability below must
+be mapped to SignalHub's existing tenant and platform authorization model.
+
+1. Account, organization, and multi-page model
+   - Support multiple autonomous status pages per organization, with a clear
+     page switcher/list and each page's own public URL and configuration.
+   - Keep public, password/private, and audience-specific page modes. The
+     chosen page mode controls public access and subscription behavior; do not
+     collapse them into a public-only page model.
+   - Give operators page-scoped access in addition to organization roles, and
+     show only their assigned pages and allowed actions.
+   - Retain organization administration, platform administration, team
+     invitations, RBAC, SSO/SAML/OIDC, SCIM where supported, IP allowlists, MFA,
+     audit logging, and activity history.
+
+2. New-page creation and launch checklist
+   - Make page creation fast: page name, URL slug, page type, and—when needed—
+     private/audience access details. Validate names and globally unique slugs.
+   - Create an unpublished draft with one clearly marked example component so a
+     first-time operator understands the service model.
+   - Provide a resumable launch checklist, in the reference order:
+       a. create and organize components
+       b. add logo, favicon, headline, and visual brand
+       c. configure subscriber channels and delivery settings
+       d. invite the incident-response team and assign roles/page access
+       e. create a practice incident and remove it before launch
+       f. review public URL, custom domain/SSL, and publish
+   - Require the essentials before first publish, but make optional features
+     (metrics, integrations, custom markup, and advanced subscriptions) easy
+     to add later.
+
+3. Page-management navigation and overview
+   - Use one operational overview per page with public visibility, public URL,
+     current overall state, open incidents, upcoming maintenance, components,
+     subscriber count, and setup progress.
+   - Organize page management into focused areas:
+       - Incidents
+       - Scheduled maintenance
+       - Your page: page information, components, groups, metrics, appearance,
+         access/audience, subscribers, and email presentation
+       - Integrations: API, webhooks, embeds, automation, and third-party data
+       - Settings: domains, SEO, localization, notification defaults, deletion
+   - Keep organization-level activity, users, security, audit, analytics, and
+     system/platform operations separate from individual page configuration.
+
+4. Components (customer-visible services)
+   - Let operators create, edit, hide, reorder, and delete components with a
+     plain-language name, description, start date, and uptime display choice.
+   - Support two-level component groups, including group ordering/collapse.
+   - Support the standard component vocabulary: operational, degraded
+     performance, partial outage, major outage, and under maintenance.
+   - Allow manual status changes, automation/API updates, and third-party
+     components with a source URL, component mapping, sync health, and a
+     manual override.
+   - Display historical uptime and incident impact per component; preserve
+     status events as the source for that history.
+   - In audience-specific pages, manage which audience groups/users can see
+     each component and how newly added components are assigned.
+
+5. Incidents, updates, postmortems, and maintenance
+   - Create incidents with title, lifecycle state (investigating, identified,
+     monitoring, resolved), initial update, affected components, component
+     status changes, and an explicit send-notifications choice.
+   - Provide update, resolve, reopen, reminder, and deletion/cleanup workflows
+     with an immutable, ordered public incident timeline.
+   - Support incident templates for consistent customer communications and
+     postmortems with draft/review/publish state after resolution.
+   - Support scheduled maintenance with start/end time, timezone, affected
+     components, announcement/reminder schedule, progress updates, completion,
+     cancellation, and subscriber notification choice.
+   - Ensure an affected-component change and an incident update stay consistent
+     but allow independent manual component changes when necessary.
+
+6. Subscribers, audience, and notification delivery
+   - Provide visitor self-subscription and authorized admin add/import/export
+     flows for email, SMS, Slack, and webhook channels supported by SignalHub.
+   - Require verification/confirmation appropriate to each channel; support
+     safe unsubscribe and self-service preference management.
+   - Support page-wide and component-specific subscriptions. When an incident
+     affects a component, notify only the relevant opted-in subscribers.
+   - Let operators enable or disable channels, component subscriptions, and
+     event types per page; expose quarantined/bounced contacts safely.
+   - Keep notification delivery deliberately tied to incidents and maintenance:
+     operators decide when a creation/update sends, rather than silently
+     notifying on every component edit.
+   - Support team-facing destinations (email, Slack/Teams-style delivery,
+     webhooks) separately from customer subscriptions, with retry/audit logs.
+   - For audience-specific pages, retain user/group import/export and map each
+     person/group to allowed components, metrics, and notifications.
+
+7. Public status-page experience
+   - Render overall service health, current incidents, scheduled maintenance,
+     grouped components, component states, optional uptime, and opt-in controls
+     without requiring a login for public pages.
+   - Render history with resolved incidents and postmortems, and make component
+     details and incident timelines linkable/shareable.
+   - Render the appropriate sign-in/password/audience path for non-public
+     pages, enforcing access on the server before serving their page data.
+   - Offer an embeddable compact status view for an application, help center,
+     or company site without exposing management credentials.
+   - Keep accessibility, mobile responsiveness, a clear visual status banner,
+     and safe visitor theme behavior as release criteria.
+
+8. Branding, content, and localization
+   - Support page name, service/organization name, URL slug, timezone, language
+     and translated/localized copy where implemented.
+   - Support logo, favicon, cover image, headline, about text, brand colors,
+     layout choices, public support/terms/privacy links, social/SEO metadata,
+     no-index, and analytics ID.
+   - Support custom domain plus TLS/SSL verification and operational guidance
+     for both single-host and multi-replica deployments.
+   - Support carefully sanitized custom HTML header/footer, custom CSS, and
+     branded notification email (logo, from name, reply-to, footer, preview).
+   - Never allow custom markup, snippets, fonts, or uploads to bypass CSP,
+     content sanitization, authorization, or asset-storage safety.
+
+9. Metrics and transparency data
+   - Keep system metrics as a first-class page feature: metadata, display
+     format, public visibility, historical chart, retention, and data points.
+   - Accept custom metric points through the managed API and support controlled
+     backfill with validation and rate limits.
+   - Support provider-backed metrics (for example uptime/response-time sources)
+     with credentials stored as secrets, sync health, and disconnect handling.
+   - Permit audience-specific visibility rules for metrics just as for
+     components.
+
+10. Monitoring and automation
+    - Keep SignalHub's monitor checks, heartbeat monitors, alert thresholds,
+      monitor templates, and worker scheduling as supported functionality.
+    - Treat direct monitoring as complementary to status communications: a
+      failed check may open/assist an incident or change a component through
+      explicit automation policy, but must not create unreviewed customer noise.
+    - Provide email/webhook/API automation for component status and incidents,
+      with authentication tokens, replay protection, audit logging, retries,
+      and clear last-error diagnostics.
+    - Maintain third-party integrations and parsers for alerting/incident tools
+      where already supported; add new providers through a provider contract
+      rather than hardcoded one-off paths.
+
+11. APIs, integrations, and developer surfaces
+    - Retain separate read/status and privileged management APIs with scoped API
+      keys for components, incidents, metrics, analytics, and subscribers.
+    - Maintain component automation tokens, heartbeat tokens, webhook endpoints,
+      outbound event delivery, feed tokens where supported, and key rotation/
+      revocation/audit workflows.
+    - Provide embeddable status, badge, and machine-readable status endpoints
+      that honor page access rules and rate limits.
+    - Integrate team collaboration and incident tooling through configured
+      destinations and webhooks; include delivery history and retry/dead-letter
+      visibility for operators.
+
+12. Analytics, operations, security, and retention
+    - Keep page analytics for visitors/subscriptions and operational analytics
+      for incidents, components, notifications, and integrations.
+    - Keep audit logs for sensitive page, subscriber, team, security, API-key,
+      and platform mutations; support protected exports and configured audit
+      sinks.
+    - Maintain explicit retention policies for analytics, notification logs,
+      resolved incidents, metric points, monitor checks, and audit records.
+    - Use asynchronous/retryable storage deletion jobs for page assets and data
+      exports; make permanent page/organization deletion highly explicit.
+
+13. Data-model and migration rule
+    - Do not ship the pending destructive migration in its current form if it
+      removes private/audience access, design/version history, feeds, monitors,
+      monitor checks/templates, or other supported capabilities listed above.
+    - Rework the migration into additive, backward-compatible schema changes
+      for onboarding, expanded page metadata, external components, subscriber
+      preference protection, reminders, and asset-deletion jobs.
+    - Only remove a table/column after its replacement is implemented, migrated,
+      documented, and no reachable page, API route, worker, test, or user guide
+      depends on it.
+    - Update the Kysely schema in lockstep with actual PostgreSQL migrations;
+      never retain a type-only compatibility field for a dropped database column.
+
+14. Delivery and verification sequence
+    - First, inventory the existing SignalHub functionality against the above
+      checklist and label each item: already supported, incomplete, missing, or
+      deliberately out of scope.
+    - Then deliver the onboarding and page-management experience without
+      regressing existing access, monitoring, metrics, or integration paths.
+    - Implement missing user-visible capability in vertical slices (schema,
+      server authorization, UI, API/worker behavior, tests, docs) rather than
+      as UI-only placeholders.
+    - Update README, setup guide, Helm/Compose guidance, user manual, contextual
+      help, navigation, and environment inventory for every shipped behavior.
+    - Validate with lint, typecheck, unit/integration tests, public-page and
+      role-based end-to-end checks, worker-path tests, migration rehearsal on a
+      disposable PostgreSQL database, and npm run verify before release.
+
+Reference scan
+The plan is based on Atlassian Statuspage documentation covering page setup and
+customization, components, incidents, maintenance, subscribers, system metrics,
+embeds/APIs, automation integrations, team/page permissions, authentication,
+and audit/activity workflows. It is a functional reference, not an assertion
+that every Atlassian plan-gated or billing feature belongs in SignalHub.

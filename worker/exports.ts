@@ -16,9 +16,8 @@ async function buildOrganizationExport(orgId: string) {
   if (!organization) throw new Error("Organization no longer exists");
   const pages = await database.selectFrom("pages").selectAll().where("orgId", "=", orgId).execute();
   const pageIds = pages.map((page) => page.id);
-  const [memberships, auditLogs, apiKeys, assets] = await Promise.all([
+  const [memberships, apiKeys, assets] = await Promise.all([
     database.selectFrom("memberships").selectAll().where("orgId", "=", orgId).execute(),
-    database.selectFrom("auditLogs").selectAll().where("orgId", "=", orgId).orderBy("createdAt", "asc").execute(),
     database.selectFrom("apiKeys").selectAll().where("orgId", "=", orgId).execute(),
     database.selectFrom("assets").selectAll().where("orgId", "=", orgId).execute(),
   ]);
@@ -98,7 +97,6 @@ async function buildOrganizationExport(orgId: string) {
     notificationJobs,
     analytics,
     apiKeys,
-    auditLogs,
     assetManifest: assets.map((asset) => ({
       id: asset.id,
       pageId: asset.pageId,

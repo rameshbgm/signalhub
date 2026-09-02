@@ -59,10 +59,6 @@ export async function POST(request: NextRequest) {
         revokedAt: null,
         lastUsedAt: null,
       }).returning("id").executeTakeFirstOrThrow();
-      await transaction.insertInto("auditLogs").values({
-        orgId: session.orgId, actor: session.email, action: "CREATE_FEED_TOKEN", target: token.id,
-        supportSessionId: session.supportSessionId ?? null, createdAt: new Date(),
-      }).execute();
       return token;
     });
     return NextResponse.json({ id: created.id, token: secret.token, prefix: secret.prefix, lastFour: secret.lastFour }, { status: 201 });
@@ -86,10 +82,6 @@ export async function DELETE(request: NextRequest) {
       const revoked = await transaction.updateTable("feedTokens").set({ revokedAt: new Date() })
         .where("id", "=", token.id).where("pageId", "=", token.pageId).returning("id").executeTakeFirst();
       if (!revoked) throw new Error("Feed token not found");
-      await transaction.insertInto("auditLogs").values({
-        orgId: session.orgId, actor: session.email, action: "REVOKE_FEED_TOKEN", target: token.id,
-        supportSessionId: session.supportSessionId ?? null, createdAt: new Date(),
-      }).execute();
     });
     return NextResponse.json({ ok: true });
   } catch (error) {

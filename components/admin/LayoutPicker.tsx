@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import {
-  PAGE_TEMPLATE_KEYS,
+  PAGE_TEMPLATE_PICKER_KEYS,
   PAGE_TEMPLATE_LABELS,
   type PageTemplateKey,
 } from "@/lib/page-design";
@@ -19,7 +19,7 @@ const DESCRIPTION: Record<PageTemplateKey, string> = {
 };
 
 export function LayoutPicker({ defaultValue, brandColor }: { defaultValue: string; brandColor: string }) {
-  const initial = PAGE_TEMPLATE_KEYS.includes(defaultValue as PageTemplateKey)
+  const initial = (PAGE_TEMPLATE_PICKER_KEYS as readonly PageTemplateKey[]).includes(defaultValue as PageTemplateKey)
     ? (defaultValue as PageTemplateKey)
     : "CENTERED_SUMMARY";
   const [layout, setLayout] = useState<PageTemplateKey>(initial);
@@ -39,7 +39,7 @@ export function LayoutPicker({ defaultValue, brandColor }: { defaultValue: strin
         </div>
       </div>
       <div ref={scroller} data-testid="page-layout-scroller" className="flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain pb-3" tabIndex={0}>
-        {PAGE_TEMPLATE_KEYS.map((key) => (
+        {PAGE_TEMPLATE_PICKER_KEYS.map((key) => (
           <button
             key={key}
             type="button"

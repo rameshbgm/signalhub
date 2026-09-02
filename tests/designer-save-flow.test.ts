@@ -26,7 +26,6 @@ describe("unified responsive designer workflow", () => {
     expect(actions).toContain("fenceActiveOrganizationMutation(");
     expect(actions).toContain('insertInto("pageDesignVersions")');
     expect(actions).toContain("publishedDesign: design");
-    expect(actions).toContain('action: "PUBLISH_PAGE_DESIGN"');
     expect(editor).toContain('"Publish"');
   });
 

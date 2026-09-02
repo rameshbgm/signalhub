@@ -155,11 +155,6 @@ export async function publishDesignDraft(pageId: string, expectedRevision: numbe
       await transaction.updateTable("pageDesignDrafts").set({
         basePublishedVersion: liveVersion, updatedBy: session.userId, updatedAt: now,
       }).where("id", "=", draft.id).where("revision", "=", draft.revision).execute();
-      await transaction.insertInto("auditLogs").values({
-        orgId: page.orgId, actor: session.email, action: "PUBLISH_PAGE_DESIGN", target: pageId,
-        metadata: { version: liveVersion, templateKey: design.templateKey },
-        supportSessionId: session.supportSessionId ?? null, createdAt: now,
-      }).execute();
       return { conflict: false as const, revision: draft.revision, liveVersion, unchanged: false, slug: page.slug };
     });
     if (result.conflict) return { ok: false, error: "The design or live page changed in another session", conflict: true, revision: result.revision };
@@ -414,10 +409,6 @@ export async function duplicateStatusPage(pageId: string) {
         endedAt: null, isMaintenance: false, note: null,
       }).execute();
     }
-    await transaction.insertInto("auditLogs").values({
-      orgId: page.orgId, actor: session.email, action: "DUPLICATE_PAGE", target: newPage.id,
-      metadata: { sourcePageId: pageId }, supportSessionId: session.supportSessionId ?? null, createdAt: now,
-    }).execute();
     return newPage.id;
   });
   revalidatePath("/organization/pages");

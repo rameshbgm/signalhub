@@ -20,10 +20,6 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
       }).where("id", "=", id).where("orgId", "=", session.orgId).where("revokedAt", "is", null)
         .returning("id").executeTakeFirst();
       if (!key) return false;
-      await transaction.insertInto("auditLogs").values({
-        orgId: session.orgId, actor: session.email, action: "ROTATE_API_KEY", target: id,
-        supportSessionId: session.supportSessionId ?? null, createdAt: new Date(),
-      }).execute();
       return true;
     });
     if (!changed) return apiError(404, "API_KEY_NOT_FOUND", "API key not found");
