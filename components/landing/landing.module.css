@@ -2313,3 +2313,67 @@
   .heroVisual { display: none; }
   .heroProof, .comparison, .capabilities, .deploy { width: min(100% - 32px, 720px); }
 }
+
+/* Enterprise public landing system: quiet surfaces, strong hierarchy, and
+   one dependable blue action. */
+.page {
+  --canvas: #f8fafd;
+  --surface: #ffffff;
+  --ink: #202124;
+  --muted: #5f6368;
+  --soft: #80868b;
+  --line: #dadce0;
+  --line-strong: #bdc1c6;
+  --blue: #1a73e8;
+  --blue-dark: #185abc;
+  --violet: #5f6368;
+  --mint: #188038;
+  --mint-dark: #137333;
+  --shadow: 0 1px 3px rgba(60, 64, 67, 0.16), 0 4px 12px rgba(60, 64, 67, 0.08);
+  background: var(--canvas);
+  font-family: var(--landing-font-sans), "Google Sans", Roboto, Arial, sans-serif;
+}
+.header { background: rgba(248, 250, 253, 0.96); box-shadow: 0 1px 2px rgba(60, 64, 67, 0.12); backdrop-filter: none; }
+.nav { width: min(1180px, calc(100% - 48px)); height: 72px; gap: 32px; }
+.brand { font-family: "Google Sans", Roboto, Arial, sans-serif; font-size: 1.125rem; letter-spacing: -0.02em; }
+.brandMark { width: 30px; height: 30px; border-radius: 8px; background: var(--blue); box-shadow: none; }
+.brandMark span { background: #fff; }
+.navLinks { gap: 25px; color: var(--muted); font-size: 0.875rem; font-weight: 500; letter-spacing: 0; text-transform: none; }
+.navActions { gap: 16px; }
+.signIn { color: var(--blue); font-size: 0.875rem; }
+.githubButton, .primaryButton, .secondaryButton { min-height: 42px; border-radius: 6px; font-family: "Google Sans", Roboto, Arial, sans-serif; font-size: 0.875rem; letter-spacing: 0; }
+.githubButton { background: var(--blue); box-shadow: none; }
+.githubButton:hover, .primaryButton:hover { transform: none; box-shadow: 0 1px 2px rgba(60, 64, 67, 0.2); }
+.hero { min-height: 690px; background: var(--canvas); }
+.hero::before, .heroGlow { display: none; }
+.heroInner { width: min(1180px, calc(100% - 48px)); min-height: 570px; padding: 92px 0 56px; grid-template-columns: minmax(0, 0.9fr) minmax(460px, 1.1fr); gap: 64px; }
+.hero h1, .sectionIntro h2, .sectionIntroRow h2, .deployHeading h2, .ownershipSticky h2, .finalCta h2 { font-family: "Google Sans", Roboto, Arial, sans-serif; letter-spacing: -0.045em; }
+.hero h1 { max-width: 10ch; font-size: clamp(3rem, 5.2vw, 5.25rem); line-height: 1.02; }
+.eyebrow, .sectionKicker { color: var(--blue-dark); font-family: "Google Sans", Roboto, Arial, sans-serif; letter-spacing: 0.03em; }
+.heroLead, .sectionIntro p, .sectionAside { max-width: 62ch; color: var(--muted); }
+.primaryButton { background: var(--blue); color: #fff; box-shadow: none; }
+.secondaryButton { border-color: var(--line-strong); color: var(--ink); }
+.secondaryButton:hover { border-color: var(--blue); background: #e8f0fe; }
+.heroProof { border-color: var(--line); color: var(--muted); font-family: "Google Sans", Roboto, Arial, sans-serif; }
+.heroProof svg { color: var(--blue); }
+.comparison, .capabilities, .deploy, .ownership { width: min(1180px, calc(100% - 48px)); }
+.comparisonGrid, .bentoGrid, .deployGrid { gap: 16px; background: transparent; border: 0; }
+.hostedCard, .signalHubCard, .capabilityCard, .deployCard { border: 1px solid var(--line); border-radius: 12px; background: var(--surface); box-shadow: var(--shadow); }
+.hostedCard:hover, .signalHubCard:hover, .capabilityCard:hover, .deployCard:hover { transform: translateY(-2px); box-shadow: 0 3px 8px rgba(60, 64, 67, 0.18); }
+.comparisonBadge, .capabilityTag, .deployEyebrow { border-radius: 999px; background: #e8f0fe; color: var(--blue-dark); }
+.iconBox, .deployIcon { border-radius: 10px; background: #e8f0fe; color: var(--blue); }
+.operationsPreview, .statusConsole, .opsCard, .monitorCard, .incidentCard, .deliveryCard { border-radius: 12px !important; }
+.operationsPreview { filter: none; }
+.ownership { max-width: none; width: 100%; padding-inline: max(24px, calc((100vw - 1180px) / 2)); background: #eef3fd; }
+.ownershipInner { width: min(1180px, calc(100% - 48px)); }
+.ownershipStep { border-radius: 12px; border-color: var(--line); background: var(--surface); }
+.finalCtaInner { border-radius: 12px; background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow); }
+.footer { background: #202124; border-top-color: #3c4043; }
+
+@media (max-width: 900px) {
+  .nav { width: min(100% - 32px, 720px); }
+  .heroInner { width: min(100% - 32px, 720px); padding-top: 64px; grid-template-columns: 1fr; }
+  .heroCopy { max-width: 100%; }
+  .heroProof, .comparison, .capabilities, .deploy { width: min(100% - 32px, 720px); }
+  .ownership { padding-inline: 16px; }
+}

@@ -33,12 +33,10 @@ export const metadata: Metadata = {
 };
 
 /* DESIGN CONTRACT
-   Direction: Dispatch Strip Wall / Wide Command Deck.
-   SignalHub prioritizes a shared operational horizon: current condition and
-   commands meet beside a persistent left Signal Rail, while public pages
-   retain their owner controls.
-   Visual language: midnight enamel, fine route lines, porcelain text, and
-   signal-lime only for live or selected operational state. */
+   Direction: Signal Workspace — a calm, light enterprise control plane.
+   Operators get a persistent workspace rail, a clear top context bar, and
+   flat white work surfaces with Google-style hierarchy and blue actions.
+   Public pages retain their owner controls while sharing the same legibility. */
 export default function RootLayout({
   children,
 }: Readonly<{

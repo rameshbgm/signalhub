@@ -1,25 +1,25 @@
 ---
 name: SignalHub
-description: A shared control horizon for self-hosted status operations.
+description: A calm, precise workspace for self-hosted status operations.
 colors:
-  midnight: "#0c1828"
-  deep-surface: "#12243a"
-  raised-surface: "#17304a"
-  porcelain: "#f3f1e9"
-  signal-lime: "#d7ef4b"
-  healthy: "#a5e76a"
-  caution: "#f6c35f"
-  incident: "#ff7460"
-  route-blue: "#79b9ee"
+  canvas: "#f8fafd"
+  surface: "#ffffff"
+  surface-subtle: "#f1f3f6"
+  text: "#202124"
+  text-muted: "#5f6368"
+  action-blue: "#1a73e8"
+  healthy: "#188038"
+  caution: "#b06000"
+  incident: "#d93025"
 typography:
   display:
-    fontFamily: "Arial Narrow, Roboto Condensed, Avenir Next, Segoe UI, sans-serif"
-    fontSize: "clamp(2.7rem, 6vw, 5.6rem)"
+    fontFamily: "Google Sans, Inter, Roboto, Arial, sans-serif"
+    fontSize: "clamp(2.25rem, 4vw, 4rem)"
     fontWeight: 600
-    lineHeight: 0.9
-    letterSpacing: "-0.065em"
+    lineHeight: 1.08
+    letterSpacing: "-0.035em"
   body:
-    fontFamily: "Arial Narrow, Roboto Condensed, Avenir Next, Segoe UI, sans-serif"
+    fontFamily: "Google Sans, Inter, Roboto, Arial, sans-serif"
     fontSize: "1rem"
     lineHeight: 1.5
   label:
@@ -28,20 +28,20 @@ typography:
     fontWeight: 700
     letterSpacing: "0.16em"
 rounded:
-  command: "0px"
+  command: "8px"
 spacing:
   strip: "8px"
   field: "16px"
-  deck: "32px"
+  deck: "28px"
 components:
   button-primary:
-    backgroundColor: "{colors.signal-lime}"
-    textColor: "#132339"
+    backgroundColor: "{colors.action-blue}"
+    textColor: "#ffffff"
     rounded: "{rounded.command}"
-    padding: "12px 16px"
+    padding: "10px 18px"
   input-default:
-    backgroundColor: "rgba(6, 17, 30, 0.44)"
-    textColor: "{colors.porcelain}"
+    backgroundColor: "{colors.surface}"
+    textColor: "{colors.text}"
     rounded: "{rounded.command}"
     padding: "12px 16px"
 ---

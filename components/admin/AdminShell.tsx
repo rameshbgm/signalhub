@@ -73,7 +73,8 @@ export function AdminShell({ sidebar, children }: { sidebar: ReactNode; children
         </>
       )}
       <main className="app-console-main min-w-0 flex-1 overflow-x-clip">
-        <div className={focusedFlow ? "" : "mx-auto w-full max-w-[112rem] px-4 py-6 sm:px-6 lg:px-8 lg:py-9 [&>*]:mx-auto"}>{children}</div>
+        {!focusedFlow && <div className="enterprise-topbar"><span className="enterprise-topbar__brand">SignalHub</span><span className="enterprise-topbar__context">Operations workspace</span></div>}
+        <div className={focusedFlow ? "" : "mx-auto w-full max-w-[112rem] px-4 py-6 sm:px-8 lg:px-10 lg:py-9 [&>*]:mx-auto"}>{children}</div>
       </main>
     </div>
   );

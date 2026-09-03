@@ -3,43 +3,43 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 :root {
-  --bg: #0c1828;
-  --surface: #12243a;
-  --surface-raised: #17304a;
-  --line: rgba(236, 241, 232, 0.22);
-  --line-bright: rgba(236, 241, 232, 0.52);
-  --fg: #f3f1e9;
-  --fg-soft: #c7d1cd;
-  --fg-dim: #93a5a8;
+  --bg: #f8fafd;
+  --surface: #ffffff;
+  --surface-raised: #f1f3f6;
+  --line: #dfe3eb;
+  --line-bright: #b9c1cf;
+  --fg: #202124;
+  --fg-soft: #5f6368;
+  --fg-dim: #80868b;
 
-  --cyan: #d7ef4b;
-  --cyan-soft: rgba(215, 239, 75, 0.14);
-  --green: #a5e76a;
-  --green-soft: rgba(165, 231, 106, 0.14);
-  --amber: #f6c35f;
-  --amber-soft: rgba(246, 195, 95, 0.15);
-  --orange: #f49355;
-  --orange-soft: rgba(244, 147, 85, 0.15);
-  --red: #ff7460;
-  --red-soft: rgba(255, 116, 96, 0.15);
-  --blue: #79b9ee;
-  --blue-soft: rgba(121, 185, 238, 0.14);
+  --cyan: #1a73e8;
+  --cyan-soft: #e8f0fe;
+  --green: #188038;
+  --green-soft: #e6f4ea;
+  --amber: #b06000;
+  --amber-soft: #fef7e0;
+  --orange: #c26401;
+  --orange-soft: #fce8e6;
+  --red: #d93025;
+  --red-soft: #fce8e6;
+  --blue: #1a73e8;
+  --blue-soft: #e8f0fe;
 
-  --on-cyan: #132339;
-  --on-green: #132339;
+  --on-cyan: #ffffff;
+  --on-green: #ffffff;
 
-  --hover-overlay: rgba(243, 241, 233, 0.08);
-  --hover-overlay-strong: rgba(243, 241, 233, 0.14);
-  --panel-glass: rgba(19, 38, 58, 0.9);
-  --input-overlay-bg: rgba(6, 17, 30, 0.44);
-  --input-overlay-border: rgba(243, 241, 233, 0.24);
-  --input-overlay-border-focus: rgba(215, 239, 75, 0.82);
-  --placeholder-overlay: rgba(199, 209, 205, 0.68);
+  --hover-overlay: #f1f3f4;
+  --hover-overlay-strong: #e8eaed;
+  --panel-glass: rgba(255, 255, 255, 0.96);
+  --input-overlay-bg: #ffffff;
+  --input-overlay-border: #c7cbd1;
+  --input-overlay-border-focus: #1a73e8;
+  --placeholder-overlay: #80868b;
 
-  --font-body-family: "Arial Narrow", "Roboto Condensed", "Avenir Next", "Segoe UI", sans-serif;
+  --font-body-family: "Google Sans", "Inter", Roboto, Arial, sans-serif;
   --font-mono-family: "SFMono-Regular", "Roboto Mono", Consolas, monospace;
 
-  color-scheme: dark;
+  color-scheme: light;
 }
 
 :root.dark {
@@ -724,6 +724,106 @@ select option {
   }
 }
 
+/* Signal Workspace replacement layer. This intentionally supersedes the
+   former dark console treatment with a light, enterprise workspace system. */
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-body-family);
+}
+
+.dispatch-shell {
+  display: grid !important;
+  grid-template-columns: 16rem minmax(0, 1fr);
+  background: var(--bg) !important;
+}
+
+.dispatch-command-deck {
+  position: sticky;
+  top: 0;
+  width: auto !important;
+  min-height: 100vh;
+  border-right: 1px solid var(--line) !important;
+  background: var(--surface) !important;
+  box-shadow: 1px 0 0 rgba(32, 33, 36, 0.02) !important;
+}
+
+.dispatch-command-deck::before { display: none; }
+.dispatch-command-deck > :first-child { border-bottom: 1px solid var(--line) !important; }
+
+.dispatch-nav { padding: 1rem 0.75rem; }
+.dispatch-nav-group { padding: 0.75rem 0; border-bottom: 0; }
+.dispatch-nav-label {
+  padding-inline: 0.75rem;
+  color: var(--fg-dim);
+  font-family: var(--font-body-family);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.dispatch-nav-items { gap: 0.2rem; }
+.dispatch-nav-link {
+  min-height: 2.5rem;
+  gap: 0.75rem;
+  border-radius: 0.5rem;
+  padding: 0.625rem 0.75rem;
+  color: var(--fg-soft);
+  font-family: var(--font-body-family);
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+.dispatch-nav-link:hover { background: var(--hover-overlay); color: var(--fg); }
+.dispatch-nav-link--active { background: var(--cyan-soft); color: var(--cyan); font-weight: 600; }
+.dispatch-nav-link--active svg { color: var(--cyan); }
+.dispatch-operator { padding: 1rem 0.875rem; border-top: 1px solid var(--line); }
+.dispatch-operator > div > span { border: 0; border-radius: 50%; background: var(--cyan-soft); color: var(--cyan); }
+
+.app-console-main { background: var(--bg); }
+.app-console-main > div::before { display: none; }
+.app-console-main :where(input:not([type="checkbox"]):not([type="radio"]), textarea, select) {
+  border-radius: 0.5rem !important;
+  border-color: var(--input-overlay-border);
+  background: var(--surface);
+  color: var(--fg);
+}
+.app-console-main :where(input:not([type="checkbox"]):not([type="radio"]), textarea, select):focus {
+  border-color: var(--input-overlay-border-focus);
+  box-shadow: 0 0 0 3px var(--cyan-soft);
+}
+.app-console-main button:not([aria-label="Close navigation"]) { border-radius: 0.5rem; }
+.app-console-main :where(section, article, aside):not(.status-public-header):not(.status-public-footer) { border-radius: 0.75rem; }
+
+.enterprise-topbar {
+  display: flex;
+  min-height: 3.5rem;
+  align-items: center;
+  gap: 0.75rem;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+  padding: 0 2rem;
+}
+.enterprise-topbar__brand { color: var(--fg); font-size: 1rem; font-weight: 600; letter-spacing: -0.02em; }
+.enterprise-topbar__context { color: var(--fg-dim); font-size: 0.8125rem; }
+.enterprise-topbar__context::before { content: "/"; margin-right: 0.75rem; color: var(--line-bright); }
+
+.status-dispatch-shell { background: var(--bg) !important; background-image: none !important; }
+.status-public-header { box-shadow: 0 1px 0 var(--line); }
+.status-public-header::before { height: 3px; }
+.status-public-header :where(a, button) { border-radius: 0.5rem; }
+.status-public-title { font-family: var(--font-body-family); font-weight: 600; }
+.status-public-footer { background: var(--surface); }
+
+@media (max-width: 1023px) {
+  .dispatch-shell { display: block !important; }
+  .dispatch-command-deck { min-height: 100%; }
+  .enterprise-topbar { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; }
+}
+
 /* ---------- pulsing live dot ---------- */
 
 .pulse-dot {
@@ -1056,3 +1156,29 @@ select option {
   .public-status-banner { align-items: flex-start; }
   .public-status-banner svg { margin-top: 0.1rem; }
 }
+
+/* Final enterprise tokens (kept at EOF so legacy surface rules cannot
+   reintroduce the retired dark/grid treatment). */
+.dispatch-shell { background: var(--bg) !important; }
+.dispatch-command-deck { background: var(--surface) !important; box-shadow: 1px 0 0 rgba(32, 33, 36, 0.02) !important; }
+.status-dispatch-shell { background: var(--bg) !important; background-image: none !important; }
+.grain::before, .grain::after { display: none; }
+.app-console-main { background: var(--bg); }
+.app-console-main :where(h1, h2, h3, h4) { font-family: var(--font-body-family); letter-spacing: -0.025em; }
+.dispatch-access { font-family: var(--font-body-family); }
+.dispatch-access :where(h1, h2, h3, .font-mono) { font-family: var(--font-body-family); letter-spacing: -0.025em; }
+.dispatch-access main { max-width: 78rem; border-color: var(--line); }
+.dispatch-access section { background: var(--surface) !important; }
+.dispatch-access input { border-radius: 0.5rem; }
+.dispatch-access button, .dispatch-access a[class*="border"] { border-radius: 0.5rem; }
+.dispatch-org-switcher button { border-radius: 0.5rem; }
+.status-theme, .status-theme[data-typography="MONO"], .status-theme[data-typography="HUMANIST"], .status-theme[data-typography="GEOMETRIC"] { font-family: var(--font-body-family); }
+.status-theme :where(h1, h2, h3, h4, .font-mono) { font-family: var(--font-body-family); letter-spacing: -0.02em; }
+.public-ops-block { border: 1px solid var(--line) !important; border-radius: 0.75rem !important; background: var(--surface) !important; box-shadow: 0 1px 2px rgba(60, 64, 67, 0.08); padding: 1.25rem !important; }
+.public-ops-block:empty { display: none !important; }
+.public-status-banner { border-radius: 0.75rem !important; box-shadow: none !important; }
+.public-service-group { border: 1px solid var(--line) !important; border-radius: 0.75rem !important; background: var(--surface) !important; padding: 0.75rem 1rem !important; }
+.public-service-row { border-bottom-color: var(--line) !important; }
+.public-service-row:last-child { border-bottom: 0 !important; }
+.public-incident-card, .public-metric, .public-subscribe-block { border: 1px solid var(--line) !important; border-radius: 0.75rem !important; background: var(--surface) !important; padding: 1rem !important; }
+.public-subscribe-trigger { border-radius: 0.5rem !important; font-family: var(--font-body-family); font-size: 0.875rem; letter-spacing: 0; text-transform: none; }
