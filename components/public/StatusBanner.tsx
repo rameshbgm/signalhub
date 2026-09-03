@@ -25,7 +25,7 @@ export function StatusBanner({
     <div
       role="status"
       aria-live="polite"
-      className={`page-panel border flex items-center gap-4 ${
+      className={`public-status-banner page-panel border flex items-center gap-4 ${
         variant === "COMPACT" ? "px-4 py-3" : "px-5 py-5 sm:px-6 sm:py-6"
       } ${variant === "CENTERED" ? "justify-center text-center" : ""}`}
       style={{

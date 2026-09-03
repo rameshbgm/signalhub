@@ -26,14 +26,12 @@ async function buildOrganizationExport(orgId: string) {
   const users = userIds.length
     ? await database.selectFrom("users").selectAll().where("id", "in", userIds).execute()
     : [];
-  const [componentGroups, components, incidents, templates, templateGroups, subscribers, metrics,
+  const [componentGroups, components, incidents, subscribers, metrics,
     monitors, endpoints, destinations, notificationLogs, notificationJobs, analytics] = pageIds.length
     ? await Promise.all([
         database.selectFrom("componentGroups").selectAll().where("pageId", "in", pageIds).execute(),
         database.selectFrom("components").selectAll().where("pageId", "in", pageIds).execute(),
         database.selectFrom("incidents").selectAll().where("pageId", "in", pageIds).execute(),
-        database.selectFrom("incidentTemplates").selectAll().where("pageId", "in", pageIds).execute(),
-        database.selectFrom("templateGroups").selectAll().where("pageId", "in", pageIds).execute(),
         database.selectFrom("subscribers").selectAll().where("pageId", "in", pageIds).execute(),
         database.selectFrom("metrics").selectAll().where("pageId", "in", pageIds).execute(),
         database.selectFrom("monitors").selectAll().where("pageId", "in", pageIds).execute(),
@@ -43,7 +41,7 @@ async function buildOrganizationExport(orgId: string) {
         database.selectFrom("notificationJobs").selectAll().where("pageId", "in", pageIds).execute(),
         database.selectFrom("analyticsDaily").selectAll().where("pageId", "in", pageIds).execute(),
       ])
-    : [[], [], [], [], [], [], [], [], [], [], [], [], []] as const;
+    : [[], [], [], [], [], [], [], [], [], [], []] as const;
 
   const componentIds = components.map((component) => component.id);
   const incidentIds = incidents.map((incident) => incident.id);
@@ -84,8 +82,6 @@ async function buildOrganizationExport(orgId: string) {
     incidents,
     incidentUpdates,
     incidentComponents,
-    templateGroups,
-    incidentTemplates: templates,
     subscribers,
     metrics,
     metricPoints,

@@ -27,9 +27,9 @@ export function PageSurfaceLayout({
   const tablet = new Map(pageGridPlacements(design, surface, "tablet").map((placement) => [placement.blockId, placement]));
   const mobile = new Map(pageGridPlacements(design, surface, "mobile").map((placement) => [placement.blockId, placement]));
   return (
-    <main className={`${contentWidthClass(design)} mx-auto w-full flex-1 px-4 py-8 sm:py-12`}>
+    <main className={`public-ops-main ${contentWidthClass(design)} mx-auto w-full flex-1 px-4 py-8 sm:py-12`}>
       {intro}
-      <div className="page-responsive-grid">
+      <div className="public-ops-grid page-responsive-grid">
         {gridBlocks.map((block) => {
           const desktopPlacement = desktop.get(block.id);
           const tabletPlacement = tablet.get(block.id);
@@ -44,7 +44,7 @@ export function PageSurfaceLayout({
             "--grid-mobile-order": mobilePlacement.order,
           } as CSSProperties;
           return (
-            <div key={block.id} data-page-block={block.type} className="page-responsive-grid-item" style={style}>
+            <div key={block.id} data-page-block={block.type} className="public-ops-block page-responsive-grid-item" style={style}>
               {block.hidden ? null : renderBlock(block)}
             </div>
           );

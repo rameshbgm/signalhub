@@ -10,7 +10,6 @@ import { enqueueJobSweep, JOB_TASKS } from "@/lib/jobs";
 const MONITOR_DOWN_STATUSES = ["DEGRADED_PERFORMANCE", "PARTIAL_OUTAGE", "MAJOR_OUTAGE"] as const;
 
 const monitorInputSchema = z.object({
-  templateId: z.string().nullable().optional(),
   name: z.string().trim().min(1).max(200),
   type: z.enum(MONITOR_TYPES),
   componentId: z.string().nullable(),
@@ -77,12 +76,6 @@ export async function createPreparedMonitor(
       .where("id", "=", input.componentId).where("pageId", "=", page.id).executeTakeFirst();
     if (!component) throw new Error("Component not found on this page");
   }
-  if (input.templateId) {
-    const template = await transaction.selectFrom("monitorTemplates").select("id")
-      .where("id", "=", input.templateId).where("enabled", "=", true).executeTakeFirst();
-    if (!template) throw new Error("Monitor template not found");
-  }
-
   const metric = input.actionRecordMetric
     ? await transaction.insertInto("metrics").values({
         pageId: page.id,
@@ -98,7 +91,6 @@ export async function createPreparedMonitor(
   const heartbeatToken = input.type === "HEARTBEAT" ? generateAutomationToken() : null;
   const monitor = await transaction.insertInto("monitors").values({
     pageId: page.id,
-    templateId: input.templateId ?? null,
     componentId: input.componentId,
     name: input.name,
     type: input.type,

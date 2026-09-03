@@ -666,7 +666,7 @@ Installation administration:
 
 | Identity | Intended scope |
 | --- | --- |
-| Organization Admin | Cross-organization operations, global users, monitor templates, provider configuration, identity connections, audit delivery, and audited organization lifecycle actions |
+| Organization Admin | Cross-organization operations, global users, provider configuration, identity connections, audit delivery, and audited organization lifecycle actions |
 
 API keys are independently scoped by capability, optional page IDs, expiration,
 and source CIDRs. Avoid using browser accounts for automation.

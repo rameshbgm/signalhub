@@ -15,10 +15,6 @@ export default async function NewMaintenancePage({ searchParams }: { searchParam
   const components = pageId
     ? await database.selectFrom("components").selectAll().where("pageId", "=", pageId).orderBy("order", "asc").execute()
     : [];
-  const templates = pageId
-    ? await database.selectFrom("incidentTemplates").selectAll().where("pageId", "=", pageId)
-      .where("kind", "=", "MAINTENANCE").where("archivedAt", "is", null).execute()
-    : [];
 
   return (
     <div className="max-w-2xl">
@@ -32,9 +28,7 @@ export default async function NewMaintenancePage({ searchParams }: { searchParam
           <MaintenanceForm
             action={createMaintenance}
             pageId={pageId}
-            pageName={pages.find((page) => page.id === pageId)?.name ?? "Status page"}
             components={components}
-            templates={templates}
           />
         )}
       </div>

@@ -166,26 +166,6 @@ export const HELP_CATEGORIES: HelpCategory[] = [
           },
         ],
       },
-      {
-        slug: "templates",
-        title: "Templates",
-        summary: "Reusable incident/maintenance boilerplate so you're not retyping the same message every time.",
-        body: [
-          {
-            heading: "Why use templates",
-            paragraphs: [
-              "If you frequently see the same kind of incident (e.g. 'Elevated error rates on X'), save it as a template: default status, impact, affected components, and message body.",
-            ],
-          },
-          {
-            heading: "Creating one",
-            paragraphs: [
-              "Go to Templates → optionally create a Template Group to organize related templates → New Template with title, body (use {{component}} as a placeholder), default status/impact, and default affected components.",
-              "Templates appear in the 'Apply template' dropdown when declaring a new incident.",
-            ],
-          },
-        ],
-      },
     ],
   },
   {
@@ -301,26 +281,6 @@ export const HELP_CATEGORIES: HelpCategory[] = [
             paragraphs: [
               "Linking a component lets monitor state participate in effective component status. Incidents, maintenance, manual status, and other monitors are reconciled together, so recovery from one source does not incorrectly clear another active outage.",
               "Use Check on next poll for validation, inspect recent check history and latency, then enable automated actions only after thresholds behave as expected.",
-            ],
-          },
-        ],
-      },
-      {
-        slug: "third-party",
-        title: "Monitor Templates",
-        summary: "Start a real worker-backed check from a curated, editable monitor configuration.",
-        body: [
-          {
-            heading: "Why use a template",
-            paragraphs: [
-              "If your service depends on a provider with a stable public status endpoint, add its template to create a component and enabled availability monitor together.",
-              "Templates are deliberately curated. Providers without a stable check endpoint are omitted instead of pretending to monitor them.",
-            ],
-          },
-          {
-            heading: "Adding one",
-            paragraphs: [
-              "Create the component on its page, then use Monitors to configure its target, interval, assertions, thresholds, and automated actions.",
             ],
           },
         ],
@@ -691,13 +651,12 @@ export const HELP_CATEGORIES: HelpCategory[] = [
       {
         slug: "platform-configuration",
         title: "Platform configuration and governance",
-        summary: "Configure providers, monitor templates, security defaults, and review platform-wide audit evidence.",
+        summary: "Configure providers, security defaults, and review platform-wide audit evidence.",
         body: [
           {
             heading: "Configuration",
             paragraphs: [
               "Enable only notification and identity providers that are actually configured. Provider readiness in the organization console reflects these platform settings and the required runtime services.",
-              "Curated monitor templates should point to stable, documented targets. Exclude providers that cannot be checked truthfully rather than shipping a misleading template.",
             ],
           },
           {

@@ -3,35 +3,17 @@
 import { useState } from "react";
 import { FluentSelect } from "@/components/FluentSelect";
 import { COMPONENT_STATUSES, COMPONENT_STATUS_LABEL, INCIDENT_STATUSES, INCIDENT_STATUS_LABEL, IMPACTS, IMPACT_LABEL } from "@/lib/status";
-import {
-  communicationTemplateValues,
-  renderCommunicationTemplate,
-  templateNotifyByDefault,
-} from "@/components/admin/IncidentCommunicationForms";
 
 type Component = { id: string; name: string };
-type Template = {
-  id: string;
-  title: string;
-  body: string;
-  defaultStatus: string;
-  defaultImpact: string;
-  defaultComponentIds: string[];
-  notifyByDefault?: boolean;
-};
 
 export function IncidentForm({
   action,
   pageId,
-  pageName,
   components,
-  templates,
 }: {
   action: (formData: FormData) => void;
   pageId: string;
-  pageName: string;
   components: Component[];
-  templates: Template[];
 }) {
   const [name, setName] = useState("");
   const [body, setBody] = useState("");
@@ -40,58 +22,9 @@ export function IncidentForm({
   const [selected, setSelected] = useState<Record<string, string>>({});
   const [notify, setNotify] = useState(true);
 
-  function applyTemplate(t: Template) {
-    const ids = t.defaultComponentIds.filter((id) =>
-      components.some((component) => component.id === id)
-    );
-    const next: Record<string, string> = {};
-    ids.forEach((id) => (next[id] = "MAJOR_OUTAGE"));
-    const componentNames = components
-      .filter((component) => ids.includes(component.id))
-      .map((component) => component.name);
-    const baseValues = communicationTemplateValues({
-      incidentName: t.title,
-      pageName,
-      componentNames,
-      status: t.defaultStatus,
-      impact: t.defaultImpact,
-    });
-    const nextName = renderCommunicationTemplate(t.title, baseValues);
-
-    setName(nextName);
-    setBody(
-      renderCommunicationTemplate(t.body, {
-        ...baseValues,
-        incident: nextName,
-      })
-    );
-    setStatus(t.defaultStatus);
-    setImpact(t.defaultImpact);
-    setSelected(next);
-    setNotify(templateNotifyByDefault(t));
-  }
-
   return (
     <form action={action} className="space-y-4">
       <input type="hidden" name="pageId" value={pageId} />
-
-      {templates.length > 0 && (
-        <div>
-          <p className="text-xs text-[var(--fg-dim)] mb-1">Use a template:</p>
-          <div className="flex flex-wrap gap-2">
-            {templates.map((t) => (
-              <button
-                key={t.id}
-                type="button"
-                onClick={() => applyTemplate(t)}
-                className="text-xs bg-[var(--surface-raised)] border border-[var(--line)] hover:border-[var(--line-bright)] text-[var(--fg-soft)] px-3 py-1"
-              >
-                {t.title}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
 
       <label className="block text-sm">
         <span className="text-xs text-[var(--fg-dim)] block mb-1">Incident name</span>

@@ -88,7 +88,7 @@ export function SubscribeModal({
           setOpen(true);
           recordPublicEvent(pageSlug, "SUBSCRIPTION_START");
         }}
-        className="inline-flex items-center gap-2 px-4 py-2.5 text-[var(--bg)] text-sm font-medium hover:opacity-90 transition-opacity"
+        className="public-subscribe-trigger inline-flex items-center gap-2 px-4 py-2.5 text-[var(--bg)] text-sm font-medium hover:opacity-90 transition-opacity"
         style={{ backgroundColor: brandColor }}
         aria-haspopup="dialog"
       >
@@ -99,7 +99,7 @@ export function SubscribeModal({
       </button>
       {open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onMouseDown={(event) => event.target === event.currentTarget && close()}>
-          <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="subscribe-title" className="w-full max-w-md border border-[var(--line-bright)] bg-[var(--surface)] p-6 shadow-xl">
+          <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="subscribe-title" className="public-subscribe-dialog w-full max-w-md border border-[var(--line-bright)] bg-[var(--surface)] p-6 shadow-xl">
             <div className="mb-5 flex items-center justify-between">
               <h3 id="subscribe-title" className="font-mono text-lg font-semibold text-[var(--fg)]">Get notified</h3>
               <button onClick={close} className="p-1 text-[var(--fg-dim)] hover:bg-[var(--surface-raised)] hover:text-[var(--fg)]" aria-label="Close subscription dialog">×</button>

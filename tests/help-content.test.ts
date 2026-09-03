@@ -9,10 +9,10 @@ describe("help center coverage", () => {
     }
   });
 
-  it("covers operator, designer, developer, security, and platform workflows", () => {
+  it("covers operator, public-page, developer, security, and platform workflows", () => {
     const searchable = JSON.stringify(HELP_CATEGORIES).toLowerCase();
     for (const term of [
-      "designer, saving, and versions",
+      "appearance and publishing",
       "component status automation",
       "notifications and destinations",
       "monitors",

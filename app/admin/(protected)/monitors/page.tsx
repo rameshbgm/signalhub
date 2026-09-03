@@ -2,7 +2,7 @@ import { requireSession } from "@/lib/require-session";
 import { sql } from "kysely";
 import { FluentSelect } from "@/components/FluentSelect";
 import { database } from "@/lib/postgres/client";
-import { addMonitorTemplate, removeMonitorTemplate, toggleMonitorEnabled, deleteMonitor, runMonitorNow, updateMonitor } from "./actions";
+import { toggleMonitorEnabled, deleteMonitor, runMonitorNow, updateMonitor } from "./actions";
 import { PageSelect } from "@/components/admin/PageSelect";
 import { HeartbeatTokenManager } from "@/components/admin/HeartbeatTokenManager";
 import { getScopedPages, sessionHasCapability } from "@/lib/admin-guard";
@@ -25,11 +25,6 @@ export default async function MonitorsPage({ searchParams }: { searchParams: Pro
 
   const monitors = await database.selectFrom("monitors").selectAll()
     .where("pageId", "=", pageId).orderBy("createdAt", "desc").execute();
-  const templates = await database.selectFrom("monitorTemplates").selectAll()
-    .where("enabled", "=", true).orderBy("category").orderBy("name").execute();
-  const attachedByTemplate = new Map<string, (typeof monitors)[number]>(
-    monitors.filter((monitor) => monitor.templateId).map((monitor) => [String(monitor.templateId), monitor])
-  );
   const monitorIds = monitors.map((monitor) => monitor.id);
   const rankedChecks = database.selectFrom("monitorChecks").selectAll()
     .select(sql<number>`row_number() over (partition by monitor_id order by checked_at desc)`.as("rank"))
@@ -71,46 +66,9 @@ export default async function MonitorsPage({ searchParams }: { searchParams: Pro
         </div>
       )}
 
-      <section className="space-y-3 border border-[var(--line)] bg-[var(--surface)] p-4">
-        <div>
-          <h2 className="font-mono text-base font-semibold text-[var(--fg)]">Global monitor templates</h2>
-          <p className="mt-1 text-sm text-[var(--fg-soft)]">The platform catalog is the read-only master. Add a monitor to show it on this page, or remove it without changing the global template.</p>
-        </div>
-        <div className="grid gap-3 lg:grid-cols-2">
-          {templates.map((template) => {
-            const attached = attachedByTemplate.get(template.id);
-            return (
-              <article key={template.id} className="border border-[var(--line)] bg-[var(--bg)] p-3">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <h3 className="font-semibold text-[var(--fg)]">{template.name}</h3>
-                    <p className="mt-1 text-xs text-[var(--fg-dim)]">{template.category} · {template.type}</p>
-                    <p className="mt-2 text-xs text-[var(--fg-soft)]">{template.description}</p>
-                  </div>
-                  <span className={`shrink-0 px-2 py-1 font-mono text-[10px] uppercase ${attached ? "bg-[var(--green-soft)] text-[var(--green)]" : "bg-[var(--surface-raised)] text-[var(--fg-dim)]"}`}>{attached ? "Shown" : "Available"}</span>
-                </div>
-                {canManage && (attached ? (
-                  <form action={removeMonitorTemplate.bind(null, attached.id)} className="mt-3">
-                    <button className="border border-[var(--red)]/30 px-3 py-1.5 text-xs font-semibold text-[var(--red)] hover:bg-[var(--red-soft)]">Remove from page</button>
-                  </form>
-                ) : (
-                  <form action={addMonitorTemplate.bind(null, pageId, template.id)} className="mt-3 flex flex-col gap-2 sm:flex-row">
-                    <FluentSelect name="componentId" aria-label={`Component for ${template.name}`} className="min-w-0 flex-1 border border-[var(--line)] bg-[var(--surface)] px-2 py-1.5 text-xs">
-                      <option value="">Page-wide monitor</option>
-                      {components.map((component) => <option key={component.id} value={component.id}>{component.name}</option>)}
-                    </FluentSelect>
-                    <button className="bg-[var(--cyan)] px-3 py-1.5 text-xs font-semibold text-[var(--on-cyan)]">Add to page</button>
-                  </form>
-                ))}
-              </article>
-            );
-          })}
-        </div>
-      </section>
-
       {!canManage && (
         <div className="border border-[var(--line)] bg-[var(--surface)] p-3 text-sm text-[var(--fg-soft)]">
-          Read-only monitor access. A responder or administrator can add or remove global monitors.
+          Read-only monitor access. A responder or administrator can manage monitors.
         </div>
       )}
 
@@ -135,7 +93,6 @@ export default async function MonitorsPage({ searchParams }: { searchParams: Pro
                     {m.port ? `:${m.port}` : ""}
                   </span>
                   <span className={`ml-2 px-1.5 py-0.5 text-xs uppercase tracking-wide ${statusColor}`}>{statusLabel}</span>
-                  {m.templateId && <span className="ml-2 bg-[var(--cyan-soft)] px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-[var(--cyan)]">Global master</span>}
                   {m.componentId && (
                     <span className="ml-2 text-xs text-[var(--fg-dim)]">→ {componentsById.get(m.componentId) ?? "unknown component"}</span>
                   )}
@@ -144,12 +101,8 @@ export default async function MonitorsPage({ searchParams }: { searchParams: Pro
                   <form action={runMonitorNow.bind(null, m.id)}>
                     <button className="border border-[var(--cyan)]/30 px-2.5 py-1 text-xs font-semibold text-[var(--cyan)] transition-colors hover:bg-[var(--cyan-soft)]">Check on next poll</button>
                   </form>
-                  {m.templateId ? (
-                    <form action={removeMonitorTemplate.bind(null, m.id)}><button className="border border-[var(--red)]/30 px-2.5 py-1 text-xs font-semibold text-[var(--red)] hover:bg-[var(--red-soft)]">Remove from page</button></form>
-                  ) : <>
-                    <form action={toggleMonitorEnabled.bind(null, m.id)}><button className="border border-[var(--cyan)]/30 px-2.5 py-1 text-xs font-semibold text-[var(--cyan)] transition-colors hover:bg-[var(--cyan-soft)]">{m.enabled ? "Disable" : "Enable"}</button></form>
-                    <form action={deleteMonitor.bind(null, m.id)}><button className="border border-[var(--red)]/30 px-2.5 py-1 text-xs font-semibold text-[var(--red)] transition-colors hover:bg-[var(--red-soft)]">Delete</button></form>
-                  </>}
+                  <form action={toggleMonitorEnabled.bind(null, m.id)}><button className="border border-[var(--cyan)]/30 px-2.5 py-1 text-xs font-semibold text-[var(--cyan)] transition-colors hover:bg-[var(--cyan-soft)]">{m.enabled ? "Disable" : "Enable"}</button></form>
+                  <form action={deleteMonitor.bind(null, m.id)}><button className="border border-[var(--red)]/30 px-2.5 py-1 text-xs font-semibold text-[var(--red)] transition-colors hover:bg-[var(--red-soft)]">Delete</button></form>
                 </div>}
               </div>
               <p className="mt-2 text-xs text-[var(--fg-dim)]">
@@ -165,7 +118,7 @@ export default async function MonitorsPage({ searchParams }: { searchParams: Pro
                 </p>
               )}
               {m.type === "HEARTBEAT" && canManage && <HeartbeatTokenManager monitorId={m.id} />}
-              {canManage && !m.templateId && (
+              {canManage && (
                 <details className="mt-3 border-t border-[var(--line)] pt-3">
                   <summary className="cursor-pointer text-xs font-medium text-[var(--fg-soft)]">
                     Edit monitor

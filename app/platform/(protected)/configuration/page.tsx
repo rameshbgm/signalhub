@@ -91,7 +91,6 @@ export default async function PlatformConfigurationPage() {
       </section>
 
       <section className="grid gap-3 md:grid-cols-3">
-        <ManagementLink href="/organization/platform/templates" title="Monitor templates" detail="Define installation-wide monitor blueprints for tenant teams." />
         <ManagementLink href="/organization/platform/identity" title="Identity and provisioning" detail="Manage OIDC, SAML, SCIM, and enterprise authentication policy." />
         <ManagementLink href="/organization/platform/operations" title="Operations" detail="Inspect workers, delivery queues, migrations, and retention defaults." />
       </section>

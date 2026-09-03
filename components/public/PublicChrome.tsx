@@ -93,14 +93,14 @@ export function PublicHeader({
     )
   ) : null;
   const nav = (
-    <div className={`flex flex-1 items-center gap-4 text-sm font-medium ${headerVariant === "CENTERED" ? "justify-center text-center flex-wrap" : ""}`}>
+    <div className={`status-public-nav flex flex-1 items-center gap-4 text-sm font-medium ${headerVariant === "CENTERED" ? "justify-center text-center flex-wrap" : ""}`}>
       {visibleItems.map((item) => {
         if (item.type === "LOGO") {
           return effectiveLogoUrl ? (
             <Image key={item.id} unoptimized src={effectiveLogoUrl} alt={name} width={160} height={40} sizes="(max-width: 639px) 128px, 176px" className="max-h-10 w-auto max-w-32 object-contain object-left sm:max-w-44" />
           ) : null;
         }
-        if (item.type === "TITLE") return <span key={item.id} className="font-mono font-semibold text-lg text-[var(--fg)]">{name}</span>;
+        if (item.type === "TITLE") return <span key={item.id} className="status-public-title font-mono font-semibold text-lg text-[var(--fg)]">{name}</span>;
         if (item.type === "HUB_LINK" && hubSlug) return <Link key={item.id} href={`/hub/${hubSlug}`} className="hover:opacity-80">All Products</Link>;
         if (item.type === "NAVIGATION") {
           return (
@@ -119,7 +119,7 @@ export function PublicHeader({
   if (headerVariant === "MINIMAL") {
     return (
       <>
-        <header className="border-b-2 bg-[var(--surface)]" style={{ borderColor: design?.theme.palette.brand ?? brandColor ?? "var(--cyan)" }}>
+        <header className="status-public-header status-public-header--minimal border-b-2 bg-[var(--surface)]" style={{ borderColor: design?.theme.palette.brand ?? brandColor ?? "var(--cyan)" }}>
           <div className={`${design ? contentWidthClass(design) : "max-w-4xl"} mx-auto px-4 sm:px-6 py-3 flex items-center gap-4 text-[var(--fg-soft)]`}>
             {nav}
           </div>
@@ -132,7 +132,7 @@ export function PublicHeader({
   if (headerVariant === "HERO") {
     if (effectiveCoverImageUrl && showCompleteCover) {
       return (
-        <header className="relative overflow-hidden border-b border-[var(--line)] bg-[var(--bg)]">
+        <header className="status-public-header status-public-header--hero relative overflow-hidden border-b border-[var(--line)] bg-[var(--bg)]">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={effectiveCoverImageUrl} alt="" aria-hidden="true" className="absolute inset-0 h-full w-full scale-105 object-cover opacity-25 blur-lg" />
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -149,7 +149,7 @@ export function PublicHeader({
 
     return (
       <header
-        className="relative grain overflow-hidden border-b border-[var(--line)] bg-[var(--bg)]"
+        className="status-public-header status-public-header--hero relative grain overflow-hidden border-b border-[var(--line)] bg-[var(--bg)]"
         style={effectiveCoverImageUrl ? coverImageStyle(
           effectiveCoverImageUrl,
           {
@@ -174,7 +174,7 @@ export function PublicHeader({
   if (headerVariant === "CENTERED") {
     return (
       <>
-        <header className={`border-b border-[var(--line)] bg-[var(--surface)] ${header?.sticky ? "sticky top-0 z-30" : ""}`}>
+        <header className={`status-public-header status-public-header--centered border-b border-[var(--line)] bg-[var(--surface)] ${header?.sticky ? "sticky top-0 z-30" : ""}`}>
           <div className={`${design ? contentWidthClass(design) : "max-w-4xl"} mx-auto flex items-center justify-center px-4 py-7 text-[var(--fg-soft)] sm:px-6`}>
             {nav}
           </div>
@@ -186,7 +186,7 @@ export function PublicHeader({
 
   return (
     <>
-      <header className={`border-b border-[var(--line)] bg-[var(--surface)]/90 backdrop-blur-sm z-30 ${header?.sticky ? "sticky top-0" : ""}`}>
+      <header className={`status-public-header border-b border-[var(--line)] bg-[var(--surface)]/90 backdrop-blur-sm z-30 ${header?.sticky ? "sticky top-0" : ""}`}>
         <div className={`${design ? contentWidthClass(design) : "max-w-4xl"} mx-auto px-4 sm:px-6 py-4 flex items-center gap-5 text-[var(--fg-soft)]`}>
           {nav}
         </div>
@@ -213,7 +213,7 @@ export function PublicFooter({
   const safePrivacyUrl = safeUrl(privacyUrl);
   const safeSupportUrl = safeUrl(supportUrl);
   return (
-    <footer className="border-t border-[var(--line)] mt-16 py-8 text-sm text-[var(--fg-dim)]">
+    <footer className="status-public-footer border-t border-[var(--line)] mt-16 py-8 text-sm text-[var(--fg-dim)]">
       <div className={`${design ? contentWidthClass(design) : "max-w-4xl"} mx-auto px-4 sm:px-6 flex flex-wrap items-center justify-between gap-5`}>
         {design?.chrome.footer.items.filter((item) => !item.hidden).map((item) => {
           if (item.type === "CUSTOM_TEXT" && design.chrome.footer.customText) return <span key={item.id}>{design.chrome.footer.customText}</span>;

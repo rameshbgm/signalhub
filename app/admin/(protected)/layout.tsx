@@ -19,7 +19,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const organizations = userOrganizations;
 
   const sidebar = (
-      <aside className="flex h-full w-full shrink-0 flex-col bg-[var(--surface)] lg:sticky lg:top-0 lg:h-screen lg:w-64 lg:border-r lg:border-[var(--line)]">
+      <aside className="dispatch-command-deck">
         <OrgSwitcher
           orgId={org.id}
           orgName={org.name}
@@ -28,9 +28,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           canConfigurePages={capabilities.includes("page.configure")}
         />
         <AdminNav capabilities={capabilities} />
-        <div className="hidden border-t border-[var(--line)] p-3 lg:block">
-          <div className="flex min-w-0 items-center gap-2.5 px-2 py-2">
-            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--surface-raised)] font-mono text-xs font-semibold text-[var(--fg)]">
+        <div className="dispatch-operator">
+          <div className="flex min-w-0 items-center gap-2.5">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center border border-[var(--line-bright)] bg-[var(--surface-raised)] font-mono text-xs font-semibold text-[var(--fg)]">
               {session.name.slice(0, 1).toUpperCase()}
             </span>
             <div className="min-w-0">

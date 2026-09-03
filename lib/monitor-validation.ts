@@ -73,8 +73,8 @@ export function monitorNetworkHostname(configuration: MonitorConfiguration) {
 }
 
 /**
- * Applies the type-specific invariants shared by monitor creation and global
- * monitor templates. Network resolution is intentionally handled separately.
+ * Applies the type-specific invariants shared by monitor creation paths.
+ * Network resolution is intentionally handled separately.
  */
 export function normalizeMonitorConfiguration<T extends MonitorConfiguration>(
   configuration: T

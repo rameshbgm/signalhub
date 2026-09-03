@@ -3,9 +3,6 @@ import { describe, expect, it } from "vitest";
 process.env.DATABASE_URL ??= "postgresql://signalhub:signalhub@127.0.0.1:5432/status_unit_tests";
 
 const maintenance = await import("../lib/domain/maintenance");
-const communications = await import(
-  "../components/admin/IncidentCommunicationForms"
-);
 
 describe("maintenance reminder eligibility", () => {
   const now = new Date("2026-07-25T04:00:00.000Z");
@@ -62,36 +59,6 @@ describe("maintenance reminder eligibility", () => {
         { ...scheduled, maintenanceStatus: "IN_PROGRESS" },
         now
       )
-    ).toBe(false);
-  });
-});
-
-describe("incident lifecycle communication templates", () => {
-  it("renders shared variables and preserves unknown placeholders", () => {
-    const values = communications.communicationTemplateValues({
-      incidentName: "Database maintenance",
-      pageName: "Acme Status",
-      componentNames: ["Primary database", "API"],
-      status: "SCHEDULED",
-      impact: "NONE",
-    });
-    expect(
-      communications.renderCommunicationTemplate(
-        "{{maintenance}} on {{page}} affects {{components}} ({{status}}/{{impact}}) {{owner}}",
-        values
-      )
-    ).toBe(
-      "Database maintenance on Acme Status affects Primary database, API (SCHEDULED/NONE) {{owner}}"
-    );
-  });
-
-  it("honors explicit notify defaults and defaults legacy templates to notify", () => {
-    expect(communications.templateNotifyByDefault({})).toBe(true);
-    expect(
-      communications.templateNotifyByDefault({ notifyByDefault: true })
-    ).toBe(true);
-    expect(
-      communications.templateNotifyByDefault({ notifyByDefault: false })
     ).toBe(false);
   });
 });

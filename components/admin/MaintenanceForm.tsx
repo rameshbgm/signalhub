@@ -1,14 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import {
-  communicationTemplateValues,
-  renderCommunicationTemplate,
-  templateNotifyByDefault,
-} from "@/components/admin/IncidentCommunicationForms";
 
 type Component = { id: string; name: string };
-type Template = { id: string; title: string; body: string; defaultComponentIds: string[]; notifyByDefault?: boolean };
 
 function defaultDateTime(offsetHours: number) {
   const d = new Date(Date.now() + offsetHours * 3600 * 1000);
@@ -19,15 +13,11 @@ function defaultDateTime(offsetHours: number) {
 export function MaintenanceForm({
   action,
   pageId,
-  pageName,
   components,
-  templates = [],
 }: {
   action: (formData: FormData) => void;
   pageId: string;
-  pageName: string;
   components: Component[];
-  templates?: Template[];
 }) {
   const [selected, setSelected] = useState<string[]>([]);
   const [name, setName] = useState("");
@@ -35,49 +25,9 @@ export function MaintenanceForm({
   const [notify, setNotify] = useState(true);
   const [sendReminder, setSendReminder] = useState(true);
 
-  function applyTemplate(template: Template) {
-    const componentIds = template.defaultComponentIds.filter((id) =>
-      components.some((component) => component.id === id)
-    );
-    const componentNames = components
-      .filter((component) => componentIds.includes(component.id))
-      .map((component) => component.name);
-    const baseValues = communicationTemplateValues({
-      incidentName: template.title,
-      pageName,
-      componentNames,
-      status: "SCHEDULED",
-      impact: "NONE",
-    });
-    const nextName = renderCommunicationTemplate(template.title, baseValues);
-
-    setName(nextName);
-    setBody(
-      renderCommunicationTemplate(template.body, {
-        ...baseValues,
-        incident: nextName,
-        maintenance: nextName,
-      })
-    );
-    setNotify(templateNotifyByDefault(template));
-    setSelected(componentIds);
-  }
-
   return (
     <form action={action} className="space-y-4">
       <input type="hidden" name="pageId" value={pageId} />
-      {templates.length > 0 && (
-        <div>
-          <p className="mb-1 text-xs text-[var(--fg-dim)]">Apply a maintenance template</p>
-          <div className="flex flex-wrap gap-2">
-            {templates.map((template) => (
-              <button key={template.id} type="button" onClick={() => applyTemplate(template)} className="border border-[var(--line)] bg-[var(--surface-raised)] px-3 py-1 text-xs">
-                {template.title}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
       <label className="block text-sm">
         <span className="text-xs text-[var(--fg-dim)] block mb-1">Title</span>
         <input

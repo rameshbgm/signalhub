@@ -54,7 +54,6 @@ The public project landing page is [signalhub.at](https://signalhub.at).
 
 - Investigating → Identified → Monitoring → Resolved lifecycle.
 - Severity, impact, affected-component, and subscriber communication workflows.
-- Incident templates and organization-independent platform monitor templates.
 - Scheduled maintenance with lifecycle automation.
 - Durable email, Slack, Teams, and signed webhook delivery.
 - Retry leases, delivery history, and dead-letter visibility.
@@ -76,8 +75,7 @@ The public project landing page is [signalhub.at](https://signalhub.at).
 - Organization provisioning, suspension, reactivation, and retryable purge.
 - Emergency global-user disable and audited support sessions.
 - View-only or explicitly scoped operate-mode support access.
-- Global templates, lifecycle jobs, diagnostics, retention defaults, and
-  platform audit.
+- Lifecycle jobs, diagnostics, retention defaults, and platform audit.
 - Administrator safeguards for destructive and installation-wide workflows.
 
 ### Enterprise identity
@@ -166,7 +164,7 @@ Installation administration:
 
 | Identity | Core scope |
 | --- | --- |
-| Organization Admin | Organizations, global users, operations, templates, configuration, identity, and platform audit under `/organization/platform` |
+| Organization Admin | Organizations, global users, operations, configuration, identity, and platform audit under `/organization/platform` |
 
 API credentials are separate from human sessions and can be restricted by
 capability, page, expiration, and source CIDR.

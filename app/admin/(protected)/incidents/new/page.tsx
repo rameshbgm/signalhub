@@ -15,10 +15,6 @@ export default async function NewIncidentPage({ searchParams }: { searchParams: 
   const components = pageId
     ? await database.selectFrom("components").selectAll().where("pageId", "=", pageId).orderBy("order", "asc").execute()
     : [];
-  const templates = pageId
-    ? await database.selectFrom("incidentTemplates").selectAll().where("pageId", "=", pageId)
-      .where("archivedAt", "is", null).where("kind", "=", "INCIDENT").execute()
-    : [];
 
   return (
     <div className="max-w-2xl">
@@ -32,9 +28,7 @@ export default async function NewIncidentPage({ searchParams }: { searchParams: 
           <IncidentForm
             action={createIncident}
             pageId={pageId}
-            pageName={pages.find((page) => page.id === pageId)?.name ?? "Status page"}
             components={components}
-            templates={templates}
           />
         )}
       </div>

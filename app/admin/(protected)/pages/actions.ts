@@ -121,7 +121,7 @@ export async function createPage(formData: FormData) {
       const component = await transaction.insertInto("components").values({
         pageId: page.id,
         groupId: null,
-        name: "Service (example)",
+        name: "Service",
         description: "",
         status: "OPERATIONAL",
         order: 0,
@@ -321,46 +321,19 @@ export async function updateEmailCustomization(pageId: string, formData: FormDat
   revalidatePath(`/organization/pages/${pageId}/your-page/customize/emails`);
 }
 
-export async function deletePage(pageId: string) {
+export async function deletePage(pageId: string, formData: FormData) {
   const session = await requireCapability("page.configure", pageId);
-  await withTransaction(async (transaction) => {
-    await fenceActiveOrganizationMutation(session.orgId, transaction);
-    const now = new Date();
-    const changed = await transaction.updateTable("pages").set({ deletedAt: now, deletedBy: session.userId })
-      .where("id", "=", pageId).where("orgId", "=", session.orgId).where("deletedAt", "is", null)
-      .returning("id").executeTakeFirst();
-    if (!changed) throw new Error("Page is already deleted or unavailable");
-    await audit(transaction, session, "SOFT_DELETE_PAGE", pageId);
-  });
-  revalidatePath("/organization/pages");
-  revalidatePath("/organization/pages/deleted");
-  redirect("/organization/pages");
-}
-
-export async function restorePage(pageId: string) {
-  const session = await requireCapability("page.configure");
-  await withTransaction(async (transaction) => {
-    await fenceActiveOrganizationMutation(session.orgId, transaction);
-    const changed = await transaction.updateTable("pages").set({ deletedAt: null, deletedBy: null })
-      .where("id", "=", pageId).where("orgId", "=", session.orgId).where("deletedAt", "is not", null)
-      .returning("id").executeTakeFirst();
-    if (!changed) throw new Error("Deleted page not found");
-    await audit(transaction, session, "RESTORE_PAGE", pageId);
-  });
-  revalidatePath("/organization/pages");
-  revalidatePath("/organization/pages/deleted");
-}
-
-export async function permanentlyDeletePage(pageId: string) {
-  const session = await requireCapability("page.configure");
+  const page = await assertPageInOrg(pageId, session.orgId);
+  if (String(formData.get("confirmation") ?? "").trim() !== page.name) {
+    throw new Error("Type the exact page name to permanently delete it");
+  }
   await deletePageCascade(pageId, session.orgId, {
-    requireSoftDeleted: true,
     afterDelete: async (transaction) => {
-      await audit(transaction, session, "PERMANENTLY_DELETE_PAGE", pageId);
+      await audit(transaction, session, "DELETE_PAGE", pageId);
     },
   });
   revalidatePath("/organization/pages");
-  revalidatePath("/organization/pages/deleted");
+  redirect("/organization/pages");
 }
 
 export async function updatePrivatePagePassword(pageId: string, formData: FormData) {

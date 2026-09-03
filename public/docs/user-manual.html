@@ -171,7 +171,7 @@
         <h3>Before production use</h3>
         <div class="grid">
           <section class="card"><h3>People</h3><ul><li>Assign Admin, incident, responder, and viewer responsibilities.</li><li>Define who may publish customer communication.</li><li>Keep a tested local Admin recovery path.</li></ul></section>
-          <section class="card"><h3>Content</h3><ul><li>Name services in customer language.</li><li>Prepare incident and maintenance templates.</li><li>Agree on severity, impact, and update cadence.</li></ul></section>
+          <section class="card"><h3>Content</h3><ul><li>Name services in customer language.</li><li>Prepare clear incident and maintenance messages.</li><li>Agree on severity, impact, and update cadence.</li></ul></section>
           <section class="card"><h3>Delivery</h3><ul><li>Verify SMTP and optional SMS.</li><li>Test Slack, Teams, and signed webhooks.</li><li>Confirm the worker is ready before relying on delivery.</li></ul></section>
           <section class="card"><h3>Recovery</h3><ul><li>Back up PostgreSQL and assets.</li><li>Restore into an isolated environment.</li><li>Monitor SignalHub from outside its primary infrastructure.</li></ul></section>
         </div>
@@ -193,7 +193,7 @@
         <div class="callout warning"><strong>Menu visibility is not the security boundary.</strong> SignalHub checks authorization in server actions and API routes. If a user can see an unexpected menu item, still report it, but do not assume hidden controls are the only protection.</div>
       </article>
 
-      <article id="menus" data-search="menu dashboard pages deleted analytics audit help incidents maintenance templates subscribers destinations metrics monitors embed api keys security users settings platform">
+      <article id="menus" data-search="menu dashboard pages analytics audit help incidents maintenance subscribers destinations metrics monitors embed api keys security users settings platform">
         <p class="kicker">03 · Menu reference</p>
         <h2>What every organization menu is for</h2>
         <table>
@@ -201,18 +201,15 @@
           <tbody>
             <tr><td>Overview · Dashboard</td><td>Start and end an operator shift; review active incidents, scheduled maintenance, worker state, and page readiness.</td><td>Open the item needing attention.</td></tr>
             <tr><td>Overview · Pages</td><td>Create, publish, group, and manage public, private, audience, and hub experiences.</td><td>Create page; continue setup; view public output.</td></tr>
-            <tr><td>Overview · Deleted Pages</td><td>Review soft-deleted pages before their lifecycle ends.</td><td>Restore or follow the approved deletion process.</td></tr>
             <tr><td>Overview · Analytics</td><td>Understand page visits, engagement, and subscriber activity without exposing visitor identity.</td><td>Select a page and time range.</td></tr>
             <tr><td>Overview · Help Center</td><td>Get short, signed-in help for a specific task.</td><td>Search an article; return here for the full manual.</td></tr>
             <tr><td>Incidents · Incidents</td><td>Communicate unplanned degradation or outage.</td><td>Declare, update, resolve, edit timeline, publish postmortem.</td></tr>
             <tr><td>Incidents · Maintenance</td><td>Announce planned service work.</td><td>Schedule a window and optional automatic transitions.</td></tr>
-            <tr><td>Incidents · Templates</td><td>Standardize recurring incident or maintenance messages.</td><td>Create grouped reusable content and defaults.</td></tr>
             <tr><td>Communicate · Subscribers</td><td>Review and manage verified contacts for a selected page.</td><td>Import, quarantine, export, or inspect state.</td></tr>
             <tr><td>Communicate · Destinations</td><td>Configure team channels and signed event endpoints.</td><td>Test and save Slack, Teams, or webhook destinations.</td></tr>
             <tr><td>Monitoring · Metrics</td><td>Publish numeric service indicators.</td><td>Create a metric and push data points.</td></tr>
-            <tr><td>Monitoring · Monitors</td><td>Check availability and optionally reconcile component status.</td><td>Create or attach a check; inspect history and thresholds.</td></tr>
+            <tr><td>Monitoring · Monitors</td><td>Check availability and optionally reconcile component status.</td><td>Create a check; inspect history and thresholds.</td></tr>
             <tr><td>Integrations · SignalHub Embed</td><td>Show incident state on another website.</td><td>Copy the script or badge snippet.</td></tr>
-            <tr><td>Integrations · Monitor Templates</td><td>Start from an installation-curated monitor blueprint.</td><td>Add the template to a page and review its target.</td></tr>
             <tr><td>Integrations · API Keys</td><td>Automate management actions without a browser session.</td><td>Create a scoped, expiring, CIDR-limited key.</td></tr>
             <tr><td>Organization · Security</td><td>Manage MFA, sessions, SSO, SCIM, and identity policy.</td><td>Enroll, test, rotate, or revoke.</td></tr>
             <tr><td>Organization · Users &amp; Roles</td><td>Grant or remove organization access.</td><td>Create a user; change role or page scope.</td></tr>
@@ -276,7 +273,7 @@
         <h3>Declare an incident</h3>
         <ol class="steps">
           <li>Confirm the affected customer experience. Do not wait for complete root-cause certainty before acknowledging a clear impact.</li>
-          <li>Open <strong>Incidents → New incident</strong>, choose the page, apply a template if appropriate, and enter a plain-language title.</li>
+          <li>Open <strong>Incidents → New incident</strong>, choose the page, and enter a plain-language title.</li>
           <li>Select status, severity/impact, affected services, and the first public update. State what users observe, what the team is doing, and when the next update is expected.</li>
           <li>Review whether subscriber notifications should be sent. Publish and verify the public page and delivery history.</li>
         </ol>
@@ -295,7 +292,7 @@
         <div class="callout danger"><strong>Do not use maintenance for an unplanned outage.</strong> If customers are unexpectedly affected, declare an incident even when work is already underway.</div>
       </article>
 
-      <article id="maintenance" data-search="maintenance scheduled planned window auto transition templates in progress completed duration">
+      <article id="maintenance" data-search="maintenance scheduled planned window auto transition in progress completed duration">
         <p class="kicker">06 · Maintenance</p>
         <h2>Set expectations before planned work begins</h2>
         <ol class="steps">
@@ -306,8 +303,6 @@
           <li>At start, confirm the real work matches the announced scope. If impact becomes unexpected or exceeds the plan, open an incident.</li>
           <li>At completion, verify service health and public component state before closing the window.</li>
         </ol>
-        <h3>Templates</h3>
-        <p>Use <strong>Templates</strong> for recurring work or incident patterns. A template can provide a default title/body, status, impact, and affected services. Organize related templates into groups. Review templated facts before publishing; boilerplate accelerates communication but does not replace incident-specific judgment.</p>
       </article>
 
       <article id="monitoring" data-search="monitor http keyword tcp dns ssl icmp heartbeat threshold recovery history component metric points worker check">
@@ -422,7 +417,7 @@
         <div class="callout danger"><strong>Preserve recovery access.</strong> Before enforcing SSO or changing role mappings, verify a local Admin account, MFA recovery material, canonical URL, and direct database-backed sign-in path.</div>
       </article>
 
-      <article id="platform" data-search="platform installation administration organizations global users operations jobs templates configuration identity audit purge suspend reactivate diagnostics retention">
+      <article id="platform" data-search="platform installation administration organizations global users operations jobs configuration identity audit purge suspend reactivate diagnostics retention">
         <p class="kicker">11 · Installation administration</p>
         <h2>Operate all organizations from the unified Admin console</h2>
         <p>Admins see the <strong>Platform</strong> group and use paths under <code>/organization/platform</code>. These controls have installation-wide impact and require an explicit operational reason where the workflow requests one.</p>
@@ -433,7 +428,6 @@
             <tr><td>Organizations</td><td>Provision, switch into, suspend, reactivate, and queue purge.</td><td>Suspension freezes tenant traffic/work; purge is permanent and audited.</td></tr>
             <tr><td>Global Users</td><td>Review cross-organization memberships and emergency-disable an identity.</td><td>Disable affects every organization and revokes authorization.</td></tr>
             <tr><td>Operations</td><td>Worker readiness, platform jobs, retries, delivery state, migrations, and retention.</td><td>Understand the failure before retrying; avoid duplicate external effects.</td></tr>
-            <tr><td>Monitor Templates</td><td>Maintain installation-curated monitor blueprints.</td><td>Templates must point to stable, safe, observable targets.</td></tr>
             <tr><td>Configuration</td><td>Enable destination providers and review runtime/storage capability.</td><td>Provider enablement affects what every organization can configure.</td></tr>
             <tr><td>Identity</td><td>OIDC, SAML, SCIM tokens, JIT/group mappings.</td><td>Test before enforcement; rotate tokens after exposure.</td></tr>
             <tr><td>Platform Audit</td><td>Installation-wide evidence, export, chain state, and audit sinks.</td><td>Validate sink signatures/retries and preserve evidence during retention.</td></tr>
@@ -466,7 +460,7 @@
         <h3>Each operator shift</h3>
         <ul><li>Review dashboard, active incidents, upcoming maintenance, worker readiness, queue depth, and dead letters.</li><li>Confirm external monitoring can reach public pages.</li><li>Handoff open communication commitments and next-update times.</li></ul>
         <h3>Weekly</h3>
-        <ul><li>Review failed monitors, noisy thresholds, delivery retries, certificate warnings, stale API keys, and audit anomalies.</li><li>Confirm backups completed and asset protection is healthy.</li><li>Review scheduled maintenance and templates for accuracy.</li></ul>
+        <ul><li>Review failed monitors, noisy thresholds, delivery retries, certificate warnings, stale API keys, and audit anomalies.</li><li>Confirm backups completed and asset protection is healthy.</li><li>Review scheduled maintenance and its customer-facing communications for accuracy.</li></ul>
         <h3>Monthly</h3>
         <ul><li>Review users, roles, page scopes, sessions, API keys, webhook endpoints, and identity mappings.</li><li>Patch the base image and dependencies through the organization's release process.</li><li>Verify audit chains and SIEM delivery.</li></ul>
         <h3>Quarterly</h3>

@@ -2225,3 +2225,91 @@
     display: none;
   }
 }
+
+/* Dispatch Strip Wall override: the marketing surface previews the same calm,
+   information-rich operating model as the console instead of a SaaS card grid. */
+.page {
+  --canvas: #0c1828;
+  --surface: #12243a;
+  --ink: #f3f1e9;
+  --muted: #c7d1cd;
+  --soft: #93a5a8;
+  --line: rgba(236, 241, 232, 0.2);
+  --line-strong: rgba(236, 241, 232, 0.45);
+  --blue: #d7ef4b;
+  --blue-dark: #d7ef4b;
+  --violet: #79b9ee;
+  --mint: #a5e76a;
+  --mint-dark: #a5e76a;
+  --shadow: 0 20px 45px rgba(2, 9, 17, 0.3);
+  background:
+    linear-gradient(90deg, rgba(215, 239, 75, 0.035) 1px, transparent 1px),
+    var(--canvas);
+  background-size: 88px 100%;
+}
+
+.header {
+  border-bottom-color: var(--line);
+  background: rgba(18, 36, 58, 0.94);
+  box-shadow: none;
+}
+
+.nav {
+  width: min(1440px, calc(100% - 40px));
+  height: 64px;
+  gap: 26px;
+}
+
+.brand { color: var(--ink); font-family: var(--landing-font-mono), ui-monospace, monospace; letter-spacing: -0.05em; }
+.brandMark { border-radius: 0; background: var(--blue); box-shadow: none; }
+.brandMark span { background: #132339; }
+.navLinks { gap: 23px; color: var(--muted); font-size: 12px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; }
+.navLinks a:hover, .signIn:hover { color: var(--blue); }
+.signIn { color: var(--muted); }
+.githubButton, .primaryButton, .secondaryButton { border-radius: 0; font-family: var(--landing-font-mono), ui-monospace, monospace; font-size: 12px; letter-spacing: 0.015em; }
+.githubButton { min-height: 36px; background: var(--blue); color: #132339 !important; box-shadow: none; }
+.githubButton:hover, .primaryButton:hover { transform: none; box-shadow: inset 0 -2px 0 rgba(19, 35, 57, 0.38); }
+
+.hero { min-height: 680px; background: var(--canvas); border-bottom-color: var(--line); }
+.hero::before { background-image: linear-gradient(rgba(215, 239, 75, 0.045) 1px, transparent 1px), linear-gradient(90deg, rgba(215, 239, 75, 0.045) 1px, transparent 1px); background-size: 44px 44px; mask-image: none; }
+.heroGlow { border-radius: 0; background: rgba(121, 185, 238, 0.12); filter: blur(75px); }
+.heroInner { width: min(1440px, calc(100% - 40px)); min-height: 580px; padding: 62px 0 46px; grid-template-columns: minmax(0, 0.84fr) minmax(560px, 1.16fr); gap: 52px; }
+.hero h1, .sectionIntro h2, .sectionIntroRow h2, .deployHeading h2, .ownershipSticky h2, .finalCta h2 { color: var(--ink); font-family: var(--landing-font-mono), ui-monospace, monospace; letter-spacing: -0.06em; }
+.hero h1 { max-width: 11ch; font-size: clamp(3.1rem, 5.6vw, 6.3rem); line-height: 0.91; }
+.eyebrow, .sectionKicker { color: var(--blue); font-family: var(--landing-font-mono), ui-monospace, monospace; }
+.heroLead, .sectionIntro p, .sectionAside { color: var(--muted); }
+.primaryButton { background: var(--blue); color: #132339; box-shadow: none; }
+.secondaryButton { border-color: var(--line-strong); color: var(--ink); }
+.secondaryButton:hover { border-color: var(--blue); background: rgba(215, 239, 75, 0.09); }
+.costNote { border-color: var(--line); color: var(--muted); background: rgba(18, 36, 58, 0.6); }
+.heroProof { width: min(1440px, calc(100% - 40px)); border-color: var(--line); color: var(--muted); font-family: var(--landing-font-mono), ui-monospace, monospace; font-size: 11px; }
+.heroProof svg { color: var(--blue); }
+
+.comparison, .capabilities, .deploy, .ownership { width: min(1440px, calc(100% - 40px)); }
+.comparison { padding-block: 112px; }
+.comparisonGrid, .bentoGrid, .deployGrid { gap: 1px; background: var(--line); border: 1px solid var(--line); }
+.hostedCard, .signalHubCard, .capabilityCard, .deployCard { border: 0; border-radius: 0; background: var(--surface); box-shadow: none; }
+.hostedCard:hover, .signalHubCard:hover, .capabilityCard:hover, .deployCard:hover { transform: none; box-shadow: inset 0 3px 0 var(--blue); }
+.comparisonCardHeader h3, .capabilityCard h3, .deployCard h3 { color: var(--ink); }
+.comparisonCardHeader p, .capabilityCard p, .deployCard p { color: var(--muted); }
+.comparisonBadge, .capabilityTag, .deployEyebrow { border-radius: 0; background: rgba(215, 239, 75, 0.12); color: var(--blue); }
+.iconBox, .deployIcon { border-radius: 0; background: rgba(215, 239, 75, 0.11); color: var(--blue); }
+.capabilityCard[data-accent="blue"] .iconBox, .capabilityCard[data-accent="violet"] .iconBox { background: rgba(121, 185, 238, 0.12); color: #79b9ee; }
+
+.operationsPreview, .statusConsole, .opsCard, .monitorCard, .incidentCard, .deliveryCard { border-radius: 0 !important; }
+.operationsPreview { filter: saturate(0.85) contrast(1.06); }
+.ownership { max-width: none; width: 100%; padding-inline: max(20px, calc((100vw - 1440px) / 2)); background: #07111f; }
+.ownershipInner { width: min(1440px, calc(100% - 40px)); }
+.ownershipStep { border-radius: 0; border-color: var(--line); background: var(--surface); }
+.finalCtaInner { border-radius: 0; background: var(--surface); border: 1px solid var(--line-strong); box-shadow: none; }
+.footer { background: #07111f; border-top-color: var(--line); }
+
+@media (max-width: 900px) {
+  .nav { width: min(100% - 28px, 720px); height: auto; min-height: 60px; padding-block: 10px; flex-wrap: wrap; gap: 13px; }
+  .navLinks { order: 3; width: 100%; overflow-x: auto; padding-bottom: 2px; }
+  .navActions { margin-left: auto; }
+  .githubButton { display: none; }
+  .heroInner { width: min(100% - 32px, 720px); padding-top: 55px; grid-template-columns: 1fr; }
+  .heroVisual { display: none; }
+  .heroProof, .comparison, .capabilities, .deploy { width: min(100% - 32px, 720px); }
+}

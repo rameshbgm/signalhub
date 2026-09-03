@@ -26,12 +26,12 @@ export function AdminShell({ sidebar, children }: { sidebar: ReactNode; children
   }, [navigationOpen]);
 
   return (
-    <div className={`min-h-screen bg-[var(--bg)] text-[var(--fg)] ${focusedFlow ? "block" : "lg:flex"}`}>
+    <div className={`dispatch-shell min-h-screen bg-[var(--bg)] text-[var(--fg)] ${focusedFlow ? "block" : "lg:flex"}`}>
       {!focusedFlow && (
         <>
           <header className="sticky top-0 z-40 flex h-14 items-center justify-between border-b border-[var(--line)] bg-[var(--surface)]/95 px-4 backdrop-blur lg:hidden">
-            <Link href="/organization" className="font-mono text-sm font-semibold tracking-tight text-[var(--fg)]">
-              SignalHub
+            <Link href="/organization" className="flex items-center gap-2 font-mono text-sm font-semibold tracking-tight text-[var(--fg)]">
+              <span className="inline-block h-2 w-2 bg-[var(--cyan)]" aria-hidden /> SignalHub
             </Link>
             <button
               type="button"
@@ -41,13 +41,11 @@ export function AdminShell({ sidebar, children }: { sidebar: ReactNode; children
               className="inline-flex h-10 items-center gap-2 border border-[var(--line)] px-3 font-mono text-xs font-semibold text-[var(--fg)] hover:bg-[var(--hover-overlay)]"
               onClick={() => setNavigationPath((current) => current === pathname ? null : pathname)}
             >
-              <span aria-hidden className="text-base leading-none">{navigationOpen ? "×" : "☰"}</span>
+              <span aria-hidden className="text-base leading-none">{navigationOpen ? "×" : "≡"}</span>
               Menu
             </button>
           </header>
-          <div
-            className={`${navigationOpen ? "fixed" : "hidden"} inset-0 z-50 lg:static lg:inset-auto lg:block lg:shrink-0`}
-          >
+          <div className={`${navigationOpen ? "fixed" : "hidden"} inset-0 z-50 lg:static lg:inset-auto lg:block lg:shrink-0`}>
             <button
               type="button"
               aria-label="Close navigation"
@@ -56,7 +54,7 @@ export function AdminShell({ sidebar, children }: { sidebar: ReactNode; children
             />
             <div
               id="portal-navigation"
-              className="relative h-full w-[min(20rem,calc(100vw-3rem))] bg-[var(--surface)] shadow-2xl lg:contents"
+              className="relative h-full w-[min(22rem,calc(100vw-2rem))] bg-[var(--surface)] shadow-2xl lg:contents"
             >
               <div className="flex h-14 items-center justify-between border-b border-[var(--line)] px-4 lg:hidden">
                 <span className="font-mono text-sm font-semibold">Navigation</span>
@@ -75,7 +73,7 @@ export function AdminShell({ sidebar, children }: { sidebar: ReactNode; children
         </>
       )}
       <main className="app-console-main min-w-0 flex-1 overflow-x-clip">
-        <div className={focusedFlow ? "" : "mx-auto w-full max-w-[96rem] p-4 sm:p-6 [&>*]:mx-auto"}>{children}</div>
+        <div className={focusedFlow ? "" : "mx-auto w-full max-w-[112rem] px-4 py-6 sm:px-6 lg:px-8 lg:py-9 [&>*]:mx-auto"}>{children}</div>
       </main>
     </div>
   );

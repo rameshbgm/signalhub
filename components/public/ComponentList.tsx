@@ -167,7 +167,7 @@ function ConfiguredComponentItem({
   }
 
   return (
-    <div data-component-row className={`${settings.view === "COMPACT" ? "py-2.5" : "py-4"} min-w-0 max-w-full overflow-hidden border-b border-[var(--line)] last:border-b-0`}>
+    <div data-component-row className={`public-service-row ${settings.view === "COMPACT" ? "py-2.5" : "py-4"} min-w-0 max-w-full overflow-hidden border-b border-[var(--line)] last:border-b-0`}>
       <div className="flex min-w-0 flex-wrap items-center justify-between gap-x-4 gap-y-2">
         <div className="min-w-0 flex-1">
           <span className="text-sm font-medium text-[var(--fg)]">{c.name}</span>
@@ -244,7 +244,7 @@ export function ComponentList({
   );
 
   return (
-    <div>
+    <div className="public-components">
       {settings.showSummary && (
         <div data-service-summary className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-5">
           {summaryItems.map((item) => {
@@ -299,7 +299,7 @@ export function ComponentList({
       )}
       <div data-component-list>
         {!groupingEnabled && flatComponents.length > 0 && (
-          <div className="page-panel min-w-0 overflow-hidden border border-[var(--line)] bg-[var(--surface)] px-5">
+          <div className="public-service-list page-panel min-w-0 overflow-hidden border border-[var(--line)] bg-[var(--surface)] px-5">
             {renderComponents(flatComponents)}
           </div>
         )}
@@ -311,7 +311,7 @@ export function ComponentList({
             className="space-y-4"
           >
             {configuredGroups.map((group) => (
-              <AccordionItem key={group.id} value={group.id} className="page-panel overflow-hidden border border-[var(--line)] bg-[var(--surface)]">
+              <AccordionItem key={group.id} value={group.id} className="public-service-group page-panel overflow-hidden border border-[var(--line)] bg-[var(--surface)]">
                 <AccordionHeader expandIconPosition="end" size="large" className="px-3">
                   <span className="flex w-full items-center justify-between gap-4 pr-2 text-left">
                     <span className="font-semibold text-[var(--fg)]">{group.name}</span>
@@ -330,7 +330,7 @@ export function ComponentList({
         {configuredGroups.length > 0 && settings.groupStyle !== "ACCORDION" && (
           <div className={settings.groupStyle === "CARDS" ? "grid gap-4 md:grid-cols-2" : "space-y-4"}>
             {configuredGroups.map((group) => (
-              <section key={group.id} className="page-panel min-w-0 overflow-hidden border border-[var(--line)] bg-[var(--surface)] p-5">
+              <section key={group.id} className="public-service-group page-panel min-w-0 overflow-hidden border border-[var(--line)] bg-[var(--surface)] p-5">
                 <div className="mb-4 flex items-center justify-between gap-4">
                   <h3 className="font-semibold text-[var(--fg)]">{group.name}</h3>
                   <span className="text-sm text-[var(--fg-dim)]">{group.components.length} {group.components.length === 1 ? "service" : "services"}</span>

@@ -32,9 +32,11 @@ export default async function PageSettings({ params }: { params: Promise<{ pageI
 
       <section className="border border-[var(--red)]/30 bg-[var(--surface)] p-5">
         <h2 className="font-mono font-semibold text-[var(--red)]">Delete page</h2>
-        <p className="mt-1 text-sm text-[var(--fg-dim)]">This hides the page and its data from visitors and operators. An administrator can restore it from Deleted Pages.</p>
+        <p id="delete-page-warning" className="mt-1 text-sm leading-6 text-[var(--fg-dim)]">Permanently deletes this page, its services, incidents, subscriber records, metrics, monitors, and uploaded assets. This cannot be undone.</p>
         <PlatformActionForm action={deletePage.bind(null, pageId)} successMessage="Page deleted" className="mt-4 flex max-w-lg flex-col gap-3">
-          <PlatformSubmitButton pendingLabel="Deleting…" confirmMessage={`Delete ${page.name}? An administrator can restore it from Deleted Pages.`} className="w-fit border border-[var(--red)]/40 px-4 py-2 text-sm font-semibold text-[var(--red)]">Delete page</PlatformSubmitButton>
+          <label className="text-sm text-[var(--fg-soft)]" htmlFor="delete-page-confirmation">Type <code className="font-mono text-[var(--fg)]">{page.name}</code> to confirm</label>
+          <input id="delete-page-confirmation" name="confirmation" autoComplete="off" required aria-describedby="delete-page-warning" className="w-full rounded-md border border-[var(--red)]/40 bg-[var(--bg)] px-3 py-2 text-sm text-[var(--fg)] focus:border-[var(--red)] focus:outline-none" />
+          <PlatformSubmitButton pendingLabel="Deleting permanently…" confirmMessage={`Permanently delete ${page.name} and all of its data? This cannot be undone.`} className="w-fit border border-[var(--red)]/40 px-4 py-2 text-sm font-semibold text-[var(--red)]">Delete permanently</PlatformSubmitButton>
         </PlatformActionForm>
       </section>
     </div>

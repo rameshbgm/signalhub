@@ -33,7 +33,7 @@ export function MetricChart({
   }));
 
   return (
-    <div className="bg-[var(--surface)] border border-[var(--line)] p-5">
+    <div className="public-metric bg-[var(--surface)] border border-[var(--line)] p-5">
       <h4 className="text-sm font-mono font-semibold mb-3 text-[var(--fg)]">
         {name} <span className="text-[var(--fg-dim)] font-normal">({suffix || "value"})</span>
       </h4>

@@ -658,7 +658,6 @@ export interface NotificationLogTable {
 export interface MonitorTable {
   id: Generated<string>;
   pageId: string;
-  templateId: string | null;
   componentId: string | null;
   name: string;
   type: string;
@@ -718,45 +717,9 @@ export interface MonitorCheckTable {
   error: string | null;
 }
 
-export interface MonitorTemplateTable {
-  id: Generated<string>;
-  name: string;
-  category: string;
-  description: string;
-  type: string;
-  target: string;
-  port: number | null;
-  expectedStatusRange: string;
-  keywordMatch: string | null;
-  enabled: Generated<boolean>;
-}
-
 export type MonitorRow = Selectable<MonitorTable>;
 export type MonitorCheckRow = Selectable<MonitorCheckTable>;
 export type PlatformJobRow = Selectable<PlatformJobTable>;
-
-export interface TemplateGroupTable {
-  id: Generated<string>;
-  pageId: string;
-  name: string;
-}
-
-export interface IncidentTemplateTable {
-  id: Generated<string>;
-  pageId: string;
-  groupId: string | null;
-  title: string;
-  body: string;
-  defaultStatus: string;
-  defaultImpact: string;
-  defaultComponentIds: Generated<string[]>;
-  kind: Generated<string>;
-  variables: Generated<string[]>;
-  notifyByDefault: Generated<boolean>;
-  archivedAt: NullableTimestamp;
-  updatedAt: GeneratedTimestamp;
-  createdAt: GeneratedTimestamp;
-}
 
 export interface AssetTable {
   id: Generated<string>;
@@ -891,13 +854,10 @@ export interface SignalHubDatabase {
   incidents: IncidentTable;
   incidentUpdates: IncidentUpdateTable;
   incidentComponents: IncidentComponentTable;
-  templateGroups: TemplateGroupTable;
-  incidentTemplates: IncidentTemplateTable;
   subscribers: SubscriberTable;
   subscriptionOtps: SubscriptionOtpTable;
   metrics: MetricTable;
   metricPoints: MetricPointTable;
-  monitorTemplates: MonitorTemplateTable;
   monitors: MonitorTable;
   monitorChecks: MonitorCheckTable;
   assets: AssetTable;

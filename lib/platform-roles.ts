@@ -4,14 +4,14 @@ export type PlatformCapability =
   | "overview.read" | "organizations.read" | "organizations.create"
   | "organizations.suspend" | "organizations.purge" | "users.read"
   | "users.disable" | "operations.read" | "operations.retry"
-  | "templates.read" | "templates.manage" | "configuration.read"
+  | "configuration.read"
   | "configuration.manage" | "audit.read" | "audit.manage"
   | "identity.read" | "identity.manage";
 
 const ALL_CAPABILITIES = new Set<PlatformCapability>([
   "overview.read", "organizations.read", "organizations.create", "organizations.suspend",
   "organizations.purge", "users.read", "users.disable", "operations.read",
-  "operations.retry", "templates.read", "templates.manage", "configuration.read",
+  "operations.retry", "configuration.read",
   "configuration.manage", "audit.read", "audit.manage", "identity.read", "identity.manage",
 ]);
 

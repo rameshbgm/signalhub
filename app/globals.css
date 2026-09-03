@@ -3,80 +3,75 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 :root {
-  --bg: #f4f5f7;
-  --surface: #ffffff;
-  --surface-raised: #ffffff;
-  --line: #d8dce3;
-  --line-bright: #b8bfcb;
-  --fg: #12161c;
-  --fg-soft: #4b5563;
-  --fg-dim: #8a93a1;
+  --bg: #0c1828;
+  --surface: #12243a;
+  --surface-raised: #17304a;
+  --line: rgba(236, 241, 232, 0.22);
+  --line-bright: rgba(236, 241, 232, 0.52);
+  --fg: #f3f1e9;
+  --fg-soft: #c7d1cd;
+  --fg-dim: #93a5a8;
 
-  --cyan: #0891b2;
-  --cyan-soft: rgba(8, 145, 178, 0.1);
-  --green: #16a34a;
-  --green-soft: rgba(22, 163, 74, 0.1);
-  --amber: #b45309;
-  --amber-soft: rgba(180, 83, 9, 0.1);
-  --orange: #c2410c;
-  --orange-soft: rgba(194, 65, 12, 0.1);
-  --red: #dc2626;
-  --red-soft: rgba(220, 38, 38, 0.1);
-  --blue: #1d4ed8;
-  --blue-soft: rgba(29, 78, 216, 0.1);
+  --cyan: #d7ef4b;
+  --cyan-soft: rgba(215, 239, 75, 0.14);
+  --green: #a5e76a;
+  --green-soft: rgba(165, 231, 106, 0.14);
+  --amber: #f6c35f;
+  --amber-soft: rgba(246, 195, 95, 0.15);
+  --orange: #f49355;
+  --orange-soft: rgba(244, 147, 85, 0.15);
+  --red: #ff7460;
+  --red-soft: rgba(255, 116, 96, 0.15);
+  --blue: #79b9ee;
+  --blue-soft: rgba(121, 185, 238, 0.14);
 
-  --on-cyan: #ffffff;
-  --on-green: #ffffff;
+  --on-cyan: #132339;
+  --on-green: #132339;
 
-  --hover-overlay: rgba(0, 0, 0, 0.035);
-  --hover-overlay-strong: rgba(0, 0, 0, 0.06);
-  --panel-glass: rgba(255, 255, 255, 0.7);
-  --input-overlay-bg: rgba(0, 0, 0, 0.03);
-  --input-overlay-border: rgba(0, 0, 0, 0.12);
-  --input-overlay-border-focus: rgba(0, 0, 0, 0.4);
-  --placeholder-overlay: rgba(0, 0, 0, 0.35);
+  --hover-overlay: rgba(243, 241, 233, 0.08);
+  --hover-overlay-strong: rgba(243, 241, 233, 0.14);
+  --panel-glass: rgba(19, 38, 58, 0.9);
+  --input-overlay-bg: rgba(6, 17, 30, 0.44);
+  --input-overlay-border: rgba(243, 241, 233, 0.24);
+  --input-overlay-border-focus: rgba(215, 239, 75, 0.82);
+  --placeholder-overlay: rgba(199, 209, 205, 0.68);
 
-  --font-body-family: "Avenir Next", "Segoe UI", Helvetica, Arial, sans-serif;
-  --font-mono-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  --font-body-family: "Arial Narrow", "Roboto Condensed", "Avenir Next", "Segoe UI", sans-serif;
+  --font-mono-family: "SFMono-Regular", "Roboto Mono", Consolas, monospace;
 
-  color-scheme: light;
+  color-scheme: dark;
 }
 
 :root.dark {
-  --bg: #0a0e14;
-  --surface: #11151c;
-  --surface-raised: #161b24;
-  --line: #232a36;
-  --line-bright: #333d4d;
-  --fg: #e6edf3;
-  --fg-soft: #8b96a5;
-  --fg-dim: #5c6773;
-
-  --cyan: #22d3ee;
-  --cyan-soft: rgba(34, 211, 238, 0.12);
-  --green: #4ade80;
-  --green-soft: rgba(74, 222, 128, 0.12);
-  --amber: #fbbf24;
-  --amber-soft: rgba(251, 191, 36, 0.12);
-  --orange: #fb923c;
-  --orange-soft: rgba(251, 146, 60, 0.12);
-  --red: #f87171;
-  --red-soft: rgba(248, 113, 113, 0.12);
-  --blue: #60a5fa;
-  --blue-soft: rgba(96, 165, 250, 0.12);
-
-  --on-cyan: #0a0e14;
-  --on-green: #0a0e14;
-
-  --hover-overlay: rgba(255, 255, 255, 0.03);
-  --hover-overlay-strong: rgba(255, 255, 255, 0.06);
-  --panel-glass: rgba(255, 255, 255, 0.03);
-  --input-overlay-bg: rgba(255, 255, 255, 0.05);
-  --input-overlay-border: rgba(255, 255, 255, 0.15);
-  --input-overlay-border-focus: rgba(255, 255, 255, 0.4);
-  --placeholder-overlay: rgba(255, 255, 255, 0.3);
-
-  color-scheme: dark;
+  --bg: #07111f;
+  --surface: #0d1c2f;
+  --surface-raised: #11253c;
+  --line: rgba(236, 241, 232, 0.17);
+  --line-bright: rgba(236, 241, 232, 0.4);
+  --fg: #f6f3eb;
+  --fg-soft: #c8d2ce;
+  --fg-dim: #8b9da3;
+  --cyan: #dcf35a;
+  --cyan-soft: rgba(220, 243, 90, 0.14);
+  --green: #b0ee74;
+  --green-soft: rgba(176, 238, 116, 0.14);
+  --amber: #f8ce6d;
+  --amber-soft: rgba(248, 206, 109, 0.15);
+  --orange: #f5a369;
+  --orange-soft: rgba(245, 163, 105, 0.15);
+  --red: #ff7f6e;
+  --red-soft: rgba(255, 127, 110, 0.15);
+  --blue: #8bc7f4;
+  --blue-soft: rgba(139, 199, 244, 0.14);
+  --on-cyan: #0b192a;
+  --on-green: #0b192a;
+  --hover-overlay: rgba(243, 241, 233, 0.08);
+  --hover-overlay-strong: rgba(243, 241, 233, 0.14);
+  --panel-glass: rgba(13, 28, 47, 0.92);
+  --input-overlay-bg: rgba(5, 14, 25, 0.54);
+  --input-overlay-border: rgba(243, 241, 233, 0.2);
+  --input-overlay-border-focus: rgba(220, 243, 90, 0.82);
+  --placeholder-overlay: rgba(200, 210, 206, 0.68);
 }
 
 /* Public pages own their palette. This prevents the admin theme and custom
@@ -160,6 +155,308 @@
 body {
   font-family: var(--font-body-family);
   transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+/* Dispatch Strip Wall — the signed-in console is a shared operational horizon,
+   not a collection of isolated product pages. The public status surface keeps
+   its own palette under .status-theme. */
+.dispatch-shell {
+  min-height: 100vh;
+  background:
+    linear-gradient(90deg, rgba(215, 239, 75, 0.035) 1px, transparent 1px),
+    linear-gradient(rgba(215, 239, 75, 0.025) 1px, transparent 1px),
+    var(--bg);
+  background-size: 88px 88px;
+}
+
+.dispatch-command-deck {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  min-height: 100vh;
+  width: 17rem;
+  flex: 0 0 17rem;
+  align-items: stretch;
+  flex-direction: column;
+  border-right: 1px solid var(--line-bright);
+  background: rgba(18, 36, 58, 0.96);
+  box-shadow: 0 16px 34px rgba(2, 9, 17, 0.24);
+}
+
+.dispatch-command-deck::before {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--cyan) 0 58%, transparent 58% 64%, var(--cyan) 64% 100%);
+  content: "";
+}
+
+.dispatch-command-deck > :first-child {
+  min-width: 0;
+  border-bottom: 1px solid var(--line) !important;
+  border-right: 0 !important;
+}
+
+.dispatch-operator {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: auto;
+  padding: 0.75rem 1rem;
+  border-top: 1px solid var(--line);
+}
+
+.dispatch-operator > :last-child {
+  margin-left: auto;
+}
+
+.dispatch-nav {
+  display: block;
+  min-width: 0;
+  flex: 1;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.dispatch-nav-group {
+  display: block;
+  min-width: 0;
+  padding: 0.7rem 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.dispatch-nav-group:last-child { border-bottom: 0; }
+
+.dispatch-nav-label {
+  margin: 0 0 0.36rem;
+  padding-inline: 0.42rem;
+  color: var(--fg-dim);
+  font-family: var(--font-mono-family);
+  font-size: 0.56rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.dispatch-nav-items {
+  display: grid;
+  gap: 0.14rem;
+}
+
+.dispatch-nav-link {
+  display: flex;
+  min-height: 2.2rem;
+  align-items: center;
+  gap: 0.34rem;
+  padding: 0.45rem 0.5rem;
+  color: var(--fg-soft);
+  font-size: 0.78rem;
+  font-weight: 600;
+  line-height: 1.1;
+  text-decoration: none;
+  transition: background-color 120ms ease, color 120ms ease;
+}
+
+.dispatch-nav-link:hover {
+  background: var(--hover-overlay);
+  color: var(--fg);
+}
+
+.dispatch-nav-link--active {
+  background: var(--cyan);
+  color: var(--on-cyan);
+}
+
+.dispatch-nav-link:focus-visible,
+.dispatch-command-deck a:focus-visible,
+.dispatch-command-deck button:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 2px;
+}
+
+.app-console-main {
+  position: relative;
+}
+
+.app-console-main > div {
+  position: relative;
+}
+
+.app-console-main > div::before {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: clamp(4rem, 12vw, 13rem);
+  height: 1px;
+  background: var(--cyan);
+  content: "";
+}
+
+.app-console-main :where(input:not([type="checkbox"]):not([type="radio"]), textarea, select) {
+  border-radius: 0 !important;
+  border-color: var(--input-overlay-border);
+  background-color: var(--input-overlay-bg);
+  color: var(--fg);
+}
+
+.app-console-main :where(input:not([type="checkbox"]):not([type="radio"]), textarea, select):focus {
+  border-color: var(--input-overlay-border-focus);
+  box-shadow: 0 0 0 2px var(--cyan-soft);
+}
+
+.app-console-main :where(input, textarea)::placeholder {
+  color: var(--placeholder-overlay);
+}
+
+/* Public pages inherit their owner-selected colours, but share a more precise
+   route-line chrome so they feel like the public face of the same system. */
+.status-dispatch-shell {
+  background-image:
+    linear-gradient(90deg, color-mix(in srgb, var(--page-brand, var(--cyan)) 6%, transparent) 1px, transparent 1px);
+  background-size: 7.5rem 100%;
+}
+
+.status-public-header {
+  position: relative;
+  box-shadow: 0 1px 0 color-mix(in srgb, var(--page-brand, var(--cyan)) 18%, transparent);
+}
+
+.status-public-header::before {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: clamp(4rem, 13vw, 12rem);
+  height: 2px;
+  background: var(--page-brand, var(--cyan));
+  content: "";
+}
+
+.status-public-nav {
+  letter-spacing: 0.01em;
+}
+
+.status-public-nav a {
+  position: relative;
+  padding-bottom: 0.2rem;
+}
+
+.status-public-nav a::after {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 1px;
+  background: currentColor;
+  content: "";
+  opacity: 0;
+  transform: scaleX(0.55);
+  transition: opacity 140ms ease, transform 140ms ease;
+}
+
+.status-public-nav a:hover::after,
+.status-public-nav a:focus-visible::after {
+  opacity: 0.8;
+  transform: scaleX(1);
+}
+
+.status-public-title {
+  letter-spacing: -0.035em;
+}
+
+.status-public-header--hero::before {
+  background: var(--page-brand, var(--cyan));
+}
+
+.status-public-footer {
+  position: relative;
+}
+
+.status-public-footer::before {
+  position: absolute;
+  top: -1px;
+  left: max(1rem, calc((100% - 80rem) / 2));
+  width: 4rem;
+  height: 1px;
+  background: var(--page-brand, var(--cyan));
+  content: "";
+}
+
+@media (max-width: 1199px) {
+  .dispatch-command-deck { width: 15.5rem; flex-basis: 15.5rem; }
+
+  .dispatch-operator {
+    padding-inline: 0.75rem;
+  }
+}
+
+@media (max-width: 1023px) {
+  .dispatch-command-deck {
+    display: block;
+    min-height: 100%;
+    width: 100%;
+    flex-basis: auto;
+    position: relative;
+    top: auto;
+    border-right: 0;
+    background: var(--surface);
+  }
+
+  .dispatch-command-deck::before {
+    background: linear-gradient(90deg, var(--cyan) 0 45%, transparent 45%);
+  }
+
+  .dispatch-command-deck > :first-child {
+    min-width: 0;
+    border-right: 0;
+  }
+
+  .dispatch-nav {
+    display: block;
+    overflow: visible;
+    padding: 0.75rem;
+  }
+
+  .dispatch-nav-group {
+    display: block;
+    padding: 0.8rem 0;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .dispatch-nav-group:last-child {
+    border-bottom: 0;
+  }
+
+  .dispatch-nav-label {
+    padding-inline: 0.45rem;
+  }
+
+  .dispatch-nav-items {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.25rem;
+  }
+
+  .dispatch-nav-link {
+    min-height: 2.45rem;
+    padding: 0.55rem;
+    font-size: 0.82rem;
+  }
+
+  .dispatch-operator {
+    display: flex;
+    margin: 0;
+    border-top: 1px solid var(--line);
+  }
+
+  .dispatch-operator > div {
+    display: block;
+  }
 }
 
 /* Console-wide resilience: grid/flex descendants may contain long domains,
@@ -535,4 +832,227 @@ select option {
     grid-column: var(--grid-desktop-column);
     order: var(--grid-desktop-order);
   }
+}
+
+/* Public operations surface. This layer changes the reading structure of the
+   published status page while leaving its data, block order, and owner palette
+   intact. Services read as one dispatch strip wall; incidents and metrics read
+   as evidence alongside it, not as unrelated floating cards. */
+.status-dispatch-shell {
+  --public-rule: color-mix(in srgb, var(--page-brand, var(--cyan)) 25%, var(--line));
+  --public-tint: color-mix(in srgb, var(--page-brand, var(--cyan)) 7%, var(--surface));
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--page-brand, var(--cyan)) 5%, transparent) 1px, transparent 1px),
+    var(--bg);
+  background-size: 6rem 100%;
+}
+
+.status-dispatch-shell .status-public-header {
+  box-shadow: 0 1px 0 var(--public-rule);
+}
+
+.status-dispatch-shell .status-public-header > div {
+  max-width: 90rem;
+}
+
+.status-dispatch-shell .status-public-header--hero {
+  min-height: 4.25rem;
+}
+
+.status-dispatch-shell .status-public-header--hero > div {
+  padding-block: 1.2rem;
+}
+
+.status-dispatch-shell .status-public-header--hero:has(+ .public-ops-main) img[role="img"] {
+  max-height: 12rem;
+}
+
+.public-ops-main {
+  max-width: 90rem !important;
+  padding-top: clamp(2.25rem, 4vw, 4rem) !important;
+  padding-bottom: clamp(3rem, 6vw, 6rem) !important;
+}
+
+.public-ops-intro {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(15rem, 0.38fr);
+  align-items: end;
+  gap: 2rem;
+  border-bottom: 1px solid var(--public-rule);
+  padding-bottom: 1.5rem;
+}
+
+.public-ops-intro > p:first-child {
+  grid-column: 1 / -1;
+  margin: 0 0 -1.35rem;
+  color: var(--page-brand, var(--cyan));
+  font-family: var(--font-mono-family);
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.public-ops-intro h1 {
+  margin: 0;
+  font-family: var(--font-mono-family);
+  font-size: clamp(2rem, 4vw, 3.65rem);
+  font-weight: 600;
+  letter-spacing: -0.055em;
+  line-height: 0.95;
+}
+
+.public-ops-intro p:last-child {
+  max-width: 38ch;
+  margin: 0;
+  justify-self: end;
+  color: var(--fg-soft);
+  font-size: 0.94rem;
+  line-height: 1.55;
+}
+
+.public-ops-grid {
+  gap: clamp(1.25rem, 2.8vw, 2.5rem) var(--page-block-gap);
+}
+
+.public-ops-block {
+  min-width: 0;
+}
+
+/* Operational blocks are the page's primary read path. Let them occupy the
+   full control field instead of inheriting legacy template spans that leave a
+   blank half-page beside the service list. */
+.public-ops-block[data-page-block="OVERALL_STATUS"],
+.public-ops-block[data-page-block="COMPONENT_STATUS"],
+.public-ops-block[data-page-block="ACTIVE_INCIDENTS"],
+.public-ops-block[data-page-block="SCHEDULED_MAINTENANCE"],
+.public-ops-block[data-page-block="METRICS"],
+.public-ops-block[data-page-block="HISTORY_PREVIEW"],
+.public-ops-block[data-page-block="ANNOUNCEMENTS"],
+.public-ops-block[data-page-block="SUBSCRIBE"] {
+  grid-column: 1 / -1 !important;
+}
+
+.public-ops-block > .public-ops-section > h2,
+.public-ops-block > .public-ops-section > div > h2 {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  margin-bottom: 0.9rem;
+  border-bottom: 1px solid var(--public-rule);
+  padding-bottom: 0.65rem;
+  color: var(--fg);
+  font-family: var(--font-mono-family);
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.public-status-banner {
+  border-width: 1px 0 !important;
+  border-radius: 0 !important;
+  background: var(--public-tint) !important;
+  padding: 1.15rem 0.2rem !important;
+}
+
+.public-status-banner p:first-child {
+  font-size: clamp(1.2rem, 2vw, 1.55rem);
+  letter-spacing: -0.025em;
+}
+
+.public-status-banner svg { width: 2rem; height: 2rem; }
+
+.public-service-list {
+  border-width: 1px 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  padding-inline: 0 !important;
+}
+
+.public-service-row {
+  min-height: 4.2rem;
+  border-bottom-color: var(--public-rule) !important;
+  padding: 0.9rem 0.25rem !important;
+}
+
+.public-service-row:hover { background: var(--public-tint); }
+
+.public-service-row > div:first-child > div:first-child > span:first-child,
+.public-service-group h3 {
+  font-family: var(--font-mono-family);
+  font-size: 0.9rem;
+  letter-spacing: -0.01em;
+}
+
+.public-service-group {
+  border-radius: 0 !important;
+  border-width: 1px 0 !important;
+  background: transparent !important;
+}
+
+.public-service-group [role="button"] { border-radius: 0 !important; }
+
+.public-incident-card {
+  border-width: 1px 0 !important;
+  border-radius: 0 !important;
+  background: var(--public-tint) !important;
+  padding: 1.1rem 0 !important;
+}
+
+.public-incident-card + .public-incident-card { border-top: 0 !important; }
+
+.public-incident-card h3 { letter-spacing: -0.02em; }
+
+.public-incident-card [data-incident-timeline="detailed"] { margin-top: 1.5rem; }
+
+.public-metric {
+  border-width: 1px 0 !important;
+  border-radius: 0 !important;
+  background: var(--public-tint) !important;
+  padding: 1rem 0 !important;
+}
+
+.public-metric h4 {
+  font-family: var(--font-mono-family);
+  letter-spacing: 0.01em;
+}
+
+.public-subscribe-block {
+  border-width: 1px 0 !important;
+  border-radius: 0 !important;
+  background: var(--public-tint) !important;
+}
+
+.public-subscribe-trigger {
+  border-radius: 0 !important;
+  font-family: var(--font-mono-family);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.public-subscribe-dialog { border-radius: 0 !important; }
+
+.status-dispatch-shell .status-public-footer {
+  margin-top: 0;
+  border-top-color: var(--public-rule);
+}
+
+@media (max-width: 639px) {
+  .public-ops-intro {
+    display: block;
+  }
+
+  .public-ops-intro > p:first-child {
+    margin-bottom: 0.7rem;
+  }
+
+  .public-ops-intro p:last-child {
+    margin-top: 1rem;
+  }
+
+  .public-status-banner { align-items: flex-start; }
+  .public-status-banner svg { margin-top: 0.1rem; }
 }

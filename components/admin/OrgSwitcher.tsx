@@ -69,7 +69,7 @@ export function OrgSwitcher({
   }
 
   return (
-    <div ref={ref} className="relative flex items-center gap-2 border-b border-[var(--line)] px-3 py-3">
+    <div ref={ref} className="dispatch-org-switcher relative flex items-center gap-2 border-b border-[var(--line)] px-3 py-3">
       <button
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}

@@ -223,21 +223,6 @@ async function main() {
     }));
     await transaction.insertInto("metricPoints").values(points).execute();
 
-    await transaction.insertInto("monitorTemplates").values({
-      name: "Development HTTP check",
-      category: "HTTP",
-      description: "Disabled example monitor template",
-      type: "HTTP",
-      target: "https://example.com",
-      port: null,
-      expectedStatusRange: "200-299",
-      keywordMatch: null,
-      enabled: false,
-    }).onConflict((conflict) => conflict.column("name").doUpdateSet({
-      description: "Disabled example monitor template",
-      enabled: false,
-    })).execute();
-
     await transaction.insertInto("subscribers").values([
       {
         pageId: apiPage.id,

@@ -49,7 +49,7 @@ export function withTransaction<T>(operation: (transaction: DatabaseTransaction)
 export async function deletePageCascade(
   pageId: string,
   organizationId: string,
-  options: { requireSoftDeleted?: boolean; afterDelete?: (transaction: DatabaseTransaction) => Promise<void> } = {}
+  options: { afterDelete?: (transaction: DatabaseTransaction) => Promise<void> } = {}
 ) {
   const assets = await database.selectFrom("assets")
     .select(["storageDriver", "storageKey"])
@@ -62,10 +62,9 @@ export async function deletePageCascade(
     const removed = await transaction.deleteFrom("pages")
       .where("id", "=", pageId)
       .where("orgId", "=", organizationId)
-      .$if(options.requireSoftDeleted === true, (query) => query.where("deletedAt", "is not", null))
       .returning("id")
       .executeTakeFirst();
-    if (!removed) throw new Error(options.requireSoftDeleted ? "Deleted page not found" : "Page not found in your organization");
+    if (!removed) throw new Error("Page not found in your organization");
     await options.afterDelete?.(transaction);
   });
   // Database deletion is authoritative. Removing blobs afterwards avoids data

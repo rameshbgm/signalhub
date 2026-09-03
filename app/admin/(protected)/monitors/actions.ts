@@ -67,81 +67,10 @@ export async function createMonitor(pageId: string, formData: FormData) {
   revalidatePath("/organization/monitors");
 }
 
-export async function addMonitorTemplate(pageId: string, templateId: string, formData: FormData) {
-  const session = await requireCapability("monitor.manage", pageId);
-  await assertPageInOrg(pageId, session.orgId);
-  const [template, existing] = await Promise.all([
-    database.selectFrom("monitorTemplates").selectAll()
-      .where("id", "=", templateId).where("enabled", "=", true).executeTakeFirst(),
-    database.selectFrom("monitors").select("id")
-      .where("pageId", "=", pageId).where("templateId", "=", templateId).executeTakeFirst(),
-  ]);
-  if (!template) throw new Error("Global monitor template is unavailable");
-  if (existing) throw new Error("This global monitor is already shown on the page");
-  const componentId = optionalString(formData, "componentId");
-  const rawInput: MonitorInput = {
-    templateId,
-    name: template.name,
-    type: template.type as MonitorInput["type"],
-    componentId,
-    target: template.type === "HEARTBEAT" ? "inbound-heartbeat" : template.target,
-    port: template.port,
-    method: "GET",
-    requestBody: null,
-    requestHeaders: "",
-    expectedStatusRange: template.expectedStatusRange,
-    keywordMatch: template.keywordMatch,
-    keywordAbsent: null,
-    sslWarnDays: template.type === "TLS" ? 14 : null,
-    authType: "NONE",
-    authUsername: null,
-    authSecret: null,
-    authHeaderName: null,
-    verifyTls: true,
-    intervalSec: 300,
-    timeoutMs: 10_000,
-    failThreshold: 1,
-    recoverThreshold: 1,
-    downStatus: "MAJOR_OUTAGE",
-    actionFlipStatus: Boolean(componentId),
-    actionRecordMetric: true,
-    actionAutoIncident: false,
-    actionNotify: false,
-    tags: ["global-template"],
-    groupName: template.category,
-    heartbeatGraceSec: template.type === "HEARTBEAT" ? 60 : null,
-    dnsRecordType: template.type === "DNS" ? "A" : null,
-    dnsExpectedValue: null,
-  };
-  const monitor = await createMonitorDomain(session.orgId, pageId, rawInput);
-  await writeSupportMutationAudit(session, {
-    action: "ADD_GLOBAL_MONITOR_TO_PAGE",
-    targetType: "monitor",
-    targetId: monitor.id,
-    metadata: { pageId, templateId, templateName: template.name },
-  });
-  revalidatePath("/organization/monitors");
-}
-
 async function monitorContext(monitorId: string) {
   const monitor = await database.selectFrom("monitors").selectAll().where("id", "=", monitorId).executeTakeFirst();
   if (!monitor) throw new Error("Monitor not found");
   return monitor;
-}
-
-export async function removeMonitorTemplate(monitorId: string) {
-  const monitor = await monitorContext(monitorId);
-  if (!monitor.templateId) throw new Error("Attached global monitor not found");
-  const session = await requireCapability("monitor.manage", monitor.pageId);
-  await assertPageInOrg(monitor.pageId, session.orgId);
-  await deleteMonitorCascade(monitorId, session.orgId, monitor.pageId);
-  await writeSupportMutationAudit(session, {
-    action: "REMOVE_GLOBAL_MONITOR_FROM_PAGE",
-    targetType: "monitor",
-    targetId: monitorId,
-    metadata: { pageId: monitor.pageId, templateId: monitor.templateId },
-  });
-  revalidatePath("/organization/monitors");
 }
 
 export async function toggleMonitorEnabled(monitorId: string) {

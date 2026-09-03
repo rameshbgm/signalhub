@@ -29,7 +29,7 @@ async function migrationManifest(): Promise<MigrationManifestEntry[]> {
   }));
 }
 
-export const LATEST_MIGRATION_ID = "004_minimal_status_pages.sql";
+export const LATEST_MIGRATION_ID = "006_remove_monitor_templates.sql";
 
 export async function inspectMigrationState(): Promise<MigrationInspection> {
   const manifest = await migrationManifest();

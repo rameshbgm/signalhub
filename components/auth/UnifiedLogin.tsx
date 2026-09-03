@@ -58,60 +58,41 @@ export function UnifiedLogin({ returnTo }: { returnTo: string | null }) {
   }
 
   return (
-    <div className="grid min-h-screen bg-[var(--bg)] text-[var(--fg)] lg:grid-cols-[minmax(0,1.08fr)_minmax(430px,0.92fr)]">
-      <aside className="grain relative hidden min-h-screen overflow-hidden border-r border-[var(--line)] bg-[var(--surface)] px-10 py-9 lg:flex lg:flex-col xl:px-14 xl:py-11">
-        <div aria-hidden className="absolute -left-32 -top-28 h-96 w-96 rounded-full bg-[var(--cyan)]/14 blur-3xl" />
-        <div aria-hidden className="absolute -bottom-36 -right-28 h-[28rem] w-[28rem] rounded-full bg-[var(--cyan)]/10 blur-3xl" />
+    <div className="dispatch-access min-h-screen bg-[var(--bg)] text-[var(--fg)]">
+      <header className="flex min-h-16 items-center justify-between border-b border-[var(--line)] bg-[var(--surface)] px-5 sm:px-8">
+        <Link href="/" className="flex items-center gap-2 font-mono text-base font-semibold tracking-tight">
+          <span className="inline-block h-2.5 w-2.5 bg-[var(--cyan)] pulse-dot" /> SignalHub
+        </Link>
+        <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--fg-dim)]">Operator access</span>
+      </header>
 
-        <header className="relative flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2 font-mono text-lg font-semibold">
-            SignalHub <span className="mt-1 inline-block h-2 w-2 bg-[var(--cyan)] pulse-dot" />
-          </Link>
-          <span className="border border-[var(--line-bright)] bg-[var(--bg)]/70 px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--fg-dim)]">
-            Enterprise status operations
-          </span>
-        </header>
-
-        <div className="relative my-auto w-full max-w-2xl py-8">
-          <p className="font-mono text-xs uppercase tracking-[0.2em] text-[var(--cyan)]">One identity · one console</p>
-          <h2 className="mt-4 max-w-xl font-mono text-[clamp(2.25rem,4vw,4rem)] font-semibold leading-[1.04] tracking-[-0.04em]">
-            Run every status operation from one place.
-          </h2>
-          <p className="mt-5 max-w-xl text-base leading-7 text-[var(--fg-soft)]">
-            Publish trusted updates, coordinate incident response, and govern every organization with a unified enterprise control plane.
-          </p>
-
-          <div className="mt-8 grid max-w-2xl grid-cols-2 gap-3">
-            {[
-              ["01", "Status experiences", "Custom pages, components, groups, themes, and live previews."],
-              ["02", "Incident operations", "Incidents, maintenance, monitors, metrics, and response workflows."],
-              ["03", "Audience delivery", "Email, SMS, chat, webhooks, on-call destinations, and feeds."],
-              ["04", "Identity & governance", "Role-based access, SSO, SCIM, audit trails, and platform controls."],
-            ].map(([number, title, description]) => (
-              <div key={number} className="border border-[var(--line)] bg-[var(--bg)]/75 p-4 backdrop-blur-sm">
-                <div className="flex items-start gap-3">
-                  <span className="font-mono text-[10px] font-semibold tracking-wider text-[var(--cyan)]">{number}</span>
-                  <div>
-                    <h3 className="text-sm font-semibold">{title}</h3>
-                    <p className="mt-1.5 text-xs leading-5 text-[var(--fg-soft)]">{description}</p>
-                  </div>
+      <main className="mx-auto grid w-full max-w-[76rem] gap-px border-x border-[var(--line)] bg-[var(--line)] lg:grid-cols-[minmax(0,1.2fr)_minmax(23rem,0.8fr)]">
+        <section className="relative min-h-[21rem] overflow-hidden bg-[var(--surface)] px-6 py-12 sm:px-10 lg:min-h-[calc(100vh-4rem)] lg:px-14 lg:py-16">
+          <div aria-hidden className="absolute inset-0 opacity-50 [background-image:linear-gradient(rgba(215,239,75,0.04)_1px,transparent_1px),linear-gradient(90deg,rgba(215,239,75,0.04)_1px,transparent_1px)] [background-size:42px_42px]" />
+          <div className="relative max-w-xl">
+            <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--cyan)]">Control horizon</p>
+            <h1 className="mt-5 font-mono text-[clamp(2.7rem,6vw,5.6rem)] font-semibold leading-[0.9] tracking-[-0.065em]">Enter the operations deck.</h1>
+            <p className="mt-6 max-w-lg text-base leading-7 text-[var(--fg-soft)]">
+              Your organization’s status pages, response work, and delivery controls are ready on one shared horizon.
+            </p>
+            <div className="mt-10 grid max-w-2xl grid-cols-2 border border-[var(--line)] bg-[var(--bg)]/45 text-xs sm:grid-cols-4">
+              {[
+                ["01", "Pages"], ["02", "Response"], ["03", "Delivery"], ["04", "Governance"],
+              ].map(([number, label]) => (
+                <div key={number} className="border-r border-[var(--line)] px-3 py-4 last:border-r-0 sm:px-4">
+                  <span className="block font-mono text-[10px] text-[var(--cyan)]">{number}</span>
+                  <span className="mt-1 block font-semibold text-[var(--fg-soft)]">{label}</span>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
-        </div>
+        </section>
 
-        <footer className="relative flex items-center justify-between border-t border-[var(--line)] pt-5 text-xs text-[var(--fg-dim)]">
-          <span>Self-hosted and enterprise ready</span>
-          <span className="font-mono uppercase tracking-[0.14em]">Secure · Observable · Customizable</span>
-        </footer>
-      </aside>
-
-      <main className="flex items-center justify-center p-4 sm:p-6 lg:py-8">
-        <div className="w-full max-w-md">
-          <Link href="/" className="mb-7 flex items-center gap-2 font-mono text-lg font-semibold lg:hidden">SignalHub <span className="mt-1.5 inline-block h-2 w-2 bg-[var(--cyan)]" /></Link>
-          <h1 className="font-mono text-3xl font-semibold tracking-tight">Welcome back</h1>
-          <p className="mt-2 text-sm text-[var(--fg-soft)]">Sign in to the SignalHub console with your User ID.</p>
+        <section className="flex items-center bg-[var(--bg)] p-5 sm:p-8 lg:p-10">
+          <div className="w-full max-w-md">
+          <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--fg-dim)]">Identity checkpoint</p>
+          <h2 className="mt-3 font-mono text-3xl font-semibold tracking-[-0.045em]">Sign in</h2>
+          <p className="mt-2 text-sm text-[var(--fg-soft)]">Use your SignalHub User ID to continue.</p>
 
           <form onSubmit={submit} className="mt-7 space-y-3">
             <input value={username} onChange={(event) => setUsername(event.target.value)} autoComplete="username" placeholder="User ID" disabled={mfaRequired} required className="w-full border border-[var(--line)] bg-[var(--bg)] px-4 py-3 text-sm outline-none focus:border-[var(--cyan)] disabled:opacity-60" />
@@ -124,7 +105,8 @@ export function UnifiedLogin({ returnTo }: { returnTo: string | null }) {
           {process.env.NEXT_PUBLIC_OIDC_ENABLED === "true" && <Link href="/api/auth/oidc/start" prefetch={false} className="mt-3 block w-full border border-[var(--line-bright)] py-3 text-center text-sm font-semibold hover:bg-[var(--hover-overlay)]">Sign in with OpenID Connect</Link>}
           {connections.map((connection) => <Link key={connection.startUrl} href={connection.startUrl} prefetch={false} className="mt-3 block w-full border border-[var(--line-bright)] py-3 text-center text-sm font-semibold hover:bg-[var(--hover-overlay)]">Sign in with {connection.name}</Link>)}
           <QuickLogin />
-        </div>
+          </div>
+        </section>
       </main>
     </div>
   );

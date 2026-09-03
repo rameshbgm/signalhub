@@ -100,7 +100,7 @@ export default async function PublicStatusPage({ params }: { params: Promise<{ s
         return <AnnouncementList pageId={page.id} announcements={announcements} maxItems={block.settings.maxItems} />;
       case "RICH_TEXT":
         return (
-          <article className={`page-panel border border-[var(--line)] bg-[var(--surface)] p-[var(--page-block-padding)] ${block.settings.align === "CENTER" ? "text-center" : ""}`}>
+            <article className={`public-ops-panel page-panel border border-[var(--line)] bg-[var(--surface)] p-[var(--page-block-padding)] ${block.settings.align === "CENTER" ? "text-center" : ""}`}>
             {block.settings.heading && <h2 className="text-xl font-semibold">{block.settings.heading}</h2>}
             {block.settings.body && <p className="mt-2 whitespace-pre-wrap text-sm leading-7 text-[var(--fg-soft)]">{block.settings.body}</p>}
           </article>
@@ -109,7 +109,7 @@ export default async function PublicStatusPage({ params }: { params: Promise<{ s
         return <ComponentList groups={groups} ungrouped={ungrouped} settings={block.settings} nowIso={now.toISOString()} />;
       case "ACTIVE_INCIDENTS":
         return activeIncidents.length ? (
-          <section>
+          <section className="public-ops-section">
             <h2 className="mb-3 text-lg font-semibold">{block.settings.heading}</h2>
             <div className="space-y-3">
               {activeIncidents.map((incident) => <IncidentCard key={incident.id} incident={incident} pageSlug={incidentPageSlug} locale={page.language} timeZone={page.timezone} />)}
@@ -118,7 +118,7 @@ export default async function PublicStatusPage({ params }: { params: Promise<{ s
         ) : null;
       case "SCHEDULED_MAINTENANCE":
         return upcomingMaintenance.length || activeMaintenance.length ? (
-          <section>
+          <section className="public-ops-section">
             <h2 className="mb-3 text-lg font-semibold">{block.settings.heading}</h2>
             <div className="space-y-3">
               {[...activeMaintenance, ...upcomingMaintenance].map((incident) => <IncidentCard key={incident.id} incident={incident} pageSlug={incidentPageSlug} locale={page.language} timeZone={page.timezone} />)}
@@ -127,7 +127,7 @@ export default async function PublicStatusPage({ params }: { params: Promise<{ s
         ) : null;
       case "METRICS":
         return metrics.length ? (
-          <section>
+          <section className="public-ops-section">
             <h2 className="mb-3 text-lg font-semibold">{block.settings.heading}</h2>
             <div className={`grid gap-4 ${block.settings.columns === 2 ? "sm:grid-cols-2" : ""}`}>
               {metrics.map((metric) => (
@@ -147,7 +147,7 @@ export default async function PublicStatusPage({ params }: { params: Promise<{ s
         ) : null;
       case "HISTORY_PREVIEW":
         return (
-          <section>
+          <section className="public-ops-section">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
               <h2 className="text-lg font-semibold">{block.settings.heading}</h2>
               <Link href={`${basePath}/history`} className="text-sm underline" style={{ color: "var(--page-brand)" }}>Incident history</Link>
@@ -157,7 +157,7 @@ export default async function PublicStatusPage({ params }: { params: Promise<{ s
         );
       case "SUBSCRIBE":
         return (
-          <section className={block.settings.style === "PANEL" ? "page-panel border border-[var(--line)] bg-[var(--surface)] p-[var(--page-block-padding)]" : ""}>
+          <section className={`public-subscribe-block ${block.settings.style === "PANEL" ? "page-panel border border-[var(--line)] bg-[var(--surface)] p-[var(--page-block-padding)]" : ""}`}>
             <div className={block.settings.style === "PANEL" ? "flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between" : ""}>
               {block.settings.style !== "BUTTON" && <h2 className={block.settings.style === "PANEL" ? "min-w-0 font-semibold" : "mb-3 font-semibold"}>{block.settings.heading}</h2>}
               <SubscribeModal
@@ -174,7 +174,7 @@ export default async function PublicStatusPage({ params }: { params: Promise<{ s
         return block.settings.links.length ? (
           <div className="grid gap-3 sm:grid-cols-2">
             {block.settings.links.map((link) => (
-              <a key={link.url} href={link.url} className="page-panel border border-[var(--line)] bg-[var(--surface)] p-4 transition-transform hover:-translate-y-0.5">
+              <a key={link.url} href={link.url} className="public-ops-panel page-panel border border-[var(--line)] bg-[var(--surface)] p-4 transition-transform hover:-translate-y-0.5">
                 <strong>{link.label}</strong>
                 {link.description && <p className="mt-1 text-sm text-[var(--fg-soft)]">{link.description}</p>}
               </a>
@@ -221,7 +221,7 @@ export default async function PublicStatusPage({ params }: { params: Promise<{ s
         design={design}
         surface="status"
         intro={(
-          <section className="mb-8">
+          <section className="public-ops-intro mb-8">
             <p className="font-mono text-xs uppercase tracking-[0.18em] text-[var(--fg-dim)]">Live service health</p>
             <h1 className="mt-2 text-2xl font-semibold tracking-tight text-[var(--fg)] sm:text-3xl">{page.headline || "Service Status"}</h1>
             {page.aboutText && !design.surfaces.status.full.some((block) => block.type === "OVERALL_STATUS" && !block.hidden && block.settings.showDescription) && (

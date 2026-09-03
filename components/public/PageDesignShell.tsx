@@ -32,7 +32,7 @@ export function PageDesignShell({
 
   return (
     <div
-      className="status-theme min-h-screen flex flex-col bg-[var(--bg)] text-[var(--fg)]"
+      className="status-theme status-dispatch-shell min-h-screen flex flex-col bg-[var(--bg)] text-[var(--fg)]"
       data-status-page={pageId}
       data-published-version={publishedVersion}
       data-template={design.templateKey}

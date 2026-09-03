@@ -25,11 +25,9 @@ export default async function IncidentDetailPage({ params }: { params: Promise<{
   const canUpdate = sessionHasCapability(session, "incident.update");
   const canManage = sessionHasCapability(session, "incident.manage");
 
-  const [updates, links, templates] = await Promise.all([
+  const [updates, links] = await Promise.all([
     database.selectFrom("incidentUpdates").selectAll().where("incidentId", "=", incidentRow.id).orderBy("createdAt").execute(),
     database.selectFrom("incidentComponents").selectAll().where("incidentId", "=", incidentRow.id).execute(),
-    database.selectFrom("incidentTemplates").selectAll().where("pageId", "=", incidentRow.pageId)
-      .where("archivedAt", "is", null).execute(),
   ]);
   const components = links.length
     ? await database.selectFrom("components").selectAll()
@@ -105,10 +103,6 @@ export default async function IncidentDetailPage({ params }: { params: Promise<{
           <IncidentUpdateComposer
             action={boundPostUpdate}
             currentStatus={incident.status}
-            incidentName={incident.name}
-            pageName={incident.page.name}
-            componentNames={incident.components.map((component) => component.component.name)}
-            templates={templates.filter((template) => ["UPDATE", "RESOLUTION"].includes(template.kind))}
           />
         </div>
       )}
@@ -119,14 +113,6 @@ export default async function IncidentDetailPage({ params }: { params: Promise<{
           <MaintenanceUpdateComposer
             action={boundMaintenanceStatus}
             currentStatus={incident.maintenanceStatus ?? "SCHEDULED"}
-            incidentName={incident.name}
-            pageName={incident.page.name}
-            componentNames={incident.components.map(
-              (component) => component.component.name
-            )}
-            templates={templates
-              .filter((template) => template.kind === "MAINTENANCE")
-            }
           />
           <p className="text-xs text-[var(--fg-dim)] mt-2">
             Auto-transition is {incident.autoTransition ? "on" : "off"}: this window will {incident.autoTransition ? "" : "not "}
@@ -143,12 +129,6 @@ export default async function IncidentDetailPage({ params }: { params: Promise<{
             action={boundPostmortem}
             initialBody={incident.postmortemBody ?? ""}
             published={Boolean(incident.postmortemPublishedAt)}
-            incidentName={incident.name}
-            pageName={incident.page.name}
-            componentNames={incident.components.map(
-              (component) => component.component.name
-            )}
-            templates={templates.filter((template) => template.kind === "POSTMORTEM")}
           />
         </div>
       )}

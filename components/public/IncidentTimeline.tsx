@@ -91,7 +91,7 @@ export function IncidentCard({
   }));
 
   return (
-    <div className="border border-[var(--line)] border-l-2 bg-[var(--surface)] p-5" style={{ borderLeftColor: color }}>
+    <div className="public-incident-card border border-[var(--line)] border-l-2 bg-[var(--surface)] p-5" style={{ borderLeftColor: color }}>
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <h3 className="font-mono font-semibold text-sm text-[var(--fg)]">
           {linkPermalink ? (
