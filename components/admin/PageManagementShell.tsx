@@ -3,32 +3,22 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import type { ReactNode } from "react";
-import { Eye, EyeOff, Send } from "lucide-react";
-import { PlatformActionForm } from "@/components/platform/PlatformActionForm";
-import { PlatformSubmitButton } from "@/components/platform/PlatformSubmitButton";
-import { finishPageSetup, setPagePublicVisibility } from "@/app/admin/(protected)/pages/actions";
 
 type ManagedPage = { id: string; name: string; slug: string; isHub: boolean; type: string; setupCompleted: boolean; publicVisible: boolean; publicPath: string; parentHub: { id: string; name: string } | null; canPublish: boolean };
 const sections = [{ key: "overview", label: "Overview", suffix: "" }, { key: "content", label: "Content", suffix: "/content" }, { key: "appearance", label: "Appearance", suffix: "/appearance" }, { key: "access", label: "Access", suffix: "/access" }, { key: "notifications", label: "Notifications", suffix: "/notifications" }, { key: "settings", label: "Settings", suffix: "/settings" }] as const;
 
-export function PageManagementShell({ page, children }: { page: ManagedPage; children: ReactNode }) {
+export function PageManagementShell({ page, actions, children }: { page: ManagedPage; actions: ReactNode; children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const base = `/organization/pages/${page.id}`;
   const visibleSections = page.type === "PUBLIC" ? sections.filter((section) => section.key !== "access") : sections;
-  if (pathname === `${base}/appearance` || pathname === `${base}/design` || pathname.startsWith(`${base}/setup/`)) return children;
+  // Keep the Appearance editor inside the same page-management chrome as the
+  // other sections. The advanced design route and onboarding screens remain
+  // focused flows with their own full-page controls.
+  if (pathname === `${base}/design` || pathname.startsWith(`${base}/setup/`)) return children;
   const current = visibleSections.find((section) => pathname === `${base}${section.suffix}`) ?? visibleSections[0];
   const state = !page.setupCompleted ? "Draft" : page.publicVisible ? "Published" : "Hidden";
   const sectionLabel = (key: typeof visibleSections[number]["key"], fallback: string) => key === "content" ? (page.isHub ? "Status pages" : "Services & groups") : fallback;
-  const publishing = !page.setupCompleted || !page.publicVisible;
-  const publishAction = !page.setupCompleted
-    ? finishPageSetup.bind(null, page.id)
-    : setPagePublicVisibility.bind(null, page.id, true);
-  const visibilityAction = page.setupCompleted && page.publicVisible
-    ? setPagePublicVisibility.bind(null, page.id, false)
-    : publishAction;
-  const actionLabel = page.setupCompleted && page.publicVisible ? "Hide page" : "Publish page";
-  const actionMessage = page.setupCompleted && page.publicVisible ? "Page hidden" : "Page published";
   return (
     <div className="mx-auto w-full max-w-7xl space-y-6">
       <header className="border-b border-[var(--line)] pb-6">
@@ -73,12 +63,10 @@ export function PageManagementShell({ page, children }: { page: ManagedPage; chi
           </div>
         </nav>
 
-        <div className="flex shrink-0 items-center gap-2 pb-2 md:pb-1">
-          {page.setupCompleted && page.publicVisible && <a href={page.publicPath} target="_blank" rel="noreferrer" className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-[var(--line-bright)] bg-[var(--surface)] px-3.5 py-2 text-sm font-semibold text-[var(--cyan)] hover:bg-[var(--cyan-soft)]"><Eye aria-hidden="true" size={16} />Preview</a>}
-          <PlatformActionForm action={visibilityAction} successMessage={actionMessage} className="relative flex" messageClassName="absolute right-0 top-full z-10 mt-2 whitespace-nowrap">
-            <PlatformSubmitButton disabled={!page.setupCompleted && !page.canPublish} pendingLabel={publishing ? "Publishing…" : "Updating…"} className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-[var(--cyan)] px-3.5 py-2 text-sm font-semibold text-[var(--on-cyan)]"><span aria-hidden="true">{page.setupCompleted && page.publicVisible ? <EyeOff size={16} /> : <Send size={16} />}</span>{actionLabel}</PlatformSubmitButton>
-          </PlatformActionForm>
-        </div>
+        {/* Appearance owns its preview and design-publish controls. Its action
+            mount keeps those controls in this shared row without duplicating
+            the page visibility actions. */}
+        {current.key === "appearance" ? <div id="page-management-actions" className="shrink-0" /> : actions}
       </div>
 
       <div className="min-w-0">{children}</div>

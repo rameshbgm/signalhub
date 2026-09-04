@@ -40,10 +40,10 @@ const GROUPS: Array<{ label: string; items: NavItem[] }> = [
   {
     label: "Operate",
     items: [
-      { href: "/organization/incidents", label: "Incidents", icon: Siren },
-      { href: "/organization/maintenance", label: "Maintenance", icon: Wrench },
-      { href: "/organization/monitors", label: "Monitors", icon: MonitorDot },
-      { href: "/organization/metrics", label: "Metrics", icon: Gauge },
+      { href: "/organization/incidents", label: "Incidents", icon: Siren, capability: "incident.update" },
+      { href: "/organization/maintenance", label: "Maintenance", icon: Wrench, capability: "incident.update" },
+      { href: "/organization/monitors", label: "Monitors", icon: MonitorDot, capability: "monitor.manage" },
+      { href: "/organization/metrics", label: "Metrics", icon: Gauge, capability: "monitor.manage" },
     ],
   },
   {

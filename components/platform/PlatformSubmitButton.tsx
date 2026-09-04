@@ -8,12 +8,14 @@ export function PlatformSubmitButton({
   confirmMessage,
   className = "",
   disabled = false,
+  title,
 }: {
   children: React.ReactNode;
   pendingLabel?: string;
   confirmMessage?: string;
   className?: string;
   disabled?: boolean;
+  title?: string;
 }) {
   const { pending } = useFormStatus();
   return (
@@ -22,6 +24,7 @@ export function PlatformSubmitButton({
       onClick={(event) => {
         if (confirmMessage && !window.confirm(confirmMessage)) event.preventDefault();
       }}
+      title={title}
       className={`${className} disabled:cursor-wait disabled:opacity-50`}
     >
       {pending ? pendingLabel : children}

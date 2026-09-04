@@ -2,7 +2,7 @@
 
 import { fetchWithTimeout } from "@/lib/client-fetch";
 
-import { useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { useRouter } from "next/navigation";
 import {
   bannerCropFromDrag,
@@ -73,6 +73,7 @@ export function AssetUploader({
   const [messageIsError, setMessageIsError] = useState(false);
   const [loading, setLoading] = useState(false);
   const [savingFraming, setSavingFraming] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
   const initialCover = normalizedCoverImageSettings({
     fit: currentCoverFit,
     positionX: currentCoverPositionX,
@@ -90,6 +91,15 @@ export function AssetUploader({
   const [imageDimensions, setImageDimensions] = useState({ width: 0, height: 0 });
   const isCover = kind === "COVER";
   const busy = loading || savingFraming;
+
+  useEffect(() => {
+    if (!previewOpen) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setPreviewOpen(false);
+    };
+    document.addEventListener("keydown", closeOnEscape);
+    return () => document.removeEventListener("keydown", closeOnEscape);
+  }, [previewOpen]);
 
   async function upload(file: File) {
     if (loading) return;
@@ -280,31 +290,38 @@ export function AssetUploader({
   }
 
   return (
-    <div className={`space-y-3 border border-[var(--line)] bg-[var(--surface)] p-4 ${isCover ? "sm:col-span-full" : ""}`}>
+    <div className="space-y-3 border border-[var(--line)] bg-[var(--surface)] p-4">
       <div className="flex items-center justify-between gap-3">
         <div>
           <p className="text-sm font-semibold text-[var(--fg)]">{label}</p>
           <p className="mt-0.5 text-xs text-[var(--fg-dim)]">{help}</p>
         </div>
-        {preview && !isCover ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={preview}
-            alt=""
-            className="h-14 w-28 shrink-0 border border-[var(--line)] bg-[var(--bg)] object-contain p-2"
-          />
-        ) : !isCover ? (
-          <div className="flex h-14 w-28 items-center justify-center border border-dashed border-[var(--line)] text-xs text-[var(--fg-dim)]">
-            No image
-          </div>
-        ) : null}
       </div>
+      {!isCover && (
+        <div className="flex aspect-[16/5] w-full items-center justify-center overflow-hidden border border-[var(--line)] bg-[var(--bg)]">
+          {preview ? (
+            <button type="button" onClick={() => setPreviewOpen(true)} aria-label={`Preview ${label.toLowerCase()}`} title="Preview image" className="h-full w-full rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--cyan)]">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={preview} alt={`${label} preview`} className="h-full w-full object-contain p-4 transition-opacity hover:opacity-80" />
+            </button>
+          ) : (
+            <span className="text-xs text-[var(--fg-dim)]">No image</span>
+          )}
+        </div>
+      )}
       {isCover && (
         preview ? (
           <div className="space-y-3">
-            <div className="flex max-h-[32rem] justify-center overflow-hidden border border-[var(--line)] bg-[var(--bg)] p-2">
+            <div
+              className={`flex justify-center overflow-hidden border border-[var(--line)] bg-[var(--bg)] p-2 ${simple ? "aspect-[16/5] w-full cursor-zoom-in transition-opacity hover:opacity-85" : "max-h-[32rem]"}`}
+              role={simple ? "button" : undefined}
+              tabIndex={simple ? 0 : undefined}
+              aria-label={simple ? "Preview cover image" : undefined}
+              onClick={simple ? () => setPreviewOpen(true) : undefined}
+              onKeyDown={simple ? (event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setPreviewOpen(true); } } : undefined}
+            >
               <div
-                className={`relative inline-block max-h-[30rem] max-w-full overflow-hidden ${simple ? "" : "select-none touch-none"} ${!simple && coverFit === "COVER" ? "cursor-crosshair" : ""}`}
+                className={`relative inline-block max-h-[30rem] max-w-full overflow-hidden ${simple ? "h-full w-full" : "select-none touch-none"} ${!simple && coverFit === "COVER" ? "cursor-crosshair" : ""}`}
                 onPointerDown={simple ? undefined : startCrop}
                 onPointerMove={simple ? undefined : updateCrop}
                 onPointerUp={simple ? undefined : finishCrop}
@@ -315,7 +332,7 @@ export function AssetUploader({
                   src={preview}
                   alt="Full cover image crop source"
                   draggable={false}
-                  className="block max-h-[30rem] max-w-full object-contain"
+                  className={simple ? "block h-full w-full object-contain" : "block max-h-[30rem] max-w-full object-contain"}
                   onLoad={(event) => {
                     const dimensions = {
                       width: event.currentTarget.naturalWidth,
@@ -458,6 +475,21 @@ export function AssetUploader({
         >
           {message}
         </p>
+      )}
+      {previewOpen && preview && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/65 p-4 sm:p-8"
+          role="dialog"
+          aria-modal="true"
+          aria-label={`${label} preview`}
+          onClick={() => setPreviewOpen(false)}
+        >
+          <div className="relative max-h-full max-w-5xl rounded-xl border border-white/20 bg-[var(--surface)] p-3 shadow-2xl" onClick={(event) => event.stopPropagation()}>
+            <button type="button" onClick={() => setPreviewOpen(false)} aria-label="Close image preview" title="Close preview" className="absolute right-3 top-3 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-black/65 text-lg text-white hover:bg-black/80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">×</button>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={preview} alt={`${label} preview`} className={`max-h-[85vh] max-w-[min(90vw,72rem)] rounded-lg object-contain ${isCover ? "w-full" : "h-auto"}`} />
+          </div>
+        </div>
       )}
     </div>
   );

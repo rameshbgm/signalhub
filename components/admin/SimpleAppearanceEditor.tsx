@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Eye } from "lucide-react";
+import { Eye, Send } from "lucide-react";
 import { FluentSelect } from "@/components/FluentSelect";
 import { AssetUploader } from "@/components/admin/AssetUploader";
 import {
@@ -57,12 +58,14 @@ export function SimpleAppearanceEditor({
   initialPublishedDesign,
   initialRevision,
   publishedVersion,
+  embedded = false,
 }: {
   page: AppearancePage;
   initialDesign: StatusPageDesign;
   initialPublishedDesign: StatusPageDesign;
   initialRevision: number;
   publishedVersion: number;
+  embedded?: boolean;
 }) {
   const router = useRouter();
   const [design, setDesign] = useState(() => cloneDesign(initialDesign));
@@ -72,6 +75,7 @@ export function SimpleAppearanceEditor({
   const [liveVersion, setLiveVersion] = useState(publishedVersion);
   const [saveState, setSaveState] = useState<"SAVED" | "DIRTY" | "SAVING" | "CONFLICT" | "ERROR">("SAVED");
   const [message, setMessage] = useState("");
+  const [actionsMount, setActionsMount] = useState<HTMLElement | null>(null);
 
   function commit(next: StatusPageDesign) {
     if (sameStatusPageDesign(design, next)) return;
@@ -124,18 +128,20 @@ export function SimpleAppearanceEditor({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [design, saveState]);
 
+  useEffect(() => {
+    if (!embedded) return;
+    const frame = window.requestAnimationFrame(() => {
+      setActionsMount(document.getElementById("page-management-actions"));
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [embedded]);
+
   function selectLayout(key: PageTemplateKey) {
     commit(applyPageTemplateLayout(design, key));
   }
 
   function selectPreset(key: string) {
     commit(designWithThemePreset(design, key as StatusPageDesign["theme"]["preset"]));
-  }
-
-  function updateBrandColor(value: string) {
-    const next = cloneDesign(design);
-    next.theme.palette.brand = value;
-    commit(statusPageDesignSchema.parse(next));
   }
 
   function updatePresentation(patch: Partial<StatusPageDesign["presentation"]>) {
@@ -156,37 +162,44 @@ export function SimpleAppearanceEditor({
           ? "Save failed"
           : `Draft r${revision}`;
 
+  const actionControls = (
+    <div className="flex shrink-0 items-center gap-2 pb-2 md:pb-1">
+      {page.publicAvailable ? (
+        <Link href={page.publicPath} target="_blank" rel="noreferrer" aria-label="Preview public page" title="Preview public page" className="page-management-action-icon rounded-lg border border-[var(--line-bright)] bg-[var(--surface)] text-[var(--cyan)] hover:bg-[var(--cyan-soft)]">
+          <Eye aria-hidden="true" size={17} />
+        </Link>
+      ) : (
+        <button type="button" disabled aria-label="Preview unavailable until the page is published" title="Preview is available after publishing" className="page-management-action-icon cursor-not-allowed rounded-lg border border-[var(--line)] bg-[var(--surface)] text-[var(--fg-dim)] opacity-70">
+          <Eye aria-hidden="true" size={17} />
+        </button>
+      )}
+      <button
+        type="button"
+        data-button-guard="off"
+        aria-label="Publish changes"
+        title="Publish changes"
+        onClick={() => void publish()}
+        disabled={!hasUnpublishedChanges || saveState === "SAVING" || saveState === "CONFLICT"}
+        className="page-management-action-icon rounded-lg bg-[var(--cyan)] text-[var(--on-cyan)] disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        <Send aria-hidden="true" size={17} />
+        <span className="sr-only">Publish changes</span>
+      </button>
+    </div>
+  );
+
   return (
-    <div className="mx-auto w-full max-w-4xl pb-12">
-      <header className="flex flex-col gap-4 border-b border-[var(--line)] pb-6 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <Link href={`/organization/pages/${page.id}`} className="text-sm font-semibold text-[var(--cyan)] hover:underline">Back to page</Link>
-          <h1 className="mt-3 text-3xl font-semibold tracking-tight text-[var(--fg)]">Appearance</h1>
-          <p className="mt-2 text-sm text-[var(--fg-soft)]">Choose a layout and add your brand. Changes stay private until you publish.</p>
-        </div>
-        <div className="flex flex-wrap items-center gap-3">
-          {page.publicAvailable ? (
-            <Link href={page.publicPath} target="_blank" rel="noreferrer" className="inline-flex min-h-11 items-center gap-2 rounded-md border border-[var(--line)] bg-[var(--surface)] px-4 text-sm font-semibold text-[var(--fg-soft)] hover:border-[var(--line-bright)] hover:text-[var(--cyan)]">
-              <Eye aria-hidden="true" size={16} />
-              Preview
-            </Link>
-          ) : (
-            <button type="button" disabled title="Publish the page before opening a public preview" className="inline-flex min-h-11 cursor-not-allowed items-center gap-2 rounded-md border border-[var(--line)] bg-[var(--surface)] px-4 text-sm font-semibold text-[var(--fg-dim)] opacity-70">
-              <Eye aria-hidden="true" size={16} />
-              Preview
-            </button>
-          )}
-          <button
-            type="button"
-            data-button-guard="off"
-            onClick={() => void publish()}
-            disabled={!hasUnpublishedChanges || saveState === "SAVING" || saveState === "CONFLICT"}
-            className="min-h-11 rounded-md bg-[var(--cyan)] px-4 text-sm font-semibold text-[var(--on-cyan)] disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            Publish changes
-          </button>
-        </div>
-      </header>
+    <>
+      {embedded && actionsMount ? createPortal(actionControls, actionsMount) : null}
+      <div className={`mx-auto w-full ${embedded ? "max-w-none" : "max-w-4xl"} pb-12`}>
+        <header className="flex flex-col gap-4 border-b border-[var(--line)] pb-6 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            {!embedded && <Link href={`/organization/pages/${page.id}`} className="text-sm font-semibold text-[var(--cyan)] hover:underline">Back to page</Link>}
+            <h1 className={`${embedded ? "mt-0" : "mt-3"} text-3xl font-semibold tracking-tight text-[var(--fg)]`}>Appearance</h1>
+            <p className="mt-2 text-sm text-[var(--fg-soft)]">Choose a layout and add your brand. Changes stay private until you publish.</p>
+          </div>
+          {!embedded && actionControls}
+        </header>
 
       {message && (
         <p role={saveState === "ERROR" || saveState === "CONFLICT" ? "alert" : "status"} className={`mt-4 text-sm ${saveState === "ERROR" || saveState === "CONFLICT" ? "text-[var(--red)]" : "text-[var(--fg-soft)]"}`}>
@@ -228,18 +241,14 @@ export function SimpleAppearanceEditor({
         <section aria-labelledby="style-heading" className="border-t border-[var(--line)] pt-8">
           <div className="max-w-2xl">
             <h2 id="style-heading" className="text-lg font-semibold text-[var(--fg)]">Style</h2>
-            <p className="mt-1 text-sm text-[var(--fg-soft)]">Start with a preset, then add your brand color.</p>
+            <p className="mt-1 text-sm text-[var(--fg-soft)]">Choose a preset to set the page colors and visual tone.</p>
           </div>
-          <div className="mt-5 grid max-w-xl gap-4 sm:grid-cols-[minmax(0,1fr)_10rem]">
+          <div className="mt-5 max-w-xl">
             <label className="text-sm font-medium text-[var(--fg)]">
               Style preset
               <FluentSelect aria-label="Style preset" value={design.theme.preset} onChange={(event) => selectPreset(event.target.value)} className="mt-2 w-full border border-[var(--line)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--fg)]">
                 {PAGE_THEME_PRESET_KEYS.map((preset) => <option key={preset} value={preset}>{PAGE_THEME_PRESET_LABELS[preset]}</option>)}
               </FluentSelect>
-            </label>
-            <label className="text-sm font-medium text-[var(--fg)]">
-              Brand color
-              <input aria-label="Brand color" type="color" value={design.theme.palette.brand} onChange={(event) => updateBrandColor(event.target.value)} className="mt-2 h-10 w-full border border-[var(--line)] bg-[var(--surface)] p-1" />
             </label>
           </div>
         </section>
@@ -249,7 +258,7 @@ export function SimpleAppearanceEditor({
             <h2 id="brand-heading" className="text-lg font-semibold text-[var(--fg)]">Brand assets</h2>
             <p className="mt-1 text-sm text-[var(--fg-soft)]">Add the images visitors recognize. New cover images are shown in full by default.</p>
           </div>
-          <div className="mt-5 grid gap-4 sm:grid-cols-2">
+          <div className="mt-5 grid gap-4 lg:grid-cols-3">
             <AssetUploader pageId={page.id} kind="LOGO" currentUrl={design.presentation.logoUrl} label="Logo" help="Used in the public page header." staged simple onStagedChange={({ url }) => updatePresentation({ logoUrl: url })} />
             <AssetUploader pageId={page.id} kind="FAVICON" currentUrl={design.presentation.faviconUrl} label="Site icon" help="Shown in supported browser tabs." staged simple onStagedChange={({ url }) => updatePresentation({ faviconUrl: url })} />
             <AssetUploader
@@ -287,6 +296,7 @@ export function SimpleAppearanceEditor({
       <footer className="mt-10 border-t border-[var(--line)] pt-6">
         <p className={`text-sm ${saveState === "ERROR" || saveState === "CONFLICT" ? "text-[var(--red)]" : "text-[var(--fg-soft)]"}`}>{saveLabel}</p>
       </footer>
-    </div>
+      </div>
+    </>
   );
 }
