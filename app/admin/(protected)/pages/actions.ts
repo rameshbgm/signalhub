@@ -278,6 +278,8 @@ export async function updatePageInfo(pageId: string, formData: FormData) {
     await transaction.updateTable("pages").set(values).where("id", "=", pageId).where("orgId", "=", session.orgId).where("deletedAt", "is", null).executeTakeFirstOrThrow();
     await audit(transaction, session, "UPDATE_PAGE_INFO", pageId);
   });
+  revalidatePath(`/organization/pages/${pageId}/settings`);
+  revalidatePath(`/organization/pages/${pageId}`, "layout");
   revalidatePath(`/organization/pages/${pageId}/your-page/page-info`);
   revalidatePath(`/${page.slug}`, "layout");
 }

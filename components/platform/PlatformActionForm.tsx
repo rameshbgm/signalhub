@@ -30,6 +30,7 @@ export function PlatformActionForm({
   onSuccess,
   ...formProps
 }: PlatformActionFormProps) {
+  const formClassName = formProps.className ?? "";
   const [state, formAction, pending] = useActionState(
     runPlatformActionWithFeedback.bind(null, action, successMessage),
     INITIAL_STATE
@@ -41,7 +42,11 @@ export function PlatformActionForm({
   }, [onSuccess, state]);
 
   return (
-    <form action={formAction} {...formProps}>
+    <form
+      action={formAction}
+      {...formProps}
+      className={`${formClassName} ${formClassName.includes("flex") ? "flex-wrap" : ""}`.trim()}
+    >
       {children}
       <p
         aria-atomic="true"

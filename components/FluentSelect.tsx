@@ -187,6 +187,7 @@ export function FluentSelect({
   const selectedLabel =
     parsedOptions.find((option) => option.value === selectedValue)?.label ?? "";
   const fillsContainer = /(?:^|\s)(?:[a-z]+:)*w-full(?:\s|$)/.test(className);
+  const growsInFlex = /(?:^|\s)(?:[a-z]+:)*flex-1(?:\s|$)/.test(className);
   const isCompact = /text-(?:xs|\[10px\])/.test(className);
   const isLarge = /py-2\.5/.test(className);
   const maxWidth = /(?:^|\s)(?:[a-z]+:)*max-w-20(?:\s|$)/.test(className)
@@ -286,7 +287,8 @@ export function FluentSelect({
         style={{
           maxWidth,
           minWidth: 0,
-          width: fillsContainer ? "100%" : undefined,
+          width: fillsContainer || growsInFlex ? "100%" : undefined,
+          flex: growsInFlex ? "1 1 0%" : undefined,
         }}
       >
         <Button

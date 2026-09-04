@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { Eye } from "lucide-react";
 import { FluentSelect } from "@/components/FluentSelect";
 import { AssetUploader } from "@/components/admin/AssetUploader";
 import {
@@ -164,10 +165,16 @@ export function SimpleAppearanceEditor({
           <p className="mt-2 text-sm text-[var(--fg-soft)]">Choose a layout and add your brand. Changes stay private until you publish.</p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          {page.publicAvailable && (
-            <Link href={page.publicPath} target="_blank" rel="noreferrer" className="text-sm font-semibold text-[var(--fg-soft)] underline decoration-[var(--line-bright)] underline-offset-4 hover:text-[var(--cyan)]">
-              Open live
+          {page.publicAvailable ? (
+            <Link href={page.publicPath} target="_blank" rel="noreferrer" className="inline-flex min-h-11 items-center gap-2 rounded-md border border-[var(--line)] bg-[var(--surface)] px-4 text-sm font-semibold text-[var(--fg-soft)] hover:border-[var(--line-bright)] hover:text-[var(--cyan)]">
+              <Eye aria-hidden="true" size={16} />
+              Preview
             </Link>
+          ) : (
+            <button type="button" disabled title="Publish the page before opening a public preview" className="inline-flex min-h-11 cursor-not-allowed items-center gap-2 rounded-md border border-[var(--line)] bg-[var(--surface)] px-4 text-sm font-semibold text-[var(--fg-dim)] opacity-70">
+              <Eye aria-hidden="true" size={16} />
+              Preview
+            </button>
           )}
           <button
             type="button"

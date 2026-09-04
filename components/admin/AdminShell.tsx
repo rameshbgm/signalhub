@@ -26,7 +26,7 @@ export function AdminShell({ sidebar, children }: { sidebar: ReactNode; children
   }, [navigationOpen]);
 
   return (
-    <div className={`dispatch-shell min-h-screen bg-[var(--bg)] text-[var(--fg)] ${focusedFlow ? "block" : "lg:flex"}`}>
+    <div className={`dispatch-shell min-h-screen bg-[var(--bg)] text-[var(--fg)] ${focusedFlow ? "dispatch-shell--focused" : "lg:flex"}`}>
       {!focusedFlow && (
         <>
           <header className="sticky top-0 z-40 flex h-14 items-center justify-between border-b border-[var(--line)] bg-[var(--surface)]/95 px-4 backdrop-blur lg:hidden">

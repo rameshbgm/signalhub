@@ -1160,6 +1160,7 @@ body {
 /* Final enterprise tokens (kept at EOF so legacy surface rules cannot
    reintroduce the retired dark/grid treatment). */
 .dispatch-shell { background: var(--bg) !important; }
+.dispatch-shell--focused { display: block !important; grid-template-columns: minmax(0, 1fr) !important; }
 .dispatch-command-deck { background: var(--surface) !important; box-shadow: 1px 0 0 rgba(32, 33, 36, 0.02) !important; }
 .status-dispatch-shell { background: var(--bg) !important; background-image: none !important; }
 .grain::before, .grain::after { display: none; }
