@@ -3,8 +3,9 @@
 import { fetchWithTimeout } from "@/lib/client-fetch";
 
 import { useState } from "react";
-import { CopyButton } from "@/components/CopyButton";
 import { Button } from "@/components/ui/button";
+import { Alert } from "@/components/ui/alert";
+import { SecretField } from "@/components/admin/SecretReveal";
 
 export function HeartbeatTokenManager({ monitorId }: { monitorId: string }) {
   const [url, setUrl] = useState<string | null>(null);
@@ -32,17 +33,9 @@ export function HeartbeatTokenManager({ monitorId }: { monitorId: string }) {
   }
 
   return (
-    <div className="mt-2 border border-[var(--line)] bg-[var(--bg)] p-2 text-xs">
+    <div className="mt-3 space-y-2 rounded-control bg-sunken/60 p-3 text-xs">
       {url ? (
-        <div className="space-y-2">
-          <p className="text-[var(--amber)]">Copy this URL now. It will not be shown again.</p>
-          <code className="block break-all text-[var(--fg)]">{url}</code>
-          <CopyButton
-            value={url}
-            label="Copy URL"
-            className="border border-[var(--line)] px-2 py-1 disabled:opacity-50"
-          />
-        </div>
+        <Alert tone="warn" title="Copy this URL now. It will not be shown again."><SecretField value={url} copyLabel="Copy URL" className="mt-2" /></Alert>
       ) : (
         <Button
           type="button"
@@ -50,12 +43,12 @@ export function HeartbeatTokenManager({ monitorId }: { monitorId: string }) {
           onClick={() => void rotate()}
           variant="link"
           size="sm"
-          className="h-auto px-0 py-0 text-[var(--cyan)]"
+          className="h-auto px-0 py-0"
         >
           {pending ? "Creating heartbeat URL…" : "Create or rotate heartbeat URL"}
         </Button>
       )}
-      {error && <p role="alert" className="mt-1 text-[var(--red)]">{error}</p>}
+      {error && <p role="alert" className="mt-1 text-danger-fg">{error}</p>}
     </div>
   );
 }

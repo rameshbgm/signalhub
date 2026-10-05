@@ -11,5 +11,5 @@ export default async function SetupLayout({
   const session = await requireCapability("page.configure", pageId);
   await assertPageInOrg(pageId, session.orgId);
 
-  return <div className="max-w-3xl mx-auto">{children}</div>;
+  return <div className="mx-auto w-full max-w-2xl px-4 pb-16 pt-4 sm:px-6 sm:pt-8">{children}</div>;
 }

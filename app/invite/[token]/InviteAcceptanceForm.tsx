@@ -4,7 +4,9 @@ import { fetchWithTimeout } from "@/lib/client-fetch";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 
 export function InviteAcceptanceForm({
@@ -52,11 +54,8 @@ export function InviteAcceptanceForm({
   }
 
   return (
-    <form onSubmit={submit} className="mt-6 space-y-3">
-      <div>
-        <label htmlFor="invite-password" className="text-xs font-semibold text-[var(--fg)]">
-          {hasPassword ? "Confirm your existing password" : "Create a password"}
-        </label>
+    <form onSubmit={submit} className="mt-8 space-y-4">
+      <Field label={hasPassword ? "Confirm your existing password" : "Create a password"} htmlFor="invite-password" hint={hasPassword ? undefined : `Use at least ${passwordMinimum} characters.`}>
         <Input
           id="invite-password"
           value={password}
@@ -66,14 +65,11 @@ export function InviteAcceptanceForm({
           maxLength={1024}
           autoComplete={hasPassword ? "current-password" : "new-password"}
           required
-          className="mt-1 px-4 py-3"
+          className="h-12 px-4"
         />
-      </div>
+      </Field>
       {!hasPassword && (
-        <div>
-          <label htmlFor="invite-confirmation" className="text-xs font-semibold text-[var(--fg)]">
-            Confirm password
-          </label>
+        <Field label="Confirm password" htmlFor="invite-confirmation">
           <Input
             id="invite-confirmation"
             value={confirmation}
@@ -83,12 +79,12 @@ export function InviteAcceptanceForm({
             maxLength={1024}
             autoComplete="new-password"
             required
-            className="mt-1 px-4 py-3"
+            className="h-12 px-4"
           />
-        </div>
+        </Field>
       )}
-      {error && <p role="alert" className="text-xs text-[var(--red)]">{error}</p>}
-      <Button type="submit" loading={pending} className="w-full py-3">
+      {error && <Alert tone="danger">{error}</Alert>}
+      <Button type="submit" loading={pending} size="lg" className="w-full">
         {pending ? "Accepting…" : "Accept invitation"}
       </Button>
     </form>

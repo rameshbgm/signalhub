@@ -1,4 +1,7 @@
 import { redirect } from "next/navigation";
+import { PauseCircle } from "lucide-react";
+import { AuthShell } from "@/components/admin/AuthShell";
+import { IconTile } from "@/components/ui/icon-tile";
 import { LogoutButton } from "@/components/admin/LogoutButton";
 import { getSession } from "@/lib/auth";
 import { database } from "@/lib/postgres/client";
@@ -22,14 +25,15 @@ export default async function OrgSuspendedPage() {
   if (organizationStatus(organization) !== "SUSPENDED") redirect("/organization");
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[var(--bg)] p-4">
-      <div className="max-w-md space-y-3 border border-[var(--line)] bg-[var(--surface)] p-8 text-center">
-        <h1 className="font-mono text-lg font-semibold text-[var(--red)]">Organization suspended</h1>
-        <p className="text-sm text-[var(--fg-soft)]">
-          {organization.name} has been suspended by a platform administrator. Contact support if you believe this is a mistake.
-        </p>
-        <LogoutButton />
+    <AuthShell>
+      <IconTile icon={PauseCircle} hue="rose" size="lg" />
+      <h1 className="mt-5 text-3xl font-semibold tracking-tight">Organization suspended</h1>
+      <p className="mt-2 text-sm leading-6 text-ink-soft">
+        {organization.name} has been suspended by a platform administrator. Contact support if you believe this is a mistake.
+      </p>
+      <div className="mt-8">
+        <LogoutButton className="border border-line-strong bg-surface shadow-card" />
       </div>
-    </div>
+    </AuthShell>
   );
 }

@@ -4,9 +4,15 @@ import { fetchWithTimeout } from "@/lib/client-fetch";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { CopyButton } from "@/components/CopyButton";
+import { RefreshCw, Trash2, Webhook } from "lucide-react";
+import { SecretField } from "@/components/admin/SecretReveal";
+import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { StatusBadge } from "@/components/ui/status-badge";
 
 type Endpoint = {
   id: string;
@@ -90,48 +96,65 @@ export function WebhookEndpointManager({
   }
 
   return (
-    <div className="space-y-3">
-      <form onSubmit={create} className="flex flex-col gap-2 sm:flex-row">
-        <label htmlFor="webhook-url" className="sr-only">HTTPS webhook URL</label>
-        <Input
-          id="webhook-url"
-          value={url}
-          onChange={(event) => setUrl(event.target.value)}
-          type="url"
-          placeholder="https://example.com/webhook"
-          required
-        />
-        <Button type="submit" variant="secondary" loading={pending === "create"}>
-          {pending === "create" ? "Verifying…" : "Verify & Add"}
-        </Button>
-      </form>
-      {error && <p role="alert" className="text-sm text-[var(--red)]">{error}</p>}
+    <div className="space-y-4">
+      {error && <Alert tone="danger">{error}</Alert>}
       {secret && (
-        <div role="status" className="border border-[var(--amber)]/40 bg-[var(--amber-soft)] p-3 text-sm">
-          <p className="font-semibold text-[var(--fg)]">Copy this signing secret now. It will not be shown again.</p>
-          <code className="mt-2 block break-all select-all text-[var(--fg)]">{secret}</code>
-          <CopyButton
-            value={secret}
-            label="Copy secret"
-            className="mt-2 text-xs font-semibold text-[var(--cyan)] disabled:opacity-50"
-          />
-        </div>
+        <Alert tone="warn" role="status" title="Copy this signing secret now. It will not be shown again.">
+          <SecretField value={secret} copyLabel="Copy secret" className="mt-3" />
+        </Alert>
       )}
-      <div className="divide-y divide-[var(--line)] border border-[var(--line)] bg-[var(--surface)]">
-        {endpoints.map((endpoint) => (
-          <div key={endpoint.id} className="flex flex-col gap-2 p-3 text-sm sm:flex-row sm:items-center sm:justify-between">
-            <div className="min-w-0">
-              <p className="truncate font-medium text-[var(--fg)]">{endpoint.url}</p>
-              <code className="text-xs text-[var(--fg-soft)]">signature: {endpoint.secretLabel}</code>
-            </div>
-            <div className="flex gap-2">
-              <Button type="button" variant="outline" size="sm" disabled={Boolean(pending)} onClick={() => mutate(endpoint.id, "rotate")}>Rotate</Button>
-              <Button type="button" variant="destructive" size="sm" disabled={Boolean(pending)} onClick={() => mutate(endpoint.id, "delete")}>Delete</Button>
-            </div>
+      <Card>
+        <CardContent className="space-y-5">
+          <div>
+            <form onSubmit={create} className="flex flex-col gap-3 sm:flex-row sm:items-end">
+              <Field label="HTTPS webhook URL" htmlFor="webhook-url" className="min-w-0 flex-1">
+                <Input
+                  id="webhook-url"
+                  value={url}
+                  onChange={(event) => setUrl(event.target.value)}
+                  type="url"
+                  placeholder="https://example.com/webhook"
+                  className="font-mono"
+                  required
+                />
+              </Field>
+              <Button type="submit" loading={pending === "create"}>
+                {pending === "create" ? "Verifying…" : "Verify and add"}
+              </Button>
+            </form>
+            <p className="mt-2 text-xs leading-5 text-ink-dim">SignalHub verifies the endpoint before saving it, then signs every delivery with the secret shown once after it is added.</p>
           </div>
-        ))}
-        {endpoints.length === 0 && <p className="p-3 text-sm text-[var(--fg-dim)]">No webhook endpoints yet.</p>}
-      </div>
+          {endpoints.length === 0 ? (
+            <EmptyState icon={Webhook} hue="teal" title="No webhook endpoints yet" description="Add an HTTPS endpoint to receive signed status events." className="border-0 bg-transparent py-6" />
+          ) : (
+            <ul className="space-y-2 border-t border-line pt-5">
+              {endpoints.map((endpoint) => (
+                <li key={endpoint.id} className="flex flex-wrap items-center justify-between gap-3 rounded-control border border-line px-3.5 py-3 text-sm">
+                  <div className="min-w-0">
+                    <p className="flex flex-wrap items-center gap-2">
+                      <span className="truncate font-mono text-xs font-medium text-ink">{endpoint.url}</span>
+                      <StatusBadge tone={endpoint.verifiedAt ? "ok" : "warn"}>{endpoint.verifiedAt ? "Verified" : "Unverified"}</StatusBadge>
+                    </p>
+                    <p className="mt-0.5 font-mono text-xs text-ink-dim">signature: {endpoint.secretLabel}</p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button type="button" variant="secondary" size="sm" disabled={Boolean(pending)} onClick={() => mutate(endpoint.id, "rotate")}>
+                      <RefreshCw aria-hidden size={14} />
+                      Rotate
+                    </Button>
+                    <Button type="button" variant="ghost" size="sm" className={DANGER_GHOST} disabled={Boolean(pending)} onClick={() => mutate(endpoint.id, "delete")}>
+                      <Trash2 aria-hidden size={14} />
+                      Delete
+                    </Button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
+
+const DANGER_GHOST = "hover:!bg-danger-bg hover:!text-danger-fg [&_svg]:!text-ink-dim hover:[&_svg]:!text-danger-fg";

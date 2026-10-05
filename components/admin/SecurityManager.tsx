@@ -6,8 +6,16 @@ import { useEffect, useState } from "react";
 import { CopyButton } from "@/components/CopyButton";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/button";
+import { KeyRound, Laptop, LogIn, MonitorSmartphone, ShieldCheck, Smartphone } from "lucide-react";
+import { SecretField } from "@/components/admin/SecretReveal";
+import { Alert } from "@/components/ui/alert";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Field } from "@/components/ui/field";
+import { IconTile } from "@/components/ui/icon-tile";
 import { Input } from "@/components/ui/input";
+import { StatusBadge } from "@/components/ui/status-badge";
 
 type Session = {
   id: string;
@@ -98,53 +106,98 @@ export function SecurityManager({ enrollmentRequired }: { enrollmentRequired: bo
     }
   }
 
+  const mfaSummary = mfa?.enrolled
+    ? `Enabled · ${mfa.recoveryCodesRemaining} recovery codes remain`
+    : enrollmentRequired
+      ? "Enrollment is required before administrative changes are allowed."
+      : "Protect password sign-in with a time-based one-time code.";
+
   return (
     <div className="space-y-6">
-      <section className={`border bg-[var(--surface)] p-5 ${enrollmentRequired ? "border-[var(--amber)]" : "border-[var(--line)]"}`}>
-        <h2 className="font-mono text-sm font-semibold">Authenticator MFA</h2>
-        <p className="mt-1 text-xs text-[var(--fg-dim)]">
-          {mfa?.enrolled ? `Enabled · ${mfa.recoveryCodesRemaining} recovery codes remain` : enrollmentRequired ? "Enrollment is required before administrative changes are allowed." : "Protect password sign-in with a time-based one-time code."}
-        </p>
-        {!mfa?.enrolled && !secret && (
-          <Button type="button" size="sm" loading={pendingAction === "start"} onClick={() => void mfaAction("start")} className="mt-3">Start enrollment</Button>
-        )}
-        {secret && (
-          <div className="mt-3 space-y-3">
-            <div className="border border-[var(--line)] bg-[var(--bg)] p-3 text-xs">
-              <p>Add this key or URI to your authenticator application:</p>
-              <code className="mt-2 block break-all">{secret}</code>
-              <CopyButton value={uri ?? secret} label="Copy setup URI" className="mt-2 font-semibold text-[var(--cyan)]" />
-            </div>
-            <div className="flex gap-2">
-              <Input value={code} onChange={(event) => setCode(event.target.value.replace(/\D/g, "").slice(0, 6))} placeholder="6-digit code" className="max-w-48" />
-              <Button type="button" size="sm" loading={pendingAction === "confirm"} disabled={code.length !== 6} onClick={() => void mfaAction("confirm")}>Confirm</Button>
+      <Card className={enrollmentRequired && !mfa?.enrolled ? "ring-2 ring-warn/40" : undefined}>
+        <CardHeader className="flex-row items-start justify-between gap-4">
+          <div className="flex min-w-0 items-start gap-3">
+            <IconTile icon={ShieldCheck} hue="rose" />
+            <div className="min-w-0">
+              <CardTitle>Authenticator MFA</CardTitle>
+              <CardDescription>{mfaSummary}</CardDescription>
             </div>
           </div>
-        )}
-        {recoveryCodes.length > 0 && (
-          <div className="mt-3 border border-[var(--amber)]/40 bg-[var(--amber-soft)] p-3 text-xs">
-            <p className="font-semibold">Save these one-time recovery codes. You will be signed out after enrollment.</p>
-            <div className="mt-2 grid grid-cols-2 gap-1 font-mono">{recoveryCodes.map((value) => <code key={value}>{value}</code>)}</div>
-            <Link href="/login" className="mt-3 inline-block font-semibold text-[var(--cyan)]">Return to sign in</Link>
-          </div>
-        )}
-      </section>
-      <section className="border border-[var(--line)] bg-[var(--surface)] p-5">
-        <h2 className="font-mono text-sm font-semibold">Active sessions</h2>
-        <div className="mt-3 divide-y divide-[var(--line)] border border-[var(--line)]">
-          {sessions.map((session) => (
-            <div key={session.id} className="flex flex-wrap items-center justify-between gap-3 p-3 text-xs">
-              <div>
-                <p className="font-semibold">{session.authMethod}{session.current ? " · Current" : ""}{session.mfaVerified ? " · MFA" : ""}</p>
-                <p className="mt-1 text-[var(--fg-dim)]">{session.ipAddress ?? "IP unavailable"} · {new Date(session.lastSeenAt).toLocaleString()}</p>
-                <p className="mt-1 max-w-xl truncate text-[10px] text-[var(--fg-dim)]">{session.userAgent ?? "User agent unavailable"}</p>
+          {mfa && <StatusBadge tone={mfa.enrolled ? "ok" : enrollmentRequired ? "warn" : "neutral"}>{mfa.enrolled ? "Enabled" : enrollmentRequired ? "Required" : "Not set up"}</StatusBadge>}
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {!mfa?.enrolled && !secret && (
+            <Button type="button" loading={pendingAction === "start"} onClick={() => void mfaAction("start")}>
+              <KeyRound aria-hidden size={16} />
+              Start enrollment
+            </Button>
+          )}
+          {secret && (
+            <div className="space-y-4">
+              <div className="rounded-control border border-line bg-sunken p-4">
+                <p className="mb-3 text-sm text-ink-soft">Add this key or URI to your authenticator application:</p>
+                <SecretField value={secret} copyValue={uri ?? secret} copyLabel="Copy setup URI" />
               </div>
-              <Button type="button" variant="destructive" size="sm" loading={pendingAction === `revoke:${session.id}`} disabled={Boolean(pendingAction)} onClick={() => void revoke(session.id)}>Revoke</Button>
+              <div className="flex flex-wrap items-end gap-3">
+                <Field label="Verification code" htmlFor="mfa-code" className="w-full sm:w-48">
+                  <Input id="mfa-code" value={code} onChange={(event) => setCode(event.target.value.replace(/\D/g, "").slice(0, 6))} placeholder="6-digit code" inputMode="numeric" autoComplete="one-time-code" />
+                </Field>
+                <Button type="button" loading={pendingAction === "confirm"} disabled={code.length !== 6} onClick={() => void mfaAction("confirm")}>Confirm</Button>
+              </div>
             </div>
-          ))}
-        </div>
-      </section>
-      {error && <p role="alert" className="text-sm text-[var(--red)]">{error}</p>}
+          )}
+          {recoveryCodes.length > 0 && (
+            <Alert tone="warn" role="status" title="Save these one-time recovery codes. You will be signed out after enrollment.">
+              <ul className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                {recoveryCodes.map((value) => <li key={value}><code className="block rounded-control border border-line-strong bg-surface px-2.5 py-1.5 text-center font-mono text-xs text-ink">{value}</code></li>)}
+              </ul>
+              <div className="mt-4 flex flex-wrap items-center gap-2">
+                <CopyButton value={recoveryCodes.join("\n")} label="Copy codes" />
+                <Link href="/login" className={buttonVariants({ variant: "default", size: "sm" })}><LogIn aria-hidden size={14} />Return to sign in</Link>
+              </div>
+            </Alert>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Active sessions</CardTitle>
+          <CardDescription>Devices currently signed in to your account. Revoke any you do not recognise.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {sessions.length === 0 ? (
+            <EmptyState icon={MonitorSmartphone} hue="rose" title="No active sessions" description="Signed-in devices appear here." className="border-0 bg-transparent py-8" />
+          ) : (
+            <ul className="space-y-2">
+              {sessions.map((session) => {
+                const mobile = /mobile|android|iphone|ipad/i.test(session.userAgent ?? "");
+                const DeviceIcon = mobile ? Smartphone : Laptop;
+                return (
+                  <li key={session.id} className="flex flex-wrap items-center justify-between gap-3 rounded-control border border-line px-3.5 py-3 text-sm">
+                    <div className="flex min-w-0 items-start gap-3">
+                      <IconTile icon={DeviceIcon} hue="slate" size="sm" />
+                      <div className="min-w-0">
+                        <p className="flex flex-wrap items-center gap-2 font-medium text-ink">
+                          {session.authMethod}
+                          {session.current && <StatusBadge tone="info">Current</StatusBadge>}
+                          {session.mfaVerified && <StatusBadge tone="ok">MFA</StatusBadge>}
+                        </p>
+                        <p className="mt-0.5 text-xs text-ink-soft">{session.ipAddress ?? "IP unavailable"} · {new Date(session.lastSeenAt).toLocaleString()}</p>
+                        <p className="mt-0.5 max-w-xl truncate text-xs text-ink-dim">{session.userAgent ?? "User agent unavailable"}</p>
+                      </div>
+                    </div>
+                    <Button type="button" variant="ghost" size="sm" className={DANGER_GHOST} loading={pendingAction === `revoke:${session.id}`} disabled={Boolean(pendingAction)} onClick={() => void revoke(session.id)}>Revoke</Button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </CardContent>
+      </Card>
+      {error && <Alert tone="danger">{error}</Alert>}
     </div>
   );
 }
+
+const DANGER_GHOST = "hover:!bg-danger-bg hover:!text-danger-fg";

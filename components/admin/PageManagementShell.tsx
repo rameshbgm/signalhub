@@ -1,74 +1,108 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import type { ReactNode } from "react";
-import { Select } from "@/components/ui/select";
+import { usePathname } from "next/navigation";
+import { useEffect, useRef, type ReactNode } from "react";
+import { ArrowLeft, ArrowUpRight, Bell, Boxes, Layers3, LayoutDashboard, LayoutGrid, Palette, Settings, ShieldCheck, type LucideIcon } from "lucide-react";
+import { buttonVariants } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { PageHeader } from "@/components/ui/page-header";
+import { StatusBadge } from "@/components/ui/status-badge";
+import { cn } from "@/lib/utils";
 
 type ManagedPage = { id: string; name: string; slug: string; isHub: boolean; type: string; setupCompleted: boolean; publicVisible: boolean; publicPath: string; parentHub: { id: string; name: string } | null; canPublish: boolean };
-const sections = [{ key: "overview", label: "Overview", suffix: "" }, { key: "content", label: "Content", suffix: "/content" }, { key: "appearance", label: "Appearance", suffix: "/appearance" }, { key: "access", label: "Access", suffix: "/access" }, { key: "notifications", label: "Notifications", suffix: "/notifications" }, { key: "settings", label: "Settings", suffix: "/settings" }] as const;
+const sections: ReadonlyArray<{ key: "overview" | "content" | "appearance" | "access" | "notifications" | "settings"; label: string; suffix: string; icon: LucideIcon }> = [
+  { key: "overview", label: "Overview", suffix: "", icon: LayoutDashboard },
+  { key: "content", label: "Content", suffix: "/content", icon: Boxes },
+  { key: "appearance", label: "Appearance", suffix: "/appearance", icon: Palette },
+  { key: "access", label: "Access", suffix: "/access", icon: ShieldCheck },
+  { key: "notifications", label: "Notifications", suffix: "/notifications", icon: Bell },
+  { key: "settings", label: "Settings", suffix: "/settings", icon: Settings },
+];
 
 export function PageManagementShell({ page, actions, children }: { page: ManagedPage; actions: ReactNode; children: ReactNode }) {
   const pathname = usePathname();
-  const router = useRouter();
+  const tabs = useRef<HTMLElement>(null);
   const base = `/organization/pages/${page.id}`;
   const visibleSections = page.type === "PUBLIC" ? sections.filter((section) => section.key !== "access") : sections;
+  const current = visibleSections.find((section) => section.suffix && (pathname === `${base}${section.suffix}` || pathname.startsWith(`${base}${section.suffix}/`))) ?? visibleSections[0];
+
+  // On narrow screens the tabs scroll sideways: keep the active one in view.
+  useEffect(() => {
+    const nav = tabs.current;
+    const active = nav?.querySelector<HTMLElement>("[aria-current='page']");
+    if (nav && active) nav.scrollLeft = active.offsetLeft - (nav.clientWidth - active.offsetWidth) / 2;
+  }, [current.key]);
+
   // Keep the Appearance editor inside the same page-management chrome as the
   // other sections. The advanced design route and onboarding screens remain
   // focused flows with their own full-page controls.
   if (pathname === `${base}/design` || pathname.startsWith(`${base}/setup/`)) return children;
-  const current = visibleSections.find((section) => pathname === `${base}${section.suffix}`) ?? visibleSections[0];
+
+  const live = page.setupCompleted && page.publicVisible;
   const state = !page.setupCompleted ? "Draft" : page.publicVisible ? "Published" : "Hidden";
+  const stateTone = !page.setupCompleted ? "warn" : page.publicVisible ? "ok" : "neutral";
   const sectionLabel = (key: typeof visibleSections[number]["key"], fallback: string) => key === "content" ? (page.isHub ? "Status pages" : "Services & groups") : fallback;
+  const sectionIcon = (key: typeof visibleSections[number]["key"], fallback: LucideIcon) => key === "content" && page.isHub ? Layers3 : fallback;
+
   return (
-    <div className="mx-auto w-full max-w-7xl space-y-6">
-      <header className="border-b border-[var(--line)] pb-6">
-        <Link href="/organization/pages" className="inline-flex text-sm font-semibold text-[var(--cyan)] hover:underline">← All pages</Link>
-        <div className="mt-5 flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="rounded-full bg-[var(--cyan-soft)] px-2.5 py-1 text-xs font-semibold text-[var(--cyan)]">{page.isHub ? "Hub" : "Status page"}</span>
-              <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${page.publicVisible && page.setupCompleted ? "bg-[var(--green-soft)] text-[var(--green)]" : "bg-[var(--amber-soft)] text-[var(--amber)]"}`}>{state}</span>
-              <span className="text-sm text-[var(--fg-dim)]">/{page.slug}</span>
-            </div>
-            <h1 className="mt-3 truncate text-3xl font-semibold tracking-[-0.03em] text-[var(--fg)]">{page.name}</h1>
-            {page.parentHub && <p className="mt-1.5 text-sm text-[var(--fg-dim)]">In hub <Link href={`/organization/pages/${page.parentHub.id}/content`} className="font-semibold text-[var(--cyan)] hover:underline">{page.parentHub.name}</Link></p>}
-          </div>
-        </div>
-      </header>
+    <div className="space-y-6">
+      <div className="space-y-3">
+        <Link href="/organization/pages" className={buttonVariants({ variant: "ghost", size: "sm", className: "-ml-3 max-sm:min-h-10" })}>
+          <ArrowLeft aria-hidden size={16} />
+          All pages
+        </Link>
+        <PageHeader
+          title={page.name}
+          icon={page.isHub ? Layers3 : LayoutGrid}
+          hue="violet"
+          description={
+            <span className="flex flex-wrap items-center gap-x-3 gap-y-2">
+              <StatusBadge tone={stateTone} live={live}>{state}</StatusBadge>
+              <Badge>{page.isHub ? "Hub" : "Status page"}</Badge>
+              <span className="font-mono text-xs text-ink-dim">/{page.slug}</span>
+              {live && (
+                <a href={page.publicPath} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-chip font-semibold text-primary-ink outline-none hover:underline focus-visible:ring-4 focus-visible:ring-primary/25">
+                  View live page
+                  <ArrowUpRight aria-hidden size={14} />
+                </a>
+              )}
+              {page.parentHub && (
+                <span>In hub <Link href={`/organization/pages/${page.parentHub.id}/content`} className="rounded-chip font-semibold text-primary-ink outline-none hover:underline focus-visible:ring-4 focus-visible:ring-primary/25">{page.parentHub.name}</Link></span>
+              )}
+            </span>
+          }
+          // Appearance owns its preview and design-publish controls. Its action
+          // mount keeps those controls in this shared header without duplicating
+          // the page visibility actions.
+          actions={current.key === "appearance" ? <div id="page-management-actions" className="shrink-0" /> : actions}
+        />
+      </div>
 
-      <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-        <label className="grid gap-1.5 text-sm font-medium text-[var(--fg-soft)] md:hidden">
-          Page section
-          <Select aria-label="Page section" value={`${base}${current.suffix}`} onChange={(event) => router.push(event.target.value)} className="rounded-lg border border-[var(--line)] bg-[var(--surface)] px-3 py-2.5 text-sm text-[var(--fg)]">
-            {visibleSections.map((section) => <option key={section.key} value={`${base}${section.suffix}`}>{sectionLabel(section.key, section.label)}</option>)}
-          </Select>
-        </label>
-
-        <nav aria-label="Page management" className="hidden min-w-0 flex-1 border-b border-[var(--line)] md:block">
-          <div className="hidden min-w-max items-center gap-1 overflow-x-auto pb-px md:flex">
-            {visibleSections.map((section) => {
-              const href = `${base}${section.suffix}`;
-              const active = current.key === section.key;
-              return (
+      <nav ref={tabs} aria-label="Page management" className="w-full overflow-x-auto rounded-card border border-line bg-surface p-1.5 shadow-card [scrollbar-width:none] sm:w-fit sm:max-w-full [&::-webkit-scrollbar]:hidden">
+        <ul className="flex min-w-max gap-1">
+          {visibleSections.map((section) => {
+            const href = `${base}${section.suffix}`;
+            const active = current.key === section.key;
+            const Icon = sectionIcon(section.key, section.icon);
+            return (
+              <li key={section.key}>
                 <Link
-                  key={section.key}
                   href={href}
                   aria-current={active ? "page" : undefined}
-                  className={`border-b-2 px-4 py-3 text-sm font-medium transition-colors ${active ? "border-[var(--cyan)] text-[var(--cyan)]" : "border-transparent text-[var(--fg-soft)] hover:border-[var(--line-bright)] hover:text-[var(--fg)]"}`}
+                  className={cn(
+                    "inline-flex min-h-10 items-center gap-2 whitespace-nowrap rounded-control px-3.5 text-sm outline-none transition-[background-color,color,box-shadow] duration-200 ease-soft focus-visible:ring-4 focus-visible:ring-primary/25",
+                    active ? "bg-primary-soft font-semibold text-primary-ink ring-1 ring-inset ring-primary/20" : "font-medium text-ink-soft hover:bg-sunken hover:text-ink",
+                  )}
                 >
+                  <Icon aria-hidden size={16} className={active ? "text-primary" : "text-ink-dim"} />
                   {sectionLabel(section.key, section.label)}
                 </Link>
-              );
-            })}
-          </div>
-        </nav>
-
-        {/* Appearance owns its preview and design-publish controls. Its action
-            mount keeps those controls in this shared row without duplicating
-            the page visibility actions. */}
-        {current.key === "appearance" ? <div id="page-management-actions" className="shrink-0" /> : actions}
-      </div>
+              </li>
+            );
+          })}
+        </ul>
+      </nav>
 
       <div className="min-w-0">{children}</div>
     </div>

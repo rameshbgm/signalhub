@@ -1,20 +1,24 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { CheckRow } from "@/components/admin/operate-ui";
 import { COMPONENT_STATUSES, COMPONENT_STATUS_LABEL, type ComponentStatus } from "@/lib/status";
-import { HelpTip } from "@/components/HelpTip";
 
 const MONITOR_TYPES = ["HTTP", "KEYWORD", "TCP", "TLS", "ICMP", "DNS", "HEARTBEAT"] as const;
 
-const inputClass =
-  "border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--fg)] outline-none placeholder:text-[var(--fg-dim)] focus:border-[var(--cyan)]";
-const inputClassXs =
-  "border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-xs text-[var(--fg)] outline-none placeholder:text-[var(--fg-dim)] focus:border-[var(--cyan)]";
+function Section({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <fieldset className="space-y-4 rounded-card border border-line p-4">
+      <legend className="px-1.5 text-sm font-semibold text-ink">{title}</legend>
+      {children}
+    </fieldset>
+  );
+}
 
 export function MonitorForm({
   action,
@@ -29,174 +33,205 @@ export function MonitorForm({
   const isHttpLike = type === "HTTP" || type === "KEYWORD";
 
   return (
-    <form action={action} className="space-y-4 border border-[var(--line)] bg-[var(--surface)] p-4 text-sm">
-      <div className="grid gap-3 sm:grid-cols-2">
-        <Input name="name" placeholder="Monitor name" className={`${inputClass} w-full`} required />
-        <Select aria-label="Monitor type" name="type" value={type} onChange={(e) => setType(e.target.value as typeof type)} className={`${inputClass} w-full`}>
-          {MONITOR_TYPES.map((t) => (
-            <option key={t} value={t}>
-              {t}
-            </option>
-          ))}
-        </Select>
+    <form action={action} className="space-y-5 rounded-card border border-line bg-surface p-5 text-sm shadow-card">
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field label="Monitor name" htmlFor="monitor-name" required>
+          <Input id="monitor-name" name="name" placeholder="Monitor name" required />
+        </Field>
+        <Field label="Monitor type" htmlFor="monitor-type">
+          <Select id="monitor-type" aria-label="Monitor type" name="type" value={type} onChange={(e) => setType(e.target.value as typeof type)}>
+            {MONITOR_TYPES.map((t) => (
+              <option key={t} value={t}>
+                {t}
+              </option>
+            ))}
+          </Select>
+        </Field>
 
-        {type !== "HEARTBEAT" && <Input
-          name="target"
-          placeholder={isUrlBased ? "https://example.com/health" : "host.example.com"}
-          className={`${inputClass} w-full sm:col-span-2`}
-          required
-        />}
+        {type !== "HEARTBEAT" && (
+          <Field label="Target" htmlFor="monitor-target" className="sm:col-span-2" required>
+            <Input
+              id="monitor-target"
+              name="target"
+              placeholder={isUrlBased ? "https://example.com/health" : "host.example.com"}
+              className="font-mono"
+              required
+            />
+          </Field>
+        )}
         {type === "HEARTBEAT" && <Input type="hidden" name="target" value="inbound-heartbeat" />}
 
-        {type === "TCP" && <Input name="port" type="number" placeholder="Port" className={`${inputClass} w-full`} required />}
+        {type === "TCP" && (
+          <Field label="Port" htmlFor="monitor-port" required>
+            <Input id="monitor-port" name="port" type="number" placeholder="Port" required />
+          </Field>
+        )}
 
-        <Select aria-label="Component" name="componentId" className={`${inputClass} w-full`}>
-          <option value="">Not tied to a component</option>
-          {components.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}
-            </option>
-          ))}
-        </Select>
+        <Field label="Component" htmlFor="monitor-component">
+          <Select id="monitor-component" aria-label="Component" name="componentId">
+            <option value="">Not tied to a component</option>
+            {components.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </Select>
+        </Field>
       </div>
 
       {isHttpLike && (
-        <fieldset className="space-y-2 border border-[var(--line)] p-3">
-          <legend className="px-1 font-mono text-xs uppercase tracking-wide text-[var(--fg-dim)]">HTTP request</legend>
-          <div className="grid gap-2 sm:grid-cols-3">
-            <Select aria-label="HTTP method" name="method" defaultValue="GET" className={`${inputClassXs} w-full`}>
-              <option value="GET">GET</option>
-              <option value="POST">POST</option>
-              <option value="HEAD">HEAD</option>
-            </Select>
-            <Input name="expectedStatusRange" defaultValue="200-299" placeholder="Expected status (e.g. 200-299)" className={`${inputClassXs} w-full`} />
-            <Input name="timeoutMs" type="number" defaultValue={10000} placeholder="Timeout (ms)" className={`${inputClassXs} w-full`} />
+        <Section title="HTTP request">
+          <div className="grid gap-4 sm:grid-cols-3">
+            <Field label="HTTP method" htmlFor="monitor-method">
+              <Select id="monitor-method" aria-label="HTTP method" name="method" defaultValue="GET">
+                <option value="GET">GET</option>
+                <option value="POST">POST</option>
+                <option value="HEAD">HEAD</option>
+              </Select>
+            </Field>
+            <Field label="Expected status" htmlFor="monitor-status-range">
+              <Input id="monitor-status-range" name="expectedStatusRange" defaultValue="200-299" placeholder="Expected status (e.g. 200-299)" />
+            </Field>
+            <Field label="Timeout (ms)" htmlFor="monitor-timeout-http">
+              <Input id="monitor-timeout-http" name="timeoutMs" type="number" defaultValue={10000} placeholder="Timeout (ms)" />
+            </Field>
           </div>
-          <Textarea name="requestHeaders" placeholder='Custom headers JSON, e.g. {"X-Api-Key":"abc"}' className={`${inputClassXs} w-full`} rows={2} />
-          <Textarea name="requestBody" placeholder="POST body (optional)" className={`${inputClassXs} w-full`} rows={2} />
-          <div className="grid gap-2 sm:grid-cols-2">
-            <div className="flex items-center gap-1.5">
-              <Input name="keywordMatch" placeholder="Body must contain (optional)" className={`${inputClassXs} w-full`} />
-              <HelpTip text="Monitor is marked down if the response body does not contain this text." />
-            </div>
-            <div className="flex items-center gap-1.5">
-              <Input name="keywordAbsent" placeholder="Body must NOT contain (optional)" className={`${inputClassXs} w-full`} />
-              <HelpTip text="Monitor is marked down if the response body contains this text." />
-            </div>
+          <Field label="Custom headers" htmlFor="monitor-headers" hint="A JSON object.">
+            <Textarea id="monitor-headers" name="requestHeaders" placeholder='Custom headers JSON, e.g. {"X-Api-Key":"abc"}' className="font-mono" rows={2} />
+          </Field>
+          <Field label="Request body" htmlFor="monitor-body">
+            <Textarea id="monitor-body" name="requestBody" placeholder="POST body (optional)" className="font-mono" rows={2} />
+          </Field>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Body must contain" htmlFor="monitor-keyword" hint="Monitor is marked down if the response body does not contain this text.">
+              <Input id="monitor-keyword" name="keywordMatch" placeholder="Body must contain (optional)" />
+            </Field>
+            <Field label="Body must not contain" htmlFor="monitor-keyword-absent" hint="Monitor is marked down if the response body contains this text.">
+              <Input id="monitor-keyword-absent" name="keywordAbsent" placeholder="Body must NOT contain (optional)" />
+            </Field>
           </div>
-        </fieldset>
+        </Section>
       )}
 
       {type === "TLS" && (
-        <fieldset className="border border-[var(--line)] p-3">
-          <legend className="px-1 font-mono text-xs uppercase tracking-wide text-[var(--fg-dim)]">TLS certificate</legend>
-          <div className="flex items-center gap-1.5">
-            <Input name="sslWarnDays" type="number" defaultValue={14} placeholder="Warn if expiring within N days" className={`${inputClassXs} w-full sm:w-auto`} />
-            <HelpTip text="Triggers a warning once the certificate has fewer than this many days left before expiry." />
-          </div>
-        </fieldset>
+        <Section title="TLS certificate">
+          <Field label="Warn before expiry (days)" htmlFor="monitor-ssl-warn" hint="Triggers a warning once the certificate has fewer than this many days left before expiry." className="sm:max-w-xs">
+            <Input id="monitor-ssl-warn" name="sslWarnDays" type="number" defaultValue={14} placeholder="Warn if expiring within N days" />
+          </Field>
+        </Section>
       )}
       {type === "DNS" && (
-        <fieldset className="border border-[var(--line)] p-3">
-          <legend className="px-1 font-mono text-xs uppercase tracking-wide text-[var(--fg-dim)]">DNS assertion</legend>
-          <div className="grid gap-2 sm:grid-cols-2">
-            <Select aria-label="DNS record type" name="dnsRecordType" defaultValue="A" className={`${inputClassXs} w-full`}>
-              {["A", "AAAA", "CNAME", "MX", "TXT", "NS"].map((record) => <option key={record} value={record}>{record}</option>)}
-            </Select>
-            <Input name="dnsExpectedValue" placeholder="Expected value (optional)" className={`${inputClassXs} w-full`} />
+        <Section title="DNS assertion">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="DNS record type" htmlFor="monitor-dns-type">
+              <Select id="monitor-dns-type" aria-label="DNS record type" name="dnsRecordType" defaultValue="A">
+                {["A", "AAAA", "CNAME", "MX", "TXT", "NS"].map((record) => <option key={record} value={record}>{record}</option>)}
+              </Select>
+            </Field>
+            <Field label="Expected value" htmlFor="monitor-dns-value">
+              <Input id="monitor-dns-value" name="dnsExpectedValue" placeholder="Expected value (optional)" />
+            </Field>
           </div>
-        </fieldset>
+        </Section>
       )}
       {type === "HEARTBEAT" && (
-        <fieldset className="border border-[var(--line)] p-3">
-          <legend className="px-1 font-mono text-xs uppercase tracking-wide text-[var(--fg-dim)]">Heartbeat grace</legend>
-          <Input name="heartbeatGraceSec" type="number" defaultValue={60} className={`${inputClassXs} w-full`} />
-          <p className="mt-1 text-xs text-[var(--fg-dim)]">The heartbeat becomes late after its interval plus this grace period.</p>
-        </fieldset>
+        <Section title="Heartbeat grace">
+          <Field label="Grace period (seconds)" htmlFor="monitor-grace" hint="The heartbeat becomes late after its interval plus this grace period." className="sm:max-w-xs">
+            <Input id="monitor-grace" name="heartbeatGraceSec" type="number" defaultValue={60} />
+          </Field>
+        </Section>
       )}
 
       {isUrlBased && (
-        <fieldset className="space-y-2 border border-[var(--line)] p-3">
-          <legend className="px-1 font-mono text-xs uppercase tracking-wide text-[var(--fg-dim)]">Security / authentication</legend>
-          <div className="grid gap-2 sm:grid-cols-2">
-            <Select aria-label="Authentication type" name="authType" value={authType} onChange={(e) => setAuthType(e.target.value)} className={`${inputClassXs} w-full`}>
-              <option value="NONE">No authentication</option>
-              <option value="BASIC">Basic auth</option>
-              <option value="BEARER">Bearer token</option>
-              <option value="HEADER">Custom header</option>
-            </Select>
-            <label className="flex items-center gap-2 text-xs text-[var(--fg-soft)]">
-              <Checkbox name="verifyTls" defaultChecked /> Verify TLS certificate
-            </label>
+        <Section title="Security and authentication">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Authentication type" htmlFor="monitor-auth-type">
+              <Select id="monitor-auth-type" aria-label="Authentication type" name="authType" value={authType} onChange={(e) => setAuthType(e.target.value)}>
+                <option value="NONE">No authentication</option>
+                <option value="BASIC">Basic auth</option>
+                <option value="BEARER">Bearer token</option>
+                <option value="HEADER">Custom header</option>
+              </Select>
+            </Field>
+            <CheckRow name="verifyTls" defaultChecked label="Verify TLS certificate" className="sm:self-end" />
           </div>
           {authType === "BASIC" && (
-            <div className="grid gap-2 sm:grid-cols-2">
-              <Input name="authUsername" placeholder="Username" className={`${inputClassXs} w-full`} />
-              <Input name="authSecret" type="password" placeholder="Password" className={`${inputClassXs} w-full`} />
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="Username" htmlFor="monitor-auth-user">
+                <Input id="monitor-auth-user" name="authUsername" placeholder="Username" />
+              </Field>
+              <Field label="Password" htmlFor="monitor-auth-secret">
+                <Input id="monitor-auth-secret" name="authSecret" type="password" placeholder="Password" />
+              </Field>
             </div>
           )}
-          {authType === "BEARER" && <Input name="authSecret" type="password" placeholder="Bearer token" className={`${inputClassXs} w-full`} />}
+          {authType === "BEARER" && (
+            <Field label="Bearer token" htmlFor="monitor-auth-secret">
+              <Input id="monitor-auth-secret" name="authSecret" type="password" placeholder="Bearer token" />
+            </Field>
+          )}
           {authType === "HEADER" && (
-            <div className="grid gap-2 sm:grid-cols-2">
-              <Input name="authHeaderName" placeholder="Header name (e.g. X-Api-Key)" className={`${inputClassXs} w-full`} />
-              <Input name="authSecret" type="password" placeholder="Header value" className={`${inputClassXs} w-full`} />
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="Header name" htmlFor="monitor-auth-header">
+                <Input id="monitor-auth-header" name="authHeaderName" placeholder="Header name (e.g. X-Api-Key)" />
+              </Field>
+              <Field label="Header value" htmlFor="monitor-auth-secret">
+                <Input id="monitor-auth-secret" name="authSecret" type="password" placeholder="Header value" />
+              </Field>
             </div>
           )}
-        </fieldset>
+        </Section>
       )}
 
-      <fieldset className="space-y-2 border border-[var(--line)] p-3">
-        <legend className="px-1 font-mono text-xs uppercase tracking-wide text-[var(--fg-dim)]">Scheduling &amp; thresholds</legend>
-        <div className="grid gap-2 sm:grid-cols-4">
-          <div className="flex items-center gap-1.5">
-            <Input name="intervalSec" type="number" defaultValue={300} placeholder="Interval (sec)" className={`${inputClassXs} w-full`} />
-            <HelpTip text="How often the monitor polls the target, in seconds." />
-          </div>
-          {!isHttpLike && <Input name="timeoutMs" type="number" defaultValue={10000} placeholder="Timeout (ms)" className={`${inputClassXs} w-full`} />}
-          <div className="flex items-center gap-1.5">
-            <Input name="failThreshold" type="number" defaultValue={1} placeholder="Fails before down" className={`${inputClassXs} w-full`} />
-            <HelpTip text="Number of consecutive failed checks required before the monitor is marked down." />
-          </div>
-          <div className="flex items-center gap-1.5">
-            <Input name="recoverThreshold" type="number" defaultValue={1} placeholder="OKs before recovered" className={`${inputClassXs} w-full`} />
-            <HelpTip text="Number of consecutive successful checks required before the monitor is marked recovered." />
-          </div>
+      <Section title="Scheduling and thresholds">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <Field label="Interval (seconds)" htmlFor="monitor-interval" hint="How often the monitor polls the target.">
+            <Input id="monitor-interval" name="intervalSec" type="number" defaultValue={300} placeholder="Interval (sec)" />
+          </Field>
+          {!isHttpLike && (
+            <Field label="Timeout (ms)" htmlFor="monitor-timeout">
+              <Input id="monitor-timeout" name="timeoutMs" type="number" defaultValue={10000} placeholder="Timeout (ms)" />
+            </Field>
+          )}
+          <Field label="Fails before down" htmlFor="monitor-fail" hint="Consecutive failed checks before the monitor is marked down.">
+            <Input id="monitor-fail" name="failThreshold" type="number" defaultValue={1} placeholder="Fails before down" />
+          </Field>
+          <Field label="OKs before recovered" htmlFor="monitor-recover" hint="Consecutive successful checks before the monitor is marked recovered.">
+            <Input id="monitor-recover" name="recoverThreshold" type="number" defaultValue={1} placeholder="OKs before recovered" />
+          </Field>
         </div>
-        <Select aria-label="Component status on failure" name="downStatus" defaultValue="MAJOR_OUTAGE" className={`${inputClassXs} w-full`}>
-          {COMPONENT_STATUSES.filter((s: ComponentStatus) => s !== "OPERATIONAL" && s !== "UNDER_MAINTENANCE").map((s) => (
-            <option key={s} value={s}>
-              On failure, set component to: {COMPONENT_STATUS_LABEL[s]}
-            </option>
-          ))}
-        </Select>
-      </fieldset>
+        <Field label="Component status on failure" htmlFor="monitor-down-status" className="sm:max-w-sm">
+          <Select id="monitor-down-status" aria-label="Component status on failure" name="downStatus" defaultValue="MAJOR_OUTAGE">
+            {COMPONENT_STATUSES.filter((s: ComponentStatus) => s !== "OPERATIONAL" && s !== "UNDER_MAINTENANCE").map((s) => (
+              <option key={s} value={s}>
+                On failure, set component to: {COMPONENT_STATUS_LABEL[s]}
+              </option>
+            ))}
+          </Select>
+        </Field>
+      </Section>
 
-      <div className="grid gap-2 sm:grid-cols-2">
-        <Input name="groupName" placeholder="Monitor group (optional)" className={`${inputClassXs} w-full`} />
-        <Input name="tags" placeholder="Tags, comma separated" className={`${inputClassXs} w-full`} />
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field label="Monitor group" htmlFor="monitor-group">
+          <Input id="monitor-group" name="groupName" placeholder="Monitor group (optional)" />
+        </Field>
+        <Field label="Tags" htmlFor="monitor-tags">
+          <Input id="monitor-tags" name="tags" placeholder="Tags, comma separated" />
+        </Field>
       </div>
 
-      <fieldset className="border border-[var(--line)] p-3">
-        <legend className="px-1 font-mono text-xs uppercase tracking-wide text-[var(--fg-dim)]">Automated actions</legend>
-        <div className="grid gap-2 text-xs text-[var(--fg-soft)] sm:grid-cols-2">
-          <label className="flex items-center gap-2">
-            <Checkbox name="actionFlipStatus" defaultChecked /> Flip component status
-          </label>
-          <label className="flex items-center gap-2">
-            <Checkbox name="actionRecordMetric" defaultChecked /> Record response-time metric
-          </label>
-          <label className="flex items-center gap-2">
-            <Checkbox name="actionAutoIncident" /> Auto open/close incident
-            <HelpTip text="Automatically creates an incident when the monitor goes down and resolves it when the monitor recovers." />
-          </label>
-          <label className="flex items-center gap-2">
-            <Checkbox name="actionNotify" /> Notify subscribers
-            <HelpTip text="Sends a notification to all subscribers on this page when the monitor status changes." />
-          </label>
+      <Section title="Automated actions">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <CheckRow name="actionFlipStatus" defaultChecked label="Flip component status" />
+          <CheckRow name="actionRecordMetric" defaultChecked label="Record response-time metric" />
+          <CheckRow name="actionAutoIncident" label="Auto open/close incident" hint="Creates an incident when the monitor goes down and resolves it when the monitor recovers." />
+          <CheckRow name="actionNotify" label="Notify subscribers" hint="Sends a notification to all subscribers on this page when the monitor status changes." />
         </div>
-      </fieldset>
+      </Section>
 
-      <Button type="submit">Add Monitor</Button>
+      <div className="flex justify-end">
+        <Button type="submit">Add monitor</Button>
+      </div>
     </form>
   );
 }

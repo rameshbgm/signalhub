@@ -4,10 +4,14 @@ import { fetchWithTimeout } from "@/lib/client-fetch";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { CopyButton } from "@/components/CopyButton";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
+import { Alert } from "@/components/ui/alert";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Field } from "@/components/ui/field";
+import { SecretField } from "@/components/admin/SecretReveal";
+import { Rss } from "lucide-react";
 
 type FeedToken = {
   id: string;
@@ -101,24 +105,19 @@ export function FeedTokenManager({
   };
 
   return (
-    <div className="space-y-3">
-      <form onSubmit={create} className="space-y-3 border border-[var(--line)] bg-[var(--surface)] p-4">
-        <div className="grid gap-2 sm:grid-cols-2">
-          <label className="text-xs text-[var(--fg-soft)]">
-            Token name
-            <Input value={name} onChange={(event) => setName(event.target.value)} required maxLength={100} className="mt-1" />
-          </label>
-          <label className="text-xs text-[var(--fg-soft)]">
-            Optional expiry
-            <Input type="datetime-local" value={expiresAt} onChange={(event) => setExpiresAt(event.target.value)} className="mt-1" />
-          </label>
+    <div className="space-y-4">
+      <form onSubmit={create} className="space-y-4 rounded-control bg-sunken/60 p-4">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Token name" htmlFor="feed-token-name" required><Input id="feed-token-name" value={name} onChange={(event) => setName(event.target.value)} required maxLength={100} /></Field>
+          <Field label="Expires at" htmlFor="feed-token-expiry" hint="Optional."><Input id="feed-token-expiry" type="datetime-local" value={expiresAt} onChange={(event) => setExpiresAt(event.target.value)} /></Field>
         </div>
         {components.length > 0 && (
           <fieldset>
-            <legend className="mb-1 text-xs text-[var(--fg-soft)]">Component scope (leave empty for all)</legend>
-            <div className="grid max-h-32 gap-1 overflow-y-auto border border-[var(--line)] bg-[var(--bg)] p-2 sm:grid-cols-2">
+            <legend className="mb-2 text-sm font-medium text-ink">Service scope</legend>
+            <p className="mb-2 text-xs text-ink-dim">Leave every service unchecked to allow access to all services.</p>
+            <div className="grid max-h-40 gap-2 overflow-y-auto rounded-control border border-line bg-surface p-3 sm:grid-cols-2">
               {components.map((component) => (
-                <label key={component.id} className="flex items-center gap-2 text-xs text-[var(--fg-soft)]">
+                <label key={component.id} className="flex items-center gap-2 text-sm text-ink-soft">
                   <Checkbox
                     checked={selected.includes(component.id)}
                     onChange={(event) =>
@@ -135,43 +134,31 @@ export function FeedTokenManager({
             </div>
           </fieldset>
         )}
-        <Button type="submit" loading={pending}>
-          {pending ? "Creating…" : "Create signed feed token"}
-        </Button>
+        <div className="flex justify-end"><Button type="submit" loading={pending}>{pending ? "Creating…" : "Create signed feed token"}</Button></div>
       </form>
-      {error && <p role="alert" className="text-sm text-[var(--red)]">{error}</p>}
+      {error && <Alert tone="danger">{error}</Alert>}
       {secret && (
-        <div role="status" className="space-y-2 border border-[var(--amber)]/40 bg-[var(--amber-soft)] p-3 text-sm">
-          <p className="font-semibold text-[var(--fg)]">Copy these feed URLs now. The token will not be shown again.</p>
+        <Alert tone="warn" title="Copy these feed URLs now. The token will not be shown again.">
           {(["rss", "atom"] as const).map((format) => (
-            <div key={format} className="flex flex-wrap items-center gap-2">
-              <span className="mr-2 font-mono text-xs uppercase text-[var(--fg-soft)]">{format}</span>
-              <code className="break-all select-all text-xs text-[var(--fg)]">{feedUrl(format)}</code>
-              <CopyButton
-                value={feedUrl(format)}
-                label={`Copy ${format.toUpperCase()} URL`}
-                className="text-xs font-semibold text-[var(--cyan)] disabled:opacity-50"
-              />
-            </div>
+            <SecretField key={format} value={feedUrl(format)} copyLabel={`Copy ${format.toUpperCase()} URL`} label={format.toUpperCase()} className="mt-2" />
           ))}
-        </div>
+        </Alert>
       )}
-      <div className="divide-y divide-[var(--line)] border border-[var(--line)] bg-[var(--surface)]">
+      {tokens.length > 0 ? <ul className="space-y-2">
         {tokens.map((token) => (
-          <div key={token.id} className="flex flex-col gap-2 p-3 text-sm sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <span className="font-medium text-[var(--fg)]">{token.name}</span>
-              <code className="ml-2 text-xs text-[var(--fg-soft)]">{token.label}</code>
-              <p className="mt-1 text-xs text-[var(--fg-dim)]">
+          <li key={token.id} className="flex flex-col gap-3 rounded-control border border-line px-3.5 py-3 text-sm sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
+              <span className="font-medium text-ink">{token.name}</span>
+              <code className="ml-2 text-xs text-ink-soft">{token.label}</code>
+              <p className="mt-1 text-xs text-ink-dim">
                 {token.expiresAt ? `expires ${new Date(token.expiresAt).toLocaleString()}` : "no expiry"}
                 {token.lastUsedAt ? ` · last used ${new Date(token.lastUsedAt).toLocaleString()}` : " · never used"}
               </p>
             </div>
             <Button type="button" variant="destructive" size="sm" loading={pending} onClick={() => revoke(token.id)} className="self-start sm:self-auto">Revoke</Button>
-          </div>
+          </li>
         ))}
-        {tokens.length === 0 && <p className="p-3 text-sm text-[var(--fg-dim)]">No active feed tokens.</p>}
-      </div>
+      </ul> : <EmptyState icon={Rss} hue="teal" title="No active feed tokens" description="Create a token above to grant access to protected feeds." />}
     </div>
   );
 }

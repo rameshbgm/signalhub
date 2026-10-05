@@ -1,8 +1,24 @@
+import { BarChart3, ChartNoAxesCombined, Eye, Percent, Siren, UserPlus, type LucideIcon } from "lucide-react";
 import { requireSession } from "@/lib/require-session";
 import { database } from "@/lib/postgres/client";
 import { PageSelect } from "@/components/admin/PageSelect";
-import { getScopedPages } from "@/lib/admin-guard";
+import { NoPagesState } from "@/components/admin/operate-ui";
+import { getScopedPages, sessionHasCapability } from "@/lib/admin-guard";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
+import { IconTile, type Hue } from "@/components/ui/icon-tile";
+import { PageHeader } from "@/components/ui/page-header";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+
+function StatTile({ label, value, icon, hue }: { label: string; value: number | string; icon: LucideIcon; hue: Hue }) {
+  return (
+    <div className="rounded-card border border-line bg-surface p-5 shadow-card">
+      <IconTile icon={icon} hue={hue} />
+      <p className="mt-4 text-3xl font-semibold tabular-nums tracking-tight text-ink">{value}</p>
+      <p className="mt-0.5 text-sm text-ink-soft">{label}</p>
+    </div>
+  );
+}
 
 export default async function AnalyticsPage({
   searchParams,
@@ -13,7 +29,15 @@ export default async function AnalyticsPage({
   const requested = (await searchParams).pageId;
   const pages = await getScopedPages(session, org.id, { orderBy: "name" });
   const selected = pages.find((page) => page.id === requested) ?? pages[0];
-  if (!selected) return <p className="text-sm text-[var(--fg-dim)]">Create a page first.</p>;
+  const description = "Cookie-free, aggregate activity stored on your infrastructure.";
+  if (!selected) {
+    return (
+      <div className="space-y-8">
+        <PageHeader title="Page analytics" icon={ChartNoAxesCombined} hue="violet" description={description} />
+        <NoPagesState description="Analytics are collected for each status page. Create one to start seeing activity." canCreate={sessionHasCapability(session, "page.configure")} />
+      </div>
+    );
+  }
   const rows = await database.selectFrom("analyticsDaily").selectAll()
     .where("pageId", "=", selected.id).orderBy("date", "desc").limit(30).execute();
   const totals = rows.reduce(
@@ -27,43 +51,58 @@ export default async function AnalyticsPage({
   );
   const conversion = totals.starts ? Math.round((totals.completions / totals.starts) * 1000) / 10 : 0;
   return (
-    <div className="max-w-5xl space-y-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h1 className="font-mono text-2xl font-semibold">Page analytics</h1>
-          <p className="mt-1 text-sm text-[var(--fg-soft)]">Cookie-free, aggregate activity stored on your infrastructure.</p>
-        </div>
-        <div className="w-60">
-          <PageSelect pages={pages.map((page) => ({ id: page.id, name: page.name }))} selected={selected.id} basePath="/organization/analytics" />
-        </div>
-      </div>
-      <div className="grid gap-3 sm:grid-cols-4">
-        {[
-          ["Page views", totals.views],
-          ["Incident views", totals.incidentViews],
-          ["Subscription starts", totals.starts],
-          ["Conversion", `${conversion}%`],
-        ].map(([label, value]) => (
-          <div key={label} className="border border-[var(--line)] bg-[var(--surface)] p-4">
-            <p className="font-mono text-2xl font-semibold">{value}</p>
-            <p className="mt-1 text-xs text-[var(--fg-dim)]">{label}</p>
+    <div className="space-y-8">
+      <PageHeader
+        title="Page analytics"
+        icon={ChartNoAxesCombined}
+        hue="violet"
+        description={description}
+        actions={
+          <div className="w-full sm:w-60">
+            <PageSelect pages={pages.map((page) => ({ id: page.id, name: page.name }))} selected={selected.id} basePath="/organization/analytics" />
           </div>
-        ))}
+        }
+      />
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <StatTile label="Page views" value={totals.views} icon={Eye} hue="violet" />
+        <StatTile label="Incident views" value={totals.incidentViews} icon={Siren} hue="amber" />
+        <StatTile label="Subscription starts" value={totals.starts} icon={UserPlus} hue="emerald" />
+        <StatTile label="Conversion" value={`${conversion}%`} icon={Percent} hue="teal" />
       </div>
-      <div className="border border-[var(--line)] bg-[var(--surface)]">
-        <Table className="text-left text-sm">
-          <TableHeader className="text-xs text-[var(--fg-dim)]">
-            <TableRow><TableHead className="p-3">Date</TableHead><TableHead>Views</TableHead><TableHead>Incidents</TableHead><TableHead>Starts</TableHead><TableHead>Completed</TableHead></TableRow>
-          </TableHeader>
-          <TableBody>
-            {rows.map((row) => (
-              <TableRow key={row.id} className="border-b border-[var(--line)] last:border-0">
-                <TableCell className="p-3 font-mono">{row.date}</TableCell><TableCell>{row.views ?? 0}</TableCell><TableCell>{row.incidentViews ?? 0}</TableCell><TableCell>{row.subscriptionStarts ?? 0}</TableCell><TableCell>{row.subscriptionCompletions ?? 0}</TableCell>
+      <Card className="overflow-hidden">
+        <CardHeader>
+          <CardTitle>Daily activity</CardTitle>
+          <CardDescription>The most recent 30 days with recorded activity. Totals above cover these days.</CardDescription>
+        </CardHeader>
+        {rows.length === 0 ? (
+          <CardContent>
+            <EmptyState icon={BarChart3} hue="violet" title="No activity recorded yet" description="Daily totals appear here once visitors view this page." className="border-0 bg-transparent py-8" />
+          </CardContent>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Date</TableHead>
+                <TableHead className="text-right">Views</TableHead>
+                <TableHead className="text-right">Incidents</TableHead>
+                <TableHead className="text-right">Starts</TableHead>
+                <TableHead className="text-right">Completed</TableHead>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
+            </TableHeader>
+            <TableBody>
+              {rows.map((row) => (
+                <TableRow key={row.id}>
+                  <TableCell className="whitespace-nowrap font-medium tabular-nums text-ink">{row.date}</TableCell>
+                  <TableCell className="text-right tabular-nums">{row.views ?? 0}</TableCell>
+                  <TableCell className="text-right tabular-nums">{row.incidentViews ?? 0}</TableCell>
+                  <TableCell className="text-right tabular-nums">{row.subscriptionStarts ?? 0}</TableCell>
+                  <TableCell className="text-right tabular-nums">{row.subscriptionCompletions ?? 0}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </Card>
     </div>
   );
 }

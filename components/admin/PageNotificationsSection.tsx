@@ -1,9 +1,14 @@
+import { Mail, MessageSquare, Rss } from "lucide-react";
 import { database } from "@/lib/postgres/client";
 import { subscriptionCapabilities } from "@/lib/notification-capabilities";
 import { enabledDestinationChannels } from "@/lib/platform-configuration";
 import { secretLabel } from "@/lib/secrets";
 import { NotificationDestinationManager } from "@/components/admin/NotificationDestinationManager";
 import { WebhookEndpointManager } from "@/components/admin/WebhookEndpointManager";
+import { Alert } from "@/components/ui/alert";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { IconTile } from "@/components/ui/icon-tile";
+import { StatusBadge } from "@/components/ui/status-badge";
 
 export async function PageNotificationsSection({ pageId }: { pageId: string }) {
   const [endpointDocs, destinations, capabilities, enabledChannels] = await Promise.all([
@@ -15,73 +20,79 @@ export async function PageNotificationsSection({ pageId }: { pageId: string }) {
   const endpoints = endpointDocs;
 
   const subscriberChannels = [
-    { label: "Email", ready: capabilities.email.enabled, state: capabilities.email.reason ?? "Available" },
-    { label: "SMS", ready: capabilities.sms.enabled, state: capabilities.sms.reason ?? "Available" },
-    { label: "RSS / Atom", ready: true, state: "Available" },
+    { label: "Email", icon: Mail, ready: capabilities.email.enabled, state: capabilities.email.reason ?? "Available" },
+    { label: "SMS", icon: MessageSquare, ready: capabilities.sms.enabled, state: capabilities.sms.reason ?? "Available" },
+    { label: "RSS / Atom", icon: Rss, ready: true, state: "Available" },
   ];
 
   return (
-    <section id="notifications" className="space-y-8 border border-[var(--line)] bg-[var(--surface)] p-4 sm:p-5">
-      <div>
-        <h2 className="font-mono font-semibold text-[var(--fg)]">Notifications & webhooks</h2>
-        <p className="mt-1 text-sm text-[var(--fg-dim)]">Configure subscriber readiness, operational destinations, and signed status-event delivery in one place.</p>
-      </div>
+    <section id="notifications" className="space-y-6">
+      <p className="max-w-3xl text-sm leading-6 text-ink-soft">Configure subscriber readiness, operational destinations, and signed status-event delivery in one place.</p>
 
-      <div className={`flex flex-col gap-2 border p-4 text-sm sm:flex-row sm:items-center sm:justify-between ${capabilities.workerReady ? "border-[var(--green)]/30 bg-[var(--green-soft)]" : "border-[var(--amber)]/30 bg-[var(--amber-soft)]"}`}>
-        <div>
-          <p className="font-semibold text-[var(--fg)]">Delivery worker</p>
-          <p className="mt-0.5 text-xs text-[var(--fg-soft)]">Processes queued notifications with retries.</p>
-        </div>
-        <span className={`font-mono text-xs font-semibold uppercase tracking-wider ${capabilities.workerReady ? "text-[var(--green)]" : "text-[var(--amber)]"}`}>
-          {capabilities.workerReady ? "Ready" : "Offline"}
-        </span>
-      </div>
+      <Alert tone={capabilities.workerReady ? "ok" : "warn"} title={capabilities.workerReady ? "Delivery worker is ready" : "Delivery worker is offline"}>
+        Processes queued notifications with retries.
+      </Alert>
 
-      <div>
-        <h3 className="text-sm font-semibold text-[var(--fg)]">Subscriber channels</h3>
-        <div className="mt-3 grid gap-3 sm:grid-cols-3">
-          {subscriberChannels.map((channel) => (
-            <article key={channel.label} className="border border-[var(--line)] bg-[var(--bg)] p-3">
-              <div className="flex items-start justify-between gap-2">
-                <span className="text-sm font-semibold text-[var(--fg)]">{channel.label}</span>
-                <span className={`font-mono text-[9px] uppercase tracking-wider ${channel.ready ? "text-[var(--green)]" : "text-[var(--amber)]"}`}>{channel.state}</span>
-              </div>
-            </article>
-          ))}
-        </div>
-      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle>Subscriber channels</CardTitle>
+          <CardDescription>How visitors can subscribe to updates from this page.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ul className="grid gap-3 sm:grid-cols-3">
+            {subscriberChannels.map((channel) => (
+              <li key={channel.label} className="flex items-start gap-3 rounded-control border border-line px-3.5 py-3">
+                <IconTile icon={channel.icon} hue={channel.ready ? "emerald" : "amber"} size="sm" />
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-ink">{channel.label}</p>
+                  <StatusBadge tone={channel.ready ? "ok" : "warn"} className="mt-1">{channel.ready ? "Available" : "Needs setup"}</StatusBadge>
+                  {channel.state !== "Available" && <p className="mt-1.5 text-xs leading-5 text-ink-dim">{channel.state}</p>}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </CardContent>
+      </Card>
 
-      <div>
-        <h3 className="text-sm font-semibold text-[var(--fg)]">Team and on-call destinations</h3>
-        <p className="mb-4 mt-1 text-xs text-[var(--fg-dim)]">Connections are tested before they are enabled.</p>
-        <NotificationDestinationManager
-          pageId={pageId}
-          enabledChannels={enabledChannels}
-          initial={destinations.map((destination) => ({
-            id: destination.id,
-            name: destination.name,
-            channel: destination.channel,
-            active: destination.active,
-            verifiedAt: destination.verifiedAt?.toISOString() ?? null,
-            lastTestOk: destination.lastTestOk,
-            lastError: destination.lastError,
-          }))}
-        />
-      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle>Team and on-call destinations</CardTitle>
+          <CardDescription>Connections are tested before they are enabled.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <NotificationDestinationManager
+            pageId={pageId}
+            enabledChannels={enabledChannels}
+            initial={destinations.map((destination) => ({
+              id: destination.id,
+              name: destination.name,
+              channel: destination.channel,
+              active: destination.active,
+              verifiedAt: destination.verifiedAt?.toISOString() ?? null,
+              lastTestOk: destination.lastTestOk,
+              lastError: destination.lastError,
+            }))}
+          />
+        </CardContent>
+      </Card>
 
-      <div>
-        <h3 className="text-sm font-semibold text-[var(--fg)]">Signed status-event webhooks</h3>
-        <p className="mb-4 mt-1 text-xs text-[var(--fg-dim)]">Register HTTPS endpoints with verification, HMAC signatures, retries, and secret rotation.</p>
-        <WebhookEndpointManager
-          pageId={pageId}
-          endpoints={endpoints.map((endpoint) => ({
-            id: endpoint.id,
-            url: endpoint.url,
-            secretLabel: secretLabel(endpoint.secretPrefix, endpoint.secretLastFour),
-            verifiedAt: endpoint.verifiedAt?.toISOString() ?? null,
-          }))}
-        />
-      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle>Signed status-event webhooks</CardTitle>
+          <CardDescription>Register HTTPS endpoints with verification, HMAC signatures, retries, and secret rotation.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <WebhookEndpointManager
+            pageId={pageId}
+            endpoints={endpoints.map((endpoint) => ({
+              id: endpoint.id,
+              url: endpoint.url,
+              secretLabel: secretLabel(endpoint.secretPrefix, endpoint.secretLastFour),
+              verifiedAt: endpoint.verifiedAt?.toISOString() ?? null,
+            }))}
+          />
+        </CardContent>
+      </Card>
     </section>
   );
 }

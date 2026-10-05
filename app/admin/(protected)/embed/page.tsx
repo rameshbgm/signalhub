@@ -3,6 +3,11 @@ import { PageSelect } from "@/components/admin/PageSelect";
 import { HelpTip } from "@/components/HelpTip";
 import { getScopedPages, requireCapability } from "@/lib/admin-guard";
 import { publicPagePath } from "@/lib/public-path";
+import { Code2, RadioTower } from "lucide-react";
+import { CopyButton } from "@/components/CopyButton";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
+import { PageHeader } from "@/components/ui/page-header";
 
 function escapeHtmlAttribute(value: string) {
   return value.replace(
@@ -33,37 +38,18 @@ export default async function EmbedPage({ searchParams }: { searchParams: Promis
     : "";
 
   return (
-    <div className="max-w-2xl space-y-6">
-      <h1 className="font-mono text-xl font-semibold text-[var(--fg)]">SignalHub Embed</h1>
-      <p className="text-sm text-[var(--fg-soft)]">
-        Drop this snippet into your website or app. It stays invisible during normal operation and automatically shows a banner
-        when there&apos;s an active incident or maintenance window.
-      </p>
-
-      <div className="w-full sm:w-56">
-        <PageSelect pages={pages.map((p) => ({ id: p.id, name: p.name }))} basePath="/organization/embed" selected={pageId} />
-      </div>
-
-      {page && (
-        <>
-          <div>
-            <div className="mb-2 flex items-center gap-1.5">
-              <h2 className="font-mono text-sm font-semibold text-[var(--fg)]">Auto-appearing incident banner</h2>
-              <HelpTip text="Renders a banner on your site automatically during active incidents or maintenance — no code changes needed after install." />
-            </div>
-            <pre className="overflow-x-auto border border-[var(--line)] bg-[var(--bg)] p-3 text-xs text-[var(--fg-soft)]">{scriptTag}</pre>
-          </div>
-          <div>
-            <h2 className="mb-2 font-mono text-sm font-semibold text-[var(--fg)]">Live status badge</h2>
-            <pre className="overflow-x-auto border border-[var(--line)] bg-[var(--bg)] p-3 text-xs text-[var(--fg-soft)]">{badgeTag}</pre>
-            {page.type !== "PUBLIC" && (
-              <p className="mt-2 text-xs text-[var(--fg-dim)]">
-                Replace <code>YOUR_FEED_TOKEN</code> with a signed feed token that has the intended component access.
-              </p>
-            )}
-          </div>
-        </>
-      )}
+    <div className="space-y-8">
+      <PageHeader title="SignalHub embed" icon={Code2} hue="teal" description="Add a status banner or badge to your website or app." actions={pages.length > 0 ? <div className="w-full sm:w-56"><PageSelect pages={pages.map((p) => ({ id: p.id, name: p.name }))} basePath="/organization/embed" selected={pageId} /></div> : undefined} />
+      {page ? <div className="grid items-start gap-5 xl:grid-cols-2">
+        <Card>
+          <CardHeader><div className="flex items-center gap-1.5"><CardTitle>Incident banner</CardTitle><HelpTip text="Renders a banner on your site automatically during active incidents or maintenance — no code changes needed after install." /></div><CardDescription>The script stays invisible during normal operation and shows a banner during an active incident or maintenance window.</CardDescription></CardHeader>
+          <CardContent className="space-y-3"><pre className="overflow-x-auto rounded-control bg-sunken p-3 font-mono text-xs leading-5 text-ink-soft">{scriptTag}</pre><CopyButton value={scriptTag} label="Copy banner snippet" /></CardContent>
+        </Card>
+        <Card>
+          <CardHeader><CardTitle>Live status badge</CardTitle><CardDescription>Show the current status of this page wherever visitors need it.</CardDescription></CardHeader>
+          <CardContent className="space-y-3"><pre className="overflow-x-auto rounded-control bg-sunken p-3 font-mono text-xs leading-5 text-ink-soft">{badgeTag}</pre><CopyButton value={badgeTag} label="Copy badge snippet" />{page.type !== "PUBLIC" && <p className="text-xs text-ink-dim">Replace <code className="font-mono">YOUR_FEED_TOKEN</code> with a signed feed token that has the intended service access.</p>}</CardContent>
+        </Card>
+      </div> : <EmptyState icon={RadioTower} hue="teal" title="Create a status page first" description="Embeds show the status of a selected page." />}
     </div>
   );
 }

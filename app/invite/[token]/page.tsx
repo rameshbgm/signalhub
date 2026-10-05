@@ -1,5 +1,6 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
+import { MailPlus } from "lucide-react";
+import { AuthShell } from "@/components/admin/AuthShell";
 import { database } from "@/lib/postgres/client";
 import { hashSecret } from "@/lib/secrets";
 import { passwordMinimumLength } from "@/lib/password-policy";
@@ -29,26 +30,20 @@ export default async function InvitationPage({
   }
 
   return (
-    <main className="grain flex min-h-screen items-center justify-center bg-[var(--bg)] p-4">
-      <section className="w-full max-w-md border border-[var(--line)] bg-[var(--surface)] p-6 sm:p-8">
-        <Link href="/" className="font-mono text-sm font-semibold text-[var(--fg)]">
-          SignalHub
-        </Link>
-        <p className="mt-5 font-mono text-xs uppercase tracking-widest text-[var(--cyan)]">
-          Organization invitation
-        </p>
-        <h1 className="mt-2 font-mono text-2xl font-semibold text-[var(--fg)]">
-          Join {invite.organizationName}
-        </h1>
-        <p className="mt-2 text-sm text-[var(--fg-soft)]">
-          Continue as {invite.email}. This invitation expires 48 hours after it was issued.
-        </p>
-        <InviteAcceptanceForm
-          token={token}
-          hasPassword={Boolean(invite.passwordHash)}
-          passwordMinimum={passwordMinimumLength()}
-        />
-      </section>
-    </main>
+    <AuthShell>
+      <span className="inline-flex items-center gap-1.5 rounded-full bg-primary-soft px-2.5 py-0.5 text-xs font-medium text-primary-ink">
+        <MailPlus aria-hidden size={12} />
+        Organization invitation
+      </span>
+      <h1 className="mt-4 text-3xl font-semibold tracking-tight">Join {invite.organizationName}</h1>
+      <p className="mt-2 text-sm leading-6 text-ink-soft">
+        Continue as {invite.email}. This invitation expires 48 hours after it was issued.
+      </p>
+      <InviteAcceptanceForm
+        token={token}
+        hasPassword={Boolean(invite.passwordHash)}
+        passwordMinimum={passwordMinimumLength()}
+      />
+    </AuthShell>
   );
 }

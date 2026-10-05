@@ -6,6 +6,12 @@ import { secretLabel } from "@/lib/secrets";
 import { WebhookEndpointManager } from "@/components/admin/WebhookEndpointManager";
 import { FeedTokenManager } from "@/components/admin/FeedTokenManager";
 import { getScopedPages, requireCapability } from "@/lib/admin-guard";
+import { KeyRound, RadioTower, Rss } from "lucide-react";
+import { Alert } from "@/components/ui/alert";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
+import { PageHeader } from "@/components/ui/page-header";
+import { StatusBadge } from "@/components/ui/status-badge";
 
 export default async function ApiKeysPage({ searchParams }: { searchParams: Promise<{ pageId?: string }> }) {
   const { session, org } = await requireSession();
@@ -29,85 +35,43 @@ export default async function ApiKeysPage({ searchParams }: { searchParams: Prom
     : [];
 
   return (
-    <div className="max-w-2xl space-y-6">
-      <h1 className="font-mono text-xl font-semibold text-[var(--fg)]">API Keys &amp; Webhooks</h1>
-      <p className="text-sm text-[var(--fg-soft)]">
-        Use these keys to authenticate programmatic access to the Management API. Pass as{" "}
-        <code className="bg-[var(--surface)] px-1 text-[var(--fg)]">Authorization: Bearer &lt;key&gt;</code>. See{" "}
-        <code className="bg-[var(--surface)] px-1 text-[var(--fg)]">/api/v1/manage/*</code> endpoints.
-      </p>
+    <div className="space-y-8">
+      <PageHeader title="API keys and webhooks" icon={KeyRound} hue="teal" description="Manage programmatic access, signed webhooks, and protected feeds." />
+      <Card>
+        <CardHeader>
+          <CardTitle>Management API keys</CardTitle>
+          <CardDescription>Use a key to authenticate Management API requests. Send it as <code className="rounded-chip bg-sunken px-1.5 py-0.5 font-mono text-xs text-ink">Authorization: Bearer &lt;key&gt;</code> to <code className="font-mono text-xs text-ink">/api/v1/manage/*</code>.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-5">
+          <ApiKeyCreator pages={pages.map((page) => ({ id: page.id, name: page.name }))} />
+          {keys.length > 0 ? <ul className="space-y-2">
+            {keys.map((k) => <li key={k.id} className="flex flex-col gap-3 rounded-control border border-line px-3.5 py-3 text-sm sm:flex-row sm:items-center sm:justify-between">
+              <div className="min-w-0 space-y-1">
+                <div className="flex flex-wrap items-center gap-2"><span className="font-medium text-ink">{k.name}</span><code className="rounded-chip bg-sunken px-1.5 py-0.5 text-xs text-ink-soft">{secretLabel(k.prefix, k.lastFour)}</code>{k.legacyFullAccess && <StatusBadge tone="warn">Legacy full access — rotate</StatusBadge>}</div>
+                <p className="break-words text-xs text-ink-dim">{(k.scopes ?? []).join(", ") || "No scopes"}{k.expiresAt ? ` · expires ${k.expiresAt.toLocaleString()}` : " · no expiry"}</p>
+              </div>
+              <ApiKeyActions id={k.id} />
+            </li>)}
+          </ul> : <EmptyState icon={KeyRound} hue="teal" title="No API keys yet" description="Create a key above to give an integration access to the Management API." />}
+        </CardContent>
+      </Card>
 
-      <ApiKeyCreator pages={pages.map((page) => ({ id: page.id, name: page.name }))} />
+      <Card>
+        <CardHeader className="flex-row flex-wrap items-start justify-between gap-4">
+          <div className="min-w-0"><CardTitle>Outbound webhooks</CardTitle><CardDescription className="mt-1">Incident, maintenance, and postmortem events for the selected page are sent as JSON to active endpoints.</CardDescription></div>
+          {pages.length > 0 && <div className="w-full sm:w-56"><PageSelect pages={pages.map((p) => ({ id: p.id, name: p.name }))} basePath="/organization/api-keys" selected={pageId} /></div>}
+        </CardHeader>
+        <CardContent>{pageId ? <WebhookEndpointManager pageId={pageId} endpoints={webhookEndpoints.map((endpoint) => ({ id: endpoint.id, url: endpoint.url, secretLabel: secretLabel(endpoint.secretPrefix, endpoint.secretLastFour), verifiedAt: endpoint.verifiedAt?.toISOString() ?? null }))} /> : <EmptyState icon={RadioTower} hue="teal" title="Create a status page first" description="Webhooks are connected to a status page." />}</CardContent>
+      </Card>
 
-      <div className="divide-y divide-[var(--line)] border border-[var(--line)] bg-[var(--surface)]">
-        {keys.map((k) => (
-          <div key={k.id} className="flex flex-col gap-2 p-3 text-sm sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <span className="font-medium text-[var(--fg)]">{k.name}</span>
-              <code className="ml-2 bg-[var(--bg)] px-1 text-xs text-[var(--fg-soft)]">{secretLabel(k.prefix, k.lastFour)}</code>
-              {k.legacyFullAccess && (
-                <span className="ml-2 bg-[var(--amber-soft)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--amber)]">
-                  Legacy full access — rotate
-                </span>
-              )}
-              <p className="mt-1 text-[10px] text-[var(--fg-dim)]">
-                {(k.scopes ?? []).join(", ") || "No scopes"}
-                {k.expiresAt ? ` · expires ${k.expiresAt.toISOString()}` : " · no expiry"}
-              </p>
-            </div>
-            <ApiKeyActions id={k.id} />
-          </div>
-        ))}
-        {keys.length === 0 && <p className="p-3 text-sm text-[var(--fg-dim)]">No API keys yet.</p>}
-      </div>
-
-      <div className="space-y-4 border-t border-[var(--line)] pt-6">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <h2 className="font-mono text-sm font-semibold text-[var(--fg)]">Outbound Webhooks</h2>
-          <div className="w-full sm:w-56">
-            <PageSelect pages={pages.map((p) => ({ id: p.id, name: p.name }))} basePath="/organization/api-keys" selected={pageId} />
-          </div>
-        </div>
-        <p className="text-sm text-[var(--fg-soft)]">
-          Every incident/maintenance/postmortem event for this page is POSTed as JSON to each active endpoint below.
-        </p>
-        {pageId && (
-          <WebhookEndpointManager
-            pageId={pageId}
-            endpoints={webhookEndpoints.map((endpoint) => ({
-              id: endpoint.id,
-              url: endpoint.url,
-              secretLabel: secretLabel(endpoint.secretPrefix, endpoint.secretLastFour),
-              verifiedAt: endpoint.verifiedAt?.toISOString() ?? null,
-            }))}
-          />
-        )}
-      </div>
-
-      <div className="space-y-4 border-t border-[var(--line)] pt-6">
-        <h2 className="font-mono text-sm font-semibold text-[var(--fg)]">Protected Feed Tokens</h2>
-        <p className="text-sm text-[var(--fg-soft)]">
-          Private and audience pages use revocable, optionally component-scoped tokens for RSS, Atom, embeds, and public API reads.
-        </p>
-        {selectedPage?.type === "PUBLIC" ? (
-          <p className="border border-[var(--line)] bg-[var(--surface)] p-3 text-sm text-[var(--fg-soft)]">
-            This page is public and its RSS and Atom feeds do not require a token.
-          </p>
-        ) : selectedPage ? (
-          <FeedTokenManager
-            pageId={selectedPage.id}
-            pageSlug={selectedPage.slug}
-            components={pageComponents.map((component) => ({ id: component.id, name: component.name }))}
-            tokens={feedTokens.map((token) => ({
-              id: token.id,
-              name: token.name,
-              label: secretLabel(token.prefix, token.lastFour),
-              expiresAt: token.expiresAt?.toISOString() ?? null,
-              lastUsedAt: token.lastUsedAt?.toISOString() ?? null,
-            }))}
-          />
-        ) : null}
-      </div>
+      <Card>
+        <CardHeader><CardTitle>Protected feed tokens</CardTitle><CardDescription>Private and audience pages use revocable, optionally service-scoped tokens for RSS, Atom, embeds, and public API reads.</CardDescription></CardHeader>
+        <CardContent>
+          {selectedPage?.type === "PUBLIC" ? <Alert tone="info">This page is public and its RSS and Atom feeds do not require a token.</Alert> : selectedPage ? (
+            <FeedTokenManager pageId={selectedPage.id} pageSlug={selectedPage.slug} components={pageComponents.map((component) => ({ id: component.id, name: component.name }))} tokens={feedTokens.map((token) => ({ id: token.id, name: token.name, label: secretLabel(token.prefix, token.lastFour), expiresAt: token.expiresAt?.toISOString() ?? null, lastUsedAt: token.lastUsedAt?.toISOString() ?? null }))} />
+          ) : <EmptyState icon={Rss} hue="teal" title="Create a status page first" description="Feed tokens are connected to a status page." />}
+        </CardContent>
+      </Card>
     </div>
   );
 }

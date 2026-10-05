@@ -2,12 +2,15 @@
 
 import { fetchWithTimeout } from "@/lib/client-fetch";
 
-import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { useId, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { useRouter } from "next/navigation";
-import { X } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { CheckCircle2, ImageIcon, Loader2, Maximize2, Trash2, Upload, X } from "lucide-react";
+import { Alert } from "@/components/ui/alert";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { Dialog } from "@/components/ui/dialog";
+import { Field } from "@/components/ui/field";
 import { Select } from "@/components/ui/select";
+import { cn } from "@/lib/utils";
 import {
   bannerCropFromDrag,
   coverImageStyle,
@@ -71,6 +74,7 @@ export function AssetUploader({
 }) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
+  const fitId = useId();
   const cropInteractionRef = useRef<CropInteraction | null>(null);
   const [preview, setPreview] = useState(currentUrl ?? "");
   const [message, setMessage] = useState<string | null>(null);
@@ -95,15 +99,6 @@ export function AssetUploader({
   const [imageDimensions, setImageDimensions] = useState({ width: 0, height: 0 });
   const isCover = kind === "COVER";
   const busy = loading || savingFraming;
-
-  useEffect(() => {
-    if (!previewOpen) return;
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setPreviewOpen(false);
-    };
-    document.addEventListener("keydown", closeOnEscape);
-    return () => document.removeEventListener("keydown", closeOnEscape);
-  }, [previewOpen]);
 
   async function upload(file: File) {
     if (loading) return;
@@ -293,23 +288,27 @@ export function AssetUploader({
     }
   }
 
+  const accept = kind === "FAVICON" ? "image/png,image/webp,image/x-icon" : "image/png,image/jpeg,image/webp,image/avif";
+  const formats = kind === "FAVICON" ? "PNG, WebP or ICO." : "PNG, JPEG, WebP or AVIF.";
+
   return (
-    <div className="space-y-3 border border-[var(--line)] bg-[var(--surface)] p-4">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <p className="text-sm font-semibold text-[var(--fg)]">{label}</p>
-          <p className="mt-0.5 text-xs text-[var(--fg-dim)]">{help}</p>
-        </div>
+    <div className="space-y-4 rounded-control border border-line bg-surface p-4">
+      <div>
+        <p className="text-sm font-semibold text-ink">{label}</p>
+        <p className="mt-0.5 text-xs leading-5 text-ink-dim">{help}</p>
       </div>
       {!isCover && (
-        <div className="flex aspect-[16/5] w-full items-center justify-center overflow-hidden border border-[var(--line)] bg-[var(--bg)]">
+        <div className="flex aspect-[16/5] w-full items-center justify-center overflow-hidden rounded-control border border-line bg-sunken">
           {preview ? (
-            <Button type="button" variant="ghost" onClick={() => setPreviewOpen(true)} aria-label={`Preview ${label.toLowerCase()}`} title="Preview image" className="h-full w-full rounded-md p-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--cyan)]">
+            <button type="button" onClick={() => setPreviewOpen(true)} aria-label={`Preview ${label.toLowerCase()}`} title="Preview image" className="group relative grid h-full w-full place-items-center outline-none focus-visible:ring-4 focus-visible:ring-inset focus-visible:ring-primary/25">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={preview} alt={`${label} preview`} className="h-full w-full object-contain p-4 transition-opacity hover:opacity-80" />
-            </Button>
+              <img src={preview} alt={`${label} preview`} className="h-full w-full object-contain p-4" />
+              <span aria-hidden="true" className="absolute right-2 top-2 grid size-7 place-items-center rounded-chip bg-surface text-ink-soft opacity-0 shadow-card transition-opacity duration-200 group-hover:opacity-100 group-focus-visible:opacity-100">
+                <Maximize2 size={14} />
+              </span>
+            </button>
           ) : (
-            <span className="text-xs text-[var(--fg-dim)]">No image</span>
+            <span className="flex flex-col items-center gap-1 text-xs text-ink-dim"><ImageIcon aria-hidden="true" size={18} />No image</span>
           )}
         </div>
       )}
@@ -317,7 +316,10 @@ export function AssetUploader({
         preview ? (
           <div className="space-y-3">
             <div
-              className={`flex justify-center overflow-hidden border border-[var(--line)] bg-[var(--bg)] p-2 ${simple ? "aspect-[16/5] w-full cursor-zoom-in transition-opacity hover:opacity-85" : "max-h-[32rem]"}`}
+              className={cn(
+                "flex justify-center overflow-hidden rounded-control border border-line bg-sunken p-2",
+                simple ? "aspect-[16/5] w-full cursor-zoom-in outline-none transition-opacity hover:opacity-85 focus-visible:ring-4 focus-visible:ring-primary/25" : "max-h-[32rem]",
+              )}
               role={simple ? "button" : undefined}
               tabIndex={simple ? 0 : undefined}
               aria-label={simple ? "Preview cover image" : undefined}
@@ -325,7 +327,11 @@ export function AssetUploader({
               onKeyDown={simple ? (event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setPreviewOpen(true); } } : undefined}
             >
               <div
-                className={`relative inline-block max-h-[30rem] max-w-full overflow-hidden ${simple ? "h-full w-full" : "select-none touch-none"} ${!simple && coverFit === "COVER" ? "cursor-crosshair" : ""}`}
+                className={cn(
+                  "relative inline-block max-h-[30rem] max-w-full overflow-hidden",
+                  simple ? "h-full w-full" : "touch-none select-none",
+                  !simple && coverFit === "COVER" && "cursor-crosshair",
+                )}
                 onPointerDown={simple ? undefined : startCrop}
                 onPointerMove={simple ? undefined : updateCrop}
                 onPointerUp={simple ? undefined : finishCrop}
@@ -360,7 +366,7 @@ export function AssetUploader({
                     }}
                   >
                     <span className="pointer-events-none absolute inset-0 border border-black/30" />
-                    <span className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 whitespace-nowrap rounded bg-black/60 px-2 py-1 text-[10px] font-semibold text-white">
+                    <span className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 whitespace-nowrap rounded-chip bg-ink/70 px-2 py-1 text-2xs font-semibold text-white">
                       Drag to move
                     </span>
                     {CROP_HANDLES.map(({ handle, className }) => (
@@ -368,7 +374,7 @@ export function AssetUploader({
                         key={handle}
                         data-crop-handle={handle}
                         aria-hidden="true"
-                        className={`absolute h-4 w-4 rounded-sm border-2 border-white bg-[var(--cyan)] shadow ${className}`}
+                        className={cn("absolute size-4 rounded-chip border-2 border-white bg-primary shadow-card", className)}
                       />
                     ))}
                   </span>
@@ -377,11 +383,11 @@ export function AssetUploader({
             </div>
             {!simple && coverFit === "COVER" && coverCrop && (
               <div>
-                <p className="mb-1 text-xs font-medium text-[var(--fg-soft)]">Published banner preview</p>
+                <p className="mb-1 text-xs font-medium text-ink-soft">Published banner preview</p>
                 <div
                   role="img"
                   aria-label="Selected cover banner preview"
-                  className="aspect-[16/5] w-full border border-[var(--line)] bg-[var(--bg)]"
+                  className="aspect-[16/5] w-full rounded-control border border-line bg-sunken"
                   style={coverImageStyle(preview, {
                     fit: "COVER",
                     cropX: coverCrop.x,
@@ -393,13 +399,13 @@ export function AssetUploader({
               </div>
             )}
             {simple ? (
-              <p className="text-xs text-[var(--fg-dim)]">New cover images are shown in full by default.</p>
+              <p className="text-xs leading-5 text-ink-dim">New cover images are shown in full by default.</p>
             ) : (
               <>
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-                  <label className="text-xs text-[var(--fg-soft)]">
-                    Image display
+                  <Field label="Image display" htmlFor={fitId} className="sm:min-w-52">
                     <Select
+                      id={fitId}
                       value={coverFit}
                       onChange={(event) => {
                         const fit = event.target.value as CoverImageFit;
@@ -409,12 +415,12 @@ export function AssetUploader({
                         }
                       }}
                       disabled={busy}
-                      className="mt-1 min-w-52 border border-[var(--line)] bg-[var(--bg)] px-2 py-2 text-sm text-[var(--fg)]"
+                      className="w-full"
                     >
                       <option value="CONTAIN">Show full image</option>
                       <option value="COVER">Fill frame (crop)</option>
                     </Select>
-                  </label>
+                  </Field>
                   {coverFit === "COVER" && imageDimensions.width > 0 && (
                     <Button
                       type="button"
@@ -422,13 +428,13 @@ export function AssetUploader({
                       onClick={() => setCoverCrop(defaultBannerCrop(imageDimensions.width, imageDimensions.height))}
                       variant="outline"
                       size="sm"
-                      className="w-fit text-xs"
+                      className="w-fit"
                     >
                       Reset crop
                     </Button>
                   )}
                 </div>
-                <p className="text-xs text-[var(--fg-dim)]">
+                <p className="text-xs leading-5 text-ink-dim">
                   {coverFit === "COVER"
                     ? "Drag inside the frame to reposition it, drag a corner to resize it, or drag outside the frame to draw a new 16:5 banner selection."
                     : "The public page shows the complete image without cropping and caps its height responsively."}
@@ -437,68 +443,67 @@ export function AssetUploader({
             )}
           </div>
         ) : (
-          <div className="flex aspect-[16/5] w-full items-center justify-center border border-dashed border-[var(--line)] text-xs text-[var(--fg-dim)]">
+          <div className="flex aspect-[16/5] w-full flex-col items-center justify-center gap-1 rounded-control border border-dashed border-line-strong bg-sunken text-xs text-ink-dim">
+            <ImageIcon aria-hidden="true" size={18} />
             No cover image
           </div>
         )
       )}
-      <Input
-        ref={inputRef}
-        type="file"
-        accept={kind === "FAVICON" ? "image/png,image/webp,image/x-icon" : "image/png,image/jpeg,image/webp,image/avif"}
-        className="h-auto border-dashed p-2 text-xs file:mr-3 file:border file:border-[var(--line)] file:bg-[var(--surface-raised)] file:px-3 file:py-2 file:text-xs file:text-[var(--fg)]"
-        disabled={busy}
-        onChange={(event) => {
-          const file = event.target.files?.[0];
-          if (file) {
-            const localPreview = URL.createObjectURL(file);
-            setPreview(localPreview);
-            void upload(file).finally(() => URL.revokeObjectURL(localPreview));
-          }
-        }}
-      />
-      {preview && (
-        <div className="flex flex-wrap gap-2">
-          {isCover && !simple && (
-            <Button type="button" loading={savingFraming} disabled={loading} variant="outline" size="sm" onClick={() => void saveFraming()} className="border-[var(--cyan)] text-[var(--cyan)]">
-              {savingFraming ? "Saving framing…" : "Save cover framing"}
-            </Button>
-          )}
-          <Button
+      <div className="flex flex-wrap items-center gap-2">
+        <label className={cn(buttonVariants({ variant: "secondary", size: "sm" }), "cursor-pointer focus-within:ring-4 focus-within:ring-primary/25", busy && "pointer-events-none opacity-50")}>
+          {loading ? <Loader2 aria-hidden="true" size={16} className="animate-spin" /> : <Upload aria-hidden="true" size={16} />}
+          <span>{loading ? "Uploading…" : preview ? "Replace image" : "Upload image"}</span>
+          <input
+            ref={inputRef}
+            type="file"
+            accept={accept}
+            className="sr-only"
+            disabled={busy}
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              if (file) {
+                const localPreview = URL.createObjectURL(file);
+                setPreview(localPreview);
+                void upload(file).finally(() => URL.revokeObjectURL(localPreview));
+              }
+            }}
+          />
+        </label>
+        {preview && isCover && !simple && (
+          <Button type="button" loading={savingFraming} disabled={loading} variant="outline" size="sm" onClick={() => void saveFraming()}>
+            {savingFraming ? "Saving framing…" : "Save cover framing"}
+          </Button>
+        )}
+        {preview && (
+          <button
             type="button"
-            variant="destructive"
-            size="sm"
             disabled={busy}
             onClick={() => void remove()}
-            className="text-xs"
+            className="inline-flex min-h-8 items-center gap-2 rounded-control px-3 py-1.5 text-xs font-semibold text-danger-fg outline-none transition-colors duration-200 hover:bg-danger-bg focus-visible:ring-4 focus-visible:ring-danger/25 disabled:pointer-events-none disabled:opacity-50"
           >
+            <Trash2 aria-hidden="true" size={16} />
             Remove image
+          </button>
+        )}
+      </div>
+      <p className="text-xs leading-5 text-ink-dim">{formats}</p>
+      {message && (messageIsError
+        ? <Alert tone="danger">{message}</Alert>
+        : (
+          <p role="status" className="flex items-center gap-1.5 text-xs text-ink-soft">
+            <CheckCircle2 aria-hidden="true" size={14} className="shrink-0 text-ok" />
+            {message}
+          </p>
+        ))}
+      <Dialog open={previewOpen && Boolean(preview)} onOpenChange={(_event, data) => setPreviewOpen(data.open)}>
+        <div role="dialog" aria-modal="true" aria-label={`${label} preview`} className="relative max-h-full max-w-5xl animate-pop overflow-auto rounded-sheet border border-line bg-surface p-3 shadow-float">
+          <Button type="button" variant="secondary" size="icon" onClick={() => setPreviewOpen(false)} aria-label="Close image preview" title="Close preview" className="absolute right-5 top-5 z-10">
+            <X aria-hidden size={16} />
           </Button>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={preview} alt={`${label} preview`} className={cn("max-h-[85vh] max-w-[min(90vw,72rem)] rounded-card object-contain", isCover ? "w-full" : "h-auto")} />
         </div>
-      )}
-      {message && (
-        <p
-          role={messageIsError ? "alert" : "status"}
-          className={`text-xs ${messageIsError ? "text-[var(--red)]" : "text-[var(--fg-soft)]"}`}
-        >
-          {message}
-        </p>
-      )}
-      {previewOpen && preview && (
-        <div
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/65 p-4 sm:p-8"
-          role="dialog"
-          aria-modal="true"
-          aria-label={`${label} preview`}
-          onClick={() => setPreviewOpen(false)}
-        >
-          <div className="relative max-h-full max-w-5xl rounded-xl border border-white/20 bg-[var(--surface)] p-3 shadow-2xl" onClick={(event) => event.stopPropagation()}>
-            <Button type="button" variant="ghost" size="icon" onClick={() => setPreviewOpen(false)} aria-label="Close image preview" title="Close preview" className="absolute right-3 top-3 z-10 h-9 w-9 rounded-full bg-black/65 text-lg text-white hover:bg-black/80 hover:text-white focus-visible:outline-white"><X aria-hidden size={18} /></Button>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={preview} alt={`${label} preview`} className={`max-h-[85vh] max-w-[min(90vw,72rem)] rounded-lg object-contain ${isCover ? "w-full" : "h-auto"}`} />
-          </div>
-        </div>
-      )}
+      </Dialog>
     </div>
   );
 }

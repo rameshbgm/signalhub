@@ -1,12 +1,40 @@
 import { requireSession } from "@/lib/require-session";
 import { requestOrgExport, updateOrgRetention, updateOrgSettings } from "./actions";
-import { HelpTip } from "@/components/HelpTip";
 import { requireCapability } from "@/lib/admin-guard";
 import { effectiveRetention, RETENTION_BOUNDS } from "@/lib/retention";
 import { database } from "@/lib/postgres/client";
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
+import { Archive, Download, FileDown, Fingerprint, History, Settings2, TriangleAlert } from "lucide-react";
+import { CopyButton } from "@/components/CopyButton";
+import { Alert } from "@/components/ui/alert";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Field } from "@/components/ui/field";
+import { IconTile } from "@/components/ui/icon-tile";
 import { Input } from "@/components/ui/input";
+import { PageHeader } from "@/components/ui/page-header";
+import { StatusBadge, type StatusTone } from "@/components/ui/status-badge";
+
+const RETENTION_LABELS: Record<string, string> = {
+  monitorChecksDays: "Monitor check history",
+  analyticsDays: "Analytics",
+  notificationLogsDays: "Notification logs",
+  resolvedIncidentsDays: "Resolved incidents",
+};
+
+function retentionLabel(key: string) {
+  if (RETENTION_LABELS[key]) return RETENTION_LABELS[key];
+  const text = key.replace(/([A-Z])/g, " $1").trim().toLowerCase();
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+const EXPORT_TONE: Record<string, StatusTone> = { SUCCEEDED: "ok", FAILED: "danger" };
+
+function sentence(value: string) {
+  const text = value.replaceAll("_", " ").toLowerCase();
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
 
 export default async function OrgSettingsPage() {
   const { session, org } = await requireSession();
@@ -24,142 +52,175 @@ export default async function OrgSettingsPage() {
     : [];
 
   return (
-    <div className="max-w-2xl space-y-8">
-      <h1 className="font-mono text-xl font-semibold text-[var(--fg)]">Organization Settings</h1>
+    <div className="space-y-8">
+      <PageHeader
+        title="Organization settings"
+        description="Manage your organization profile, data retention, enterprise sign-in, and exports."
+        icon={Settings2}
+        hue="slate"
+      />
 
-      <section className="border border-[var(--line)] bg-[var(--surface)] p-5">
-        <h2 className="mb-4 font-mono text-sm font-semibold text-[var(--fg)]">General</h2>
-        <form action={updateOrgSettings} className="space-y-3">
-          <label className="block text-sm">
-            <span className="mb-1 block text-xs text-[var(--fg-dim)]">Organization name</span>
-            <Input
-              name="name"
-              defaultValue={org.name}
-              className="w-full border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--fg)] focus:border-[var(--cyan)] focus:outline-none disabled:opacity-50"
-              required
-              disabled={!isAdmin}
-            />
-          </label>
-          <label className="block text-sm">
-            <span className="mb-1 flex items-center gap-1.5 text-xs text-[var(--fg-dim)]">
-              Organization slug
-              <HelpTip text="The organization slug is a stable internal identifier and is not changed here." />
-            </span>
-            <Input
-              value={org.slug}
-              className="w-full border border-[var(--line)] bg-[var(--surface-raised)] px-3 py-2 text-sm text-[var(--fg-soft)]"
-              disabled
-            />
-          </label>
-          <label className="block text-sm">
-            <span className="mb-1 block text-xs text-[var(--fg-dim)]">Organization contact email</span>
-            <Input
-              name="contactEmail"
-              type="email"
-              defaultValue={org.contactEmail ?? ""}
-              className="w-full border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--fg)] focus:border-[var(--cyan)] focus:outline-none disabled:opacity-50"
-              disabled={!isAdmin}
-            />
-          </label>
-          {isAdmin && <Button type="submit">Save</Button>}
-          {!isAdmin && <p className="text-xs text-[var(--fg-dim)]">Only Admins can change organization settings.</p>}
-        </form>
-      </section>
-
-      {isAdmin && (
-        <section className="border border-[var(--line)] bg-[var(--surface)] p-5">
-          <h2 className="font-mono text-sm font-semibold">Data retention</h2>
-          <p className="mt-1 text-xs text-[var(--fg-dim)]">
-            Organization overrides are bounded by installation safety limits and processed by the worker.
-          </p>
-          <form action={updateOrgRetention} className="mt-4 grid gap-3 sm:grid-cols-2">
-            {Object.entries(RETENTION_BOUNDS).map(([key, bounds]) => (
-              <label key={key} className="text-xs text-[var(--fg-soft)]">
-                {key.replace(/([A-Z])/g, " $1").replace(/^./, (value) => value.toUpperCase())}
-                <Input
-                  type="number"
-                  name={key}
-                  min={bounds.min}
-                  max={bounds.max}
-                  defaultValue={retention[key as keyof typeof retention]}
-                  className="mt-1 w-full border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm"
-                />
-              </label>
-            ))}
-            <Button type="submit" className="sm:col-span-2">
-              Save retention policy
-            </Button>
-          </form>
-        </section>
-      )}
-
-      {isAdmin && (
-        <section className="border border-[var(--line)] bg-[var(--surface)] p-5">
-          <h2 className="font-mono text-sm font-semibold">Enterprise identity assignments</h2>
-          <p className="mt-1 text-xs text-[var(--fg-dim)]">
-            Connection credentials and provisioning tokens are controlled by platform administrators.
-          </p>
-          <div className="mt-3 divide-y divide-[var(--line)] border border-[var(--line)]">
-            {identityConnections.map((connection) => (
-              <div key={connection.id} className="p-3 text-xs">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="font-semibold">{connection.name} · {connection.type}</span>
-                  <span className={connection.enabled ? "text-[var(--green)]" : "text-[var(--red)]"}>{connection.enabled ? "Enabled" : "Disabled"}</span>
+      <div className="grid gap-6 xl:grid-cols-2 xl:items-start">
+        <Card>
+          <CardHeader>
+            <CardTitle>General</CardTitle>
+            <CardDescription>The name and contact address shown across your workspace.</CardDescription>
+          </CardHeader>
+          <form action={updateOrgSettings}>
+            <CardContent className="space-y-4">
+              <Field label="Organization name" htmlFor="org-name">
+                <Input id="org-name" name="name" defaultValue={org.name} required disabled={!isAdmin} />
+              </Field>
+              <Field label="Organization slug" htmlFor="org-slug" hint="The organization slug is a stable internal identifier and is not changed here.">
+                <Input id="org-slug" defaultValue={org.slug} className="font-mono" disabled />
+              </Field>
+              <Field label="Organization contact email" htmlFor="org-contact-email">
+                <Input id="org-contact-email" name="contactEmail" type="email" defaultValue={org.contactEmail ?? ""} disabled={!isAdmin} />
+              </Field>
+              {isAdmin ? (
+                <div className="flex justify-end border-t border-line pt-4">
+                  <Button type="submit">Save changes</Button>
                 </div>
-                <p className="mt-1 text-[var(--fg-dim)]">Default role: {connection.defaultRole ?? "None"} · {connection.roleMappings.length} group mappings</p>
-                {connection.enabled && (
-                  <Link href={`/api/auth/${connection.type.toLowerCase()}/${connection.slug}/start`} className="mt-2 inline-block font-semibold text-[var(--cyan)]">
-                    Test sign-in
-                  </Link>
-                )}
-              </div>
-            ))}
-            {!identityConnections.length && <p className="p-3 text-xs text-[var(--fg-dim)]">No enterprise identity connection is assigned.</p>}
-          </div>
-        </section>
-      )}
-
-      {isAdmin && (
-        <section className="border border-[var(--line)] bg-[var(--surface)] p-5">
-          <h2 className="font-mono text-sm font-semibold">Organization data export</h2>
-          <p className="mt-1 text-xs text-[var(--fg-dim)]">
-            Creates a checksummed JSON archive and asset manifest. Stored credential material is excluded.
-          </p>
-          <form action={requestOrgExport} className="mt-3">
-            <Button type="submit" variant="outline" size="sm" className="text-[var(--cyan)]">
-              Request export
-            </Button>
+              ) : (
+                <Alert tone="info">Only Admins can change organization settings.</Alert>
+              )}
+            </CardContent>
           </form>
-          <div className="mt-4 divide-y divide-[var(--line)] border border-[var(--line)]">
-            {exports.map((job) => (
-              <div key={job.id} className="flex flex-wrap items-center justify-between gap-2 p-3 text-xs">
-                <span>{job.createdAt.toLocaleString()} · {job.status}</span>
-                {job.status === "SUCCEEDED" ? (
-                  <a href={`/api/admin/exports/${job.id}`} className="font-semibold text-[var(--cyan)]">Download</a>
-                ) : job.lastError ? <span className="text-[var(--red)]">{job.lastError}</span> : null}
-              </div>
-            ))}
-            {!exports.length && <p className="p-3 text-xs text-[var(--fg-dim)]">No exports requested.</p>}
-          </div>
-        </section>
-      )}
+        </Card>
 
-      {isAdmin && (
-        <section className="border border-[var(--red)]/40 bg-[var(--surface)] p-5">
-          <h2 className="mb-2 font-mono text-sm font-semibold text-[var(--red)]">
-            Organization deletion
-          </h2>
-          <p className="text-xs leading-5 text-[var(--fg-soft)]">
-            Permanent deletion is handled by a platform Admin using the audited
-            suspend, review, and queued-purge workflow. Contact your platform
-            operator and include organization slug{" "}
-            <code className="bg-[var(--bg)] px-1 text-[var(--fg)]">
-              {org.slug}
-            </code>
-            .
-          </p>
-        </section>
-      )}
+        {isAdmin && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Data retention</CardTitle>
+              <CardDescription>
+                Organization overrides are bounded by installation safety limits and processed by the worker.
+              </CardDescription>
+            </CardHeader>
+            <form action={updateOrgRetention}>
+              <CardContent className="space-y-4">
+                <div className="grid gap-4 sm:grid-cols-2">
+                  {Object.entries(RETENTION_BOUNDS).map(([key, bounds]) => (
+                    <Field key={key} label={retentionLabel(key)} htmlFor={`retention-${key}`} hint={`Days, from ${bounds.min} to ${bounds.max}.`}>
+                      <Input
+                        id={`retention-${key}`}
+                        type="number"
+                        name={key}
+                        min={bounds.min}
+                        max={bounds.max}
+                        defaultValue={retention[key as keyof typeof retention]}
+                      />
+                    </Field>
+                  ))}
+                </div>
+                <div className="flex justify-end border-t border-line pt-4">
+                  <Button type="submit">
+                    <History aria-hidden size={16} />
+                    Save retention policy
+                  </Button>
+                </div>
+              </CardContent>
+            </form>
+          </Card>
+        )}
+
+        {isAdmin && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Enterprise identity assignments</CardTitle>
+              <CardDescription>
+                Connection credentials and provisioning tokens are controlled by platform administrators.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {identityConnections.length === 0 ? (
+                <EmptyState icon={Fingerprint} hue="slate" title="No identity connection" description="No enterprise identity connection is assigned." className="border-0 bg-transparent py-8" />
+              ) : (
+                <ul className="space-y-2">
+                  {identityConnections.map((connection) => (
+                    <li key={connection.id} className="flex flex-wrap items-center justify-between gap-3 rounded-control border border-line px-3.5 py-3 text-sm">
+                      <div className="min-w-0">
+                        <p className="flex flex-wrap items-center gap-2 font-medium text-ink">
+                          {connection.name} · {connection.type}
+                          <StatusBadge tone={connection.enabled ? "ok" : "neutral"}>{connection.enabled ? "Enabled" : "Disabled"}</StatusBadge>
+                        </p>
+                        <p className="mt-0.5 text-xs text-ink-dim">Default role: {connection.defaultRole ?? "None"} · {connection.roleMappings.length} group mappings</p>
+                      </div>
+                      {connection.enabled && (
+                        <Link href={`/api/auth/${connection.type.toLowerCase()}/${connection.slug}/start`} className={buttonVariants({ variant: "secondary", size: "sm" })}>
+                          Test sign-in
+                        </Link>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {isAdmin && (
+          <Card>
+            <CardHeader className="flex-row flex-wrap items-start justify-between gap-3">
+              <div className="min-w-0">
+                <CardTitle>Organization data export</CardTitle>
+                <CardDescription>
+                  Creates a checksummed JSON archive and asset manifest. Stored credential material is excluded.
+                </CardDescription>
+              </div>
+              <form action={requestOrgExport}>
+                <Button type="submit" variant="secondary" size="sm">
+                  <FileDown aria-hidden size={14} />
+                  Request export
+                </Button>
+              </form>
+            </CardHeader>
+            <CardContent>
+              {exports.length === 0 ? (
+                <EmptyState icon={Archive} hue="slate" title="No exports requested" description="Request an export to download your organization data." className="border-0 bg-transparent py-8" />
+              ) : (
+                <ul className="space-y-2">
+                  {exports.map((job) => (
+                    <li key={job.id} className="flex flex-wrap items-center justify-between gap-3 rounded-control border border-line px-3.5 py-3 text-sm">
+                      <div className="min-w-0">
+                        <p className="flex flex-wrap items-center gap-2 text-ink">
+                          {job.createdAt.toLocaleString()}
+                          <StatusBadge tone={EXPORT_TONE[job.status] ?? "info"}>{sentence(job.status)}</StatusBadge>
+                        </p>
+                        {job.status !== "SUCCEEDED" && job.lastError && <p className="mt-0.5 text-xs text-danger-fg">{job.lastError}</p>}
+                      </div>
+                      {job.status === "SUCCEEDED" && (
+                        <a href={`/api/admin/exports/${job.id}`} className={buttonVariants({ variant: "secondary", size: "sm" })}>
+                          <Download aria-hidden size={14} />
+                          Download
+                        </a>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {isAdmin && (
+          <Card className="xl:col-span-2">
+            <CardHeader className="flex-row items-start gap-3">
+              <IconTile icon={TriangleAlert} hue="rose" />
+              <div className="min-w-0">
+                <h2 className="text-base font-semibold tracking-tight text-danger-fg">Organization deletion</h2>
+                <CardDescription>
+                  Permanent deletion is handled by a platform Admin using the audited suspend, review, and queued-purge
+                  workflow. Contact your platform operator and include this organization slug.
+                </CardDescription>
+              </div>
+            </CardHeader>
+            <CardContent className="flex flex-wrap items-center gap-2">
+              <code className="rounded-control border border-line-strong bg-sunken px-3 py-2 font-mono text-xs text-ink">{org.slug}</code>
+              <CopyButton value={org.slug} label="Copy slug" />
+            </CardContent>
+          </Card>
+        )}
+      </div>
     </div>
   );
 }

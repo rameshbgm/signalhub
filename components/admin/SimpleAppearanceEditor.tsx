@@ -4,10 +4,17 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Eye, Send } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Check, ChevronLeft, Eye, ImageIcon, LayoutTemplate, Palette, Send } from "lucide-react";
+import { Alert } from "@/components/ui/alert";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Field } from "@/components/ui/field";
+import { IconTile } from "@/components/ui/icon-tile";
+import { PageHeader } from "@/components/ui/page-header";
 import { Select } from "@/components/ui/select";
+import { StatusBadge, type StatusTone } from "@/components/ui/status-badge";
 import { AssetUploader } from "@/components/admin/AssetUploader";
+import { cn } from "@/lib/utils";
 import {
   PAGE_TEMPLATE_LABELS,
   PAGE_THEME_PRESET_KEYS,
@@ -163,144 +170,225 @@ export function SimpleAppearanceEditor({
           ? "Save failed"
           : `Draft r${revision}`;
 
+  const saveFailed = saveState === "ERROR" || saveState === "CONFLICT";
+  const saveTone: StatusTone = saveFailed ? "danger" : saveState === "SAVED" ? "neutral" : "info";
+
   const actionControls = (
-    <div className="flex shrink-0 items-center gap-2 pb-2 md:pb-1">
+    <div className="flex shrink-0 items-center gap-2">
       {page.publicAvailable ? (
-        <Link href={page.publicPath} target="_blank" rel="noreferrer" aria-label="Preview public page" title="Preview public page" className="page-management-action-icon rounded-lg border border-[var(--line-bright)] bg-[var(--surface)] text-[var(--cyan)] hover:bg-[var(--cyan-soft)]">
-          <Eye aria-hidden="true" size={17} />
+        <Link href={page.publicPath} target="_blank" rel="noreferrer" aria-label="Preview public page" title="Preview public page" className={buttonVariants({ variant: "secondary", className: "max-sm:min-h-11" })}>
+          <Eye aria-hidden="true" size={16} />
+          <span className="max-sm:sr-only">Preview</span>
         </Link>
       ) : (
-        <Button type="button" variant="ghost" size="icon" disabled aria-label="Preview unavailable until the page is published" title="Preview is available after publishing" className="page-management-action-icon h-10 w-10 cursor-not-allowed rounded-lg border border-[var(--line)] bg-[var(--surface)] text-[var(--fg-dim)] opacity-70">
-          <Eye aria-hidden="true" size={17} />
+        <Button type="button" variant="secondary" disabled aria-label="Preview unavailable until the page is published" title="Preview is available after publishing" className="max-sm:min-h-11">
+          <Eye aria-hidden="true" size={16} />
+          <span className="max-sm:sr-only">Preview</span>
         </Button>
       )}
       <Button
         type="button"
         data-button-guard="off"
-        aria-label="Publish changes"
         title="Publish changes"
         onClick={() => void publish()}
         disabled={!hasUnpublishedChanges || saveState === "SAVING" || saveState === "CONFLICT"}
-        size="icon"
         loading={saveState === "SAVING"}
-        className="page-management-action-icon h-10 w-10 rounded-lg"
+        className="max-sm:min-h-11"
       >
-        <Send aria-hidden="true" size={17} />
-        <span className="sr-only">Publish changes</span>
+        <Send aria-hidden="true" size={16} />
+        Publish changes
       </Button>
     </div>
   );
 
+  const stateBadges = (
+    <div className="flex flex-wrap items-center gap-2">
+      <StatusBadge tone={saveTone} live={saveState === "SAVING" || saveState === "DIRTY"}>{saveLabel}</StatusBadge>
+      {saveState === "SAVED" && (
+        <StatusBadge tone={hasUnpublishedChanges ? "warn" : "ok"}>{hasUnpublishedChanges ? "Unpublished changes" : "No unpublished changes"}</StatusBadge>
+      )}
+    </div>
+  );
+
+  const description = "Choose a layout and add your brand. Changes stay private until you publish.";
+
   return (
     <>
       {embedded && actionsMount ? createPortal(actionControls, actionsMount) : null}
-      <div className={`mx-auto w-full ${embedded ? "max-w-none" : "max-w-4xl"} pb-12`}>
-        <header className="flex flex-col gap-4 border-b border-[var(--line)] pb-6 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            {!embedded && <Link href={`/organization/pages/${page.id}`} className="text-sm font-semibold text-[var(--cyan)] hover:underline">Back to page</Link>}
-            <h1 className={`${embedded ? "mt-0" : "mt-3"} text-3xl font-semibold tracking-tight text-[var(--fg)]`}>Appearance</h1>
-            <p className="mt-2 text-sm text-[var(--fg-soft)]">Choose a layout and add your brand. Changes stay private until you publish.</p>
-          </div>
-          {!embedded && actionControls}
-        </header>
-
-      {message && (
-        <p role={saveState === "ERROR" || saveState === "CONFLICT" ? "alert" : "status"} className={`mt-4 text-sm ${saveState === "ERROR" || saveState === "CONFLICT" ? "text-[var(--red)]" : "text-[var(--fg-soft)]"}`}>
-          {message}
-        </p>
-      )}
-
-      <main className="mt-8 space-y-10">
-        <section aria-labelledby="layout-heading">
-          <div className="max-w-2xl">
-            <h2 id="layout-heading" className="text-lg font-semibold text-[var(--fg)]">Layout</h2>
-            <p className="mt-1 text-sm text-[var(--fg-soft)]">Pick the structure that best fits this status page.</p>
-          </div>
-          {!currentLayout && (
-            <p className="mt-4 border-l-2 border-[var(--amber)] pl-3 text-sm text-[var(--fg-soft)]">
-              Current layout: {PAGE_TEMPLATE_LABELS[design.templateKey]}. It is preserved until you choose one of the layouts below.
-            </p>
+      <div className="space-y-8 pb-6">
+        <div className="space-y-3">
+          {embedded ? (
+            <header className="flex flex-wrap items-start justify-between gap-4">
+              <div className="min-w-0">
+                <h2 className="text-xl font-semibold tracking-tight text-ink">Appearance</h2>
+                <p className="mt-1 max-w-2xl text-sm leading-6 text-ink-soft">{description}</p>
+              </div>
+              {stateBadges}
+            </header>
+          ) : (
+            <div className="space-y-4">
+              <Link href={`/organization/pages/${page.id}`} className={buttonVariants({ variant: "ghost", size: "sm" })}>
+                <ChevronLeft aria-hidden="true" size={16} />
+                Back to page
+              </Link>
+              <PageHeader title="Appearance" description={description} icon={Palette} hue="violet" actions={<>{stateBadges}{actionControls}</>} />
+            </div>
           )}
-          <div className="mt-5 grid gap-3 sm:grid-cols-3" role="radiogroup" aria-label="Page layout">
-            {SIMPLE_LAYOUTS.map((layout) => {
-              const selected = design.templateKey === layout.key;
-              return (
-                <Button
-                  key={layout.key}
-                  type="button"
-                  variant="ghost"
-                  role="radio"
-                  aria-checked={selected}
-                  onClick={() => selectLayout(layout.key)}
-                  className={`h-auto min-h-32 justify-start whitespace-normal rounded-md border p-4 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--cyan)] ${selected ? "border-[var(--cyan)] bg-[var(--cyan-soft)]" : "border-[var(--line)] bg-[var(--surface)] hover:border-[var(--line-bright)]"}`}
-                >
-                  <span className="block text-base font-semibold text-[var(--fg)]">{layout.name}</span>
-                  <span className="mt-2 block text-sm leading-6 text-[var(--fg-soft)]">{layout.description}</span>
-                </Button>
-              );
-            })}
-          </div>
+
+          {message && (saveFailed
+            ? <Alert tone="danger">{message}</Alert>
+            : <p role="status" className="text-sm text-ink-soft">{message}</p>)}
+        </div>
+
+        <section aria-labelledby="layout-heading">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-3.5">
+                <IconTile icon={LayoutTemplate} hue="indigo" />
+                <div className="min-w-0">
+                  <CardTitle id="layout-heading">Layout</CardTitle>
+                  <CardDescription>Pick the structure that best fits this status page.</CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {!currentLayout && (
+                <Alert tone="info">
+                  Current layout: {PAGE_TEMPLATE_LABELS[design.templateKey]}. It is preserved until you choose one of the layouts below.
+                </Alert>
+              )}
+              <div className="grid gap-4 sm:grid-cols-3" role="radiogroup" aria-label="Page layout">
+                {SIMPLE_LAYOUTS.map((layout) => {
+                  const selected = design.templateKey === layout.key;
+                  return (
+                    <button
+                      key={layout.key}
+                      type="button"
+                      role="radio"
+                      aria-checked={selected}
+                      onClick={() => selectLayout(layout.key)}
+                      className={cn(
+                        "flex flex-col gap-3 rounded-card border p-4 text-left outline-none transition-[background-color,border-color,box-shadow] duration-200 ease-soft focus-visible:ring-4 focus-visible:ring-primary/25",
+                        selected ? "border-primary bg-primary-soft shadow-card" : "border-line-strong bg-surface hover:border-primary/40 hover:bg-sunken",
+                      )}
+                    >
+                      <LayoutSketch layout={layout.key} selected={selected} />
+                      <span className="block">
+                        <span className="flex items-center justify-between gap-2">
+                          <span className="text-base font-semibold text-ink">{layout.name}</span>
+                          {selected && (
+                            <span aria-hidden="true" className="grid size-5 shrink-0 place-items-center rounded-full bg-primary text-on-primary">
+                              <Check size={12} />
+                            </span>
+                          )}
+                        </span>
+                        <span className="mt-1 block text-sm leading-6 text-ink-soft">{layout.description}</span>
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
         </section>
 
-        <section aria-labelledby="style-heading" className="border-t border-[var(--line)] pt-8">
-          <div className="max-w-2xl">
-            <h2 id="style-heading" className="text-lg font-semibold text-[var(--fg)]">Style</h2>
-            <p className="mt-1 text-sm text-[var(--fg-soft)]">Choose a preset to set the page colors and visual tone.</p>
-          </div>
-          <div className="mt-5 max-w-xl">
-            <label className="text-sm font-medium text-[var(--fg)]">
-              Style preset
-              <Select aria-label="Style preset" value={design.theme.preset} onChange={(event) => selectPreset(event.target.value)} className="mt-2 w-full border border-[var(--line)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--fg)]">
-                {PAGE_THEME_PRESET_KEYS.map((preset) => <option key={preset} value={preset}>{PAGE_THEME_PRESET_LABELS[preset]}</option>)}
-              </Select>
-            </label>
-          </div>
+        <section aria-labelledby="style-heading">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-3.5">
+                <IconTile icon={Palette} hue="violet" />
+                <div className="min-w-0">
+                  <CardTitle id="style-heading">Style</CardTitle>
+                  <CardDescription>Choose a preset to set the page colors and visual tone.</CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <Field label="Style preset" htmlFor="style-preset" className="max-w-md">
+                <Select id="style-preset" aria-label="Style preset" value={design.theme.preset} onChange={(event) => selectPreset(event.target.value)} className="w-full">
+                  {PAGE_THEME_PRESET_KEYS.map((preset) => <option key={preset} value={preset}>{PAGE_THEME_PRESET_LABELS[preset]}</option>)}
+                </Select>
+              </Field>
+            </CardContent>
+          </Card>
         </section>
 
-        <section aria-labelledby="brand-heading" className="border-t border-[var(--line)] pt-8">
-          <div className="max-w-2xl">
-            <h2 id="brand-heading" className="text-lg font-semibold text-[var(--fg)]">Brand assets</h2>
-            <p className="mt-1 text-sm text-[var(--fg-soft)]">Add the images visitors recognize. New cover images are shown in full by default.</p>
-          </div>
-          <div className="mt-5 grid gap-4 lg:grid-cols-3">
-            <AssetUploader pageId={page.id} kind="LOGO" currentUrl={design.presentation.logoUrl} label="Logo" help="Used in the public page header." staged simple onStagedChange={({ url }) => updatePresentation({ logoUrl: url })} />
-            <AssetUploader pageId={page.id} kind="FAVICON" currentUrl={design.presentation.faviconUrl} label="Site icon" help="Shown in supported browser tabs." staged simple onStagedChange={({ url }) => updatePresentation({ faviconUrl: url })} />
-            <AssetUploader
-              pageId={page.id}
-              kind="COVER"
-              currentUrl={design.presentation.coverImageUrl}
-              currentCoverFit={design.presentation.coverImageFit}
-              currentCoverPositionX={design.presentation.coverImagePositionX}
-              currentCoverPositionY={design.presentation.coverImagePositionY}
-              currentCoverCropX={design.presentation.coverImageCropX}
-              currentCoverCropY={design.presentation.coverImageCropY}
-              currentCoverCropWidth={design.presentation.coverImageCropWidth}
-              currentCoverCropHeight={design.presentation.coverImageCropHeight}
-              label="Cover image"
-              help="Used by the banner layout."
-              staged
-              simple
-              onStagedChange={({ url, cover }) => updatePresentation({
-                coverImageUrl: url,
-                ...(cover ? {
-                  coverImageFit: cover.fit,
-                  coverImagePositionX: cover.positionX,
-                  coverImagePositionY: cover.positionY,
-                  coverImageCropX: cover.crop?.x ?? null,
-                  coverImageCropY: cover.crop?.y ?? null,
-                  coverImageCropWidth: cover.crop?.width ?? null,
-                  coverImageCropHeight: cover.crop?.height ?? null,
-                } : {}),
-              })}
-            />
-          </div>
+        <section aria-labelledby="brand-heading">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-3.5">
+                <IconTile icon={ImageIcon} hue="sky" />
+                <div className="min-w-0">
+                  <CardTitle id="brand-heading">Brand assets</CardTitle>
+                  <CardDescription>Add the images visitors recognize. New cover images are shown in full by default.</CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-4 lg:grid-cols-3">
+                <AssetUploader pageId={page.id} kind="LOGO" currentUrl={design.presentation.logoUrl} label="Logo" help="Used in the public page header." staged simple onStagedChange={({ url }) => updatePresentation({ logoUrl: url })} />
+                <AssetUploader pageId={page.id} kind="FAVICON" currentUrl={design.presentation.faviconUrl} label="Site icon" help="Shown in supported browser tabs." staged simple onStagedChange={({ url }) => updatePresentation({ faviconUrl: url })} />
+                <AssetUploader
+                  pageId={page.id}
+                  kind="COVER"
+                  currentUrl={design.presentation.coverImageUrl}
+                  currentCoverFit={design.presentation.coverImageFit}
+                  currentCoverPositionX={design.presentation.coverImagePositionX}
+                  currentCoverPositionY={design.presentation.coverImagePositionY}
+                  currentCoverCropX={design.presentation.coverImageCropX}
+                  currentCoverCropY={design.presentation.coverImageCropY}
+                  currentCoverCropWidth={design.presentation.coverImageCropWidth}
+                  currentCoverCropHeight={design.presentation.coverImageCropHeight}
+                  label="Cover image"
+                  help="Used by the banner layout."
+                  staged
+                  simple
+                  onStagedChange={({ url, cover }) => updatePresentation({
+                    coverImageUrl: url,
+                    ...(cover ? {
+                      coverImageFit: cover.fit,
+                      coverImagePositionX: cover.positionX,
+                      coverImagePositionY: cover.positionY,
+                      coverImageCropX: cover.crop?.x ?? null,
+                      coverImageCropY: cover.crop?.y ?? null,
+                      coverImageCropWidth: cover.crop?.width ?? null,
+                      coverImageCropHeight: cover.crop?.height ?? null,
+                    } : {}),
+                  })}
+                />
+              </div>
+            </CardContent>
+          </Card>
         </section>
-      </main>
-
-      <footer className="mt-10 border-t border-[var(--line)] pt-6">
-        <p className={`text-sm ${saveState === "ERROR" || saveState === "CONFLICT" ? "text-[var(--red)]" : "text-[var(--fg-soft)]"}`}>{saveLabel}</p>
-      </footer>
       </div>
     </>
+  );
+}
+
+/** A tiny wireframe of each layout so the choice is visible, not just named. */
+function LayoutSketch({ layout, selected }: { layout: PageTemplateKey; selected: boolean }) {
+  const strong = selected ? "bg-primary/60" : "bg-ink-dim/40";
+  const soft = selected ? "bg-primary/20" : "bg-line";
+  return (
+    <span aria-hidden="true" className="block h-24 space-y-1.5 overflow-hidden rounded-control border border-line bg-surface p-2.5">
+      {layout === "ILLUSTRATED_HERO" ? (
+        <>
+          <span className="block h-9 rounded-chip bg-gradient-to-r from-primary/40 to-accent/40" />
+          <span className={cn("block h-2 rounded-chip", soft)} />
+          <span className={cn("block h-2 rounded-chip", soft)} />
+        </>
+      ) : layout === "DENSE_OPERATIONS" ? (
+        <span className="grid grid-cols-2 gap-1.5">
+          {Array.from({ length: 8 }, (_, index) => <span key={index} className={cn("block h-3 rounded-chip", index === 0 ? strong : soft)} />)}
+        </span>
+      ) : (
+        <>
+          <span className={cn("mx-auto block h-3 w-1/2 rounded-full", strong)} />
+          <span className={cn("block h-3 rounded-chip", soft)} />
+          <span className={cn("block h-3 rounded-chip", soft)} />
+          <span className={cn("block h-3 rounded-chip", soft)} />
+        </>
+      )}
+    </span>
   );
 }

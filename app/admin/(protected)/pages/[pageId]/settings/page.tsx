@@ -5,8 +5,8 @@ import { assertPageInOrg, requireCapability } from "@/lib/admin-guard";
 import { deletePage, updatePageInfo } from "../../actions";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
-
-const inputClass = "mt-1.5 w-full rounded-lg border border-[var(--line)] bg-[var(--bg)] px-3.5 py-3 text-sm text-[var(--fg)] focus:border-[var(--cyan)] focus:outline-none";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Field } from "@/components/ui/field";
 
 export default async function PageSettings({ params }: { params: Promise<{ pageId: string }> }) {
   const { pageId } = await params;
@@ -15,39 +15,32 @@ export default async function PageSettings({ params }: { params: Promise<{ pageI
   if (!page) notFound();
 
   return (
-    <div className="max-w-3xl space-y-8">
-      <PlatformActionForm action={updatePageInfo.bind(null, pageId)} successMessage="Page settings saved" className="space-y-6">
-        <section className="rounded-xl border border-[var(--line)] bg-[var(--surface)] p-6 shadow-[0_1px_3px_rgba(60,64,67,0.12)] sm:p-8">
-          <div className="max-w-2xl">
-            <h2 className="text-xl font-semibold tracking-[-0.02em] text-[var(--fg)]">Page details</h2>
-            <p className="mt-2 text-sm leading-6 text-[var(--fg-dim)]">Update the essential details visitors and your team use to identify this page.</p>
-          </div>
-          <div className="mt-7 grid gap-5 sm:grid-cols-2">
-            <Field label="Page name"><Input name="name" defaultValue={page.name} required maxLength={120} className={inputClass} /></Field>
-            <Field label="Organization name"><Input name="organizationName" defaultValue={page.organizationName} maxLength={120} className={inputClass} /></Field>
-            <Field label="Company website"><Input name="companyUrl" defaultValue={page.companyUrl ?? ""} inputMode="url" className={inputClass} /></Field>
-            <Field label="Timezone"><Input name="timezone" defaultValue={page.timezone} className={inputClass} /></Field>
-            <Field label="Default SMS country code"><Input name="defaultSmsCountryCode" defaultValue={page.defaultSmsCountryCode} className={inputClass} /></Field>
-            <Field label="Google Analytics ID"><Input name="googleAnalyticsId" defaultValue={page.googleAnalyticsId ?? ""} className={inputClass} /></Field>
-          </div>
-          <label className="mt-6 flex items-center gap-2 text-sm text-[var(--fg-soft)]"><Checkbox name="noindex" defaultChecked={page.noindex} /> Ask search engines not to index this page</label>
-        </section>
-        <div className="flex flex-col-reverse gap-4 border-t border-[var(--line)] pt-6 sm:flex-row sm:items-center sm:justify-between"><p className="text-sm text-[var(--fg-dim)]">Changes are saved to this page only.</p><PlatformSubmitButton pendingLabel="Saving…" className="w-full rounded-lg bg-[var(--cyan)] px-6 py-3 text-sm font-semibold text-[var(--on-cyan)] sm:w-auto">Save changes</PlatformSubmitButton></div>
-      </PlatformActionForm>
+    <div className="space-y-8">
+      <Card>
+        <CardHeader><CardTitle>Page details</CardTitle><CardDescription>Update the details visitors and your team use to identify this page.</CardDescription></CardHeader>
+        <CardContent>
+          <PlatformActionForm action={updatePageInfo.bind(null, pageId)} successMessage="Page settings saved" className="space-y-5">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="Page name" htmlFor="page-name" required><Input id="page-name" name="name" defaultValue={page.name} required maxLength={120} /></Field>
+              <Field label="Organization name" htmlFor="organization-name"><Input id="organization-name" name="organizationName" defaultValue={page.organizationName} maxLength={120} /></Field>
+              <Field label="Company website" htmlFor="company-website"><Input id="company-website" name="companyUrl" defaultValue={page.companyUrl ?? ""} inputMode="url" /></Field>
+              <Field label="Timezone" htmlFor="page-timezone"><Input id="page-timezone" name="timezone" defaultValue={page.timezone} /></Field>
+              <Field label="Default SMS country code" htmlFor="sms-country-code"><Input id="sms-country-code" name="defaultSmsCountryCode" defaultValue={page.defaultSmsCountryCode} /></Field>
+              <Field label="Google Analytics ID" htmlFor="analytics-id"><Input id="analytics-id" name="googleAnalyticsId" defaultValue={page.googleAnalyticsId ?? ""} /></Field>
+            </div>
+            <label className="flex items-center gap-2 text-sm text-ink-soft"><Checkbox name="noindex" defaultChecked={page.noindex} /> Ask search engines not to index this page</label>
+            <div className="flex flex-col-reverse gap-3 border-t border-line pt-5 sm:flex-row sm:items-center sm:justify-between"><p className="text-xs text-ink-dim">Changes are saved to this page only.</p><PlatformSubmitButton pendingLabel="Saving…" className="w-full sm:w-auto">Save changes</PlatformSubmitButton></div>
+          </PlatformActionForm>
+        </CardContent>
+      </Card>
 
-      <section className="rounded-xl border border-[var(--red)]/30 bg-[var(--surface)] p-6 sm:p-8">
-        <h2 className="text-xl font-semibold tracking-[-0.02em] text-[var(--red)]">Delete page</h2>
-        <p id="delete-page-warning" className="mt-1 text-sm leading-6 text-[var(--fg-dim)]">Permanently deletes this page, its services, incidents, subscriber records, metrics, monitors, and uploaded assets. This cannot be undone.</p>
-        <PlatformActionForm action={deletePage.bind(null, pageId)} successMessage="Page deleted" className="mt-4 flex max-w-lg flex-col gap-3">
-          <label className="text-sm text-[var(--fg-soft)]" htmlFor="delete-page-confirmation">Type <code className="font-mono text-[var(--fg)]">{page.name}</code> to confirm</label>
-          <Input id="delete-page-confirmation" name="confirmation" autoComplete="off" required aria-describedby="delete-page-warning" className="rounded-md border-[var(--red)]/40 focus:border-[var(--red)]" />
-          <PlatformSubmitButton pendingLabel="Deleting permanently…" confirmMessage={`Permanently delete ${page.name} and all of its data? This cannot be undone.`} className="w-fit border border-[var(--red)]/40 px-4 py-2 text-sm font-semibold text-[var(--red)]">Delete permanently</PlatformSubmitButton>
-        </PlatformActionForm>
-      </section>
+      <Card className="border-danger/30">
+        <CardHeader><CardTitle className="text-danger-fg">Delete page</CardTitle><CardDescription id="delete-page-warning">Permanently deletes this page, its services, incidents, subscriber records, metrics, monitors, and uploaded assets. This cannot be undone.</CardDescription></CardHeader>
+        <CardContent><PlatformActionForm action={deletePage.bind(null, pageId)} successMessage="Page deleted" className="flex max-w-lg flex-col gap-3">
+          <Field label={<>Type <code className="font-mono text-ink">{page.name}</code> to confirm</>} htmlFor="delete-page-confirmation"><Input id="delete-page-confirmation" name="confirmation" autoComplete="off" required aria-describedby="delete-page-warning" /></Field>
+          <PlatformSubmitButton pendingLabel="Deleting permanently…" confirmMessage={`Permanently delete ${page.name} and all of its data? This cannot be undone.`} variant="destructive" className="w-fit">Delete permanently</PlatformSubmitButton>
+        </PlatformActionForm></CardContent>
+      </Card>
     </div>
   );
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return <label className="block text-sm font-medium text-[var(--fg-soft)]">{label}{children}</label>;
 }

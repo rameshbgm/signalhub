@@ -5,6 +5,10 @@ import { fetchWithTimeout } from "@/lib/client-fetch";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Alert } from "@/components/ui/alert";
+import { EmptyState } from "@/components/ui/empty-state";
+import { StatusBadge } from "@/components/ui/status-badge";
+import { BellRing } from "lucide-react";
 
 const CHANNELS = [
   {
@@ -199,10 +203,10 @@ export function NotificationDestinationManager({
   return (
     <div className="space-y-5">
       {selectedProvider ? (
-      <form onSubmit={create} className="space-y-5 border border-[var(--line)] bg-[var(--surface)] p-4 sm:p-5">
+      <form onSubmit={create} className="space-y-5 rounded-control bg-sunken/60 p-4 sm:p-5">
         <fieldset>
-          <legend className="text-sm font-semibold text-[var(--fg)]">Choose a provider</legend>
-          <p className="mt-1 text-xs leading-5 text-[var(--fg-dim)]">SignalHub sends a live verification message before saving the destination.</p>
+          <legend className="text-sm font-semibold text-ink">Choose a provider</legend>
+          <p className="mt-1 text-xs leading-5 text-ink-dim">SignalHub sends a live verification message before saving the destination.</p>
           <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {availableProviders.map((provider) => {
               const selected = provider.value === channel;
@@ -218,31 +222,31 @@ export function NotificationDestinationManager({
                     setMessage(null);
                   }}
                   variant="ghost"
-                  className={`h-auto min-w-0 justify-start whitespace-normal border p-3 text-left transition-colors ${selected ? "border-[var(--cyan)] bg-[var(--cyan-soft)]" : "border-[var(--line)] bg-[var(--bg)] hover:border-[var(--line-bright)]"}`}
+                  className={`h-auto min-w-0 flex-col items-start justify-start whitespace-normal rounded-control border p-3 text-left transition-colors ${selected ? "border-primary bg-primary-soft" : "border-line bg-surface hover:border-line-strong"}`}
                 >
                   <span className="flex items-center justify-between gap-2">
-                    <span className="text-sm font-semibold text-[var(--fg)]">{provider.label}</span>
-                    <span className="font-mono text-[9px] uppercase tracking-wider text-[var(--fg-dim)]">{provider.group}</span>
+                    <span className="text-sm font-semibold text-ink">{provider.label}</span>
+                    <span className="text-xs text-ink-dim">{provider.group}</span>
                   </span>
-                  <span className="mt-1 block text-xs leading-5 text-[var(--fg-dim)]">{provider.description}</span>
+                  <span className="mt-1 block text-xs leading-5 text-ink-dim">{provider.description}</span>
                 </Button>
               );
             })}
           </div>
         </fieldset>
 
-        <div className="border-t border-[var(--line)] pt-4">
+        <div className="border-t border-line pt-4">
           <div className="mb-3">
-            <p className="text-sm font-semibold text-[var(--fg)]">Configure {selectedProvider.label}</p>
-            <p className="mt-1 text-xs text-[var(--fg-dim)]">Credentials are encrypted at rest and are never displayed again.</p>
+            <p className="text-sm font-semibold text-ink">Configure {selectedProvider.label}</p>
+            <p className="mt-1 text-xs text-ink-dim">Credentials are encrypted at rest and are never displayed again.</p>
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
-            <label className="grid gap-1.5 text-xs font-semibold text-[var(--fg-soft)]">
+            <label className="grid gap-1.5 text-sm font-medium text-ink-soft">
               Destination name
               <Input value={name} onChange={(event) => setName(event.target.value)} placeholder={`e.g. ${selectedProvider.label} incidents`} className="font-normal" required />
             </label>
             {selectedProvider.fields.map((field) => (
-              <label key={field.key} className="grid gap-1.5 text-xs font-semibold text-[var(--fg-soft)]">
+              <label key={field.key} className="grid gap-1.5 text-sm font-medium text-ink-soft">
                 {field.label}
                 <Input
                   type={"sensitive" in field && field.sensitive ? "password" : "text"}
@@ -257,39 +261,37 @@ export function NotificationDestinationManager({
             ))}
           </div>
         </div>
-        <div className="flex justify-end border-t border-[var(--line)] pt-4">
+        <div className="flex justify-end border-t border-line pt-4">
           <Button type="submit" loading={loading} disabled={Boolean(pendingAction)} className="w-full sm:w-auto">
             {loading ? `Testing ${selectedProvider.label}…` : `Test and add ${selectedProvider.label}`}
           </Button>
         </div>
       </form>
       ) : (
-        <div className="border border-[var(--amber)]/30 bg-[var(--amber-soft)] p-4 text-sm text-[var(--fg-soft)]">
+        <Alert tone="warn">
           No team notification providers are enabled for this installation. Ask a platform administrator to enable providers in Platform configuration.
-        </div>
+        </Alert>
       )}
       {message && (
         <p
           role={messageIsError ? "alert" : "status"}
-          className={`text-sm ${messageIsError ? "text-[var(--red)]" : "text-[var(--fg-soft)]"}`}
+          className={`text-sm ${messageIsError ? "text-danger-fg" : "text-ink-soft"}`}
         >
           {message}
         </p>
       )}
-      <div className="divide-y divide-[var(--line)] border border-[var(--line)] bg-[var(--surface)]">
+      {destinations.length > 0 ? <ul className="space-y-2">
         {destinations.map((destination) => (
-          <div key={destination.id} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+          <li key={destination.id} className="flex flex-col gap-3 rounded-control border border-line px-3.5 py-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
-                <p className="font-medium text-[var(--fg)]">{destination.name}</p>
-                <span className={`px-2 py-0.5 font-mono text-[9px] font-semibold uppercase tracking-wider ${destination.active && destination.verifiedAt ? "bg-[var(--green-soft)] text-[var(--green)]" : "bg-[var(--surface-raised)] text-[var(--fg-dim)]"}`}>
-                  {destination.active && destination.verifiedAt ? "Verified" : destination.active ? "Unverified" : "Paused"}
-                </span>
+                <p className="font-medium text-ink">{destination.name}</p>
+                <StatusBadge tone={destination.active && destination.verifiedAt ? "ok" : destination.active ? "warn" : "neutral"}>{destination.active && destination.verifiedAt ? "Verified" : destination.active ? "Unverified" : "Paused"}</StatusBadge>
               </div>
-              <p className="mt-1 text-xs text-[var(--fg-dim)]">{CHANNELS.find((provider) => provider.value === destination.channel)?.label ?? destination.channel.replaceAll("_", " ")}</p>
-              {destination.lastError && <p className="mt-1 text-xs text-[var(--red)]">{destination.lastError}</p>}
+              <p className="mt-1 text-xs text-ink-dim">{CHANNELS.find((provider) => provider.value === destination.channel)?.label ?? destination.channel.replaceAll("_", " ")}</p>
+              {destination.lastError && <p className="mt-1 text-xs text-danger-fg">{destination.lastError}</p>}
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <Button type="button" variant="outline" size="sm" loading={pendingAction === `test:${destination.id}`} disabled={Boolean(pendingAction)} onClick={() => void mutate(destination.id, "test")}>
                 {pendingAction === `test:${destination.id}` ? "Sending…" : "Send test"}
               </Button>
@@ -300,10 +302,9 @@ export function NotificationDestinationManager({
                 {pendingAction === `delete:${destination.id}` ? "Deleting…" : "Delete"}
               </Button>
             </div>
-          </div>
+          </li>
         ))}
-        {!destinations.length && <p className="p-6 text-center text-sm text-[var(--fg-dim)]">No team destinations configured.</p>}
-      </div>
+      </ul> : <EmptyState icon={BellRing} hue="teal" title="No team destinations configured" description="Choose a provider above to send incident updates to your team." />}
     </div>
   );
 }

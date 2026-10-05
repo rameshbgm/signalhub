@@ -1,6 +1,7 @@
 "use client";
 
 import { useId, useState, type ButtonHTMLAttributes } from "react";
+import { Check, Copy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 type CopyButtonProps = Omit<
@@ -20,7 +21,7 @@ export function CopyButton({
   copiedLabel = "Copied",
   copyingLabel = "Copying…",
   className,
-  errorClassName = "text-xs text-[var(--red)]",
+  errorClassName = "text-xs text-danger-fg",
   disabled,
   ...buttonProps
 }: CopyButtonProps) {
@@ -56,12 +57,13 @@ export function CopyButton({
         data-button-guard="off"
         disabled={disabled || pending}
         loading={pending}
-        variant="ghost"
+        variant="secondary"
         size="sm"
         aria-describedby={error ? errorId : undefined}
         onClick={() => void copy()}
         className={className}
       >
+        {!pending && (copied ? <Check aria-hidden size={14} /> : <Copy aria-hidden size={14} />)}
         {pending ? copyingLabel : copied ? copiedLabel : label}
       </Button>
       {error && (

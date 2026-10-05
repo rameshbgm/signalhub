@@ -10,7 +10,7 @@ export function PageSelect({ pages, basePath, selected }: { pages: { id: string;
       aria-label="Status page"
       defaultValue={selected}
       onChange={(e) => router.push(`${basePath}?pageId=${e.target.value}`)}
-      className="w-full border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--fg)] focus:border-[var(--cyan)] focus:outline-none"
+      className="w-full"
     >
       {pages.map((p) => (
         <option key={p.id} value={p.id}>
