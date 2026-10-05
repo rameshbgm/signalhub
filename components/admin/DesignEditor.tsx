@@ -1,16 +1,13 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition, type ReactNode } from "react";
-import {
-  Button,
-  Dialog,
-  DialogActions,
-  DialogBody,
-  DialogContent,
-  DialogSurface,
-  DialogTitle,
-} from "@fluentui/react-components";
-import { FluentSelect } from "@/components/FluentSelect";
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, GripVertical, Minus, Plus, Redo2, Undo2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Dialog, DialogActions, DialogBody, DialogContent, DialogSurface, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Select as UiSelect } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -595,25 +592,27 @@ export function DesignEditor({
           aria-label="Designer actions"
           className="order-last flex w-full items-center gap-2 overflow-x-auto pb-0.5 xl:order-none xl:w-auto xl:pb-0"
         >
-          <button type="button" onClick={undo} disabled={!undoStack.length} aria-label="Undo design change" className="shrink-0 border border-[var(--line)] px-3 py-2 text-sm disabled:opacity-40">↶</button>
-          <button type="button" onClick={redo} disabled={!redoStack.length} aria-label="Redo design change" className="shrink-0 border border-[var(--line)] px-3 py-2 text-sm disabled:opacity-40">↷</button>
-          <button type="button" data-button-guard="off" onClick={() => void publishChanges()} disabled={saveState === "SAVING" || saveState === "CONFLICT" || sameStatusPageDesign(previewDesign, publishedDesign)} className="shrink-0 bg-[var(--cyan)] px-4 py-2 text-sm font-semibold text-[var(--on-cyan)] disabled:opacity-50">
+          <Button type="button" variant="outline" size="icon" onClick={undo} disabled={!undoStack.length} aria-label="Undo design change" className="h-9 w-9"><Undo2 aria-hidden size={16} /></Button>
+          <Button type="button" variant="outline" size="icon" onClick={redo} disabled={!redoStack.length} aria-label="Redo design change" className="h-9 w-9"><Redo2 aria-hidden size={16} /></Button>
+          <Button type="button" data-button-guard="off" onClick={() => void publishChanges()} disabled={saveState === "SAVING" || saveState === "CONFLICT" || sameStatusPageDesign(previewDesign, publishedDesign)} loading={saveState === "SAVING"} className="shrink-0">
             {saveState === "SAVING" ? "Saving…" : "Publish"}
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
+            variant="outline"
+            size="sm"
             data-button-guard="off"
             onClick={() => setPreviewVisible((visible) => !visible)}
             aria-pressed={!previewVisible}
             className="shrink-0 whitespace-nowrap border border-[var(--line)] px-3 py-2 text-sm hover:border-[var(--cyan)]"
           >
             {previewVisible ? "Hide preview" : "Show preview"}
-          </button>
-          <button type="button" onClick={() => startTransition(async () => {
+          </Button>
+          <Button type="button" variant="outline" size="sm" onClick={() => startTransition(async () => {
             const result = await duplicateStatusPage(page.id);
             if (result.ok) router.push(`/organization/pages/${result.pageId}/design`);
-          })} className="shrink-0 border border-[var(--line)] px-3 py-2 text-sm">Duplicate</button>
-          <Button appearance="secondary" shape="square" type="button" data-button-busy-mode="interaction" className="shrink-0 whitespace-nowrap" onClick={() => setResetDialogOpen(true)}>
+          })} className="shrink-0">Duplicate</Button>
+          <Button variant="secondary" size="sm" type="button" data-button-busy-mode="interaction" className="shrink-0 whitespace-nowrap" onClick={() => setResetDialogOpen(true)}>
             Reset to default
           </Button>
           {page.publicAvailable ? (
@@ -643,8 +642,8 @@ export function DesignEditor({
               <p>The reset is autosaved as a draft. The public page stays unchanged until you choose Publish.</p>
             </DialogContent>
             <DialogActions>
-              <Button appearance="secondary" onClick={() => setResetDialogOpen(false)}>Cancel</Button>
-              <Button appearance="primary" onClick={() => void resetToDefaultDraft()}>Reset draft to default</Button>
+              <Button variant="secondary" onClick={() => setResetDialogOpen(false)}>Cancel</Button>
+              <Button onClick={() => void resetToDefaultDraft()}>Reset draft to default</Button>
             </DialogActions>
           </DialogBody>
         </DialogSurface>
@@ -668,8 +667,8 @@ export function DesignEditor({
               <p>The removal is autosaved in this draft and stays private until Publish.</p>
             </DialogContent>
             <DialogActions>
-              <Button appearance="secondary" onClick={() => setPendingBlockRemoval(null)}>Cancel</Button>
-              <Button appearance="primary" onClick={confirmBlockRemoval}>Remove block</Button>
+              <Button variant="secondary" onClick={() => setPendingBlockRemoval(null)}>Cancel</Button>
+              <Button onClick={confirmBlockRemoval}>Remove block</Button>
             </DialogActions>
           </DialogBody>
         </DialogSurface>
@@ -679,7 +678,7 @@ export function DesignEditor({
       {page.legacyCssActive && (
         <div className="flex shrink-0 items-center gap-3 border-b border-[var(--amber)]/30 bg-[var(--amber-soft)] px-4 py-3 text-sm text-[var(--amber)]">
           Legacy custom CSS is still applied to the live page and is frozen.
-          <button type="button" onClick={() => startTransition(async () => { await resetLegacyCss(page.id); location.reload(); })} className="ml-auto underline">Reset legacy CSS</button>
+          <Button type="button" variant="link" size="sm" onClick={() => startTransition(async () => { await resetLegacyCss(page.id); location.reload(); })} className="ml-auto h-auto px-0 text-[var(--amber)]">Reset legacy CSS</Button>
         </div>
       )}
 
@@ -696,8 +695,8 @@ export function DesignEditor({
                 <div>
                   <PanelTitle>Portable design</PanelTitle>
                   <div className="flex gap-2">
-                    <button type="button" data-button-guard="off" onClick={exportFile} className="border border-[var(--line)] px-3 py-2 text-xs hover:border-[var(--cyan)]">Export</button>
-                    <label className="cursor-pointer border border-[var(--line)] px-3 py-2 text-xs hover:border-[var(--cyan)]">Import<input type="file" accept="application/json" className="sr-only" onChange={(event) => event.target.files?.[0] && importFile(event.target.files[0])} /></label>
+                    <Button type="button" variant="outline" size="sm" data-button-guard="off" onClick={exportFile}>Export</Button>
+                    <label className="ui-file-trigger"><span>Import</span><Input type="file" accept="application/json" className="sr-only" onChange={(event) => event.target.files?.[0] && importFile(event.target.files[0])} /></label>
                   </div>
                 </div>
               </div>
@@ -740,7 +739,7 @@ export function DesignEditor({
                     <p className="mt-1 text-xs text-[var(--fg-dim)]">New blocks start full-width and can be resized on the grid.</p>
                   </div>
                   {activeBreakpoint !== "desktop" && design.surfaces[surface].grid[activeBreakpoint] && (
-                    <button type="button" onClick={resetActiveBreakpoint} className="border border-[var(--line)] px-3 py-2 text-xs hover:border-[var(--cyan)]">Reset to desktop inheritance</button>
+                    <Button type="button" variant="outline" size="sm" onClick={resetActiveBreakpoint}>Reset to desktop inheritance</Button>
                   )}
                 </div>
                 <div className="flex flex-wrap gap-1.5">
@@ -750,17 +749,19 @@ export function DesignEditor({
                       const existingBlock = matchingBlocks[0];
                       const removeExisting = Boolean(existingBlock) && !REPEATABLE_BLOCK_TYPES.has(item.type);
                       return (
-                        <button
+                        <Button
                           key={item.type}
                           type="button"
                           data-button-busy-mode="interaction"
                           onClick={() => removeExisting ? requestBlockRemoval(existingBlock.id) : addBlock(item.type)}
                           aria-label={removeExisting ? `Remove ${item.label}` : `Add ${item.label}`}
-                          className={`inline-flex items-center gap-2 border px-2.5 py-1.5 text-left text-xs ${removeExisting ? "border-[var(--red)]/40 text-[var(--red)] hover:border-[var(--red)]" : "border-[var(--line)] hover:border-[var(--cyan)]"}`}
+                          variant="outline"
+                          size="sm"
+                          className={`h-auto gap-2 text-left text-xs ${removeExisting ? "border-[var(--red)]/40 text-[var(--red)] hover:border-[var(--red)]" : "border-[var(--line)] hover:border-[var(--cyan)]"}`}
                         >
                           {item.label}{REPEATABLE_BLOCK_TYPES.has(item.type) && matchingBlocks.length > 0 ? ` (${matchingBlocks.length})` : ""}
-                          <span>{removeExisting ? "−" : "＋"}</span>
-                        </button>
+                          {removeExisting ? <Minus aria-hidden size={13} /> : <Plus aria-hidden size={13} />}
+                        </Button>
                       );
                     })()
                   ))}
@@ -880,17 +881,17 @@ export function DesignEditor({
               </div>
               <div className="flex gap-1" aria-label="Preview viewport">
                 {(["DESKTOP", "TABLET", "MOBILE"] as const).map((size) => (
-                  <button key={size} type="button" onClick={() => setViewport(size)} aria-pressed={viewport === size} className={`px-2 py-1 text-[10px] ${viewport === size ? "bg-[var(--cyan)] text-[var(--on-cyan)]" : "border border-[var(--line)]"}`}>
+                  <Button key={size} type="button" variant={viewport === size ? "default" : "outline"} size="sm" onClick={() => setViewport(size)} aria-pressed={viewport === size} className="h-7 rounded-none px-2 py-1 text-[10px]">
                     {size.slice(0, 1)}
-                  </button>
+                  </Button>
                 ))}
               </div>
             </div>
             <div className="mt-3 flex flex-wrap gap-1" aria-label="Preview surface">
               {SURFACES.map((item) => (
-                <button key={item.key} type="button" onClick={() => { setSurface(item.key); setSelectedId(null); }} aria-pressed={surface === item.key} className={`px-2 py-1 text-[10px] ${surface === item.key ? "bg-[var(--cyan)] text-[var(--on-cyan)]" : "bg-[var(--surface-raised)]"}`}>
+                <Button key={item.key} type="button" variant={surface === item.key ? "default" : "secondary"} size="sm" onClick={() => { setSurface(item.key); setSelectedId(null); }} aria-pressed={surface === item.key} className="h-7 rounded-none px-2 py-1 text-[10px]">
                   {item.label}
-                </button>
+                </Button>
               ))}
             </div>
           </div>
@@ -954,20 +955,21 @@ function EditorSection({
 }) {
   return (
     <section className="border border-[var(--line)] bg-[var(--surface)]">
-      <button
+      <Button
         type="button"
         data-button-busy-mode="interaction"
         aria-expanded={open}
         aria-controls={`editor-section-${id}`}
         onClick={() => onToggle(open ? null : id)}
-        className="flex w-full items-center gap-4 p-4 text-left"
+        variant="ghost"
+        className="h-auto w-full justify-start gap-4 rounded-none p-4 text-left"
       >
         <span className="min-w-0 flex-1">
           <span className="block font-mono text-sm font-semibold">{title}</span>
           <span className="mt-1 block text-xs text-[var(--fg-dim)]">{description}</span>
         </span>
-        <span aria-hidden="true" className={`text-lg text-[var(--fg-dim)] transition-transform ${open ? "rotate-45" : ""}`}>＋</span>
-      </button>
+        <span aria-hidden="true" className={`text-lg text-[var(--fg-dim)] transition-transform ${open ? "rotate-45" : ""}`}>{open ? <Minus size={17} /> : <Plus size={17} />}</span>
+      </Button>
       {open && <div id={`editor-section-${id}`} className="border-t border-[var(--line)] p-4">{children}</div>}
     </section>
   );
@@ -1005,22 +1007,21 @@ function ChromePanel({
         {design.chrome.header.items.map((item, index) => (
           item.type === "SUPPORT" ? null :
           <div key={item.id} className="flex items-center gap-1 border border-[var(--line)] px-2 py-1 text-xs">
-            <input type="checkbox" checked={!item.hidden} onChange={(event) => updateHeader((header) => { header.items[index].hidden = !event.target.checked; })} />
+            <Checkbox checked={!item.hidden} onChange={(event) => updateHeader((header) => { header.items[index].hidden = !event.target.checked; })} />
             <span className="min-w-0 flex-1 truncate">{item.type.toLowerCase().replaceAll("_", " ")}</span>
-            <button type="button" onClick={() => updateHeader((header) => { if (index > 0) header.items = arrayMove(header.items, index, index - 1); })}>↑</button>
-            <button type="button" onClick={() => updateHeader((header) => { if (index < header.items.length - 1) header.items = arrayMove(header.items, index, index + 1); })}>↓</button>
+            <Button type="button" variant="ghost" size="icon" onClick={() => updateHeader((header) => { if (index > 0) header.items = arrayMove(header.items, index, index - 1); })} aria-label="Move header item up" className="h-7 w-7"><ArrowUp aria-hidden size={13} /></Button>
+            <Button type="button" variant="ghost" size="icon" onClick={() => updateHeader((header) => { if (index < header.items.length - 1) header.items = arrayMove(header.items, index, index + 1); })} aria-label="Move header item down" className="h-7 w-7"><ArrowDown aria-hidden size={13} /></Button>
           </div>
         ))}
       </div>
       <label className="mt-3 block text-xs">
         Navigation links <span className="text-[var(--fg-dim)]">(Label | https://…)</span>
-        <textarea
+        <Textarea
           rows={3}
           value={design.chrome.header.links.map((link) => `${link.label} | ${link.url}`).join("\n")}
           onChange={(event) => updateHeader((header) => {
             header.links = parseLinks(event.target.value);
           })}
-          className="mt-1 w-full border border-[var(--line)] bg-[var(--bg)] p-2"
         />
       </label>
       <Text label="Footer text" value={design.chrome.footer.customText} onChange={(value) => updateFooter((footer) => { footer.customText = value; })} />
@@ -1035,7 +1036,7 @@ function ChromePanel({
       </fieldset>
       <label className="mt-3 block text-xs">
         Additional footer links <span className="text-[var(--fg-dim)]">(Label | https://…)</span>
-        <textarea
+        <Textarea
           rows={3}
           value={design.chrome.footer.links.map((link) => `${link.label} | ${link.url}`).join("\n")}
           onChange={(event) => updateFooter((footer) => { footer.links = parseLinks(event.target.value); })}
@@ -1046,10 +1047,10 @@ function ChromePanel({
       <div className="space-y-1">
         {design.chrome.footer.items.map((item, index) => (
           <div key={item.id} className="flex items-center gap-1 border border-[var(--line)] px-2 py-1 text-xs">
-            <input type="checkbox" checked={!item.hidden} onChange={(event) => updateFooter((footer) => { footer.items[index].hidden = !event.target.checked; })} />
+            <Checkbox checked={!item.hidden} onChange={(event) => updateFooter((footer) => { footer.items[index].hidden = !event.target.checked; })} />
             <span className="min-w-0 flex-1 truncate">{item.type.toLowerCase().replaceAll("_", " ")}</span>
-            <button type="button" onClick={() => updateFooter((footer) => { if (index > 0) footer.items = arrayMove(footer.items, index, index - 1); })}>↑</button>
-            <button type="button" onClick={() => updateFooter((footer) => { if (index < footer.items.length - 1) footer.items = arrayMove(footer.items, index, index + 1); })}>↓</button>
+            <Button type="button" variant="ghost" size="icon" onClick={() => updateFooter((footer) => { if (index > 0) footer.items = arrayMove(footer.items, index, index - 1); })} aria-label="Move footer item up" className="h-7 w-7"><ArrowUp aria-hidden size={13} /></Button>
+            <Button type="button" variant="ghost" size="icon" onClick={() => updateFooter((footer) => { if (index < footer.items.length - 1) footer.items = arrayMove(footer.items, index, index + 1); })} aria-label="Move footer item down" className="h-7 w-7"><ArrowDown aria-hidden size={13} /></Button>
           </div>
         ))}
       </div>
@@ -1062,13 +1063,12 @@ function VisitorLinkField({ label, value, allowMailto = false, onChange }: { lab
   return (
     <label className="block text-xs text-[var(--fg-soft)]">
       {label}
-      <input
+      <Input
         value={value}
         onChange={(event) => onChange(event.target.value)}
         inputMode="url"
         pattern={allowMailto ? "(?:https?://.+|mailto:.+)" : "https?://.+"}
         placeholder={allowMailto ? "https://support.example.com or mailto:help@example.com" : "https://example.com"}
-        className="mt-1 w-full border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--fg)] focus:border-[var(--cyan)] focus:outline-none"
       />
     </label>
   );
@@ -1164,10 +1164,10 @@ function SortableGridBlock({
       }}
       className={`flex min-w-0 items-center gap-2 border p-2 text-xs ${selected ? "border-[var(--cyan)] bg-[var(--cyan-soft)]" : "border-[var(--line)] bg-[var(--surface)]"} ${isDragging ? "z-10 opacity-60 shadow-lg" : ""}`}
     >
-      <button ref={setActivatorNodeRef} type="button" {...attributes} {...listeners} aria-label={`Reorder ${blockLabel(block)}`} className="cursor-grab text-[var(--fg-dim)] active:cursor-grabbing">⠿</button>
-      <button type="button" onClick={onSelect} className="min-w-0 flex-1 truncate text-left font-semibold">{blockLabel(block)}</button>
+      <Button ref={setActivatorNodeRef} type="button" variant="ghost" size="icon" {...attributes} {...listeners} aria-label={`Reorder ${blockLabel(block)}`} className="h-7 w-7 cursor-grab text-[var(--fg-dim)] active:cursor-grabbing"><GripVertical aria-hidden size={15} /></Button>
+      <Button type="button" variant="ghost" onClick={onSelect} className="h-auto min-w-0 flex-1 justify-start truncate rounded-none px-0 text-left font-semibold">{blockLabel(block)}</Button>
       {block.hidden && <span className="text-[10px] text-[var(--fg-dim)]">Hidden</span>}
-      <button type="button" onClick={onRemove} aria-label={`Remove ${blockLabel(block)}`} className="text-[var(--red)]">−</button>
+      <Button type="button" variant="ghost" size="icon" onClick={onRemove} aria-label={`Remove ${blockLabel(block)}`} className="h-7 w-7 text-[var(--red)]"><Minus aria-hidden size={15} /></Button>
     </div>
   );
 }
@@ -1194,17 +1194,17 @@ function GridPlacementControls({
       <legend className="px-1 font-mono text-xs font-semibold">Grid placement</legend>
       <div className="grid grid-cols-2 gap-3">
         <label className="text-xs">Column
-          <input type="number" min={1} max={columns} value={column} onChange={(event) => onChange({ column: Number(event.target.value) })} className="mt-1 w-full border border-[var(--line)] bg-[var(--surface)] px-2 py-1.5" />
+          <Input type="number" min={1} max={columns} value={column} onChange={(event) => onChange({ column: Number(event.target.value) })} className="mt-1 bg-[var(--surface)] px-2 py-1.5" />
         </label>
         <label className="text-xs">Width
-          <input type="number" min={1} max={columns - column + 1} value={span} onChange={(event) => onChange({ span: Number(event.target.value) })} className="mt-1 w-full border border-[var(--line)] bg-[var(--surface)] px-2 py-1.5" />
+          <Input type="number" min={1} max={columns - column + 1} value={span} onChange={(event) => onChange({ span: Number(event.target.value) })} className="mt-1 bg-[var(--surface)] px-2 py-1.5" />
         </label>
       </div>
       <div className="mt-2 grid grid-cols-4 gap-1">
-        <button type="button" onClick={() => onChange({ column: column - 1 })} className="border border-[var(--line)] py-1" aria-label="Move block left">←</button>
-        <button type="button" onClick={() => onChange({ column: column + 1 })} className="border border-[var(--line)] py-1" aria-label="Move block right">→</button>
-        <button type="button" onClick={() => onChange({ span: span - 1 })} className="border border-[var(--line)] py-1" aria-label="Make block narrower">−</button>
-        <button type="button" onClick={() => onChange({ span: span + 1 })} className="border border-[var(--line)] py-1" aria-label="Make block wider">＋</button>
+        <Button type="button" variant="outline" size="icon" onClick={() => onChange({ column: column - 1 })} aria-label="Move block left" className="h-8 w-full"><ArrowLeft aria-hidden size={14} /></Button>
+        <Button type="button" variant="outline" size="icon" onClick={() => onChange({ column: column + 1 })} aria-label="Move block right" className="h-8 w-full"><ArrowRight aria-hidden size={14} /></Button>
+        <Button type="button" variant="outline" size="icon" onClick={() => onChange({ span: span - 1 })} aria-label="Make block narrower" className="h-8 w-full"><Minus aria-hidden size={14} /></Button>
+        <Button type="button" variant="outline" size="icon" onClick={() => onChange({ span: span + 1 })} aria-label="Make block wider" className="h-8 w-full"><Plus aria-hidden size={14} /></Button>
       </div>
     </fieldset>
   );
@@ -1228,7 +1228,7 @@ function ThemePanel({
       <Select label="Style preset" value={design.theme.preset} onChange={onPreset} options={[...PAGE_THEME_PRESET_KEYS]} labels={PAGE_THEME_PRESET_LABELS} />
       <div className="mt-3 grid grid-cols-2 gap-2">
         <label className="text-xs">Brand color
-          <input type="color" value={design.theme.palette.brand} onChange={(event) => updatePalette("brand", event.target.value)} className="mt-1 h-9 w-full border border-[var(--line)] bg-transparent" />
+          <Input type="color" value={design.theme.palette.brand} onChange={(event) => updatePalette("brand", event.target.value)} className="mt-1 h-9 w-full p-1" />
         </label>
         <Select label="Visitor appearance" value={design.theme.mode} onChange={(value) => updateTheme("mode", value as StatusPageDesign["theme"]["mode"])} options={["SYSTEM", "LIGHT", "DARK"]} />
       </div>
@@ -1245,7 +1245,7 @@ function ThemePanel({
       <div className="mt-3 grid grid-cols-3 gap-2">
         {(["background", "surface", "text"] as const).map((key) => (
           <label key={key} title={key} className="text-[10px] capitalize text-[var(--fg-dim)]">
-            <input type="color" value={design.theme.palette[key]} onChange={(event) => updatePalette(key, event.target.value)} className="h-8 w-full border-0 bg-transparent" />
+            <Input type="color" value={design.theme.palette[key]} onChange={(event) => updatePalette(key, event.target.value)} className="h-8 w-full border-0 bg-transparent p-1" />
             {key.replace(/([A-Z])/g, " $1")}
           </label>
         ))}
@@ -1275,7 +1275,7 @@ function BlockInspector({
   return (
     <section>
       <label className="flex items-center gap-2 text-xs">
-        <input type="checkbox" checked={!block.hidden} onChange={(event) => onUpdate((current) => ({ ...current, hidden: !event.target.checked }))} />
+        <Checkbox checked={!block.hidden} onChange={(event) => onUpdate((current) => ({ ...current, hidden: !event.target.checked }))} />
         Visible
       </label>
       {block.type === "OVERALL_STATUS" && (
@@ -1310,7 +1310,7 @@ function BlockInspector({
       {block.type === "RICH_TEXT" && (
         <div className="mt-3 space-y-2">
           <Text label="Heading" value={block.settings.heading} onChange={(value) => patchSettings({ heading: value })} />
-          <label className="block text-xs">Body<textarea value={block.settings.body} onChange={(event) => patchSettings({ body: event.target.value })} rows={5} className="mt-1 w-full border border-[var(--line)] bg-[var(--bg)] p-2" /></label>
+          <label className="block text-xs">Body<Textarea value={block.settings.body} onChange={(event) => patchSettings({ body: event.target.value })} rows={5} className="mt-1" /></label>
           <Select label="Alignment" value={block.settings.align} onChange={(value) => patchSettings({ align: value })} options={["LEFT", "CENTER"]} />
         </div>
       )}
@@ -1324,7 +1324,7 @@ function BlockInspector({
         </div>
       )}
       <SectionSaveButton onClick={onSave}>Save block</SectionSaveButton>
-      <button type="button" data-button-busy-mode="interaction" onClick={onRemove} className="mt-4 text-xs text-[var(--red)] underline">Remove block</button>
+      <Button type="button" variant="link" size="sm" data-button-busy-mode="interaction" onClick={onRemove} className="mt-4 h-auto px-0 text-xs text-[var(--red)]">Remove block</Button>
     </section>
   );
 }
@@ -1666,9 +1666,11 @@ export function PageAnnouncementManager({ pageId, announcements }: { pageId: str
               </p>
             </div>
             <div className="flex shrink-0 items-center gap-2">
-              <button type="button" disabled={pending} onClick={() => startEdit(announcement)} className="border border-[var(--cyan)]/40 px-2 py-1 font-semibold text-[var(--cyan)]">Edit</button>
-              <button
+              <Button type="button" variant="outline" size="sm" disabled={pending} onClick={() => startEdit(announcement)} className="h-7 px-2 text-[var(--cyan)]">Edit</Button>
+              <Button
                 type="button"
+                variant="destructive"
+                size="sm"
                 disabled={pending}
                 onClick={() => {
                   if (!window.confirm(`Delete ${announcement.title}? This action cannot be undone.`)) return;
@@ -1677,16 +1679,18 @@ export function PageAnnouncementManager({ pageId, announcements }: { pageId: str
                     location.reload();
                   });
                 }}
-                className="border border-[var(--red)]/40 px-2 py-1 font-semibold text-[var(--red)]"
+                className="h-7 px-2"
               >
                 Delete
-              </button>
+              </Button>
             </div>
           </div>
         ))}
       </div>
-      <button
+      <Button
         type="button"
+        variant="link"
+        size="sm"
         data-button-busy-mode="interaction"
         onClick={() => {
           if (expanded) {
@@ -1696,33 +1700,33 @@ export function PageAnnouncementManager({ pageId, announcements }: { pageId: str
             startCreate();
           }
         }}
-        className="mt-3 text-xs underline"
+        className="mt-3 h-auto px-0 text-xs"
       >
         {expanded ? (editingId ? "Close editor" : "Close composer") : "Create announcement"}
-      </button>
+      </Button>
       {expanded && (
         <div className="mt-3 space-y-3 border border-[var(--line)] bg-[var(--surface)] p-3">
           <h3 className="font-mono text-sm font-semibold">{editingId ? "Edit announcement" : "New announcement"}</h3>
           <Text label="Title" value={title} onChange={setTitle} />
           <label className="block text-xs">
             Message
-            <textarea value={body} onChange={(event) => setBody(event.target.value)} rows={3} className="mt-1 w-full border border-[var(--line)] bg-[var(--bg)] p-2" />
+            <Textarea value={body} onChange={(event) => setBody(event.target.value)} rows={3} className="mt-1" />
           </label>
           <div className="grid grid-cols-2 gap-2">
             <Select label="Severity" value={severity} onChange={(value) => setSeverity(value as EditorAnnouncement["severity"])} options={["INFO", "SUCCESS", "WARNING", "CRITICAL"]} />
             <label className="block text-xs">
               Priority
-              <input type="number" min="-100" max="100" value={priority} onChange={(event) => setPriority(event.target.value)} className="mt-1 w-full border border-[var(--line)] bg-[var(--bg)] px-2 py-1.5" />
+              <Input type="number" min="-100" max="100" value={priority} onChange={(event) => setPriority(event.target.value)} className="mt-1" />
             </label>
           </div>
           <div className="grid grid-cols-2 gap-2">
             <label className="block text-xs">
               Starts
-              <input type="datetime-local" value={startsAt} onChange={(event) => setStartsAt(event.target.value)} className="mt-1 w-full border border-[var(--line)] bg-[var(--bg)] px-2 py-1.5" />
+              <Input type="datetime-local" value={startsAt} onChange={(event) => setStartsAt(event.target.value)} className="mt-1" />
             </label>
             <label className="block text-xs">
               Ends (optional)
-              <input type="datetime-local" value={endsAt} onChange={(event) => setEndsAt(event.target.value)} className="mt-1 w-full border border-[var(--line)] bg-[var(--bg)] px-2 py-1.5" />
+              <Input type="datetime-local" value={endsAt} onChange={(event) => setEndsAt(event.target.value)} className="mt-1" />
             </label>
           </div>
           <div className="grid grid-cols-2 gap-2">
@@ -1732,9 +1736,10 @@ export function PageAnnouncementManager({ pageId, announcements }: { pageId: str
           <Check label="Visitors can dismiss this announcement" checked={dismissible} onChange={setDismissible} />
           {error && <p className="text-xs text-[var(--red)]">{error}</p>}
           <div className="flex justify-end">
-            <button
+            <Button
               type="button"
-              disabled={!title.trim() || !startsAt || pending}
+              disabled={!title.trim() || !startsAt}
+              loading={pending}
               onClick={() => startTransition(async () => {
                 setError("");
                 const startDate = new Date(startsAt);
@@ -1775,10 +1780,11 @@ export function PageAnnouncementManager({ pageId, announcements }: { pageId: str
                 }
                 location.reload();
               })}
-              className="border border-[var(--line)] bg-[var(--bg)] px-3 py-1.5 text-xs font-medium"
+              variant="outline"
+              size="sm"
             >
               {pending ? (editingId ? "Saving…" : "Creating…") : (editingId ? "Save changes" : "Create")}
-            </button>
+            </Button>
           </div>
         </div>
       )}
@@ -1810,7 +1816,7 @@ function VersionPanel({
         {versions.map((version) => (
           <div key={version.version} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 border border-[var(--line)] bg-[var(--surface)] p-2 text-xs">
             <span className="min-w-0">v{version.version} · {PAGE_TEMPLATE_LABELS[version.templateKey as keyof typeof PAGE_TEMPLATE_LABELS] ?? version.templateKey}<br /><span className="text-[var(--fg-dim)]">{new Date(version.savedAt).toLocaleString()}</span></span>
-            <Button appearance="transparent" shape="square" size="small" type="button" onClick={() => onRestore({ version: version.version, design: version.design })} className="sticky right-0 shrink-0 bg-[var(--surface)] px-2 font-semibold underline">Restore</Button>
+          <Button variant="link" size="sm" type="button" onClick={() => onRestore({ version: version.version, design: version.design })} className="sticky right-0 shrink-0 bg-[var(--surface)] px-2 font-semibold">Restore</Button>
           </div>
         ))}
         {!versions.length && <p className="text-xs text-[var(--fg-dim)]">Publish a design change to start version history.</p>}
@@ -1825,14 +1831,15 @@ function PanelTitle({ children, className = "" }: { children: ReactNode; classNa
 
 function SectionSaveButton({ onClick, children }: { onClick: () => void; children: ReactNode }) {
   return (
-    <button
+    <Button
       type="button"
       data-button-guard="off"
       onClick={onClick}
-      className="mt-4 w-full border border-[var(--cyan)] px-3 py-2 text-xs font-semibold text-[var(--cyan)] hover:bg-[var(--cyan-soft)]"
+      variant="outline"
+      className="mt-4 w-full text-xs text-[var(--cyan)]"
     >
       {children}
-    </button>
+    </Button>
   );
 }
 
@@ -1840,15 +1847,15 @@ function Select({ label, value, onChange, options, labels }: { label: string; va
   return (
     <div className="block text-xs text-[var(--fg-soft)]">
       {label}
-      <FluentSelect aria-label={label} value={value} onChange={(event) => onChange(event.target.value)} className="mt-1 w-full border border-[var(--line)] bg-[var(--bg)] px-2 py-1.5 text-xs text-[var(--fg)]">
+      <UiSelect aria-label={label} value={value} onChange={(event) => onChange(event.target.value)} className="mt-1 w-full border border-[var(--line)] bg-[var(--bg)] px-2 py-1.5 text-xs text-[var(--fg)]">
         {options.map((option) => <option key={option} value={option}>{labels?.[option] ?? option.toLowerCase().replaceAll("_", " ")}</option>)}
-      </FluentSelect>
+      </UiSelect>
     </div>
   );
 }
 
 function Check({ label, checked, onChange }: { label: string; checked: boolean; onChange: (checked: boolean) => void }) {
-  return <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} />{label}</label>;
+  return <label className="flex items-center gap-2 text-xs"><Checkbox checked={checked} onChange={(event) => onChange(event.target.checked)} />{label}</label>;
 }
 
 function Text({
@@ -1868,5 +1875,5 @@ function Text({
   inputMode?: "url" | "text";
   placeholder?: string;
 }) {
-  return <label className="block text-xs">{label}<input value={value} required={required} maxLength={maxLength} inputMode={inputMode} placeholder={placeholder} onChange={(event) => onChange(event.target.value)} className="mt-1 w-full border border-[var(--line)] bg-[var(--bg)] px-2 py-1.5" /></label>;
+  return <label className="block text-xs">{label}<Input value={value} required={required} maxLength={maxLength} inputMode={inputMode} placeholder={placeholder} onChange={(event) => onChange(event.target.value)} className="mt-1 px-2 py-1.5" /></label>;
 }

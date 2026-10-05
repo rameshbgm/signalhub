@@ -20,6 +20,8 @@ import { PlatformActionForm } from "@/components/platform/PlatformActionForm";
 import { PlatformSubmitButton } from "@/components/platform/PlatformSubmitButton";
 import { organizationPurgeCanBeCancelled } from "@/lib/platform-job-policy";
 import { SwitchOrganizationButton } from "@/components/platform/SwitchOrganizationButton";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 export default async function PlatformOrgsPage({
   searchParams,
@@ -155,14 +157,14 @@ export default async function PlatformOrgsPage({
           </div>
           <form className="flex gap-2">
             <label className="sr-only" htmlFor="organization-search">Search organizations</label>
-            <input
+            <Input
               id="organization-search"
               name="q"
               defaultValue={query}
               placeholder="Name, slug, or email"
-              className="w-56 border border-[var(--line)] bg-[var(--surface)] px-3 py-2 text-xs"
+              className="h-9 w-56 bg-[var(--surface)] px-3 py-2 text-xs"
             />
-            <button className="border border-[var(--line)] px-3 py-2 text-xs font-semibold">Search</button>
+            <Button type="submit" variant="outline" size="sm">Search</Button>
           </form>
         </div>
 
@@ -208,12 +210,12 @@ export default async function PlatformOrgsPage({
                         successMessage="Organization suspended."
                         className="mt-2 flex flex-wrap gap-2"
                       >
-                        <input
+                        <Input
                           name="reason"
                           minLength={10}
                           required
                           placeholder="Suspension reason"
-                          className="min-w-44 flex-1 border border-[var(--line)] bg-[var(--surface)] px-2 py-1.5 text-xs"
+                          className="h-8 min-w-44 flex-1 bg-[var(--surface)] px-2 py-1.5 text-xs"
                         />
                         <PlatformSubmitButton
                           pendingLabel="Suspending…"
@@ -230,12 +232,12 @@ export default async function PlatformOrgsPage({
                         successMessage="Organization reactivated."
                         className="mt-2 flex flex-wrap gap-2"
                       >
-                        <input
+                        <Input
                           name="reason"
                           minLength={10}
                           required
                           placeholder="Reactivation reason"
-                          className="min-w-44 flex-1 border border-[var(--line)] bg-[var(--surface)] px-2 py-1.5 text-xs"
+                          className="h-8 min-w-44 flex-1 bg-[var(--surface)] px-2 py-1.5 text-xs"
                         />
                         <PlatformSubmitButton pendingLabel="Reactivating…" className="border border-[var(--green)]/40 px-3 py-1.5 text-xs font-semibold text-[var(--green)]">
                           Reactivate
@@ -252,20 +254,20 @@ export default async function PlatformOrgsPage({
                           successMessage="Organization purge queued."
                           className="mt-2 space-y-2"
                         >
-                          <input
+                          <Input
                             name="reason"
                             minLength={10}
                             required
                             placeholder="Purge reason / ticket"
-                            className="w-full border border-[var(--red)]/30 bg-[var(--surface)] px-2 py-1.5 text-xs"
+                            className="h-8 w-full border-[var(--red)]/30 bg-[var(--surface)] px-2 py-1.5 text-xs"
                           />
                           <div className="flex gap-2">
-                            <input
+                            <Input
                               name="confirmation"
                               required
                               pattern={organization.slug}
                               placeholder={`type ${organization.slug}`}
-                              className="min-w-0 flex-1 border border-[var(--red)]/30 bg-[var(--surface)] px-2 py-1.5 text-xs"
+                              className="h-8 min-w-0 flex-1 border-[var(--red)]/30 bg-[var(--surface)] px-2 py-1.5 text-xs"
                             />
                             <PlatformSubmitButton
                               pendingLabel="Queueing…"
@@ -291,12 +293,12 @@ export default async function PlatformOrgsPage({
                             successMessage="Queued organization purge cancelled."
                             className="flex flex-wrap gap-2"
                           >
-                            <input
+                            <Input
                               name="reason"
                               minLength={10}
                               required
                               placeholder="Cancellation reason"
-                              className="min-w-44 flex-1 border border-[var(--line)] bg-[var(--surface)] px-2 py-1.5 text-xs"
+                              className="h-8 min-w-44 flex-1 bg-[var(--surface)] px-2 py-1.5 text-xs"
                             />
                             <PlatformSubmitButton
                               pendingLabel="Cancelling…"

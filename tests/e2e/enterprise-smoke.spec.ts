@@ -15,7 +15,7 @@ test("health and OpenAPI endpoints describe a ready product surface", async ({ r
 
 test("the unified login surface exposes working authentication controls", async ({ page }) => {
   await page.goto("/login");
-  await expect(page.getByRole("heading", { name: "Welcome back" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();
   await expect(page.getByPlaceholder("User ID")).toBeVisible();
   await expect(page.getByRole("button", { name: "Sign in" })).toBeEnabled();
 });

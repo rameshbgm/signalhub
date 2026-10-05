@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { Button } from "@/components/ui/button";
 
 export default function PlatformError({
   error,
@@ -21,12 +22,15 @@ export default function PlatformError({
         <p className="mt-2 font-mono text-[10px] text-[var(--fg-dim)]">Reference {error.digest}</p>
       )}
       <div className="mt-4 flex gap-2">
-        <button
+        <Button
+          type="button"
           onClick={reset}
-          className="border border-[var(--cyan)]/40 px-3 py-2 text-xs font-semibold text-[var(--cyan)]"
+          variant="outline"
+          size="sm"
+          className="text-[var(--cyan)]"
         >
           Reload current state
-        </button>
+        </Button>
         <Link href="/organization/platform" className="border border-[var(--line)] px-3 py-2 text-xs font-semibold">
           Platform overview
         </Link>

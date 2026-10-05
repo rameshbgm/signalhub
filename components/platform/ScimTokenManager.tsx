@@ -4,6 +4,7 @@ import { fetchWithTimeout } from "@/lib/client-fetch";
 
 import { useState } from "react";
 import { CopyButton } from "@/components/CopyButton";
+import { Button } from "@/components/ui/button";
 
 export function ScimTokenManager({ connectionId }: { connectionId: string }) {
   const [secret, setSecret] = useState<string | null>(null);
@@ -32,14 +33,16 @@ export function ScimTokenManager({ connectionId }: { connectionId: string }) {
 
   return (
     <div className="space-y-2">
-      <button
+      <Button
         type="button"
         onClick={() => void rotate()}
         disabled={pending}
-        className="border border-[var(--line)] px-2.5 py-1 text-xs disabled:opacity-50"
+        variant="outline"
+        size="sm"
+        loading={pending}
       >
         {pending ? "Rotating…" : "Rotate SCIM token"}
-      </button>
+      </Button>
       {secret && (
         <div className="border border-[var(--amber)]/40 bg-[var(--amber-soft)] p-2 text-xs">
           <p className="font-semibold">Copy this token now. It will not be shown again.</p>

@@ -6,6 +6,8 @@ import { useEffect, useState } from "react";
 import { CopyButton } from "@/components/CopyButton";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 type Session = {
   id: string;
@@ -104,7 +106,7 @@ export function SecurityManager({ enrollmentRequired }: { enrollmentRequired: bo
           {mfa?.enrolled ? `Enabled · ${mfa.recoveryCodesRemaining} recovery codes remain` : enrollmentRequired ? "Enrollment is required before administrative changes are allowed." : "Protect password sign-in with a time-based one-time code."}
         </p>
         {!mfa?.enrolled && !secret && (
-          <button disabled={Boolean(pendingAction)} onClick={() => void mfaAction("start")} className="mt-3 bg-[var(--cyan)] px-3 py-2 text-xs font-semibold text-[var(--on-cyan)] disabled:opacity-50">{pendingAction === "start" ? "Starting…" : "Start enrollment"}</button>
+          <Button type="button" size="sm" loading={pendingAction === "start"} onClick={() => void mfaAction("start")} className="mt-3">Start enrollment</Button>
         )}
         {secret && (
           <div className="mt-3 space-y-3">
@@ -114,8 +116,8 @@ export function SecurityManager({ enrollmentRequired }: { enrollmentRequired: bo
               <CopyButton value={uri ?? secret} label="Copy setup URI" className="mt-2 font-semibold text-[var(--cyan)]" />
             </div>
             <div className="flex gap-2">
-              <input value={code} onChange={(event) => setCode(event.target.value.replace(/\D/g, "").slice(0, 6))} placeholder="6-digit code" className="border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm" />
-              <button disabled={code.length !== 6 || Boolean(pendingAction)} onClick={() => void mfaAction("confirm")} className="bg-[var(--cyan)] px-3 py-2 text-xs font-semibold text-[var(--on-cyan)] disabled:opacity-50">{pendingAction === "confirm" ? "Confirming…" : "Confirm"}</button>
+              <Input value={code} onChange={(event) => setCode(event.target.value.replace(/\D/g, "").slice(0, 6))} placeholder="6-digit code" className="max-w-48" />
+              <Button type="button" size="sm" loading={pendingAction === "confirm"} disabled={code.length !== 6} onClick={() => void mfaAction("confirm")}>Confirm</Button>
             </div>
           </div>
         )}
@@ -137,7 +139,7 @@ export function SecurityManager({ enrollmentRequired }: { enrollmentRequired: bo
                 <p className="mt-1 text-[var(--fg-dim)]">{session.ipAddress ?? "IP unavailable"} · {new Date(session.lastSeenAt).toLocaleString()}</p>
                 <p className="mt-1 max-w-xl truncate text-[10px] text-[var(--fg-dim)]">{session.userAgent ?? "User agent unavailable"}</p>
               </div>
-              <button disabled={Boolean(pendingAction)} onClick={() => void revoke(session.id)} className="border border-[var(--red)]/40 px-2 py-1 font-semibold text-[var(--red)] disabled:opacity-50">{pendingAction === `revoke:${session.id}` ? "Revoking…" : "Revoke"}</button>
+              <Button type="button" variant="destructive" size="sm" loading={pendingAction === `revoke:${session.id}`} disabled={Boolean(pendingAction)} onClick={() => void revoke(session.id)}>Revoke</Button>
             </div>
           ))}
         </div>

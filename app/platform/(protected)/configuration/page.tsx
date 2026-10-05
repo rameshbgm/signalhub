@@ -6,6 +6,9 @@ import { subscriptionCapabilities } from "@/lib/notification-capabilities";
 import { enabledDestinationChannels } from "@/lib/platform-configuration";
 import { DESTINATION_CHANNELS } from "@/lib/notification-providers";
 import { updatePlatformConfiguration } from "./actions";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Textarea } from "@/components/ui/textarea";
 
 const PROVIDER_LABELS: Record<(typeof DESTINATION_CHANNELS)[number], string> = {
   SLACK: "Slack",
@@ -67,16 +70,16 @@ export default async function PlatformConfigurationPage() {
               <legend className="sr-only">Enabled notification providers</legend>
               {DESTINATION_CHANNELS.map((channel) => (
                 <label key={channel} className="flex cursor-pointer items-center gap-3 border border-[var(--line)] bg-[var(--bg)] p-3 text-sm text-[var(--fg)]">
-                  <input type="checkbox" name="enabledDestinationChannels" value={channel} defaultChecked={enabled.has(channel)} />
+                  <Checkbox name="enabledDestinationChannels" value={channel} defaultChecked={enabled.has(channel)} />
                   <span>{PROVIDER_LABELS[channel]}</span>
                 </label>
               ))}
             </fieldset>
             <label className="mt-4 grid max-w-2xl gap-1.5 text-xs font-semibold text-[var(--fg-soft)]">
               Change reason
-              <textarea name="reason" rows={3} minLength={10} maxLength={2000} required placeholder="Why is this installation-wide policy changing?" className="border border-[var(--line)] bg-[var(--bg)] p-3 text-sm font-normal text-[var(--fg)]" />
+              <Textarea name="reason" rows={3} minLength={10} maxLength={2000} required placeholder="Why is this installation-wide policy changing?" className="font-normal" />
             </label>
-            <button className="mt-4 bg-[var(--cyan)] px-5 py-2.5 text-sm font-semibold text-[var(--on-cyan)]">Save provider policy</button>
+            <Button type="submit" className="mt-4">Save provider policy</Button>
           </PlatformActionForm>
         ) : (
           <div className="mt-5 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">

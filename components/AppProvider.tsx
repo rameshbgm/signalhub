@@ -1,15 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import {
-  FluentProvider,
-  SSRProvider,
-  webDarkTheme,
-  webLightTheme,
-} from "@fluentui/react-components";
 import { ButtonInteractionGuard } from "@/components/ButtonInteractionGuard";
 
-export function FluentAppProvider({ children }: { children: React.ReactNode }) {
+export function AppProvider({ children }: { children: React.ReactNode }) {
   const [dark, setDark] = useState(false);
 
   useEffect(() => {
@@ -23,19 +17,10 @@ export function FluentAppProvider({ children }: { children: React.ReactNode }) {
     }
     const syncTheme = () => setDark(root.classList.contains("dark"));
     syncTheme();
-
     const observer = new MutationObserver(syncTheme);
     observer.observe(root, { attributes: true, attributeFilter: ["class"] });
     return () => observer.disconnect();
   }, []);
 
-  return (
-    <SSRProvider>
-      <FluentProvider theme={dark ? webDarkTheme : webLightTheme}>
-        <div className="min-h-screen bg-inherit text-inherit">
-          <ButtonInteractionGuard>{children}</ButtonInteractionGuard>
-        </div>
-      </FluentProvider>
-    </SSRProvider>
-  );
+  return <div data-theme={dark ? "dark" : "light"} className="min-h-screen bg-inherit text-inherit"><ButtonInteractionGuard>{children}</ButtonInteractionGuard></div>;
 }

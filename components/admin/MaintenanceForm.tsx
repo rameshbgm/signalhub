@@ -1,6 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 
 type Component = { id: string; name: string };
 
@@ -27,10 +31,10 @@ export function MaintenanceForm({
 
   return (
     <form action={action} className="space-y-4">
-      <input type="hidden" name="pageId" value={pageId} />
+      <Input type="hidden" name="pageId" value={pageId} />
       <label className="block text-sm">
         <span className="text-xs text-[var(--fg-dim)] block mb-1">Title</span>
-        <input
+        <Input
           name="name"
           value={name}
           onChange={(event) => setName(event.target.value)}
@@ -40,19 +44,18 @@ export function MaintenanceForm({
       </label>
       <label className="block text-sm">
         <span className="text-xs text-[var(--fg-dim)] block mb-1">Message</span>
-        <textarea
+        <Textarea
           name="body"
           value={body}
           onChange={(event) => setBody(event.target.value)}
           rows={3}
-          className="w-full bg-[var(--bg)] border border-[var(--line)] px-3 py-2 text-sm text-[var(--fg)] focus:border-[var(--cyan)] focus:outline-none"
           required
         />
       </label>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <label className="block text-sm">
           <span className="text-xs text-[var(--fg-dim)] block mb-1">Start</span>
-          <input
+          <Input
             name="scheduledStart"
             type="datetime-local"
             defaultValue={defaultDateTime(24)}
@@ -62,7 +65,7 @@ export function MaintenanceForm({
         </label>
         <label className="block text-sm">
           <span className="text-xs text-[var(--fg-dim)] block mb-1">End</span>
-          <input
+          <Input
             name="scheduledEnd"
             type="datetime-local"
             defaultValue={defaultDateTime(27)}
@@ -72,15 +75,14 @@ export function MaintenanceForm({
         </label>
       </div>
       <label className="flex items-center gap-2 text-sm text-[var(--fg-soft)]">
-        <input type="checkbox" name="pageWide" /> This maintenance affects the page as a whole
+        <Checkbox name="pageWide" /> This maintenance affects the page as a whole
       </label>
       <div>
         <p className="text-xs text-[var(--fg-dim)] mb-2">Affected components (set to Under Maintenance during the window)</p>
         <div className="space-y-1 border border-[var(--line)] p-3 max-h-56 overflow-y-auto">
           {components.map((c) => (
             <label key={c.id} className="flex items-center gap-2 text-sm text-[var(--fg)]">
-              <input
-                type="checkbox"
+              <Checkbox
                 name="componentIds"
                 value={c.id}
                 checked={selected.includes(c.id)}
@@ -93,15 +95,14 @@ export function MaintenanceForm({
         </div>
       </div>
       <label className="flex items-center gap-2 text-sm text-[var(--fg-soft)]">
-        <input type="checkbox" name="autoTransition" defaultChecked /> Automatically start/complete based on the window above
+        <Checkbox name="autoTransition" defaultChecked /> Automatically start/complete based on the window above
       </label>
       <label className="flex items-center gap-2 text-sm text-[var(--fg-soft)]">
-        <input type="checkbox" name="notify" checked={notify} onChange={(event) => setNotify(event.target.checked)} /> Notify subscribers when scheduled and during automatic status transitions
+        <Checkbox name="notify" checked={notify} onChange={(event) => setNotify(event.target.checked)} /> Notify subscribers when scheduled and during automatic status transitions
       </label>
       <div className="space-y-2 border border-[var(--line)] bg-[var(--surface-raised)] p-3">
         <label className="flex items-center gap-2 text-sm text-[var(--fg-soft)]">
-          <input
-            type="checkbox"
+          <Checkbox
             name="sendReminder"
             checked={sendReminder}
             onChange={(event) => setSendReminder(event.target.checked)}
@@ -112,7 +113,7 @@ export function MaintenanceForm({
           <span className="mb-1 block text-xs text-[var(--fg-dim)]">
             Minutes before start
           </span>
-          <input
+          <Input
             name="reminderMinutesBefore"
             type="number"
             min={5}
@@ -127,7 +128,7 @@ export function MaintenanceForm({
           </span>
         </label>
       </div>
-      <button className="bg-[var(--cyan)] text-[var(--on-cyan)] px-4 py-2 text-sm font-mono font-semibold">Schedule Maintenance</button>
+      <Button type="submit">Schedule Maintenance</Button>
     </form>
   );
 }

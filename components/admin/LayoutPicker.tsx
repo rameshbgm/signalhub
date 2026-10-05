@@ -1,6 +1,9 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { ArrowLeft, ArrowRight } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   PAGE_TEMPLATE_PICKER_KEYS,
   PAGE_TEMPLATE_LABELS,
@@ -34,26 +37,27 @@ export function LayoutPicker({ defaultValue, brandColor }: { defaultValue: strin
       <div className="mb-2 flex items-center justify-between gap-3">
         <legend className="text-xs text-[var(--fg-dim)]">Page layout</legend>
         <div className="flex gap-1" aria-label="Scroll page layouts">
-          <button type="button" aria-label="Scroll layouts left" onClick={() => scroll(-1)} className="border border-[var(--line)] px-2 py-1 text-xs hover:border-[var(--cyan)]">←</button>
-          <button type="button" aria-label="Scroll layouts right" onClick={() => scroll(1)} className="border border-[var(--line)] px-2 py-1 text-xs hover:border-[var(--cyan)]">→</button>
+          <Button type="button" variant="outline" size="icon" aria-label="Scroll layouts left" onClick={() => scroll(-1)} className="h-8 w-8"><ArrowLeft aria-hidden size={14} /></Button>
+          <Button type="button" variant="outline" size="icon" aria-label="Scroll layouts right" onClick={() => scroll(1)} className="h-8 w-8"><ArrowRight aria-hidden size={14} /></Button>
         </div>
       </div>
       <div ref={scroller} data-testid="page-layout-scroller" className="flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain pb-3" tabIndex={0}>
         {PAGE_TEMPLATE_PICKER_KEYS.map((key) => (
-          <button
+          <Button
             key={key}
             type="button"
             aria-pressed={layout === key}
             onClick={() => setLayout(key)}
-            className={`w-64 shrink-0 snap-start border p-2 text-left transition-colors ${layout === key ? "border-[var(--cyan)] bg-[var(--cyan-soft)]" : "border-[var(--line)] bg-[var(--bg)] hover:border-[var(--line-bright)]"}`}
+            variant="ghost"
+            className={`h-auto w-64 shrink-0 snap-start justify-start whitespace-normal border p-2 text-left transition-colors ${layout === key ? "border-[var(--cyan)] bg-[var(--cyan-soft)]" : "border-[var(--line)] bg-[var(--bg)] hover:border-[var(--line-bright)]"}`}
           >
             <LayoutThumbnail template={key} brandColor={brandColor} />
             <p className="mt-2 text-xs font-semibold text-[var(--fg)]">{PAGE_TEMPLATE_LABELS[key]}</p>
             <p className="mt-1 text-[11px] leading-4 text-[var(--fg-dim)]">{DESCRIPTION[key]}</p>
-          </button>
+          </Button>
         ))}
       </div>
-      <input type="hidden" name="layout" value={layout} />
+      <Input type="hidden" name="layout" value={layout} />
     </fieldset>
   );
 }

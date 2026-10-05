@@ -1,6 +1,7 @@
 "use client";
 
 import { useFormStatus } from "react-dom";
+import { Button } from "@/components/ui/button";
 
 export function PlatformSubmitButton({
   children,
@@ -19,8 +20,10 @@ export function PlatformSubmitButton({
 }) {
   const { pending } = useFormStatus();
   return (
-    <button
+    <Button
+      type="submit"
       disabled={disabled || pending}
+      loading={pending}
       onClick={(event) => {
         if (confirmMessage && !window.confirm(confirmMessage)) event.preventDefault();
       }}
@@ -28,6 +31,6 @@ export function PlatformSubmitButton({
       className={`${className} disabled:cursor-wait disabled:opacity-50`}
     >
       {pending ? pendingLabel : children}
-    </button>
+    </Button>
   );
 }

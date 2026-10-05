@@ -4,6 +4,7 @@ import { fetchWithTimeout } from "@/lib/client-fetch";
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { Button } from "@/components/ui/button";
 
 export function SwitchOrganizationButton({ organizationId }: { organizationId: string }) {
   const router = useRouter();
@@ -31,14 +32,16 @@ export function SwitchOrganizationButton({ organizationId }: { organizationId: s
 
   return (
     <div>
-      <button
+      <Button
         type="button"
         onClick={switchOrganization}
         disabled={pending}
-        className="border border-[var(--cyan)]/40 px-3 py-1.5 text-xs font-semibold text-[var(--cyan)] disabled:opacity-50"
+        variant="outline"
+        size="sm"
+        loading={pending}
       >
         {pending ? "Opening…" : "Open organization"}
-      </button>
+      </Button>
       {error && <p role="alert" className="mt-1 text-xs text-[var(--red)]">{error}</p>}
     </div>
   );

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { calculateSelectMenuLayout } from "@/components/FluentSelect";
+import { calculateSelectMenuLayout } from "@/components/ui/select";
 
 describe("calculateSelectMenuLayout", () => {
   it("matches a wide trigger instead of capping the popup", () => {

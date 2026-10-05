@@ -4,6 +4,7 @@ import { fetchWithTimeout } from "@/lib/client-fetch";
 
 import { useState } from "react";
 import { CopyButton } from "@/components/CopyButton";
+import { Button } from "@/components/ui/button";
 
 export function AutomationTokenManager({
   componentId,
@@ -43,9 +44,9 @@ export function AutomationTokenManager({
       <code className="bg-[var(--surface-raised)] px-1 text-[var(--fg-soft)]">
         {token ? `/api/v1/webhook-component/${token}` : `/api/v1/webhook-component/${label}`}
       </code>
-      <button type="button" disabled={pending} onClick={rotate} className="text-xs font-semibold text-[var(--cyan)] disabled:opacity-50">
+      <Button type="button" variant="link" size="sm" loading={pending} onClick={rotate} className="h-auto px-1 py-0 text-xs">
         {pending ? "Rotating…" : "Rotate"}
-      </button>
+      </Button>
       {token && (
         <CopyButton
           value={token}

@@ -4,6 +4,7 @@ import { fetchWithTimeout } from "@/lib/client-fetch";
 
 import { useState } from "react";
 import { CopyButton } from "@/components/CopyButton";
+import { Button } from "@/components/ui/button";
 
 export function HeartbeatTokenManager({ monitorId }: { monitorId: string }) {
   const [url, setUrl] = useState<string | null>(null);
@@ -43,14 +44,16 @@ export function HeartbeatTokenManager({ monitorId }: { monitorId: string }) {
           />
         </div>
       ) : (
-        <button
+        <Button
           type="button"
-          disabled={pending}
+          loading={pending}
           onClick={() => void rotate()}
-          className="text-[var(--cyan)] underline disabled:opacity-50"
+          variant="link"
+          size="sm"
+          className="h-auto px-0 py-0 text-[var(--cyan)]"
         >
           {pending ? "Creating heartbeat URL…" : "Create or rotate heartbeat URL"}
-        </button>
+        </Button>
       )}
       {error && <p role="alert" className="mt-1 text-[var(--red)]">{error}</p>}
     </div>

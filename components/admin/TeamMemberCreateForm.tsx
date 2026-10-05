@@ -1,13 +1,16 @@
 "use client";
 
 import { useActionState } from "react";
-import { FluentSelect } from "@/components/FluentSelect";
+import { Select } from "@/components/ui/select";
 import {
   createMember,
   type TeamMemberCreateState,
 } from "@/app/admin/(protected)/team/actions";
 import { HelpTip } from "@/components/HelpTip";
 import { MEMBERSHIP_ROLES } from "@/lib/identity";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
 
 const INITIAL_STATE: TeamMemberCreateState = { ok: false };
 
@@ -34,50 +37,50 @@ export function TeamMemberCreateForm({
       </div>
       <label className="grid gap-1.5 text-xs font-semibold text-[var(--fg-soft)]">
         Full name
-        <input
+        <Input
           name="name"
           maxLength={120}
           placeholder="Full name"
-          className="border border-[var(--line)] bg-[var(--bg)] px-3 py-2.5 text-sm font-normal text-[var(--fg)] placeholder:text-[var(--fg-dim)] focus:border-[var(--cyan)] focus:outline-none"
+          className="font-normal"
           required
         />
       </label>
       <label className="grid gap-1.5 text-xs font-semibold text-[var(--fg-soft)]">
         User ID
-        <input
+        <Input
           name="username"
           minLength={3}
           maxLength={64}
           placeholder="jane.smith"
           autoComplete="off"
-          className="border border-[var(--line)] bg-[var(--bg)] px-3 py-2.5 text-sm font-normal text-[var(--fg)] placeholder:text-[var(--fg-dim)] focus:border-[var(--cyan)] focus:outline-none"
+          className="font-normal"
           required
         />
       </label>
       <label className="grid gap-1.5 text-xs font-semibold text-[var(--fg-soft)]">
         Email
-        <input
+        <Input
           name="email"
           type="email"
           placeholder="name@company.com"
-          className="border border-[var(--line)] bg-[var(--bg)] px-3 py-2.5 text-sm font-normal text-[var(--fg)] placeholder:text-[var(--fg-dim)] focus:border-[var(--cyan)] focus:outline-none"
+          className="font-normal"
           required
         />
       </label>
       <label className="grid gap-1.5 text-xs font-semibold text-[var(--fg-soft)] sm:col-span-2">
         Temporary password
-        <input
+        <Input
           name="password"
           type="password"
           autoComplete="new-password"
           placeholder="Required for a new local identity"
-          className="border border-[var(--line)] bg-[var(--bg)] px-3 py-2.5 text-sm font-normal text-[var(--fg)] placeholder:text-[var(--fg-dim)] focus:border-[var(--cyan)] focus:outline-none"
+          className="font-normal"
         />
       </label>
       <div className="grid gap-1.5 text-xs font-semibold text-[var(--fg-soft)]">
         Role
         <span className="flex items-center gap-1.5">
-          <FluentSelect
+          <Select
             aria-label="Role"
             name="role"
             defaultValue="RESPONDER"
@@ -88,7 +91,7 @@ export function TeamMemberCreateForm({
                 {role.replaceAll("_", " ")}
               </option>
             ))}
-          </FluentSelect>
+          </Select>
           <HelpTip text="Admins have organization-wide access. Incident Managers, Responders, and Viewers can be limited to selected pages." />
         </span>
       </div>
@@ -97,7 +100,7 @@ export function TeamMemberCreateForm({
         <div className="grid gap-2 sm:grid-cols-2">
           {pages.map((page) => (
             <label key={page.id} className="flex items-center gap-2 text-xs text-[var(--fg-soft)]">
-              <input type="checkbox" name="pageIds" value={page.id} /> {page.name}
+              <Checkbox name="pageIds" value={page.id} /> {page.name}
             </label>
           ))}
           {pages.length === 0 && (
@@ -112,9 +115,9 @@ export function TeamMemberCreateForm({
         </p>
       )}
       <div className="flex justify-end border-t border-[var(--line)] pt-4 sm:col-span-2">
-        <button disabled={pending} className="w-full bg-[var(--cyan)] px-5 py-2.5 font-mono text-sm font-semibold text-[var(--on-cyan)] disabled:opacity-50 sm:w-auto">
+        <Button type="submit" loading={pending} className="w-full font-mono sm:w-auto">
           {pending ? "Creating user…" : "Create user and assign role"}
-        </button>
+        </Button>
       </div>
     </form>
   );

@@ -4,6 +4,9 @@ import { hasPlatformCapability } from "@/lib/platform-policy";
 import { disableUser, reactivateUser } from "./actions";
 import { PlatformActionForm } from "@/components/platform/PlatformActionForm";
 import { PlatformSubmitButton } from "@/components/platform/PlatformSubmitButton";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 export default async function PlatformUsersPage({
   searchParams,
@@ -44,40 +47,40 @@ export default async function PlatformUsersPage({
           </p>
         </div>
         <form className="flex gap-2">
-          <input
+          <Input
             name="q"
             defaultValue={query}
             aria-label="Search users"
             placeholder="Email or name"
-            className="w-56 border border-[var(--line)] bg-[var(--surface)] px-3 py-2 text-xs"
+            className="h-9 w-56 bg-[var(--surface)] px-3 py-2 text-xs"
           />
-          <button className="border border-[var(--line)] px-3 py-2 text-xs font-semibold">Search</button>
+          <Button type="submit" variant="outline" size="sm">Search</Button>
         </form>
       </div>
 
-      <div className="overflow-x-auto border border-[var(--line)] bg-[var(--surface)]">
-        <table className="w-full min-w-[760px] text-left text-sm">
-          <thead className="border-b border-[var(--line)] bg-[var(--bg)] font-mono text-[10px] uppercase tracking-wide text-[var(--fg-dim)]">
-            <tr>
-              <th className="px-4 py-3">Identity</th>
-              <th className="px-4 py-3">Memberships</th>
-              <th className="px-4 py-3">Authentication</th>
-              <th className="px-4 py-3">State / emergency action</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-[var(--line)]">
+      <div className="border border-[var(--line)] bg-[var(--surface)]">
+        <Table className="min-w-[760px] text-left text-sm">
+          <TableHeader className="bg-[var(--bg)] font-mono text-[10px] uppercase tracking-wide text-[var(--fg-dim)]">
+            <TableRow>
+              <TableHead className="px-4 py-3">Identity</TableHead>
+              <TableHead className="px-4 py-3">Memberships</TableHead>
+              <TableHead className="px-4 py-3">Authentication</TableHead>
+              <TableHead className="px-4 py-3">State / emergency action</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody className="divide-y divide-[var(--line)]">
             {users.map((user) => {
               const userMemberships = memberships.filter((membership) =>
                 membership.userId === user.id
               );
               return (
-                <tr key={user.id} className="align-top">
-                  <td className="px-4 py-3">
+                <TableRow key={user.id} className="align-top">
+                  <TableCell className="px-4 py-3">
                     <p className="font-semibold text-[var(--fg)]">{user.name}</p>
                     <p className="text-xs text-[var(--fg-dim)]">{user.email}</p>
                     <p className="mt-1 font-mono text-[10px] text-[var(--fg-dim)]">{user.id}</p>
-                  </td>
-                  <td className="px-4 py-3">
+                  </TableCell>
+                  <TableCell className="px-4 py-3">
                     {userMemberships.length ? (
                       <ul className="space-y-1 text-xs text-[var(--fg-soft)]">
                         {userMemberships.map((membership) => (
@@ -89,12 +92,12 @@ export default async function PlatformUsersPage({
                     ) : (
                       <span className="text-xs text-[var(--fg-dim)]">No memberships</span>
                     )}
-                  </td>
-                  <td className="px-4 py-3 text-xs text-[var(--fg-soft)]">
+                  </TableCell>
+                  <TableCell className="px-4 py-3 text-xs text-[var(--fg-soft)]">
                     <p>{user.passwordHash ? "Password" : "No password"}</p>
                     <p>{user.oidcIssuer ? "OIDC linked" : "OIDC not linked"}</p>
-                  </td>
-                  <td className="px-4 py-3">
+                  </TableCell>
+                  <TableCell className="px-4 py-3">
                     <p className={`text-xs font-semibold ${user.disabled ? "text-[var(--red)]" : "text-[var(--green)]"}`}>
                       {user.disabled ? "DISABLED" : "ACTIVE"}
                     </p>
@@ -111,12 +114,12 @@ export default async function PlatformUsersPage({
                         }
                         className="mt-2 flex flex-wrap gap-2"
                       >
-                        <input
+                        <Input
                           name="reason"
                           minLength={10}
                           required
                           placeholder="Emergency reason / ticket"
-                          className="w-48 border border-[var(--line)] bg-[var(--bg)] px-2 py-1.5 text-xs"
+                          className="h-8 w-48 px-2 py-1.5 text-xs"
                         />
                         <PlatformSubmitButton
                           pendingLabel={user.disabled ? "Reactivating…" : "Disabling…"}
@@ -127,15 +130,15 @@ export default async function PlatformUsersPage({
                         </PlatformSubmitButton>
                       </PlatformActionForm>
                     )}
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               );
             })}
             {users.length === 0 && (
-              <tr><td colSpan={4} className="px-4 py-8 text-center text-sm text-[var(--fg-dim)]">No users match this search.</td></tr>
+              <TableRow><TableCell colSpan={4} className="px-4 py-8 text-center text-sm text-[var(--fg-dim)]">No users match this search.</TableCell></TableRow>
             )}
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
       </div>
     </div>
   );

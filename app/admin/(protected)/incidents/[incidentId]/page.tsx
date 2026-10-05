@@ -5,6 +5,7 @@ import { IMPACT_LABEL, type Impact } from "@/lib/status";
 import { editIncidentUpdate, postIncidentUpdate, deleteIncident, savePostmortem } from "../actions";
 import { deleteMaintenance, setMaintenanceStatus } from "../../maintenance/actions";
 import { HelpTip } from "@/components/HelpTip";
+import { Button } from "@/components/ui/button";
 import {
   IncidentUpdateComposer,
   MaintenanceUpdateComposer,
@@ -136,9 +137,9 @@ export default async function IncidentDetailPage({ params }: { params: Promise<{
       {canManage && <div className="bg-[var(--surface)] border border-[var(--red)] p-4 sm:p-5">
         <h2 className="font-mono font-semibold mb-2 text-sm text-[var(--red)]">Danger Zone</h2>
         <form action={boundDelete} className="flex items-center gap-2">
-          <button className="text-[var(--red)] border border-[var(--red)] px-3 py-1.5 text-sm hover:bg-[var(--red-soft)]">
+          <Button type="submit" variant="destructive" size="sm">
             Delete {incident.isMaintenance ? "Maintenance" : "Incident"}
-          </button>
+          </Button>
           <HelpTip
             text={`Permanently deletes this ${
               incident.isMaintenance ? "maintenance window" : "incident"

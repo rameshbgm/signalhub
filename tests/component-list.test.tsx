@@ -58,7 +58,7 @@ describe("component directory customization", () => {
     });
   });
 
-  it("renders Fluent summary filters, search, accordion groups, and pill services", () => {
+  it("renders shadcn summary filters, search, accordion groups, and pill services", () => {
     const html = renderToStaticMarkup(
       <ComponentList
         groups={[{ id: "dns", name: "DNS", collapsed: false, components: components.slice(0, 2) }]}
@@ -76,9 +76,9 @@ describe("component directory customization", () => {
     expect(html).toContain("Authoritative DNS");
     expect(html).toContain("sm:grid-cols-2 lg:grid-cols-3");
     expect(html).toContain("Show details for Authoritative DNS");
-    expect(html).toContain("fui-Accordion");
-    expect(html).toContain("fui-Input");
-    expect(html).toContain("fui-Button");
+    expect(html).toContain("ui-reveal");
+    expect(html).toContain("<input");
+    expect(html).toContain("inline-flex");
   });
 
   it("keeps saved component groups visible when customization is otherwise disabled", () => {
@@ -101,7 +101,7 @@ describe("component directory customization", () => {
     expect(html).toContain("Edge Network");
     expect(html).not.toContain("data-service-summary");
     expect(html).not.toContain("Search services");
-    expect(html).toContain("fui-Accordion");
+    expect(html).toContain("aria-expanded");
     expect(html).toContain("DNS");
     expect(html).toContain("Other services");
     expect(html).not.toContain("Show details for Authoritative DNS");

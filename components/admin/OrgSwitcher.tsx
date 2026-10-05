@@ -7,6 +7,8 @@ import Link from "next/link";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { useRouter } from "next/navigation";
 import { LogoutButton } from "@/components/admin/LogoutButton";
+import { ChevronDown } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 export function OrgSwitcher({
   orgName,
@@ -70,11 +72,13 @@ export function OrgSwitcher({
 
   return (
     <div ref={ref} className="dispatch-org-switcher relative flex items-center gap-2 border-b border-[var(--line)] px-3 py-3">
-      <button
+      <Button
+        type="button"
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
         aria-haspopup="menu"
-        className="flex min-w-0 flex-1 items-center gap-2.5 px-2 py-2 transition-colors hover:bg-[var(--hover-overlay)]"
+        variant="ghost"
+        className="h-auto min-w-0 flex-1 justify-start gap-2.5 rounded-none px-2 py-2 text-left"
       >
         <span className="flex h-8 w-8 shrink-0 items-center justify-center bg-[var(--cyan)] font-mono text-xs font-bold text-[var(--on-cyan)]">
           {orgName.slice(0, 1).toUpperCase()}
@@ -83,8 +87,8 @@ export function OrgSwitcher({
           <span className="block truncate font-mono text-sm font-semibold text-[var(--fg)]">{orgName}</span>
           <span className="block text-[11px] uppercase tracking-wide text-[var(--fg-dim)]">Self-hosted</span>
         </span>
-        <span className={`text-[var(--fg-dim)] transition-transform ${open ? "rotate-180" : ""}`}>⌄</span>
-      </button>
+        <ChevronDown aria-hidden size={16} className={`text-[var(--cyan)] transition-transform ${open ? "rotate-180" : ""}`} />
+      </Button>
       <ThemeToggle />
       <LogoutButton compact className="lg:hidden" />
 
@@ -94,16 +98,18 @@ export function OrgSwitcher({
             <>
               <p className="px-3 py-1 font-mono text-[10px] uppercase tracking-wider text-[var(--fg-dim)]">Organizations</p>
               {organizations.map((organization) => (
-                <button
+                <Button
                   key={organization.id}
                   type="button"
                   role="menuitem"
                   disabled={switching || organization.id === orgId}
                   onClick={() => switchOrganization(organization.id)}
-                  className="block w-full px-3 py-1.5 text-left text-sm text-[var(--fg)] hover:bg-[var(--hover-overlay)] disabled:opacity-60"
+                  variant="ghost"
+                  size="sm"
+                  className="h-auto w-full justify-start rounded-none px-3 py-1.5 text-left text-sm font-normal text-[var(--fg)] disabled:opacity-60"
                 >
                   {organization.name} <span className="text-[10px] uppercase text-[var(--fg-dim)]">{organization.role}</span>
-                </button>
+                </Button>
               ))}
               <div className="my-1 border-t border-[var(--line)]" />
             </>

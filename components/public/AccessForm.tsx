@@ -4,6 +4,8 @@ import { fetchWithTimeout } from "@/lib/client-fetch";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 export function AccessForm({ slug, type, returnTo }: { slug: string; type: "PRIVATE" | "AUDIENCE"; returnTo: string }) {
   const router = useRouter();
@@ -42,30 +44,31 @@ export function AccessForm({ slug, type, returnTo }: { slug: string; type: "PRIV
         {type === "PRIVATE" ? "This page is password protected" : "Sign in to view your status page"}
       </h1>
       {type === "AUDIENCE" && (
-        <input
+        <Input
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           type="email"
           placeholder="Email"
-          className="w-full bg-[var(--bg)] border border-[var(--line)] rounded-none px-3 py-2 text-sm text-[var(--fg)] placeholder:text-[var(--fg-dim)] focus:outline-none focus:border-[var(--cyan)]"
+          className="rounded-none"
           required
         />
       )}
-      <input
+      <Input
         value={password}
         onChange={(e) => setPassword(e.target.value)}
         type="password"
         placeholder="Password"
-        className="w-full bg-[var(--bg)] border border-[var(--line)] rounded-none px-3 py-2 text-sm text-[var(--fg)] placeholder:text-[var(--fg-dim)] focus:outline-none focus:border-[var(--cyan)]"
+        className="rounded-none"
         required
       />
       {error && <p className="text-xs text-[var(--red)]">{error}</p>}
-      <button
+      <Button
         disabled={loading}
-        className="w-full bg-[var(--cyan)] text-[var(--on-cyan)] rounded-none py-2 text-sm font-medium disabled:opacity-50"
+        loading={loading}
+        className="w-full rounded-none py-2"
       >
         {loading ? "Checking..." : "Continue"}
-      </button>
+      </Button>
     </form>
   );
 }

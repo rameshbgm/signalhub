@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ComponentOrderList } from "@/components/admin/ComponentOrderList";
-import { FluentSelect } from "@/components/FluentSelect";
+import { Select } from "@/components/ui/select";
 import { PlatformActionForm } from "@/components/platform/PlatformActionForm";
 import { PlatformSubmitButton } from "@/components/platform/PlatformSubmitButton";
 import { assertPageInOrg, requireCapability } from "@/lib/admin-guard";
@@ -9,6 +9,9 @@ import { database } from "@/lib/postgres/client";
 import { COMPONENT_STATUSES, COMPONENT_STATUS_LABEL } from "@/lib/status";
 import { attachChildPage, detachChildPage } from "../../actions";
 import { createComponent, createGroup, deleteComponent, deleteGroup, updateComponentDetails, updateComponentStatus } from "../components-actions";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
 
 const inputClass = "w-full border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--fg)]";
 
@@ -40,12 +43,12 @@ async function HubContent({ pageId, orgId }: { pageId: string; orgId: string }) 
       </div>
       {available.length > 0 && (
         <PlatformActionForm action={attachChildPage.bind(null, pageId)} successMessage="Status page added to hub" className="mt-5 flex flex-col gap-2 border-t border-[var(--line)] pt-5 sm:flex-row">
-          <FluentSelect aria-label="Status page to add" name="childPageId" required className={`${inputClass} flex-1`}><option value="">Choose a standalone status page</option>{available.map((candidate) => <option key={candidate.id} value={candidate.id}>{candidate.name}</option>)}</FluentSelect>
-          <button className="border border-[var(--line-bright)] px-4 py-2 text-sm font-semibold">Add to hub</button>
+          <Select aria-label="Status page to add" name="childPageId" required className={`${inputClass} flex-1`}><option value="">Choose a standalone status page</option>{available.map((candidate) => <option key={candidate.id} value={candidate.id}>{candidate.name}</option>)}</Select>
+          <Button type="submit" variant="outline">Add to hub</Button>
         </PlatformActionForm>
       )}
       <div className="mt-5 space-y-2">
-        {members.map((member) => <article key={member.id} className="flex flex-col gap-3 border border-[var(--line)] bg-[var(--bg)] p-4 sm:flex-row sm:items-center sm:justify-between"><div><p className="font-semibold text-[var(--fg)]">{member.name}</p><p className="mt-0.5 text-xs text-[var(--fg-dim)]">/{member.slug} · {member.setupCompletedAt === null ? "Draft" : member.publicVisible === false ? "Hidden" : "Published"}</p></div><div className="flex gap-2"><Link href={`/organization/pages/${member.id}`} className="border border-[var(--cyan)]/30 px-3 py-1.5 text-xs font-semibold text-[var(--cyan)]">Manage</Link><form action={detachChildPage.bind(null, pageId, member.id)}><button className="border border-[var(--red)]/30 px-3 py-1.5 text-xs font-semibold text-[var(--red)]">Remove</button></form></div></article>)}
+        {members.map((member) => <article key={member.id} className="flex flex-col gap-3 border border-[var(--line)] bg-[var(--bg)] p-4 sm:flex-row sm:items-center sm:justify-between"><div><p className="font-semibold text-[var(--fg)]">{member.name}</p><p className="mt-0.5 text-xs text-[var(--fg-dim)]">/{member.slug} · {member.setupCompletedAt === null ? "Draft" : member.publicVisible === false ? "Hidden" : "Published"}</p></div><div className="flex gap-2"><Link href={`/organization/pages/${member.id}`} className="border border-[var(--cyan)]/30 px-3 py-1.5 text-xs font-semibold text-[var(--cyan)]">Manage</Link><form action={detachChildPage.bind(null, pageId, member.id)}><Button type="submit" variant="destructive" size="sm">Remove</Button></form></div></article>)}
         {members.length === 0 && <p className="border border-dashed border-[var(--line-bright)] p-6 text-center text-sm text-[var(--fg-dim)]">No status pages are assigned yet.</p>}
       </div>
     </section>
@@ -63,20 +66,20 @@ async function StatusPageContent({ pageId }: { pageId: string }) {
       <section className="border border-[var(--line)] bg-[var(--surface)] p-5">
         <h2 className="font-mono font-semibold">Service groups</h2>
         <PlatformActionForm action={createGroup.bind(null, pageId)} successMessage="Service group added" className="mt-4 flex w-full flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start">
-          <input name="name" required maxLength={120} placeholder="New group name" className={`${inputClass} min-w-0 flex-1`} />
-          <button className="w-full whitespace-nowrap border border-[var(--line-bright)] px-4 py-2 text-sm font-semibold sm:w-auto">Add group</button>
+          <Input name="name" required maxLength={120} placeholder="New group name" className={`${inputClass} min-w-0 flex-1`} />
+          <Button type="submit" variant="outline" className="w-full whitespace-nowrap sm:w-auto">Add group</Button>
         </PlatformActionForm>
-        <div className="mt-4 space-y-2">{groups.map((group) => <div key={group.id} className="flex items-center justify-between border border-[var(--line)] px-3 py-2 text-sm"><span>{group.name}</span><form action={deleteGroup.bind(null, pageId, group.id)}><button className="text-xs font-semibold text-[var(--red)]">Delete</button></form></div>)}</div>
+        <div className="mt-4 space-y-2">{groups.map((group) => <div key={group.id} className="flex items-center justify-between border border-[var(--line)] px-3 py-2 text-sm"><span>{group.name}</span><form action={deleteGroup.bind(null, pageId, group.id)}><Button type="submit" variant="destructive" size="sm">Delete</Button></form></div>)}</div>
       </section>
 
       <section className="border border-[var(--line)] bg-[var(--surface)] p-5">
         <h2 className="font-mono font-semibold">Services</h2>
         <p className="mt-1 text-sm text-[var(--fg-dim)]">Services are the systems whose health appears on this status page.</p>
         <PlatformActionForm action={createComponent.bind(null, pageId)} successMessage="Service added" className="mt-4 grid gap-3 border-b border-[var(--line)] pb-5 sm:grid-cols-2">
-          <input name="name" required maxLength={120} placeholder="Service name" className={inputClass} />
-          <FluentSelect aria-label="Service group" name="groupId" className={inputClass}><option value="">No group</option>{groups.map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}</FluentSelect>
-          <input name="description" maxLength={500} placeholder="Description (optional)" className={`${inputClass} sm:col-span-2`} />
-          <button className="w-fit bg-[var(--cyan)] px-4 py-2 text-sm font-semibold text-[var(--on-cyan)] sm:col-span-2">Add service</button>
+          <Input name="name" required maxLength={120} placeholder="Service name" className={inputClass} />
+          <Select aria-label="Service group" name="groupId" className={inputClass}><option value="">No group</option>{groups.map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}</Select>
+          <Input name="description" maxLength={500} placeholder="Description (optional)" className={`${inputClass} sm:col-span-2`} />
+          <Button type="submit" className="w-fit sm:col-span-2">Add service</Button>
         </PlatformActionForm>
         <ComponentOrderList key={components.map((component) => component.id).join(":")} pageId={pageId} components={components.map((component) => ({ id: component.id, name: component.name }))}>
           <div className="mt-5 space-y-3">
@@ -85,14 +88,14 @@ async function StatusPageContent({ pageId }: { pageId: string }) {
               <div className="mt-4 grid items-start gap-4 border-t border-[var(--line)] pt-4 lg:grid-cols-2">
                 <PlatformActionForm action={updateComponentStatus.bind(null, pageId, component.id)} successMessage="Status updated" className="flex items-start gap-2">
                   <div className="flex min-w-0 flex-1 items-start gap-2">
-                    <FluentSelect aria-label={`Public status for ${component.name}`} name="status" defaultValue={component.status} className={`${inputClass} min-w-0 flex-1`}>{COMPONENT_STATUSES.map((status) => <option key={status} value={status}>{COMPONENT_STATUS_LABEL[status]}</option>)}</FluentSelect>
+                    <Select aria-label={`Public status for ${component.name}`} name="status" defaultValue={component.status} className={`${inputClass} min-w-0 flex-1`}>{COMPONENT_STATUSES.map((status) => <option key={status} value={status}>{COMPONENT_STATUS_LABEL[status]}</option>)}</Select>
                     <PlatformSubmitButton pendingLabel="Updating…" className="self-start whitespace-nowrap border border-[var(--line)] px-3 py-2 text-xs">Update</PlatformSubmitButton>
                   </div>
                 </PlatformActionForm>
                 <PlatformActionForm id={`service-details-${component.id}`} action={updateComponentDetails.bind(null, pageId, component.id)} successMessage="Service details saved" className="grid gap-2 sm:grid-cols-2">
-                  <input name="name" defaultValue={component.name} required maxLength={120} className={inputClass} /><input name="description" defaultValue={component.description} maxLength={1000} className={inputClass} />
-                  <FluentSelect aria-label={`Group for ${component.name}`} name="groupId" defaultValue={component.groupId ?? ""} className={inputClass}><option value="">No group</option>{groups.map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}</FluentSelect>
-                  <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="visible" defaultChecked={component.visible} /> Visible publicly</label><label className="flex items-center gap-2 text-sm"><input type="checkbox" name="showUptime" defaultChecked={component.showUptime} /> Show uptime</label>
+                  <Input name="name" defaultValue={component.name} required maxLength={120} className={inputClass} /><Input name="description" defaultValue={component.description} maxLength={1000} className={inputClass} />
+                  <Select aria-label={`Group for ${component.name}`} name="groupId" defaultValue={component.groupId ?? ""} className={inputClass}><option value="">No group</option>{groups.map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}</Select>
+                  <label className="flex items-center gap-2 text-sm"><Checkbox name="visible" defaultChecked={component.visible} /> Visible publicly</label><label className="flex items-center gap-2 text-sm"><Checkbox name="showUptime" defaultChecked={component.showUptime} /> Show uptime</label>
                   <PlatformSubmitButton pendingLabel="Saving…" className="border border-[var(--cyan)]/40 px-3 py-2 text-xs font-semibold text-[var(--cyan)]">Save service</PlatformSubmitButton>
                 </PlatformActionForm>
               </div>

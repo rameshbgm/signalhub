@@ -1,9 +1,13 @@
 import { requirePlatformPageCapability } from "@/lib/platform-page-guard";
-import { FluentSelect } from "@/components/FluentSelect";
+import { Select } from "@/components/ui/select";
 import { database } from "@/lib/postgres/client";
 import { hasPlatformCapability } from "@/lib/platform-policy";
 import { PlatformActionForm } from "@/components/platform/PlatformActionForm";
 import { ScimTokenManager } from "@/components/platform/ScimTokenManager";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import {
   createIdentityConnection,
   setIdentityConnectionEnabled,
@@ -39,41 +43,41 @@ export default async function IdentityPage() {
             successMessage="Identity connection created"
             className="mt-4 grid gap-3 sm:grid-cols-2"
           >
-            <input name="name" placeholder="Connection name" required className="border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm" />
-            <input name="slug" placeholder="Stable slug" required pattern="[a-z0-9-]+" className="border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm" />
-            <FluentSelect aria-label="Connection type" name="type" className="border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm">
+            <Input name="name" placeholder="Connection name" required />
+            <Input name="slug" placeholder="Stable slug" required pattern="[a-z0-9-]+" />
+            <Select aria-label="Connection type" name="type" className="border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm">
               <option value="OIDC">OpenID Connect</option>
               <option value="SAML">SAML 2.0</option>
-            </FluentSelect>
-            <FluentSelect aria-label="Organization" name="orgId" className="border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm">
+            </Select>
+            <Select aria-label="Organization" name="orgId" className="border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm">
               <option value="">Choose organization</option>
               {organizations.map((org) => <option key={org.id} value={org.id}>{org.name}</option>)}
-            </FluentSelect>
-            <FluentSelect aria-label="Default role" name="defaultRole" defaultValue="VIEWER" className="border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm">
+            </Select>
+            <Select aria-label="Default role" name="defaultRole" defaultValue="VIEWER" className="border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm">
               <option value="VIEWER">Default: Viewer</option>
               <option value="RESPONDER">Default: Responder</option>
               <option value="INCIDENT_MANAGER">Default: Incident manager</option>
               <option value="ADMIN">Default: Admin</option>
-            </FluentSelect>
-            <input name="issuer" placeholder="OIDC issuer or SAML SP entity ID" required className="border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm" />
-            <input name="clientId" placeholder="OIDC client ID (OIDC only)" className="border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm" />
-            <input name="clientSecret" type="password" placeholder="OIDC client secret (OIDC only)" className="border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm" />
-            <input name="entryPoint" placeholder="SAML IdP SSO URL (SAML only)" className="border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm" />
-            <textarea name="idpCertificate" placeholder="SAML IdP signing certificate (SAML only)" rows={3} className="border border-[var(--line)] bg-[var(--bg)] px-3 py-2 font-mono text-xs sm:col-span-2" />
-            <textarea name="privateKey" placeholder="SAML SP private key for signed requests/encrypted assertions (optional)" rows={3} className="border border-[var(--line)] bg-[var(--bg)] px-3 py-2 font-mono text-xs" />
-            <textarea name="spCertificate" placeholder="SAML SP public certificate matching the private key (optional)" rows={3} className="border border-[var(--line)] bg-[var(--bg)] px-3 py-2 font-mono text-xs" />
-            <input name="acceptedAcrValues" placeholder="Accepted acr values, comma-separated" className="border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm" />
-            <input name="acceptedAmrValues" placeholder="Accepted amr values, comma-separated" className="border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm" />
-            <textarea
+            </Select>
+            <Input name="issuer" placeholder="OIDC issuer or SAML SP entity ID" required />
+            <Input name="clientId" placeholder="OIDC client ID (OIDC only)" />
+            <Input name="clientSecret" type="password" placeholder="OIDC client secret (OIDC only)" />
+            <Input name="entryPoint" placeholder="SAML IdP SSO URL (SAML only)" />
+            <Textarea name="idpCertificate" placeholder="SAML IdP signing certificate (SAML only)" rows={3} className="font-mono text-xs sm:col-span-2" />
+            <Textarea name="privateKey" placeholder="SAML SP private key for signed requests/encrypted assertions (optional)" rows={3} className="font-mono text-xs" />
+            <Textarea name="spCertificate" placeholder="SAML SP public certificate matching the private key (optional)" rows={3} className="font-mono text-xs" />
+            <Input name="acceptedAcrValues" placeholder="Accepted acr values, comma-separated" />
+            <Input name="acceptedAmrValues" placeholder="Accepted amr values, comma-separated" />
+            <Textarea
               name="roleMappings"
               defaultValue="[]"
               rows={3}
               aria-label="Role mappings JSON"
-              className="border border-[var(--line)] bg-[var(--bg)] px-3 py-2 font-mono text-xs sm:col-span-2"
+              className="font-mono text-xs sm:col-span-2"
             />
-            <label className="flex items-center gap-2 text-xs"><input type="checkbox" name="allowJitProvisioning" /> Allow organization JIT provisioning</label>
-            <input type="hidden" name="scopes" value="openid email profile groups" />
-            <button className="bg-[var(--cyan)] px-4 py-2 text-sm font-semibold text-[var(--on-cyan)]">Create connection</button>
+            <label className="flex items-center gap-2 text-xs"><Checkbox name="allowJitProvisioning" /> Allow organization JIT provisioning</label>
+            <Input type="hidden" name="scopes" value="openid email profile groups" />
+            <Button type="submit">Create connection</Button>
           </PlatformActionForm>
         </section>
       )}
@@ -108,11 +112,11 @@ export default async function IdentityPage() {
               {canManage && (
                 <div className="flex flex-wrap gap-2">
                   <PlatformActionForm action={testIdentityConnection.bind(null, connection.id)} successMessage="Connection test passed">
-                    <button className="border border-[var(--line)] px-2.5 py-1 text-xs">Test</button>
+                    <Button type="submit" variant="outline" size="sm">Test</Button>
                   </PlatformActionForm>
                   <PlatformActionForm action={setIdentityConnectionEnabled.bind(null, connection.id)} successMessage={connection.enabled ? "Connection disabled" : "Connection enabled"}>
-                    <input type="hidden" name="enabled" value={String(!connection.enabled)} />
-                    <button className="border border-[var(--line)] px-2.5 py-1 text-xs">{connection.enabled ? "Disable" : "Enable"}</button>
+                    <Input type="hidden" name="enabled" value={String(!connection.enabled)} />
+                    <Button type="submit" variant="outline" size="sm">{connection.enabled ? "Disable" : "Enable"}</Button>
                   </PlatformActionForm>
                 </div>
               )}

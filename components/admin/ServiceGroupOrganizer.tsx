@@ -2,7 +2,10 @@
 
 import { useState, useTransition } from "react";
 import { arrayMove } from "@dnd-kit/sortable";
-import { FluentSelect } from "@/components/FluentSelect";
+import { ArrowDown, ArrowUp } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Select } from "@/components/ui/select";
 import { reorderPageComponents } from "@/app/admin/(protected)/pages/[pageId]/design/actions";
 
 export type ServiceStructureGroup = {
@@ -83,9 +86,9 @@ export function ServiceGroupOrganizer({
           <div key={group.id} className="border border-[var(--line)] p-3 text-sm">
             <div className="flex flex-wrap items-center gap-2">
               <strong className="min-w-0 flex-1 truncate">{group.name} · {group.components.length}</strong>
-              <label className="flex items-center gap-1 text-xs text-[var(--fg-dim)]"><input type="checkbox" checked={group.collapsed} onChange={(event) => setGroups(groups.map((candidate) => candidate.id === group.id ? { ...candidate, collapsed: event.target.checked } : candidate))} />Collapsed by default</label>
-              <button type="button" onClick={() => moveGroup(index, -1)} aria-label={`Move ${group.name} up`} className="border border-[var(--line)] px-2 py-1">↑</button>
-              <button type="button" onClick={() => moveGroup(index, 1)} aria-label={`Move ${group.name} down`} className="border border-[var(--line)] px-2 py-1">↓</button>
+              <label className="flex items-center gap-1 text-xs text-[var(--fg-dim)]"><Checkbox checked={group.collapsed} onChange={(event) => setGroups(groups.map((candidate) => candidate.id === group.id ? { ...candidate, collapsed: event.target.checked } : candidate))} />Collapsed by default</label>
+              <Button type="button" variant="outline" size="icon" onClick={() => moveGroup(index, -1)} aria-label={`Move ${group.name} up`} className="h-8 w-8"><ArrowUp aria-hidden size={14} /></Button>
+              <Button type="button" variant="outline" size="icon" onClick={() => moveGroup(index, 1)} aria-label={`Move ${group.name} down`} className="h-8 w-8"><ArrowDown aria-hidden size={14} /></Button>
             </div>
             <ServiceRows services={group.components} groupId={group.id} groups={groups} onMove={moveService} />
           </div>
@@ -96,7 +99,7 @@ export function ServiceGroupOrganizer({
         </div>
       </div>
       <div className="mt-4 flex items-center gap-3">
-        <button type="button" disabled={saving} onClick={save} className="bg-[var(--cyan)] px-4 py-2 text-sm font-semibold text-[var(--on-cyan)] disabled:opacity-50">{saving ? "Saving…" : "Save organization"}</button>
+        <Button type="button" loading={saving} onClick={save}>{saving ? "Saving…" : "Save organization"}</Button>
         <p role="status" className="text-xs text-[var(--fg-dim)]">{status}</p>
       </div>
     </section>
@@ -118,12 +121,12 @@ function ServiceRows({
       {services.map((service) => (
         <div key={service.id} className="flex items-center gap-1 bg-[var(--bg)] px-2 py-1.5 text-xs">
           <span className="min-w-0 flex-1 truncate">{service.name}</span>
-          <button type="button" onClick={() => onMove(groupId, service.id, groupId, -1)} aria-label={`Move ${service.name} up`}>↑</button>
-          <button type="button" onClick={() => onMove(groupId, service.id, groupId, 1)} aria-label={`Move ${service.name} down`}>↓</button>
-          <FluentSelect aria-label={`Move ${service.name} to group`} value={groupId ?? ""} onChange={(event) => onMove(groupId, service.id, event.target.value || null)} className="max-w-32 bg-transparent text-xs">
+          <Button type="button" variant="ghost" size="icon" onClick={() => onMove(groupId, service.id, groupId, -1)} aria-label={`Move ${service.name} up`} className="h-7 w-7"><ArrowUp aria-hidden size={13} /></Button>
+          <Button type="button" variant="ghost" size="icon" onClick={() => onMove(groupId, service.id, groupId, 1)} aria-label={`Move ${service.name} down`} className="h-7 w-7"><ArrowDown aria-hidden size={13} /></Button>
+          <Select aria-label={`Move ${service.name} to group`} value={groupId ?? ""} onChange={(event) => onMove(groupId, service.id, event.target.value || null)} className="max-w-32 bg-transparent text-xs">
             <option value="">Ungrouped</option>
             {groups.map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}
-          </FluentSelect>
+          </Select>
         </div>
       ))}
       {!services.length && <p className="py-2 text-xs text-[var(--fg-dim)]">No services in this group.</p>}

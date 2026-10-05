@@ -1,6 +1,7 @@
 "use client";
 
 import { useId, useState, type ButtonHTMLAttributes } from "react";
+import { Button } from "@/components/ui/button";
 
 type CopyButtonProps = Omit<
   ButtonHTMLAttributes<HTMLButtonElement>,
@@ -49,17 +50,20 @@ export function CopyButton({
 
   return (
     <>
-      <button
+      <Button
         {...buttonProps}
         type="button"
         data-button-guard="off"
         disabled={disabled || pending}
+        loading={pending}
+        variant="ghost"
+        size="sm"
         aria-describedby={error ? errorId : undefined}
         onClick={() => void copy()}
         className={className}
       >
         {pending ? copyingLabel : copied ? copiedLabel : label}
-      </button>
+      </Button>
       {error && (
         <span id={errorId} role="alert" className={errorClassName}>
           {error}

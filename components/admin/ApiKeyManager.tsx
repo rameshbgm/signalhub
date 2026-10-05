@@ -5,6 +5,9 @@ import { fetchWithTimeout } from "@/lib/client-fetch";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { CopyButton } from "@/components/CopyButton";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
 
 const API_SCOPES = [
   "status.read",
@@ -66,7 +69,7 @@ export function ApiKeyCreator({ pages }: { pages: Array<{ id: string; name: stri
   return (
     <div className="space-y-3">
       <form onSubmit={submit} className="space-y-4 border border-[var(--line)] bg-[var(--surface)] p-4">
-        <input
+        <Input
           value={name}
           onChange={(event) => setName(event.target.value)}
           placeholder="Key name (e.g. CI pipeline)"
@@ -78,8 +81,7 @@ export function ApiKeyCreator({ pages }: { pages: Array<{ id: string; name: stri
           <div className="grid gap-2 sm:grid-cols-2">
             {API_SCOPES.map((scope) => (
               <label key={scope} className="flex items-center gap-2 text-xs">
-                <input
-                  type="checkbox"
+                <Checkbox
                   checked={scopes.includes(scope)}
                   onChange={(event) =>
                     setScopes((current) =>
@@ -102,8 +104,7 @@ export function ApiKeyCreator({ pages }: { pages: Array<{ id: string; name: stri
             <div className="grid gap-2 sm:grid-cols-2">
               {pages.map((page) => (
                 <label key={page.id} className="flex items-center gap-2 text-xs">
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     checked={pageIds.includes(page.id)}
                     onChange={(event) =>
                       setPageIds((current) =>
@@ -122,7 +123,7 @@ export function ApiKeyCreator({ pages }: { pages: Array<{ id: string; name: stri
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="text-xs text-[var(--fg-soft)]">
             Expires at (optional)
-            <input
+            <Input
               type="datetime-local"
               value={expiresAt}
               onChange={(event) => setExpiresAt(event.target.value)}
@@ -131,7 +132,7 @@ export function ApiKeyCreator({ pages }: { pages: Array<{ id: string; name: stri
           </label>
           <label className="text-xs text-[var(--fg-soft)]">
             Allowed IPv4/CIDRs (optional, comma-separated)
-            <input
+            <Input
               value={allowedCidrs}
               onChange={(event) => setAllowedCidrs(event.target.value)}
               placeholder="10.0.0.0/8, 203.0.113.10"
@@ -139,9 +140,9 @@ export function ApiKeyCreator({ pages }: { pages: Array<{ id: string; name: stri
             />
           </label>
         </div>
-        <button disabled={pending || scopes.length === 0} className="bg-[var(--cyan)] px-4 py-2 text-sm font-medium text-[var(--on-cyan)] disabled:opacity-50">
+        <Button type="submit" loading={pending} disabled={scopes.length === 0}>
           {pending ? "Generating…" : "Generate Key"}
-        </button>
+        </Button>
       </form>
       {error && <p role="alert" className="text-sm text-[var(--red)]">{error}</p>}
       {secret && (
@@ -201,12 +202,12 @@ export function ApiKeyActions({ id }: { id: string }) {
           <CopyButton value={secret} label="Copy new key" className="text-xs text-[var(--cyan)] disabled:opacity-50" />
         </>
       )}
-      <button disabled={pending} onClick={() => void mutate("rotate")} className="border border-[var(--line)] px-2.5 py-1 text-xs disabled:opacity-50">
+      <Button type="button" variant="outline" size="sm" loading={pending} onClick={() => void mutate("rotate")}>
         {pending ? "Working…" : "Rotate"}
-      </button>
-      <button disabled={pending} onClick={() => void mutate("revoke")} className="border border-[var(--red)]/30 px-2.5 py-1 text-xs font-semibold text-[var(--red)] disabled:opacity-50">
+      </Button>
+      <Button type="button" variant="destructive" size="sm" disabled={pending} onClick={() => void mutate("revoke")}>
         Revoke
-      </button>
+      </Button>
       {error && <span role="alert" className="text-xs text-[var(--red)]">{error}</span>}
     </div>
   );

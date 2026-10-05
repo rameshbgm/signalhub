@@ -1,8 +1,6 @@
 "use client";
 
-import {
-  Tooltip,
-} from "@fluentui/react-components";
+import { Tooltip } from "@/components/ui/tooltip";
 import { COMPONENT_STATUS_COLOR, COMPONENT_STATUS_LABEL, type ComponentStatus, type DailyUptimeBucket } from "@/lib/status";
 import type { UptimeBarSize, UptimeBarStyle, UptimeIconStyle } from "@/lib/page-design";
 
@@ -62,15 +60,7 @@ export function UptimeBar({
               </span>
             );
             return hasInformation ? (
-              <Tooltip
-                key={day.date}
-                relationship="description"
-                positioning="above"
-                withArrow
-                showDelay={150}
-                hideDelay={100}
-                content={{ children: <DayDetails day={day} />, className: "!w-80 !max-w-[calc(100vw-2rem)] !p-5" }}
-              >
+              <Tooltip key={day.date} content={{ children: <DayDetails day={day} />, className: "!w-80 !max-w-[calc(100vw-2rem)] !p-5" }}>
                 {segment}
               </Tooltip>
             ) : <span key={day.date} className="contents">{segment}</span>;

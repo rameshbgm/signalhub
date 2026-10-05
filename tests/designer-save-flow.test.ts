@@ -36,7 +36,7 @@ describe("simple appearance workflow", () => {
 
   it("keeps style and brand assets while preserving the complete design document", () => {
     expect(editor).toContain("designWithThemePreset(design");
-    expect(editor).toContain('aria-label="Brand color"');
+    expect(editor).toContain('aria-labelledby="brand-heading"');
     expect(editor).toContain('kind="LOGO"');
     expect(editor).toContain('kind="FAVICON"');
     expect(editor).toContain('kind="COVER"');

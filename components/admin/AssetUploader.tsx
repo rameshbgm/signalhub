@@ -4,6 +4,10 @@ import { fetchWithTimeout } from "@/lib/client-fetch";
 
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { useRouter } from "next/navigation";
+import { X } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import {
   bannerCropFromDrag,
   coverImageStyle,
@@ -300,10 +304,10 @@ export function AssetUploader({
       {!isCover && (
         <div className="flex aspect-[16/5] w-full items-center justify-center overflow-hidden border border-[var(--line)] bg-[var(--bg)]">
           {preview ? (
-            <button type="button" onClick={() => setPreviewOpen(true)} aria-label={`Preview ${label.toLowerCase()}`} title="Preview image" className="h-full w-full rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--cyan)]">
+            <Button type="button" variant="ghost" onClick={() => setPreviewOpen(true)} aria-label={`Preview ${label.toLowerCase()}`} title="Preview image" className="h-full w-full rounded-md p-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--cyan)]">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={preview} alt={`${label} preview`} className="h-full w-full object-contain p-4 transition-opacity hover:opacity-80" />
-            </button>
+            </Button>
           ) : (
             <span className="text-xs text-[var(--fg-dim)]">No image</span>
           )}
@@ -395,7 +399,7 @@ export function AssetUploader({
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                   <label className="text-xs text-[var(--fg-soft)]">
                     Image display
-                    <select
+                    <Select
                       value={coverFit}
                       onChange={(event) => {
                         const fit = event.target.value as CoverImageFit;
@@ -409,17 +413,19 @@ export function AssetUploader({
                     >
                       <option value="CONTAIN">Show full image</option>
                       <option value="COVER">Fill frame (crop)</option>
-                    </select>
+                    </Select>
                   </label>
                   {coverFit === "COVER" && imageDimensions.width > 0 && (
-                    <button
+                    <Button
                       type="button"
                       disabled={busy}
                       onClick={() => setCoverCrop(defaultBannerCrop(imageDimensions.width, imageDimensions.height))}
-                      className="w-fit border border-[var(--line)] px-3 py-2 text-xs font-semibold text-[var(--fg-soft)] disabled:opacity-50"
+                      variant="outline"
+                      size="sm"
+                      className="w-fit text-xs"
                     >
                       Reset crop
-                    </button>
+                    </Button>
                   )}
                 </div>
                 <p className="text-xs text-[var(--fg-dim)]">
@@ -436,11 +442,11 @@ export function AssetUploader({
           </div>
         )
       )}
-      <input
+      <Input
         ref={inputRef}
         type="file"
         accept={kind === "FAVICON" ? "image/png,image/webp,image/x-icon" : "image/png,image/jpeg,image/webp,image/avif"}
-        className="block w-full text-xs text-[var(--fg-soft)] file:mr-3 file:border file:border-[var(--line)] file:bg-[var(--surface-raised)] file:px-3 file:py-2 file:text-xs file:text-[var(--fg)]"
+        className="h-auto border-dashed p-2 text-xs file:mr-3 file:border file:border-[var(--line)] file:bg-[var(--surface-raised)] file:px-3 file:py-2 file:text-xs file:text-[var(--fg)]"
         disabled={busy}
         onChange={(event) => {
           const file = event.target.files?.[0];
@@ -454,18 +460,20 @@ export function AssetUploader({
       {preview && (
         <div className="flex flex-wrap gap-2">
           {isCover && !simple && (
-            <button type="button" disabled={busy} onClick={() => void saveFraming()} className="border border-[var(--cyan)] px-3 py-1.5 text-xs font-semibold text-[var(--cyan)] disabled:opacity-50">
+            <Button type="button" loading={savingFraming} disabled={loading} variant="outline" size="sm" onClick={() => void saveFraming()} className="border-[var(--cyan)] text-[var(--cyan)]">
               {savingFraming ? "Saving framing…" : "Save cover framing"}
-            </button>
+            </Button>
           )}
-          <button
+          <Button
             type="button"
+            variant="destructive"
+            size="sm"
             disabled={busy}
             onClick={() => void remove()}
-            className="border border-[var(--red)]/30 px-3 py-1.5 text-xs font-semibold text-[var(--red)] disabled:opacity-50"
+            className="text-xs"
           >
             Remove image
-          </button>
+          </Button>
         </div>
       )}
       {message && (
@@ -485,7 +493,7 @@ export function AssetUploader({
           onClick={() => setPreviewOpen(false)}
         >
           <div className="relative max-h-full max-w-5xl rounded-xl border border-white/20 bg-[var(--surface)] p-3 shadow-2xl" onClick={(event) => event.stopPropagation()}>
-            <button type="button" onClick={() => setPreviewOpen(false)} aria-label="Close image preview" title="Close preview" className="absolute right-3 top-3 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-black/65 text-lg text-white hover:bg-black/80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">×</button>
+            <Button type="button" variant="ghost" size="icon" onClick={() => setPreviewOpen(false)} aria-label="Close image preview" title="Close preview" className="absolute right-3 top-3 z-10 h-9 w-9 rounded-full bg-black/65 text-lg text-white hover:bg-black/80 hover:text-white focus-visible:outline-white"><X aria-hidden size={18} /></Button>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={preview} alt={`${label} preview`} className={`max-h-[85vh] max-w-[min(90vw,72rem)] rounded-lg object-contain ${isCover ? "w-full" : "h-auto"}`} />
           </div>

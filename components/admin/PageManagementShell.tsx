@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import type { ReactNode } from "react";
+import { Select } from "@/components/ui/select";
 
 type ManagedPage = { id: string; name: string; slug: string; isHub: boolean; type: string; setupCompleted: boolean; publicVisible: boolean; publicPath: string; parentHub: { id: string; name: string } | null; canPublish: boolean };
 const sections = [{ key: "overview", label: "Overview", suffix: "" }, { key: "content", label: "Content", suffix: "/content" }, { key: "appearance", label: "Appearance", suffix: "/appearance" }, { key: "access", label: "Access", suffix: "/access" }, { key: "notifications", label: "Notifications", suffix: "/notifications" }, { key: "settings", label: "Settings", suffix: "/settings" }] as const;
@@ -39,9 +40,9 @@ export function PageManagementShell({ page, actions, children }: { page: Managed
       <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <label className="grid gap-1.5 text-sm font-medium text-[var(--fg-soft)] md:hidden">
           Page section
-          <select value={`${base}${current.suffix}`} onChange={(event) => router.push(event.target.value)} className="rounded-lg border border-[var(--line)] bg-[var(--surface)] px-3 py-2.5 text-sm text-[var(--fg)]">
+          <Select aria-label="Page section" value={`${base}${current.suffix}`} onChange={(event) => router.push(event.target.value)} className="rounded-lg border border-[var(--line)] bg-[var(--surface)] px-3 py-2.5 text-sm text-[var(--fg)]">
             {visibleSections.map((section) => <option key={section.key} value={`${base}${section.suffix}`}>{sectionLabel(section.key, section.label)}</option>)}
-          </select>
+          </Select>
         </label>
 
         <nav aria-label="Page management" className="hidden min-w-0 flex-1 border-b border-[var(--line)] md:block">

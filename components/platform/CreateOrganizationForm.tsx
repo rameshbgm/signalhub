@@ -1,6 +1,8 @@
 "use client";
 
 import { useActionState } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   createOrganization,
   type CreateOrganizationState,
@@ -30,39 +32,39 @@ export function CreateOrganizationForm() {
         <label htmlFor="organization-name" className="text-xs font-semibold text-[var(--fg)]">
           Organization name
         </label>
-        <input
+        <Input
           id="organization-name"
           name="name"
           required
           maxLength={120}
-          className="mt-1 w-full border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm"
+          className="mt-1"
         />
       </div>
       <div>
         <label htmlFor="organization-slug" className="text-xs font-semibold text-[var(--fg)]">
           Slug
         </label>
-        <input
+        <Input
           id="organization-slug"
           name="slug"
           maxLength={80}
           placeholder="generated from name"
           pattern="[a-z0-9]+(?:-[a-z0-9]+)*"
-          className="mt-1 w-full border border-[var(--line)] bg-[var(--bg)] px-3 py-2 font-mono text-sm"
+          className="mt-1 font-mono"
         />
       </div>
       <div className="sm:col-span-2">
         <label htmlFor="organization-reason" className="text-xs font-semibold text-[var(--fg)]">
           Provisioning reason
         </label>
-        <input
+        <Input
           id="organization-reason"
           name="reason"
           required
           minLength={10}
           maxLength={500}
           placeholder="Customer request or internal ticket"
-          className="mt-1 w-full border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm"
+          className="mt-1"
         />
       </div>
       {state.error && (
@@ -71,12 +73,13 @@ export function CreateOrganizationForm() {
         </p>
       )}
       <div className="sm:col-span-2">
-        <button
+        <Button
+          type="submit"
           disabled={pending}
-          className="bg-[var(--cyan)] px-4 py-2 text-sm font-semibold text-[var(--on-cyan)] disabled:opacity-50"
+          loading={pending}
         >
           {pending ? "Creating…" : "Create organization"}
-        </button>
+        </Button>
       </div>
     </form>
   );

@@ -2,6 +2,7 @@ import { requireSession } from "@/lib/require-session";
 import { database } from "@/lib/postgres/client";
 import { PageSelect } from "@/components/admin/PageSelect";
 import { getScopedPages } from "@/lib/admin-guard";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 export default async function AnalyticsPage({
   searchParams,
@@ -49,19 +50,19 @@ export default async function AnalyticsPage({
           </div>
         ))}
       </div>
-      <div className="overflow-x-auto border border-[var(--line)] bg-[var(--surface)]">
-        <table className="w-full text-left text-sm">
-          <thead className="border-b border-[var(--line)] text-xs text-[var(--fg-dim)]">
-            <tr><th className="p-3">Date</th><th>Views</th><th>Incidents</th><th>Starts</th><th>Completed</th></tr>
-          </thead>
-          <tbody>
+      <div className="border border-[var(--line)] bg-[var(--surface)]">
+        <Table className="text-left text-sm">
+          <TableHeader className="text-xs text-[var(--fg-dim)]">
+            <TableRow><TableHead className="p-3">Date</TableHead><TableHead>Views</TableHead><TableHead>Incidents</TableHead><TableHead>Starts</TableHead><TableHead>Completed</TableHead></TableRow>
+          </TableHeader>
+          <TableBody>
             {rows.map((row) => (
-              <tr key={row.id} className="border-b border-[var(--line)] last:border-0">
-                <td className="p-3 font-mono">{row.date}</td><td>{row.views ?? 0}</td><td>{row.incidentViews ?? 0}</td><td>{row.subscriptionStarts ?? 0}</td><td>{row.subscriptionCompletions ?? 0}</td>
-              </tr>
+              <TableRow key={row.id} className="border-b border-[var(--line)] last:border-0">
+                <TableCell className="p-3 font-mono">{row.date}</TableCell><TableCell>{row.views ?? 0}</TableCell><TableCell>{row.incidentViews ?? 0}</TableCell><TableCell>{row.subscriptionStarts ?? 0}</TableCell><TableCell>{row.subscriptionCompletions ?? 0}</TableCell>
+              </TableRow>
             ))}
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
       </div>
     </div>
   );

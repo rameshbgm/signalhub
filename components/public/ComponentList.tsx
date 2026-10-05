@@ -1,15 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import {
-  Accordion,
-  AccordionHeader,
-  AccordionItem,
-  AccordionPanel,
-  Button,
-  Card,
-  Input,
-} from "@fluentui/react-components";
+import { Accordion, AccordionHeader, AccordionItem, AccordionPanel } from "@/components/ui/accordion";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Search } from "lucide-react";
 import {
   COMPONENT_STATUS_COLOR,
   COMPONENT_STATUS_LABEL,
@@ -127,8 +123,7 @@ function ConfiguredComponentItem({
     return (
       <Card
         data-component-row
-        appearance="outline"
-        className="min-w-0 !gap-0 !rounded-full !border-[var(--line)] !bg-[var(--surface)] !p-0"
+        className="min-w-0 !gap-0 !rounded-[var(--page-radius)] !border-[var(--line)] !bg-[var(--surface)] !p-0"
       >
         <div className="flex min-h-14 min-w-0 items-center gap-3 px-4">
           <span
@@ -140,9 +135,8 @@ function ConfiguredComponentItem({
           </span>
           <span className="min-w-0 flex-1 truncate text-sm font-medium text-[var(--fg)]">{c.name}</span>
           <Button
-            appearance="subtle"
-            shape="circular"
-            size="small"
+            variant="ghost"
+            size="icon"
             aria-label={`${expanded ? "Hide" : "Show"} details for ${c.name}`}
             aria-expanded={expanded}
             onClick={() => setExpanded((value) => !value)}
@@ -252,8 +246,7 @@ export function ComponentList({
             return (
               <Button
                 key={item.value}
-                appearance="subtle"
-                shape="square"
+                variant="ghost"
                 aria-pressed={selected}
                 onClick={() => setStatusFilter(item.value)}
                 className="!h-auto !min-h-24 !w-full !rounded-[var(--page-radius)] !p-4"
@@ -276,15 +269,10 @@ export function ComponentList({
       {settings.searchEnabled && (
         <label className="mb-5 block">
           <span className="sr-only">Search services</span>
-          <Input
-            type="search"
-            size="large"
-            value={query}
-            onChange={(_event, data) => setQuery(data.value)}
-            placeholder="Search services"
-            contentBefore={<span aria-hidden="true">⌕</span>}
-            className="!w-full !rounded-[var(--page-radius)] !border-[var(--line)] !bg-[var(--surface)]"
-          />
+          <span className="relative block">
+            <Search aria-hidden size={17} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--fg-dim)]" />
+            <Input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search services" className="!w-full !rounded-[var(--page-radius)] !border-[var(--line)] !bg-[var(--surface)] !pl-9" />
+          </span>
         </label>
       )}
       {settings.showLegend && (
@@ -305,14 +293,12 @@ export function ComponentList({
         )}
         {configuredGroups.length > 0 && settings.groupStyle === "ACCORDION" && (
           <Accordion
-            multiple
-            collapsible
             defaultOpenItems={configuredGroups.filter((group) => !group.collapsed).map((group) => group.id)}
             className="space-y-4"
           >
             {configuredGroups.map((group) => (
               <AccordionItem key={group.id} value={group.id} className="public-service-group page-panel overflow-hidden border border-[var(--line)] bg-[var(--surface)]">
-                <AccordionHeader expandIconPosition="end" size="large" className="px-3">
+                <AccordionHeader className="px-3">
                   <span className="flex w-full items-center justify-between gap-4 pr-2 text-left">
                     <span className="font-semibold text-[var(--fg)]">{group.name}</span>
                     <span className="whitespace-nowrap text-sm font-normal text-[var(--fg-dim)]">

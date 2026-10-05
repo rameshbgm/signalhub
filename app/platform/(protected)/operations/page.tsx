@@ -12,6 +12,8 @@ import { retryNotificationDelivery, updatePlatformRetention } from "./actions";
 import { PlatformActionForm } from "@/components/platform/PlatformActionForm";
 import { PlatformSubmitButton } from "@/components/platform/PlatformSubmitButton";
 import { effectiveRetention, RETENTION_BOUNDS } from "@/lib/retention";
+import { Input } from "@/components/ui/input";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 export default async function PlatformOperationsPage() {
   const actor = await requirePlatformPageCapability("operations.read");
@@ -113,12 +115,12 @@ export default async function PlatformOperationsPage() {
                     successMessage="Platform job queued for retry."
                     className="flex flex-wrap gap-2"
                   >
-                    <input
+                    <Input
                       name="reason"
                       minLength={10}
                       required
                       placeholder="Retry reason"
-                      className="w-40 border border-[var(--line)] bg-[var(--bg)] px-2 py-1.5 text-xs"
+                      className="h-8 w-40 px-2 py-1.5 text-xs"
                     />
                     <PlatformSubmitButton pendingLabel="Queueing…" className="border border-[var(--amber)]/40 px-3 py-1.5 text-xs font-semibold text-[var(--amber)]">
                       Retry
@@ -156,12 +158,12 @@ export default async function PlatformOperationsPage() {
                     successMessage="Notification delivery queued for retry."
                     className="flex flex-wrap gap-2"
                   >
-                    <input
+                    <Input
                       name="reason"
                       minLength={10}
                       required
                       placeholder="Retry reason"
-                      className="w-40 border border-[var(--line)] bg-[var(--bg)] px-2 py-1.5 text-xs"
+                      className="h-8 w-40 px-2 py-1.5 text-xs"
                     />
                     <PlatformSubmitButton pendingLabel="Queueing…" className="border border-[var(--amber)]/40 px-3 py-1.5 text-xs font-semibold text-[var(--amber)]">Retry</PlatformSubmitButton>
                   </PlatformActionForm>
@@ -175,26 +177,26 @@ export default async function PlatformOperationsPage() {
 
       <section className="space-y-3">
         <h2 className="font-mono text-lg font-semibold text-[var(--fg)]">Worker heartbeats</h2>
-        <div className="overflow-x-auto border border-[var(--line)] bg-[var(--surface)]">
-          <table className="w-full min-w-[650px] text-left text-xs">
-            <thead className="border-b border-[var(--line)] bg-[var(--bg)] font-mono text-[10px] uppercase tracking-wide text-[var(--fg-dim)]">
-              <tr><th className="px-4 py-3">Worker</th><th className="px-4 py-3">State</th><th className="px-4 py-3">Last heartbeat</th><th className="px-4 py-3">Loop / error</th></tr>
-            </thead>
-            <tbody className="divide-y divide-[var(--line)]">
+        <div className="border border-[var(--line)] bg-[var(--surface)]">
+          <Table className="min-w-[650px] text-left text-xs">
+            <TableHeader className="bg-[var(--bg)] font-mono text-[10px] uppercase tracking-wide text-[var(--fg-dim)]">
+              <TableRow><TableHead className="px-4 py-3">Worker</TableHead><TableHead className="px-4 py-3">State</TableHead><TableHead className="px-4 py-3">Last heartbeat</TableHead><TableHead className="px-4 py-3">Loop / error</TableHead></TableRow>
+            </TableHeader>
+            <TableBody className="divide-y divide-[var(--line)]">
               {workers.map((worker) => {
                 const fresh = worker.lastSeenAt > new Date(renderedAt - 30_000);
                 return (
-                  <tr key={worker.id}>
-                    <td className="px-4 py-3 font-mono text-[var(--fg)]">{worker.workerId}</td>
-                    <td className={`px-4 py-3 font-semibold ${fresh && worker.status === "READY" ? "text-[var(--green)]" : "text-[var(--red)]"}`}>{worker.status}</td>
-                    <td className="px-4 py-3 text-[var(--fg-soft)]">{worker.lastSeenAt.toLocaleString()}</td>
-                    <td className="px-4 py-3 text-[var(--fg-soft)]">{worker.lastError ?? (worker.lastLoopAt ? `loop ${worker.lastLoopAt.toLocaleString()}` : "No loop telemetry yet")}</td>
-                  </tr>
+                  <TableRow key={worker.id}>
+                    <TableCell className="px-4 py-3 font-mono text-[var(--fg)]">{worker.workerId}</TableCell>
+                    <TableCell className={`px-4 py-3 font-semibold ${fresh && worker.status === "READY" ? "text-[var(--green)]" : "text-[var(--red)]"}`}>{worker.status}</TableCell>
+                    <TableCell className="px-4 py-3 text-[var(--fg-soft)]">{worker.lastSeenAt.toLocaleString()}</TableCell>
+                    <TableCell className="px-4 py-3 text-[var(--fg-soft)]">{worker.lastError ?? (worker.lastLoopAt ? `loop ${worker.lastLoopAt.toLocaleString()}` : "No loop telemetry yet")}</TableCell>
+                  </TableRow>
                 );
               })}
-              {workers.length === 0 && <tr><td colSpan={4} className="px-4 py-6 text-center text-[var(--fg-dim)]">No worker heartbeat has been recorded.</td></tr>}
-            </tbody>
-          </table>
+              {workers.length === 0 && <TableRow><TableCell colSpan={4} className="px-4 py-6 text-center text-[var(--fg-dim)]">No worker heartbeat has been recorded.</TableCell></TableRow>}
+            </TableBody>
+          </Table>
         </div>
       </section>
 
@@ -212,7 +214,7 @@ export default async function PlatformOperationsPage() {
             {Object.entries(RETENTION_BOUNDS).map(([key, bounds]) => (
               <label key={key} className="text-[10px] text-[var(--fg-soft)]">
                 {key.replace(/([A-Z])/g, " $1")}
-                <input type="number" name={key} min={bounds.min} max={bounds.max} defaultValue={platformRetention[key as keyof typeof platformRetention]} className="mt-1 w-full border border-[var(--line)] bg-[var(--bg)] px-2 py-1.5 text-xs" />
+                <Input type="number" name={key} min={bounds.min} max={bounds.max} defaultValue={platformRetention[key as keyof typeof platformRetention]} className="mt-1 h-8 px-2 py-1.5 text-xs" />
               </label>
             ))}
             <PlatformSubmitButton pendingLabel="Saving…" className="bg-[var(--cyan)] px-3 py-2 text-xs font-semibold text-[var(--on-cyan)] sm:col-span-2 lg:col-span-5">Save defaults</PlatformSubmitButton>

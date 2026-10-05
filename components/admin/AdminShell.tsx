@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
+import { Menu, X } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 export function AdminShell({ sidebar, children }: { sidebar: ReactNode; children: ReactNode }) {
   const pathname = usePathname();
@@ -33,23 +35,25 @@ export function AdminShell({ sidebar, children }: { sidebar: ReactNode; children
             <Link href="/organization" className="flex items-center gap-2 font-mono text-sm font-semibold tracking-tight text-[var(--fg)]">
               <span className="inline-block h-2 w-2 bg-[var(--cyan)]" aria-hidden /> SignalHub
             </Link>
-            <button
+            <Button
               type="button"
               aria-controls="portal-navigation"
               aria-expanded={navigationOpen}
               aria-label={navigationOpen ? "Close navigation" : "Open navigation"}
-              className="inline-flex h-10 items-center gap-2 border border-[var(--line)] px-3 font-mono text-xs font-semibold text-[var(--fg)] hover:bg-[var(--hover-overlay)]"
+              variant="outline"
+              className="h-10 rounded-none px-3 font-mono text-xs"
               onClick={() => setNavigationPath((current) => current === pathname ? null : pathname)}
             >
-              <span aria-hidden className="text-base leading-none">{navigationOpen ? "×" : "≡"}</span>
+              {navigationOpen ? <X aria-hidden size={17} /> : <Menu aria-hidden size={17} />}
               Menu
-            </button>
+            </Button>
           </header>
           <div className={`${navigationOpen ? "fixed" : "hidden"} inset-0 z-50 lg:static lg:inset-auto lg:block lg:shrink-0`}>
-            <button
+            <Button
               type="button"
               aria-label="Close navigation"
-              className="absolute inset-0 bg-black/45 backdrop-blur-[1px] lg:hidden"
+              variant="ghost"
+              className="absolute inset-0 h-auto w-auto rounded-none bg-black/45 p-0 backdrop-blur-[1px] lg:hidden"
               onClick={() => setNavigationPath(null)}
             />
             <div
@@ -58,14 +62,16 @@ export function AdminShell({ sidebar, children }: { sidebar: ReactNode; children
             >
               <div className="flex h-14 items-center justify-between border-b border-[var(--line)] px-4 lg:hidden">
                 <span className="font-mono text-sm font-semibold">Navigation</span>
-                <button
+                <Button
                   type="button"
                   aria-label="Close navigation"
-                  className="flex h-10 w-10 items-center justify-center border border-[var(--line)] text-xl leading-none"
+                  variant="outline"
+                  size="icon"
+                  className="h-10 w-10 rounded-none text-xl leading-none"
                   onClick={() => setNavigationPath(null)}
                 >
-                  ×
-                </button>
+                  <X aria-hidden size={18} />
+                </Button>
               </div>
               <div className="h-[calc(100%-3.5rem)] overflow-y-auto lg:contents">{sidebar}</div>
             </div>

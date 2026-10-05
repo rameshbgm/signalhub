@@ -4,6 +4,8 @@ import { fetchWithTimeout } from "@/lib/client-fetch";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 export default function ChangeTemporaryPasswordPage() {
   const router = useRouter();
@@ -55,48 +57,45 @@ export default function ChangeTemporaryPasswordPage() {
             Replace the temporary password and add an email used only for account and operational communication.
           </p>
         </div>
-        <input
+        <Input
           type="email"
           value={email}
           onChange={(event) => setEmail(event.target.value)}
           placeholder="Communication email"
           autoComplete="email"
-          className="w-full border border-[var(--line)] bg-[var(--bg)] px-3 py-2.5 text-sm outline-none focus:border-[var(--cyan)]"
+          className="px-3 py-2.5"
           required
         />
-        <input
+        <Input
           type="password"
           value={currentPassword}
           onChange={(event) => setCurrentPassword(event.target.value)}
           placeholder="Temporary password"
-          className="w-full border border-[var(--line)] bg-[var(--bg)] px-3 py-2.5 text-sm outline-none focus:border-[var(--cyan)]"
+          className="px-3 py-2.5"
           required
         />
-        <input
+        <Input
           type="password"
           value={newPassword}
           onChange={(event) => setNewPassword(event.target.value)}
           placeholder="New password (14+ characters)"
           minLength={14}
-          className="w-full border border-[var(--line)] bg-[var(--bg)] px-3 py-2.5 text-sm outline-none focus:border-[var(--cyan)]"
+          className="px-3 py-2.5"
           required
         />
-        <input
+        <Input
           type="password"
           value={confirm}
           onChange={(event) => setConfirm(event.target.value)}
           placeholder="Confirm new password"
           minLength={14}
-          className="w-full border border-[var(--line)] bg-[var(--bg)] px-3 py-2.5 text-sm outline-none focus:border-[var(--cyan)]"
+          className="px-3 py-2.5"
           required
         />
         {error && <p role="alert" className="text-sm text-[var(--red)]">{error}</p>}
-        <button
-          disabled={loading}
-          className="w-full bg-[var(--cyan)] px-4 py-2.5 text-sm font-semibold text-[var(--on-cyan)] disabled:opacity-50"
-        >
+        <Button type="submit" loading={loading} className="w-full px-4 py-2.5">
           {loading ? "Saving…" : "Save account and continue"}
-        </button>
+        </Button>
       </form>
     </main>
   );

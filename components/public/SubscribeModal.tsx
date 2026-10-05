@@ -3,7 +3,11 @@
 import { fetchWithTimeout } from "@/lib/client-fetch";
 
 import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { Bell, X } from "lucide-react";
 import { recordPublicEvent } from "@/components/public/PublicAnalytics";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
 
 type Component = { id: string; name: string };
 
@@ -82,33 +86,32 @@ export function SubscribeModal({
 
   return (
     <>
-      <button
+      <Button
         ref={triggerRef}
+        type="button"
         onClick={() => {
           setOpen(true);
           recordPublicEvent(pageSlug, "SUBSCRIPTION_START");
         }}
-        className="public-subscribe-trigger inline-flex items-center gap-2 px-4 py-2.5 text-[var(--bg)] text-sm font-medium hover:opacity-90 transition-opacity"
+        className="public-subscribe-trigger px-4 py-2.5 text-[var(--bg)] font-medium hover:opacity-90"
         style={{ backgroundColor: brandColor }}
         aria-haspopup="dialog"
       >
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
-          <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
+        <Bell aria-hidden size={16} />
         Subscribe to Updates
-      </button>
+      </Button>
       {open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onMouseDown={(event) => event.target === event.currentTarget && close()}>
           <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="subscribe-title" className="public-subscribe-dialog w-full max-w-md border border-[var(--line-bright)] bg-[var(--surface)] p-6 shadow-xl">
             <div className="mb-5 flex items-center justify-between">
               <h3 id="subscribe-title" className="font-mono text-lg font-semibold text-[var(--fg)]">Get notified</h3>
-              <button onClick={close} className="p-1 text-[var(--fg-dim)] hover:bg-[var(--surface-raised)] hover:text-[var(--fg)]" aria-label="Close subscription dialog">×</button>
+              <Button type="button" variant="ghost" size="icon" onClick={close} className="h-9 w-9 text-[var(--fg-dim)] hover:text-[var(--fg)]" aria-label="Close subscription dialog"><X aria-hidden size={17} /></Button>
             </div>
             <div role="tablist" className="mb-5 flex gap-1 border-b border-[var(--line)] text-sm">
-              <button role="tab" aria-selected={tab === "email"} onClick={() => setTab("email")} className={`border-b-2 px-3 py-2 ${tab === "email" ? "font-medium" : "border-transparent text-[var(--fg-soft)]"}`} style={tab === "email" ? { borderColor: brandColor, color: brandColor } : undefined}>Email</button>
-              <button role="tab" aria-selected={tab === "sms"} onClick={() => setTab("sms")} className={`border-b-2 px-3 py-2 ${tab === "sms" ? "font-medium" : "border-transparent text-[var(--fg-soft)]"}`} style={tab === "sms" ? { borderColor: brandColor, color: brandColor } : undefined}>SMS</button>
+              <Button type="button" role="tab" variant="ghost" size="sm" aria-selected={tab === "email"} onClick={() => setTab("email")} className={`rounded-none border-b-2 px-3 py-2 ${tab === "email" ? "font-medium" : "border-transparent text-[var(--fg-soft)]"}`} style={tab === "email" ? { borderColor: brandColor, color: brandColor } : undefined}>Email</Button>
+              <Button type="button" role="tab" variant="ghost" size="sm" aria-selected={tab === "sms"} onClick={() => setTab("sms")} className={`rounded-none border-b-2 px-3 py-2 ${tab === "sms" ? "font-medium" : "border-transparent text-[var(--fg-soft)]"}`} style={tab === "sms" ? { borderColor: brandColor, color: brandColor } : undefined}>SMS</Button>
               {feedsEnabled && (
-                <button role="tab" aria-selected={tab === "feed"} onClick={() => setTab("feed")} className={`border-b-2 px-3 py-2 ${tab === "feed" ? "font-medium" : "border-transparent text-[var(--fg-soft)]"}`} style={tab === "feed" ? { borderColor: brandColor, color: brandColor } : undefined}>RSS / Atom</button>
+                <Button type="button" role="tab" variant="ghost" size="sm" aria-selected={tab === "feed"} onClick={() => setTab("feed")} className={`rounded-none border-b-2 px-3 py-2 ${tab === "feed" ? "font-medium" : "border-transparent text-[var(--fg-soft)]"}`} style={tab === "feed" ? { borderColor: brandColor, color: brandColor } : undefined}>RSS / Atom</Button>
               )}
             </div>
             {tab === "email" && (
@@ -156,7 +159,7 @@ function ComponentPicker({
       <div className="max-h-28 space-y-1.5 overflow-y-auto border border-[var(--line)] bg-[var(--bg)] p-2">
         {components.map((component) => (
           <label key={component.id} className="flex cursor-pointer items-center gap-2 text-sm text-[var(--fg-soft)]">
-            <input
+            <Checkbox
               type="checkbox"
               checked={selected.includes(component.id)}
               onChange={(event) =>
@@ -233,16 +236,16 @@ function ContactTab({
       <div>
         <p className="mb-2 text-sm text-[var(--fg-soft)]">Enter the six-digit code sent to {contact}.</p>
         <label className="sr-only" htmlFor="subscription-code">Verification code</label>
-        <input id="subscription-code" inputMode="numeric" autoComplete="one-time-code" value={code} onChange={(event) => setCode(event.target.value)} placeholder="123456" className={`${inputClass} mb-2`} />
+        <Input id="subscription-code" inputMode="numeric" autoComplete="one-time-code" value={code} onChange={(event) => setCode(event.target.value)} placeholder="123456" className={`${inputClass} mb-2`} />
         {message && <p role="alert" className="mb-2 text-xs text-[var(--red)]">{message}</p>}
-        <button disabled={loading || !/^\d{6}$/.test(code)} onClick={async () => (await post("/api/v1/subscribe/verify-otp", { pageSlug, channel, contact, code })) && setStage("done")} className="w-full py-2.5 text-sm font-medium text-[var(--bg)] disabled:opacity-50" style={{ backgroundColor: brandColor }}>{loading ? "Verifying…" : "Verify & Subscribe"}</button>
+        <Button type="button" loading={loading} disabled={!/^\d{6}$/.test(code)} onClick={async () => (await post("/api/v1/subscribe/verify-otp", { pageSlug, channel, contact, code })) && setStage("done")} className="w-full py-2.5 font-medium text-[var(--bg)]" style={{ backgroundColor: brandColor }}>{loading ? "Verifying…" : "Verify & Subscribe"}</Button>
       </div>
     );
   }
   return (
     <div>
       <label className="sr-only" htmlFor={`subscription-${channel.toLowerCase()}`}>{isEmail ? "Email address" : "Phone number"}</label>
-      <input
+      <Input
         id={`subscription-${channel.toLowerCase()}`}
         value={contact}
         onChange={(event) => setContact(event.target.value)}
@@ -254,7 +257,7 @@ function ContactTab({
       />
       <ComponentPicker components={components} selected={selected} onChange={setSelected} />
       {message && <p role="alert" className="mb-2 text-xs text-[var(--red)]">{message}</p>}
-      <button disabled={loading || !contact} onClick={async () => (await post("/api/v1/subscribe/request-otp", { pageSlug, channel, contact, componentIds: selected })) && setStage("otp")} className="w-full py-2.5 text-sm font-medium text-[var(--bg)] disabled:opacity-50" style={{ backgroundColor: brandColor }}>{loading ? "Sending…" : "Send verification code"}</button>
+      <Button type="button" loading={loading} disabled={!contact} onClick={async () => (await post("/api/v1/subscribe/request-otp", { pageSlug, channel, contact, componentIds: selected })) && setStage("otp")} className="w-full py-2.5 font-medium text-[var(--bg)]" style={{ backgroundColor: brandColor }}>{loading ? "Sending…" : "Send verification code"}</Button>
     </div>
   );
 }

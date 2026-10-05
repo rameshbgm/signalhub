@@ -4,6 +4,7 @@ import { fetchWithTimeout } from "@/lib/client-fetch";
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
 
 type QuickAccount = {
   key: string;
@@ -68,12 +69,14 @@ export function QuickLogin() {
       </div>
       <div className="mt-2 grid gap-2">
         {accounts.map((account) => (
-          <button
+          <Button
             key={account.key}
             type="button"
             onClick={() => login(account)}
             disabled={busy !== null}
-            className="flex items-center justify-between gap-3 border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-left hover:border-[var(--cyan)] disabled:opacity-50"
+            variant="outline"
+            loading={busy === account.key}
+            className="h-auto min-h-10 justify-between py-2 text-left"
           >
             <span className="min-w-0">
               <span className="block text-xs font-semibold text-[var(--fg)]">
@@ -86,7 +89,7 @@ export function QuickLogin() {
             <span className="shrink-0 font-mono text-[10px] font-semibold text-[var(--cyan)]">
               {account.role.replaceAll("_", " ")}
             </span>
-          </button>
+          </Button>
         ))}
       </div>
       {error && <p role="alert" className="mt-2 text-xs text-[var(--red)]">{error}</p>}

@@ -5,6 +5,8 @@ import { fetchWithTimeout } from "@/lib/client-fetch";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { CopyButton } from "@/components/CopyButton";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 type Endpoint = {
   id: string;
@@ -91,18 +93,17 @@ export function WebhookEndpointManager({
     <div className="space-y-3">
       <form onSubmit={create} className="flex flex-col gap-2 sm:flex-row">
         <label htmlFor="webhook-url" className="sr-only">HTTPS webhook URL</label>
-        <input
+        <Input
           id="webhook-url"
           value={url}
           onChange={(event) => setUrl(event.target.value)}
           type="url"
           placeholder="https://example.com/webhook"
-          className="flex-1 border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--fg)] placeholder:text-[var(--fg-dim)] focus:border-[var(--cyan)] focus:outline-none"
           required
         />
-        <button disabled={Boolean(pending)} className="border border-[var(--line-bright)] bg-[var(--surface-raised)] px-4 py-2 text-sm font-medium text-[var(--fg)] disabled:opacity-50">
+        <Button type="submit" variant="secondary" loading={pending === "create"}>
           {pending === "create" ? "Verifying…" : "Verify & Add"}
-        </button>
+        </Button>
       </form>
       {error && <p role="alert" className="text-sm text-[var(--red)]">{error}</p>}
       {secret && (
@@ -124,8 +125,8 @@ export function WebhookEndpointManager({
               <code className="text-xs text-[var(--fg-soft)]">signature: {endpoint.secretLabel}</code>
             </div>
             <div className="flex gap-2">
-              <button disabled={Boolean(pending)} onClick={() => mutate(endpoint.id, "rotate")} className="border border-[var(--line)] px-2.5 py-1 text-xs disabled:opacity-50">Rotate</button>
-              <button disabled={Boolean(pending)} onClick={() => mutate(endpoint.id, "delete")} className="border border-[var(--red)]/30 px-2.5 py-1 text-xs font-semibold text-[var(--red)] disabled:opacity-50">Delete</button>
+              <Button type="button" variant="outline" size="sm" disabled={Boolean(pending)} onClick={() => mutate(endpoint.id, "rotate")}>Rotate</Button>
+              <Button type="button" variant="destructive" size="sm" disabled={Boolean(pending)} onClick={() => mutate(endpoint.id, "delete")}>Delete</Button>
             </div>
           </div>
         ))}

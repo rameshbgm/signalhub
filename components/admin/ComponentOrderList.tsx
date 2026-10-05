@@ -1,7 +1,7 @@
 "use client";
 
 import { Children, useMemo, useState, useTransition, type ReactNode } from "react";
-import { Button } from "@fluentui/react-components";
+import { Button } from "@/components/ui/button";
 import {
   DndContext,
   KeyboardSensor,
@@ -94,15 +94,14 @@ function SortableComponent({ id, name, children }: { id: string; name: string; c
       className={`relative ${isDragging ? "z-10 opacity-70 shadow-xl" : ""}`}
     >
       <Button
-        appearance="subtle"
-        shape="square"
-        size="small"
+        variant="ghost"
+        size="icon"
         className="!absolute !left-3 !top-3 !z-10 cursor-grab active:cursor-grabbing"
         aria-label={`Drag to reorder ${name}`}
         {...attributes}
         {...listeners}
       >
-        ⠿
+        <span aria-hidden className="text-lg leading-none">⋮⋮</span>
       </Button>
       {children}
     </div>

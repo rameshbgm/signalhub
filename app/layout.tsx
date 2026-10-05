@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { FluentAppProvider } from "@/components/FluentAppProvider";
+import { AppProvider } from "@/components/AppProvider";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -45,7 +45,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className="bg-[var(--bg)] text-[var(--fg)] antialiased">
-        <FluentAppProvider>{children}</FluentAppProvider>
+        <AppProvider>{children}</AppProvider>
       </body>
     </html>
   );

@@ -29,9 +29,10 @@ type NavItem = {
   capability?: Capability;
 };
 
-const GROUPS: Array<{ label: string; items: NavItem[] }> = [
+const GROUPS: Array<{ label: string; iconClass: string; items: NavItem[] }> = [
   {
     label: "Workspace",
+    iconClass: "text-[var(--cyan)]",
     items: [
       { href: "/organization", label: "Dashboard", icon: LayoutDashboard },
       { href: "/organization/pages", label: "Pages", icon: PanelsTopLeft },
@@ -39,6 +40,7 @@ const GROUPS: Array<{ label: string; items: NavItem[] }> = [
   },
   {
     label: "Operate",
+    iconClass: "text-[var(--amber)]",
     items: [
       { href: "/organization/incidents", label: "Incidents", icon: Siren, capability: "incident.update" },
       { href: "/organization/maintenance", label: "Maintenance", icon: Wrench, capability: "incident.update" },
@@ -48,6 +50,7 @@ const GROUPS: Array<{ label: string; items: NavItem[] }> = [
   },
   {
     label: "Audience",
+    iconClass: "text-[var(--green)]",
     items: [
       { href: "/organization/subscribers", label: "Subscribers", icon: UsersRound, capability: "subscriber.manage" },
       { href: "/organization/notifications", label: "Destinations", icon: BellRing, capability: "integration.manage" },
@@ -56,6 +59,7 @@ const GROUPS: Array<{ label: string; items: NavItem[] }> = [
   },
   {
     label: "Tools",
+    iconClass: "text-[var(--blue)]",
     items: [
       { href: "/organization/embed", label: "SignalHub Embed", icon: Code2, capability: "integration.manage" },
       { href: "/organization/api-keys", label: "API Keys", icon: KeyRound, capability: "integration.manage" },
@@ -64,6 +68,7 @@ const GROUPS: Array<{ label: string; items: NavItem[] }> = [
   },
   {
     label: "Organization",
+    iconClass: "text-[var(--orange)]",
     items: [
       { href: "/organization/security", label: "Security", icon: ShieldCheck },
       { href: "/organization/team", label: "Users & Roles", icon: UsersRound, capability: "team.manage" },
@@ -72,6 +77,7 @@ const GROUPS: Array<{ label: string; items: NavItem[] }> = [
   },
   {
     label: "Platform",
+    iconClass: "text-[var(--red)]",
     items: [
       { href: "/organization/platform", label: "Platform administration", icon: Landmark, capability: "organization.manage" },
     ],
@@ -106,7 +112,7 @@ export function AdminNav({ capabilities }: { capabilities: Capability[] }) {
                       : ""
                   }`}
                 >
-                  <Icon size={14} strokeWidth={active ? 2.4 : 1.8} aria-hidden />
+                  <Icon size={14} strokeWidth={active ? 2.4 : 1.8} aria-hidden className={`${group.iconClass} transition-colors ${active ? "drop-shadow-[0_0_5px_currentColor]" : ""}`} />
                   {item.label}
                 </Link>
               );

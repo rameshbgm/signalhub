@@ -1,5 +1,5 @@
 import { requireSession } from "@/lib/require-session";
-import { FluentSelect } from "@/components/FluentSelect";
+import { Select } from "@/components/ui/select";
 import {
   removeMember,
   updateMemberRole,
@@ -9,6 +9,8 @@ import { getOrganizationMembers } from "@/lib/memberships";
 import { database } from "@/lib/postgres/client";
 import { MEMBERSHIP_ROLES } from "@/lib/identity";
 import { requireCapability } from "@/lib/admin-guard";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 
 export default async function TeamPage() {
   const { org } = await requireSession();
@@ -73,13 +75,13 @@ export default async function TeamPage() {
                   >
                     <div className="block text-xs text-[var(--fg-soft)]">
                       Role
-                      <FluentSelect aria-label="Role" name="role" defaultValue={m.role} className="mt-1 w-full border border-[var(--line)] bg-[var(--bg)] px-2 py-1.5 text-xs text-[var(--fg)]">
+                      <Select aria-label="Role" name="role" defaultValue={m.role} className="mt-1 w-full border border-[var(--line)] bg-[var(--bg)] px-2 py-1.5 text-xs text-[var(--fg)]">
                         {MEMBERSHIP_ROLES.map((role) => (
                           <option key={role} value={role}>
                             {role.replaceAll("_", " ")}
                           </option>
                         ))}
-                      </FluentSelect>
+                      </Select>
                     </div>
                     <fieldset className="border border-[var(--line)] p-2">
                       <legend className="px-1 text-[10px] text-[var(--fg-dim)]">
@@ -88,8 +90,7 @@ export default async function TeamPage() {
                       <div className="max-h-36 space-y-1 overflow-y-auto">
                         {pages.map((page) => (
                           <label key={page.id} className="flex items-center gap-2 text-xs text-[var(--fg-soft)]">
-                            <input
-                              type="checkbox"
+                            <Checkbox
                               name="pageIds"
                               value={page.id}
                               defaultChecked={m.pageIds?.includes(page.id)}
@@ -99,16 +100,16 @@ export default async function TeamPage() {
                         ))}
                       </div>
                     </fieldset>
-                    <button className="w-full bg-[var(--cyan)] px-2 py-1.5 text-xs font-semibold text-[var(--on-cyan)]">
+                    <Button type="submit" className="w-full text-xs">
                       Save access
-                    </button>
+                    </Button>
                   </form>
                 </details>
               )}
               {m.status === "REVOKED" ? (
                 <span className="text-xs text-[var(--fg-dim)]">Create this email again to reactivate</span>
               ) : <form action={removeMember.bind(null, m.id)}>
-                <button className="border border-[var(--red)]/30 px-2.5 py-1 text-xs font-semibold text-[var(--red)] transition-colors hover:bg-[var(--red-soft)]">Remove</button>
+                <Button type="submit" variant="destructive" size="sm">Remove</Button>
               </form>}
             </div>
           </div>

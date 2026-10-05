@@ -1,7 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { FluentSelect } from "@/components/FluentSelect";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { COMPONENT_STATUSES, COMPONENT_STATUS_LABEL, INCIDENT_STATUSES, INCIDENT_STATUS_LABEL, IMPACTS, IMPACT_LABEL } from "@/lib/status";
 
 type Component = { id: string; name: string };
@@ -24,11 +28,11 @@ export function IncidentForm({
 
   return (
     <form action={action} className="space-y-4">
-      <input type="hidden" name="pageId" value={pageId} />
+      <Input type="hidden" name="pageId" value={pageId} />
 
       <label className="block text-sm">
         <span className="text-xs text-[var(--fg-dim)] block mb-1">Incident name</span>
-        <input
+        <Input
           name="name"
           value={name}
           onChange={(e) => setName(e.target.value)}
@@ -39,7 +43,7 @@ export function IncidentForm({
 
       <label className="block text-sm">
         <span className="text-xs text-[var(--fg-dim)] block mb-1">Message</span>
-        <textarea
+        <Textarea
           name="body"
           value={body}
           onChange={(e) => setBody(e.target.value)}
@@ -52,7 +56,7 @@ export function IncidentForm({
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="block text-sm">
           <span className="text-xs text-[var(--fg-dim)] block mb-1">Status</span>
-          <FluentSelect
+          <Select
             aria-label="Status"
             name="status"
             value={status}
@@ -64,11 +68,11 @@ export function IncidentForm({
                 {INCIDENT_STATUS_LABEL[s]}
               </option>
             ))}
-          </FluentSelect>
+          </Select>
         </div>
         <div className="block text-sm">
           <span className="text-xs text-[var(--fg-dim)] block mb-1">Impact</span>
-          <FluentSelect
+          <Select
             aria-label="Impact"
             name="impact"
             value={impact}
@@ -80,7 +84,7 @@ export function IncidentForm({
                 {IMPACT_LABEL[i]}
               </option>
             ))}
-          </FluentSelect>
+          </Select>
         </div>
       </div>
 
@@ -89,9 +93,8 @@ export function IncidentForm({
         <div className="space-y-1 border border-[var(--line)] p-3 max-h-56 overflow-y-auto">
           {components.map((c) => (
             <div key={c.id} className="flex items-center gap-2 text-sm">
-              <input
+              <Checkbox
                 aria-label={c.name}
-                type="checkbox"
                 name="componentIds"
                 value={c.id}
                 checked={c.id in selected}
@@ -104,7 +107,7 @@ export function IncidentForm({
               />
               <span className="flex-1 text-[var(--fg)]">{c.name}</span>
               {c.id in selected && (
-                <FluentSelect
+                <Select
                   aria-label={`Status for ${c.name}`}
                   name={`componentStatus_${c.id}`}
                   value={selected[c.id]}
@@ -116,7 +119,7 @@ export function IncidentForm({
                       {COMPONENT_STATUS_LABEL[s]}
                     </option>
                   ))}
-                </FluentSelect>
+                </Select>
               )}
             </div>
           ))}
@@ -125,13 +128,12 @@ export function IncidentForm({
       </div>
 
       <label className="flex items-center gap-2 text-sm text-[var(--fg-soft)]">
-        <input type="checkbox" name="pageWide" /> This incident affects the page as a whole
+        <Checkbox name="pageWide" /> This incident affects the page as a whole
       </label>
 
       <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
         <label className="flex items-center gap-2 text-sm text-[var(--fg-soft)]">
-          <input
-            type="checkbox"
+          <Checkbox
             name="notify"
             checked={notify}
             onChange={(event) => setNotify(event.target.checked)}
@@ -139,11 +141,11 @@ export function IncidentForm({
           Notify subscribers
         </label>
         <label className="flex items-center gap-2 text-sm text-[var(--fg-soft)]">
-          <input type="checkbox" name="backfilled" /> Backfill (past incident, no notification)
+          <Checkbox name="backfilled" /> Backfill (past incident, no notification)
         </label>
       </div>
 
-      <button className="bg-[var(--cyan)] text-[var(--on-cyan)] px-4 py-2 text-sm font-mono font-semibold">Create Incident</button>
+      <Button type="submit" className="font-mono">Create Incident</Button>
     </form>
   );
 }

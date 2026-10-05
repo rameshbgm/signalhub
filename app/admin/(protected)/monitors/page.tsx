@@ -1,11 +1,14 @@
 import { requireSession } from "@/lib/require-session";
 import { sql } from "kysely";
-import { FluentSelect } from "@/components/FluentSelect";
+import { Select } from "@/components/ui/select";
 import { database } from "@/lib/postgres/client";
 import { toggleMonitorEnabled, deleteMonitor, runMonitorNow, updateMonitor } from "./actions";
 import { PageSelect } from "@/components/admin/PageSelect";
 import { HeartbeatTokenManager } from "@/components/admin/HeartbeatTokenManager";
 import { getScopedPages, sessionHasCapability } from "@/lib/admin-guard";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 function relativeTime(date: Date | null): string {
   if (!date) return "never";
@@ -99,10 +102,10 @@ export default async function MonitorsPage({ searchParams }: { searchParams: Pro
                 </div>
                 {canManage && <div className="flex flex-wrap gap-3">
                   <form action={runMonitorNow.bind(null, m.id)}>
-                    <button className="border border-[var(--cyan)]/30 px-2.5 py-1 text-xs font-semibold text-[var(--cyan)] transition-colors hover:bg-[var(--cyan-soft)]">Check on next poll</button>
+                    <Button type="submit" variant="outline" size="sm" className="text-[var(--cyan)]">Check on next poll</Button>
                   </form>
-                  <form action={toggleMonitorEnabled.bind(null, m.id)}><button className="border border-[var(--cyan)]/30 px-2.5 py-1 text-xs font-semibold text-[var(--cyan)] transition-colors hover:bg-[var(--cyan-soft)]">{m.enabled ? "Disable" : "Enable"}</button></form>
-                  <form action={deleteMonitor.bind(null, m.id)}><button className="border border-[var(--red)]/30 px-2.5 py-1 text-xs font-semibold text-[var(--red)] transition-colors hover:bg-[var(--red-soft)]">Delete</button></form>
+                  <form action={toggleMonitorEnabled.bind(null, m.id)}><Button type="submit" variant="outline" size="sm" className="text-[var(--cyan)]">{m.enabled ? "Disable" : "Enable"}</Button></form>
+                  <form action={deleteMonitor.bind(null, m.id)}><Button type="submit" variant="destructive" size="sm">Delete</Button></form>
                 </div>}
               </div>
               <p className="mt-2 text-xs text-[var(--fg-dim)]">
@@ -124,19 +127,19 @@ export default async function MonitorsPage({ searchParams }: { searchParams: Pro
                     Edit monitor
                   </summary>
                   <form action={updateMonitor.bind(null, m.id)} className="mt-3 grid gap-2 sm:grid-cols-2">
-                    <input name="name" defaultValue={m.name} aria-label="Monitor name" className="border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-xs" required />
-                    <input name="target" defaultValue={m.target} aria-label="Monitor target" className="border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-xs" required />
-                    <FluentSelect name="componentId" defaultValue={m.componentId ?? ""} aria-label="Linked component" className="border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-xs">
+                    <Input name="name" defaultValue={m.name} aria-label="Monitor name" className="text-xs" required />
+                    <Input name="target" defaultValue={m.target} aria-label="Monitor target" className="text-xs" required />
+                    <Select name="componentId" defaultValue={m.componentId ?? ""} aria-label="Linked component" className="border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-xs">
                       <option value="">No linked component</option>
                       {components.map((component) => <option key={component.id} value={component.id}>{component.name}</option>)}
-                    </FluentSelect>
-                    <input name="groupName" defaultValue={m.groupName ?? ""} placeholder="Group" className="border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-xs" />
-                    <input name="intervalSec" type="number" min={10} max={86400} defaultValue={m.intervalSec} aria-label="Interval seconds" className="border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-xs" />
-                    <input name="timeoutMs" type="number" min={100} max={60000} defaultValue={m.timeoutMs} aria-label="Timeout milliseconds" className="border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-xs" />
-                    <input name="failThreshold" type="number" min={1} max={20} defaultValue={m.failThreshold} aria-label="Failure threshold" className="border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-xs" />
-                    <input name="recoverThreshold" type="number" min={1} max={20} defaultValue={m.recoverThreshold} aria-label="Recovery threshold" className="border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-xs" />
-                    <input name="tags" defaultValue={m.tags?.join(", ") ?? ""} placeholder="Tags, comma separated" className="border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-xs sm:col-span-2" />
-                    <button className="bg-[var(--cyan)] px-3 py-2 text-xs font-semibold text-[var(--on-cyan)] sm:col-span-2">Save monitor</button>
+                    </Select>
+                    <Input name="groupName" defaultValue={m.groupName ?? ""} placeholder="Group" className="text-xs" />
+                    <Input name="intervalSec" type="number" min={10} max={86400} defaultValue={m.intervalSec} aria-label="Interval seconds" className="text-xs" />
+                    <Input name="timeoutMs" type="number" min={100} max={60000} defaultValue={m.timeoutMs} aria-label="Timeout milliseconds" className="text-xs" />
+                    <Input name="failThreshold" type="number" min={1} max={20} defaultValue={m.failThreshold} aria-label="Failure threshold" className="text-xs" />
+                    <Input name="recoverThreshold" type="number" min={1} max={20} defaultValue={m.recoverThreshold} aria-label="Recovery threshold" className="text-xs" />
+                    <Input name="tags" defaultValue={m.tags?.join(", ") ?? ""} placeholder="Tags, comma separated" className="text-xs sm:col-span-2" />
+                    <Button type="submit" className="sm:col-span-2">Save monitor</Button>
                   </form>
                 </details>
               )}
@@ -145,24 +148,24 @@ export default async function MonitorsPage({ searchParams }: { searchParams: Pro
                   Recent check history
                 </summary>
                 <div className="mt-2 overflow-x-auto">
-                  <table className="w-full min-w-[32rem] text-left text-xs">
-                    <thead className="text-[var(--fg-dim)]">
-                      <tr><th className="py-1">Checked</th><th>Result</th><th>Latency</th><th>Response</th></tr>
-                    </thead>
-                    <tbody>
+                  <Table className="min-w-[32rem] text-left text-xs">
+                    <TableHeader className="text-[var(--fg-dim)]">
+                      <TableRow><TableHead className="py-1">Checked</TableHead><TableHead>Result</TableHead><TableHead>Latency</TableHead><TableHead>Response</TableHead></TableRow>
+                    </TableHeader>
+                    <TableBody>
                       {(checksByMonitor.get(m.id) ?? []).map((check) => (
-                        <tr key={check.id} className="border-t border-[var(--line)]">
-                          <td className="py-1.5 font-mono">{new Date(check.checkedAt).toLocaleString()}</td>
-                          <td className={check.ok ? "text-[var(--green)]" : "text-[var(--red)]"}>{check.ok ? "Up" : "Down"}</td>
-                          <td>{check.latencyMs === null ? "—" : `${check.latencyMs} ms`}</td>
-                          <td className="max-w-64 truncate">{check.error ?? (check.statusCode ? `HTTP ${check.statusCode}` : "OK")}</td>
-                        </tr>
+                        <TableRow key={check.id} className="border-t border-[var(--line)]">
+                          <TableCell className="py-1.5 font-mono">{new Date(check.checkedAt).toLocaleString()}</TableCell>
+                          <TableCell className={check.ok ? "text-[var(--green)]" : "text-[var(--red)]"}>{check.ok ? "Up" : "Down"}</TableCell>
+                          <TableCell>{check.latencyMs === null ? "—" : `${check.latencyMs} ms`}</TableCell>
+                          <TableCell className="max-w-64 truncate">{check.error ?? (check.statusCode ? `HTTP ${check.statusCode}` : "OK")}</TableCell>
+                        </TableRow>
                       ))}
                       {!checksByMonitor.get(m.id)?.length && (
-                        <tr><td colSpan={4} className="py-2 text-[var(--fg-dim)]">No checks have run yet.</td></tr>
+                        <TableRow><TableCell colSpan={4} className="py-2 text-[var(--fg-dim)]">No checks have run yet.</TableCell></TableRow>
                       )}
-                    </tbody>
-                  </table>
+                    </TableBody>
+                  </Table>
                 </div>
               </details>
             </div>

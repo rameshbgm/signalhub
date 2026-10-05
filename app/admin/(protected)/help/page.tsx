@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { HELP_CATEGORIES } from "@/lib/help-content";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 export default async function HelpCenterPage({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
   const query = ((await searchParams).q ?? "").trim();
@@ -24,15 +26,14 @@ export default async function HelpCenterPage({ searchParams }: { searchParams: P
           Open the complete HTML user manual ↗
         </a>
         <form className="mt-5 flex gap-2" action="/organization/help">
-          <input
+          <Input
             type="search"
             name="q"
             defaultValue={query}
             aria-label="Search help articles"
             placeholder="Search publishing, incidents, API keys, monitors…"
-            className="min-w-0 flex-1 border border-[var(--line)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--fg)]"
           />
-          <button className="border border-[var(--cyan)] px-4 py-2 text-sm font-semibold text-[var(--cyan)]">Search</button>
+          <Button type="submit" variant="outline" className="text-[var(--cyan)]">Search</Button>
           {query && <Link href="/organization/help" className="inline-flex items-center px-2 text-sm text-[var(--fg-dim)] hover:text-[var(--fg)]">Clear</Link>}
         </form>
       </div>

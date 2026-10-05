@@ -1,10 +1,12 @@
 import { database } from "@/lib/postgres/client";
-import { FluentSelect } from "@/components/FluentSelect";
+import { Select } from "@/components/ui/select";
 import { requirePlatformPageCapability } from "@/lib/platform-page-guard";
 import Link from "next/link";
 import { hasPlatformCapability } from "@/lib/platform-policy";
 import { PlatformActionForm } from "@/components/platform/PlatformActionForm";
 import { createAuditSink, setAuditSinkEnabled } from "./actions";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 export default async function PlatformAuditPage({
   searchParams,
@@ -62,14 +64,13 @@ export default async function PlatformAuditPage({
         </div>
       </div>
       <form className="grid gap-2 border border-[var(--line)] bg-[var(--surface)] p-3 sm:grid-cols-[1fr_16rem_auto]">
-        <input
+        <Input
           name="q"
           defaultValue={query}
           placeholder="Actor, target ID, or reason"
           aria-label="Search audit"
-          className="border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-xs"
         />
-        <FluentSelect
+        <Select
           name="action"
           defaultValue={action}
           aria-label="Filter by action"
@@ -77,8 +78,8 @@ export default async function PlatformAuditPage({
         >
           <option value="">All actions</option>
           {actions.sort().map((value) => <option key={value} value={value}>{value}</option>)}
-        </FluentSelect>
-        <button className="border border-[var(--cyan)]/40 px-4 py-2 text-xs font-semibold text-[var(--cyan)]">Filter</button>
+        </Select>
+        <Button type="submit" variant="outline" size="sm" className="text-[var(--cyan)]">Filter</Button>
       </form>
 
       <section className="space-y-3 border border-[var(--line)] bg-[var(--surface)] p-4">
@@ -90,14 +91,14 @@ export default async function PlatformAuditPage({
         </div>
         {canManage && (
           <PlatformActionForm action={createAuditSink} successMessage="Audit sink created" className="grid gap-2 sm:grid-cols-2">
-            <input name="name" placeholder="Sink name" required className="border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-xs" />
-            <input name="url" type="url" placeholder="https://siem.example/events" required className="border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-xs" />
-            <input name="secret" type="password" minLength={32} placeholder="HMAC signing secret (32+ characters)" required className="border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-xs" />
-            <FluentSelect aria-label="Audit sink organization" name="orgId" className="border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-xs">
+            <Input name="name" placeholder="Sink name" required />
+            <Input name="url" type="url" placeholder="https://siem.example/events" required />
+            <Input name="secret" type="password" minLength={32} placeholder="HMAC signing secret (32+ characters)" required />
+            <Select aria-label="Audit sink organization" name="orgId" className="border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-xs">
               <option value="">Platform audit</option>
               {sinkOrganizations.map((org) => <option key={org.id} value={org.id}>{org.name}</option>)}
-            </FluentSelect>
-            <button className="bg-[var(--cyan)] px-3 py-2 text-xs font-semibold text-[var(--on-cyan)] sm:col-span-2">Add sink</button>
+            </Select>
+            <Button type="submit" size="sm" className="sm:col-span-2">Add sink</Button>
           </PlatformActionForm>
         )}
         <div className="divide-y divide-[var(--line)] border border-[var(--line)]">
@@ -110,8 +111,8 @@ export default async function PlatformAuditPage({
               </div>
               {canManage && (
                 <PlatformActionForm action={setAuditSinkEnabled.bind(null, sink.id)} successMessage={sink.enabled ? "Sink disabled" : "Sink enabled"}>
-                  <input type="hidden" name="enabled" value={String(!sink.enabled)} />
-                  <button className="border border-[var(--line)] px-2.5 py-1">{sink.enabled ? "Disable" : "Enable"}</button>
+                  <Input type="hidden" name="enabled" value={String(!sink.enabled)} />
+                  <Button type="submit" variant="outline" size="sm">{sink.enabled ? "Disable" : "Enable"}</Button>
                 </PlatformActionForm>
               )}
             </div>

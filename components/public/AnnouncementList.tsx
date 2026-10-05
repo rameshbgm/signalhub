@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { X } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 export type PublicAnnouncement = {
   id: string;
@@ -68,9 +70,9 @@ export function AnnouncementList({
               )}
             </div>
             {announcement.dismissible && (
-              <button type="button" onClick={() => dismiss(announcement.id)} className="text-xl leading-none text-[var(--fg-dim)]" aria-label={`Dismiss ${announcement.title}`}>
-                ×
-              </button>
+              <Button type="button" variant="ghost" size="icon" onClick={() => dismiss(announcement.id)} className="h-9 w-9 text-[var(--fg-dim)]" aria-label={`Dismiss ${announcement.title}`}>
+                <X aria-hidden size={17} />
+              </Button>
             )}
           </div>
         </aside>

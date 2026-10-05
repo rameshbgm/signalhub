@@ -3,6 +3,8 @@
 import { fetchWithTimeout } from "@/lib/client-fetch";
 
 import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 const CHANNELS = [
   {
@@ -205,7 +207,7 @@ export function NotificationDestinationManager({
             {availableProviders.map((provider) => {
               const selected = provider.value === channel;
               return (
-                <button
+                <Button
                   key={provider.value}
                   type="button"
                   data-button-guard="off"
@@ -215,14 +217,15 @@ export function NotificationDestinationManager({
                     setConfig({});
                     setMessage(null);
                   }}
-                  className={`min-w-0 border p-3 text-left transition-colors ${selected ? "border-[var(--cyan)] bg-[var(--cyan-soft)]" : "border-[var(--line)] bg-[var(--bg)] hover:border-[var(--line-bright)]"}`}
+                  variant="ghost"
+                  className={`h-auto min-w-0 justify-start whitespace-normal border p-3 text-left transition-colors ${selected ? "border-[var(--cyan)] bg-[var(--cyan-soft)]" : "border-[var(--line)] bg-[var(--bg)] hover:border-[var(--line-bright)]"}`}
                 >
                   <span className="flex items-center justify-between gap-2">
                     <span className="text-sm font-semibold text-[var(--fg)]">{provider.label}</span>
                     <span className="font-mono text-[9px] uppercase tracking-wider text-[var(--fg-dim)]">{provider.group}</span>
                   </span>
                   <span className="mt-1 block text-xs leading-5 text-[var(--fg-dim)]">{provider.description}</span>
-                </button>
+                </Button>
               );
             })}
           </div>
@@ -236,17 +239,17 @@ export function NotificationDestinationManager({
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="grid gap-1.5 text-xs font-semibold text-[var(--fg-soft)]">
               Destination name
-              <input value={name} onChange={(event) => setName(event.target.value)} placeholder={`e.g. ${selectedProvider.label} incidents`} className="border border-[var(--line)] bg-[var(--bg)] px-3 py-2.5 text-sm font-normal text-[var(--fg)] placeholder:text-[var(--fg-dim)]" required />
+              <Input value={name} onChange={(event) => setName(event.target.value)} placeholder={`e.g. ${selectedProvider.label} incidents`} className="font-normal" required />
             </label>
             {selectedProvider.fields.map((field) => (
               <label key={field.key} className="grid gap-1.5 text-xs font-semibold text-[var(--fg-soft)]">
                 {field.label}
-                <input
+                <Input
                   type={"sensitive" in field && field.sensitive ? "password" : "text"}
                   value={config[field.key] ?? ""}
                   onChange={(event) => setConfig({ ...config, [field.key]: event.target.value })}
                   placeholder={field.label}
-                  className="border border-[var(--line)] bg-[var(--bg)] px-3 py-2.5 text-sm font-normal text-[var(--fg)] placeholder:text-[var(--fg-dim)]"
+                  className="font-normal"
                   required={field.required}
                   autoComplete="off"
                 />
@@ -255,9 +258,9 @@ export function NotificationDestinationManager({
           </div>
         </div>
         <div className="flex justify-end border-t border-[var(--line)] pt-4">
-          <button disabled={loading || Boolean(pendingAction)} className="w-full bg-[var(--cyan)] px-4 py-2.5 text-sm font-semibold text-[var(--on-cyan)] disabled:opacity-50 sm:w-auto">
+          <Button type="submit" loading={loading} disabled={Boolean(pendingAction)} className="w-full sm:w-auto">
             {loading ? `Testing ${selectedProvider.label}…` : `Test and add ${selectedProvider.label}`}
-          </button>
+          </Button>
         </div>
       </form>
       ) : (
@@ -287,15 +290,15 @@ export function NotificationDestinationManager({
               {destination.lastError && <p className="mt-1 text-xs text-[var(--red)]">{destination.lastError}</p>}
             </div>
             <div className="flex gap-2">
-              <button disabled={loading || Boolean(pendingAction)} onClick={() => void mutate(destination.id, "test")} className="border border-[var(--line)] px-2.5 py-1 text-xs disabled:opacity-50">
+              <Button type="button" variant="outline" size="sm" loading={pendingAction === `test:${destination.id}`} disabled={Boolean(pendingAction)} onClick={() => void mutate(destination.id, "test")}>
                 {pendingAction === `test:${destination.id}` ? "Sending…" : "Send test"}
-              </button>
-              <button disabled={loading || Boolean(pendingAction)} onClick={() => void mutate(destination.id, "toggle")} className="border border-[var(--line)] px-2.5 py-1 text-xs disabled:opacity-50">
+              </Button>
+              <Button type="button" variant="outline" size="sm" loading={pendingAction === `toggle:${destination.id}`} disabled={Boolean(pendingAction)} onClick={() => void mutate(destination.id, "toggle")}>
                 {pendingAction === `toggle:${destination.id}` ? "Saving…" : destination.active ? "Pause" : "Enable"}
-              </button>
-              <button disabled={loading || Boolean(pendingAction)} onClick={() => void mutate(destination.id, "delete")} className="border border-[var(--red)]/30 px-2.5 py-1 text-xs text-[var(--red)] disabled:opacity-50">
+              </Button>
+              <Button type="button" variant="destructive" size="sm" loading={pendingAction === `delete:${destination.id}`} disabled={Boolean(pendingAction)} onClick={() => void mutate(destination.id, "delete")}>
                 {pendingAction === `delete:${destination.id}` ? "Deleting…" : "Delete"}
-              </button>
+              </Button>
             </div>
           </div>
         ))}

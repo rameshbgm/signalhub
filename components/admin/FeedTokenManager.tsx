@@ -5,6 +5,9 @@ import { fetchWithTimeout } from "@/lib/client-fetch";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { CopyButton } from "@/components/CopyButton";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
 
 type FeedToken = {
   id: string;
@@ -103,11 +106,11 @@ export function FeedTokenManager({
         <div className="grid gap-2 sm:grid-cols-2">
           <label className="text-xs text-[var(--fg-soft)]">
             Token name
-            <input value={name} onChange={(event) => setName(event.target.value)} required maxLength={100} className="mt-1 w-full border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--fg)]" />
+            <Input value={name} onChange={(event) => setName(event.target.value)} required maxLength={100} className="mt-1" />
           </label>
           <label className="text-xs text-[var(--fg-soft)]">
             Optional expiry
-            <input type="datetime-local" value={expiresAt} onChange={(event) => setExpiresAt(event.target.value)} className="mt-1 w-full border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--fg)]" />
+            <Input type="datetime-local" value={expiresAt} onChange={(event) => setExpiresAt(event.target.value)} className="mt-1" />
           </label>
         </div>
         {components.length > 0 && (
@@ -116,8 +119,7 @@ export function FeedTokenManager({
             <div className="grid max-h-32 gap-1 overflow-y-auto border border-[var(--line)] bg-[var(--bg)] p-2 sm:grid-cols-2">
               {components.map((component) => (
                 <label key={component.id} className="flex items-center gap-2 text-xs text-[var(--fg-soft)]">
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     checked={selected.includes(component.id)}
                     onChange={(event) =>
                       setSelected((current) =>
@@ -133,9 +135,9 @@ export function FeedTokenManager({
             </div>
           </fieldset>
         )}
-        <button disabled={pending} className="bg-[var(--cyan)] px-4 py-2 text-sm font-medium text-[var(--on-cyan)] disabled:opacity-50">
+        <Button type="submit" loading={pending}>
           {pending ? "Creating…" : "Create signed feed token"}
-        </button>
+        </Button>
       </form>
       {error && <p role="alert" className="text-sm text-[var(--red)]">{error}</p>}
       {secret && (
@@ -165,7 +167,7 @@ export function FeedTokenManager({
                 {token.lastUsedAt ? ` · last used ${new Date(token.lastUsedAt).toLocaleString()}` : " · never used"}
               </p>
             </div>
-            <button disabled={pending} onClick={() => revoke(token.id)} className="self-start border border-[var(--red)]/30 px-2.5 py-1 text-xs font-semibold text-[var(--red)] disabled:opacity-50 sm:self-auto">Revoke</button>
+            <Button type="button" variant="destructive" size="sm" loading={pending} onClick={() => revoke(token.id)} className="self-start sm:self-auto">Revoke</Button>
           </div>
         ))}
         {tokens.length === 0 && <p className="p-3 text-sm text-[var(--fg-dim)]">No active feed tokens.</p>}

@@ -4,6 +4,8 @@ import { fetchWithTimeout } from "@/lib/client-fetch";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 export function InviteAcceptanceForm({
   token,
@@ -55,7 +57,7 @@ export function InviteAcceptanceForm({
         <label htmlFor="invite-password" className="text-xs font-semibold text-[var(--fg)]">
           {hasPassword ? "Confirm your existing password" : "Create a password"}
         </label>
-        <input
+        <Input
           id="invite-password"
           value={password}
           onChange={(event) => setPassword(event.target.value)}
@@ -64,7 +66,7 @@ export function InviteAcceptanceForm({
           maxLength={1024}
           autoComplete={hasPassword ? "current-password" : "new-password"}
           required
-          className="mt-1 w-full border border-[var(--line)] bg-[var(--bg)] px-4 py-3 text-sm"
+          className="mt-1 px-4 py-3"
         />
       </div>
       {!hasPassword && (
@@ -72,7 +74,7 @@ export function InviteAcceptanceForm({
           <label htmlFor="invite-confirmation" className="text-xs font-semibold text-[var(--fg)]">
             Confirm password
           </label>
-          <input
+          <Input
             id="invite-confirmation"
             value={confirmation}
             onChange={(event) => setConfirmation(event.target.value)}
@@ -81,17 +83,14 @@ export function InviteAcceptanceForm({
             maxLength={1024}
             autoComplete="new-password"
             required
-            className="mt-1 w-full border border-[var(--line)] bg-[var(--bg)] px-4 py-3 text-sm"
+            className="mt-1 px-4 py-3"
           />
         </div>
       )}
       {error && <p role="alert" className="text-xs text-[var(--red)]">{error}</p>}
-      <button
-        disabled={pending}
-        className="w-full bg-[var(--cyan)] py-3 text-sm font-semibold text-[var(--on-cyan)] disabled:opacity-50"
-      >
+      <Button type="submit" loading={pending} className="w-full py-3">
         {pending ? "Accepting…" : "Accept invitation"}
-      </button>
+      </Button>
     </form>
   );
 }

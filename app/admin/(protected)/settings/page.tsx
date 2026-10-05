@@ -5,6 +5,8 @@ import { requireCapability } from "@/lib/admin-guard";
 import { effectiveRetention, RETENTION_BOUNDS } from "@/lib/retention";
 import { database } from "@/lib/postgres/client";
 import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 export default async function OrgSettingsPage() {
   const { session, org } = await requireSession();
@@ -30,7 +32,7 @@ export default async function OrgSettingsPage() {
         <form action={updateOrgSettings} className="space-y-3">
           <label className="block text-sm">
             <span className="mb-1 block text-xs text-[var(--fg-dim)]">Organization name</span>
-            <input
+            <Input
               name="name"
               defaultValue={org.name}
               className="w-full border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--fg)] focus:border-[var(--cyan)] focus:outline-none disabled:opacity-50"
@@ -43,7 +45,7 @@ export default async function OrgSettingsPage() {
               Organization slug
               <HelpTip text="The organization slug is a stable internal identifier and is not changed here." />
             </span>
-            <input
+            <Input
               value={org.slug}
               className="w-full border border-[var(--line)] bg-[var(--surface-raised)] px-3 py-2 text-sm text-[var(--fg-soft)]"
               disabled
@@ -51,7 +53,7 @@ export default async function OrgSettingsPage() {
           </label>
           <label className="block text-sm">
             <span className="mb-1 block text-xs text-[var(--fg-dim)]">Organization contact email</span>
-            <input
+            <Input
               name="contactEmail"
               type="email"
               defaultValue={org.contactEmail ?? ""}
@@ -59,7 +61,7 @@ export default async function OrgSettingsPage() {
               disabled={!isAdmin}
             />
           </label>
-          {isAdmin && <button className="bg-[var(--cyan)] px-4 py-2 text-sm font-medium text-[var(--on-cyan)]">Save</button>}
+          {isAdmin && <Button type="submit">Save</Button>}
           {!isAdmin && <p className="text-xs text-[var(--fg-dim)]">Only Admins can change organization settings.</p>}
         </form>
       </section>
@@ -74,7 +76,7 @@ export default async function OrgSettingsPage() {
             {Object.entries(RETENTION_BOUNDS).map(([key, bounds]) => (
               <label key={key} className="text-xs text-[var(--fg-soft)]">
                 {key.replace(/([A-Z])/g, " $1").replace(/^./, (value) => value.toUpperCase())}
-                <input
+                <Input
                   type="number"
                   name={key}
                   min={bounds.min}
@@ -84,9 +86,9 @@ export default async function OrgSettingsPage() {
                 />
               </label>
             ))}
-            <button className="bg-[var(--cyan)] px-4 py-2 text-sm font-medium text-[var(--on-cyan)] sm:col-span-2">
+            <Button type="submit" className="sm:col-span-2">
               Save retention policy
-            </button>
+            </Button>
           </form>
         </section>
       )}
@@ -124,9 +126,9 @@ export default async function OrgSettingsPage() {
             Creates a checksummed JSON archive and asset manifest. Stored credential material is excluded.
           </p>
           <form action={requestOrgExport} className="mt-3">
-            <button className="border border-[var(--cyan)]/40 px-3 py-2 text-xs font-semibold text-[var(--cyan)]">
+            <Button type="submit" variant="outline" size="sm" className="text-[var(--cyan)]">
               Request export
-            </button>
+            </Button>
           </form>
           <div className="mt-4 divide-y divide-[var(--line)] border border-[var(--line)]">
             {exports.map((job) => (

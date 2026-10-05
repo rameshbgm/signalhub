@@ -3,6 +3,7 @@ import { Eye, EyeOff, Send } from "lucide-react";
 import { PlatformActionForm } from "@/components/platform/PlatformActionForm";
 import { PlatformSubmitButton } from "@/components/platform/PlatformSubmitButton";
 import { finishPageSetup, setPagePublicVisibility } from "@/app/admin/(protected)/pages/actions";
+import { Button } from "@/components/ui/button";
 
 export type PageManagementActionPage = {
   id: string;
@@ -23,7 +24,7 @@ export function PageManagementActions({ page }: { page: PageManagementActionPage
 
   return (
     <div className="flex shrink-0 items-center gap-2 pb-2 md:pb-1">
-      {canPreview ? <Link href={page.publicPath} target="_blank" rel="noreferrer" aria-label="Preview public page" title="Preview public page" className="page-management-action-icon rounded-lg border border-[var(--line-bright)] bg-[var(--surface)] text-[var(--cyan)] hover:bg-[var(--cyan-soft)]"><Eye aria-hidden="true" size={17} /></Link> : <button type="button" disabled aria-label="Preview unavailable until the page is published" title="Preview is available after publishing" className="page-management-action-icon cursor-not-allowed rounded-lg border border-[var(--line)] bg-[var(--surface)] text-[var(--fg-dim)] opacity-70"><Eye aria-hidden="true" size={17} /></button>}
+      {canPreview ? <Link href={page.publicPath} target="_blank" rel="noreferrer" aria-label="Preview public page" title="Preview public page" className="page-management-action-icon rounded-lg border border-[var(--line-bright)] bg-[var(--surface)] text-[var(--cyan)] hover:bg-[var(--cyan-soft)]"><Eye aria-hidden="true" size={17} /></Link> : <Button type="button" variant="ghost" size="icon" disabled aria-label="Preview unavailable until the page is published" title="Preview is available after publishing" className="page-management-action-icon h-10 w-10 cursor-not-allowed rounded-lg border border-[var(--line)] bg-[var(--surface)] text-[var(--fg-dim)] opacity-70"><Eye aria-hidden="true" size={17} /></Button>}
       <PlatformActionForm action={action} successMessage={actionMessage} className="relative flex" messageClassName="absolute right-0 top-full z-10 mt-2 whitespace-nowrap">
         <PlatformSubmitButton aria-label={actionLabel} title={actionLabel} disabled={!page.setupCompleted && !page.canPublish} pendingLabel={publishing ? "Publishing…" : "Updating…"} className="page-management-action-icon rounded-lg bg-[var(--cyan)] text-[var(--on-cyan)]"><span aria-hidden="true">{page.setupCompleted && page.publicVisible ? <EyeOff size={17} /> : <Send size={17} />}</span><span className="sr-only">{actionLabel}</span></PlatformSubmitButton>
       </PlatformActionForm>

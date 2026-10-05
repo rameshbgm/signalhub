@@ -6,6 +6,8 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { QuickLogin } from "@/components/landing/QuickLogin";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 export function UnifiedLogin({ returnTo }: { returnTo: string | null }) {
   const router = useRouter();
@@ -95,11 +97,11 @@ export function UnifiedLogin({ returnTo }: { returnTo: string | null }) {
           <p className="mt-2 text-sm text-[var(--fg-soft)]">Use your SignalHub User ID to continue.</p>
 
           <form onSubmit={submit} className="mt-7 space-y-3">
-            <input suppressHydrationWarning value={username} onChange={(event) => setUsername(event.target.value)} autoComplete="username" placeholder="User ID" disabled={mfaRequired} required className="w-full border border-[var(--line)] bg-[var(--bg)] px-4 py-3 text-sm outline-none focus:border-[var(--cyan)] disabled:opacity-60" />
-            <input suppressHydrationWarning value={password} onChange={(event) => setPassword(event.target.value)} type="password" autoComplete="current-password" placeholder="Password" disabled={mfaRequired} required className="w-full border border-[var(--line)] bg-[var(--bg)] px-4 py-3 text-sm outline-none focus:border-[var(--cyan)] disabled:opacity-60" />
-            {mfaRequired && <input suppressHydrationWarning value={code} onChange={(event) => setCode(event.target.value.replace(/\D/g, "").slice(0, 6))} inputMode="numeric" autoComplete="one-time-code" placeholder="6-digit authenticator code" required className="w-full border border-[var(--line)] bg-[var(--bg)] px-4 py-3 font-mono text-sm tracking-widest outline-none focus:border-[var(--cyan)]" />}
+            <Input suppressHydrationWarning value={username} onChange={(event) => setUsername(event.target.value)} autoComplete="username" placeholder="User ID" disabled={mfaRequired} required className="h-12 px-4 disabled:opacity-60" />
+            <Input suppressHydrationWarning value={password} onChange={(event) => setPassword(event.target.value)} type="password" autoComplete="current-password" placeholder="Password" disabled={mfaRequired} required className="h-12 px-4 disabled:opacity-60" />
+            {mfaRequired && <Input suppressHydrationWarning value={code} onChange={(event) => setCode(event.target.value.replace(/\D/g, "").slice(0, 6))} inputMode="numeric" autoComplete="one-time-code" placeholder="6-digit authenticator code" required className="h-12 px-4 font-mono tracking-widest" />}
             {error && <p role="alert" className="text-xs text-[var(--red)]">{error}</p>}
-            <button disabled={loading} className="w-full bg-[var(--cyan)] py-3 text-sm font-semibold text-[var(--on-cyan)] disabled:opacity-50">{loading ? "Signing in…" : mfaRequired ? "Verify and sign in" : "Sign in"}</button>
+            <Button type="submit" loading={loading} className="w-full py-3">{mfaRequired ? "Verify and sign in" : "Sign in"}</Button>
           </form>
 
           {process.env.NEXT_PUBLIC_OIDC_ENABLED === "true" && <Link href="/api/auth/oidc/start" prefetch={false} className="mt-3 block w-full border border-[var(--line-bright)] py-3 text-center text-sm font-semibold hover:bg-[var(--hover-overlay)]">Sign in with OpenID Connect</Link>}

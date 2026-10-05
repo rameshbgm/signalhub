@@ -3,6 +3,9 @@
 import { useCallback, useState } from "react";
 import { PlatformActionForm } from "@/components/platform/PlatformActionForm";
 import { PlatformSubmitButton } from "@/components/platform/PlatformSubmitButton";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
+import { Radio } from "@/components/ui/radio";
 
 type Preset = { key: string; label: string; description: string; colors: string[] };
 
@@ -52,7 +55,7 @@ export function PageAppearanceForm({
         <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {presets.map((item) => (
             <label key={item.key} className={`cursor-pointer border p-3 ${preset === item.key ? "border-[var(--cyan)] bg-[var(--cyan-soft)]" : "border-[var(--line)] bg-[var(--bg)]"}`}>
-              <span className="flex items-center gap-2 text-sm font-semibold"><input type="radio" name="themePreset" value={item.key} checked={preset === item.key} onChange={() => setPreset(item.key)} />{item.label}</span>
+              <span className="flex items-center gap-2 text-sm font-semibold"><Radio name="themePreset" value={item.key} checked={preset === item.key} onChange={() => setPreset(item.key)} />{item.label}</span>
               <span className="mt-2 flex gap-1" aria-hidden>{item.colors.map((color, index) => <span key={`${color}-${index}`} className="h-4 flex-1 border border-black/10" style={{ backgroundColor: color }} />)}</span>
               <span className="mt-2 block text-xs leading-5 text-[var(--fg-dim)]">{item.description}</span>
             </label>
@@ -64,8 +67,8 @@ export function PageAppearanceForm({
         <div className="space-y-5">
           <label className="block text-xs font-semibold text-[var(--fg-soft)]">Brand color
             <span className="mt-2 flex items-center gap-3">
-              <input type="color" name="brandColor" value={brandColor} onChange={(event) => setBrandColor(event.target.value)} className="h-10 w-14 border border-[var(--line)] bg-[var(--bg)]" />
-              <input value={brandColor} onChange={(event) => setBrandColor(event.target.value)} pattern="#[0-9a-fA-F]{6}" aria-label="Brand color hex value" className="w-32 border border-[var(--line)] bg-[var(--bg)] px-3 py-2 font-mono text-sm uppercase" />
+              <Input type="color" name="brandColor" value={brandColor} onChange={(event) => setBrandColor(event.target.value)} className="h-10 w-14 p-1" />
+              <Input value={brandColor} onChange={(event) => setBrandColor(event.target.value)} pattern="#[0-9a-fA-F]{6}" aria-label="Brand color hex value" className="w-32 font-mono uppercase" />
             </span>
           </label>
           <fieldset>
@@ -75,11 +78,11 @@ export function PageAppearanceForm({
                 ["SYSTEM", "Match device", "Use each visitor's light or dark preference."],
                 ["LIGHT", "Always light", "Keep the page in light mode."],
                 ["DARK", "Always dark", "Keep the page in dark mode."],
-              ].map(([value, label, description]) => <label key={value} className={`cursor-pointer border p-3 ${mode === value ? "border-[var(--cyan)] bg-[var(--cyan-soft)]" : "border-[var(--line)]"}`}><span className="flex items-center gap-2 text-sm font-semibold"><input type="radio" name="themeMode" value={value} checked={mode === value} onChange={() => setMode(value as typeof mode)} />{label}</span><span className="mt-1 block pl-5 text-xs leading-5 text-[var(--fg-dim)]">{description}</span></label>)}
+              ].map(([value, label, description]) => <label key={value} className={`cursor-pointer border p-3 ${mode === value ? "border-[var(--cyan)] bg-[var(--cyan-soft)]" : "border-[var(--line)]"}`}><span className="flex items-center gap-2 text-sm font-semibold"><Radio name="themeMode" value={value} checked={mode === value} onChange={() => setMode(value as typeof mode)} />{label}</span><span className="mt-1 block pl-5 text-xs leading-5 text-[var(--fg-dim)]">{description}</span></label>)}
             </div>
           </fieldset>
-          {mode === "SYSTEM" && <label className="flex items-center gap-2 text-sm text-[var(--fg-soft)]"><input type="checkbox" name="allowThemeOverride" checked={allowVisitorMode} onChange={(event) => setAllowVisitorMode(event.target.checked)} /> Let visitors switch light/dark</label>}
-          {mode !== "SYSTEM" && allowVisitorMode && <input type="hidden" name="allowThemeOverride" value="on" />}
+          {mode === "SYSTEM" && <label className="flex items-center gap-2 text-sm text-[var(--fg-soft)]"><Checkbox name="allowThemeOverride" checked={allowVisitorMode} onChange={(event) => setAllowVisitorMode(event.target.checked)} /> Let visitors switch light/dark</label>}
+          {mode !== "SYSTEM" && allowVisitorMode && <Input type="hidden" name="allowThemeOverride" value="on" />}
         </div>
         <aside className="overflow-hidden border border-[var(--line)] bg-[var(--surface-raised)] p-3" aria-label="Style preview">
           <p className="font-mono text-[10px] font-semibold uppercase tracking-wider text-[var(--fg-dim)]">Quick preview</p>

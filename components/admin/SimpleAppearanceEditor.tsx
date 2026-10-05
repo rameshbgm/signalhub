@@ -5,7 +5,8 @@ import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Eye, Send } from "lucide-react";
-import { FluentSelect } from "@/components/FluentSelect";
+import { Button } from "@/components/ui/button";
+import { Select } from "@/components/ui/select";
 import { AssetUploader } from "@/components/admin/AssetUploader";
 import {
   PAGE_TEMPLATE_LABELS,
@@ -169,22 +170,24 @@ export function SimpleAppearanceEditor({
           <Eye aria-hidden="true" size={17} />
         </Link>
       ) : (
-        <button type="button" disabled aria-label="Preview unavailable until the page is published" title="Preview is available after publishing" className="page-management-action-icon cursor-not-allowed rounded-lg border border-[var(--line)] bg-[var(--surface)] text-[var(--fg-dim)] opacity-70">
+        <Button type="button" variant="ghost" size="icon" disabled aria-label="Preview unavailable until the page is published" title="Preview is available after publishing" className="page-management-action-icon h-10 w-10 cursor-not-allowed rounded-lg border border-[var(--line)] bg-[var(--surface)] text-[var(--fg-dim)] opacity-70">
           <Eye aria-hidden="true" size={17} />
-        </button>
+        </Button>
       )}
-      <button
+      <Button
         type="button"
         data-button-guard="off"
         aria-label="Publish changes"
         title="Publish changes"
         onClick={() => void publish()}
         disabled={!hasUnpublishedChanges || saveState === "SAVING" || saveState === "CONFLICT"}
-        className="page-management-action-icon rounded-lg bg-[var(--cyan)] text-[var(--on-cyan)] disabled:cursor-not-allowed disabled:opacity-50"
+        size="icon"
+        loading={saveState === "SAVING"}
+        className="page-management-action-icon h-10 w-10 rounded-lg"
       >
         <Send aria-hidden="true" size={17} />
         <span className="sr-only">Publish changes</span>
-      </button>
+      </Button>
     </div>
   );
 
@@ -222,17 +225,18 @@ export function SimpleAppearanceEditor({
             {SIMPLE_LAYOUTS.map((layout) => {
               const selected = design.templateKey === layout.key;
               return (
-                <button
+                <Button
                   key={layout.key}
                   type="button"
+                  variant="ghost"
                   role="radio"
                   aria-checked={selected}
                   onClick={() => selectLayout(layout.key)}
-                  className={`min-h-32 rounded-md border p-4 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--cyan)] ${selected ? "border-[var(--cyan)] bg-[var(--cyan-soft)]" : "border-[var(--line)] bg-[var(--surface)] hover:border-[var(--line-bright)]"}`}
+                  className={`h-auto min-h-32 justify-start whitespace-normal rounded-md border p-4 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--cyan)] ${selected ? "border-[var(--cyan)] bg-[var(--cyan-soft)]" : "border-[var(--line)] bg-[var(--surface)] hover:border-[var(--line-bright)]"}`}
                 >
                   <span className="block text-base font-semibold text-[var(--fg)]">{layout.name}</span>
                   <span className="mt-2 block text-sm leading-6 text-[var(--fg-soft)]">{layout.description}</span>
-                </button>
+                </Button>
               );
             })}
           </div>
@@ -246,9 +250,9 @@ export function SimpleAppearanceEditor({
           <div className="mt-5 max-w-xl">
             <label className="text-sm font-medium text-[var(--fg)]">
               Style preset
-              <FluentSelect aria-label="Style preset" value={design.theme.preset} onChange={(event) => selectPreset(event.target.value)} className="mt-2 w-full border border-[var(--line)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--fg)]">
+              <Select aria-label="Style preset" value={design.theme.preset} onChange={(event) => selectPreset(event.target.value)} className="mt-2 w-full border border-[var(--line)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--fg)]">
                 {PAGE_THEME_PRESET_KEYS.map((preset) => <option key={preset} value={preset}>{PAGE_THEME_PRESET_LABELS[preset]}</option>)}
-              </FluentSelect>
+              </Select>
             </label>
           </div>
         </section>

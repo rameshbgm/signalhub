@@ -2,8 +2,9 @@
 
 import { useState } from "react";
 import { useFormStatus } from "react-dom";
-import { Button, Textarea } from "@fluentui/react-components";
-import { FluentSelect } from "@/components/FluentSelect";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { Select } from "@/components/ui/select";
 import {
   INCIDENT_STATUSES,
   INCIDENT_STATUS_LABEL,
@@ -23,11 +24,9 @@ function SaveUpdateButton() {
   const { pending } = useFormStatus();
   return (
     <Button
-      appearance="primary"
-      shape="square"
       type="submit"
       disabled={pending}
-      className="bg-[var(--cyan)] text-[var(--on-cyan)]"
+      loading={pending}
     >
       {pending ? "Saving…" : "Save update"}
     </Button>
@@ -58,7 +57,7 @@ export function IncidentTimelineEditor({
                 }}
                 className="space-y-2"
               >
-                <FluentSelect
+                <Select
                   aria-label="Timeline status"
                   name="status"
                   defaultValue={update.status}
@@ -67,12 +66,11 @@ export function IncidentTimelineEditor({
                   {INCIDENT_STATUSES.map((status) => (
                     <option key={status} value={status}>{INCIDENT_STATUS_LABEL[status]}</option>
                   ))}
-                </FluentSelect>
+                </Select>
                 <Textarea
                   aria-label="Timeline message"
                   name="body"
                   defaultValue={update.body}
-                  resize="vertical"
                   rows={4}
                   required
                   className="w-full rounded-none border border-[var(--line)] bg-[var(--bg)] text-sm"
@@ -85,7 +83,7 @@ export function IncidentTimelineEditor({
                 </p>
                 <div className="flex gap-2">
                   <SaveUpdateButton />
-                  <Button appearance="outline" shape="square" type="button" onClick={() => setEditingId(null)}>
+                  <Button variant="outline" size="sm" type="button" onClick={() => setEditingId(null)}>
                     Cancel
                   </Button>
                 </div>
@@ -99,12 +97,11 @@ export function IncidentTimelineEditor({
                   <span className="text-xs text-[var(--fg-dim)]">{update.createdAtLabel}</span>
                   {update.editedAtLabel && <span className="text-[10px] text-[var(--fg-dim)]">Edited {update.editedAtLabel}</span>}
                   <Button
-                    appearance="transparent"
-                    shape="square"
-                    size="small"
+                    variant="link"
+                    size="sm"
                     type="button"
                     onClick={() => setEditingId(update.id)}
-                    className="ml-auto underline"
+                    className="ml-auto"
                   >
                     Edit
                   </Button>

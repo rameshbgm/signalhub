@@ -1,12 +1,12 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { FluentSelect } from "@/components/FluentSelect";
+import { Select } from "@/components/ui/select";
 
 export function PageSelect({ pages, basePath, selected }: { pages: { id: string; name: string }[]; basePath: string; selected?: string }) {
   const router = useRouter();
   return (
-    <FluentSelect
+    <Select
       aria-label="Status page"
       defaultValue={selected}
       onChange={(e) => router.push(`${basePath}?pageId=${e.target.value}`)}
@@ -17,6 +17,6 @@ export function PageSelect({ pages, basePath, selected }: { pages: { id: string;
           {p.name}
         </option>
       ))}
-    </FluentSelect>
+    </Select>
   );
 }
