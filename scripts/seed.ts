@@ -50,8 +50,6 @@ async function createPage(
     removeBranding: false,
     customCss: null,
     themePreset: "DEFAULT",
-    themeMode: "SYSTEM",
-    allowThemeOverride: true,
     analyticsEnabled: true,
     publishedDesign: templateDesign("CENTERED_SUMMARY", "#0f9fab"),
     publishedDesignVersion: 1,

@@ -1,6 +1,5 @@
 import Link from "next/link";
 import Image from "next/image";
-import { ThemeToggle } from "@/components/ThemeToggle";
 import { safeUrl } from "@/lib/url";
 import type { ReactNode } from "react";
 import type { StatusPageDesign } from "@/lib/page-design";
@@ -21,8 +20,6 @@ export function PublicHeader({
   coverImageCropWidth,
   coverImageCropHeight,
   brandColor,
-  allowThemeOverride = true,
-  themeMode = "SYSTEM",
   design,
   subscribeSlot,
 }: {
@@ -40,8 +37,6 @@ export function PublicHeader({
   coverImageCropWidth?: number | null;
   coverImageCropHeight?: number | null;
   brandColor?: string;
-  allowThemeOverride?: boolean;
-  themeMode?: string;
   design?: StatusPageDesign;
   subscribeSlot?: ReactNode;
 }) {
@@ -58,8 +53,6 @@ export function PublicHeader({
   const effectiveCoverImageCropY = presentation?.coverImageCropY ?? coverImageCropY;
   const effectiveCoverImageCropWidth = presentation?.coverImageCropWidth ?? coverImageCropWidth;
   const effectiveCoverImageCropHeight = presentation?.coverImageCropHeight ?? coverImageCropHeight;
-  const effectiveThemeMode = design?.theme.mode ?? themeMode;
-  const effectiveThemeOverride = design?.theme.allowVisitorMode ?? allowThemeOverride;
   const headerVariant = header?.variant ?? (layout === "COVER" ? "HERO" : layout === "MINIMAL" ? "MINIMAL" : "STANDARD");
   const visibleItems = header?.items.filter((item) => !item.hidden) ?? standardHeaderItems();
   const showCompleteCover = Boolean(effectiveCoverImageUrl && effectiveCoverImageFit !== "COVER");
@@ -110,7 +103,6 @@ export function PublicHeader({
           );
         }
         if (item.type === "SUBSCRIBE" && subscribeSlot) return <span key={item.id}>{subscribeSlot}</span>;
-        if (item.type === "THEME_TOGGLE" && effectiveThemeOverride && effectiveThemeMode === "SYSTEM") return <span key={item.id}><ThemeToggle /></span>;
         return null;
       })}
     </div>
@@ -253,6 +245,5 @@ function standardHeaderItems() {
     { id: "legacy-logo", type: "LOGO" as const, hidden: false },
     { id: "legacy-title", type: "TITLE" as const, hidden: false },
     { id: "legacy-hub", type: "HUB_LINK" as const, hidden: false },
-    { id: "legacy-theme", type: "THEME_TOGGLE" as const, hidden: false },
   ];
 }

@@ -20,7 +20,6 @@ export type UptimeIconStyle = (typeof UPTIME_ICON_STYLES)[number];
 export const PAGE_THEME_PRESET_KEYS = [
   "DEFAULT",
   "OCEAN",
-  "MIDNIGHT",
   "EMERALD",
   "SUNSET",
   "VIOLET",
@@ -34,7 +33,6 @@ export type PageThemePresetKey = (typeof PAGE_THEME_PRESET_KEYS)[number];
 export const PAGE_THEME_PRESET_LABELS: Record<PageThemePresetKey, string> = {
   DEFAULT: "Default",
   OCEAN: "Ocean",
-  MIDNIGHT: "Midnight",
   EMERALD: "Emerald",
   SUNSET: "Sunset",
   VIOLET: "Violet",
@@ -47,7 +45,6 @@ export const PAGE_THEME_PRESET_LABELS: Record<PageThemePresetKey, string> = {
 export const PAGE_THEME_PRESET_DESCRIPTIONS: Record<PageThemePresetKey, string> = {
   DEFAULT: "Balanced neutral styling with the SignalHub teal accent.",
   OCEAN: "Clear blues and cyan accents for infrastructure and network pages.",
-  MIDNIGHT: "A dark operations theme designed for low-light dashboards.",
   EMERALD: "Calm greens with strong operational-state emphasis.",
   SUNSET: "Warm orange and amber accents with an inviting surface palette.",
   VIOLET: "A modern purple and pink brand treatment with soft backgrounds.",
@@ -260,7 +257,7 @@ const surfaceSchema = z.object({
 
 const headerItemSchema = z.object({
   id: blockId,
-  type: z.enum(["LOGO", "TITLE", "HUB_LINK", "NAVIGATION", "SUPPORT", "SUBSCRIBE", "THEME_TOGGLE"]),
+  type: z.enum(["LOGO", "TITLE", "HUB_LINK", "NAVIGATION", "SUPPORT", "SUBSCRIBE"]),
   hidden: z.boolean().default(false),
 });
 
@@ -284,9 +281,22 @@ function placementsFromLegacySurface(surface: Record<string, unknown>) {
   ].filter((placement) => placement.blockId);
 }
 
+// The light-only release retired the Midnight preset and the header theme
+// toggle. Stored designs still carry them, so map them to current values
+// instead of failing validation and losing the owner's design.
+function dropRetiredThemeFields(design: Record<string, unknown>) {
+  const theme = design.theme as { preset?: unknown } | undefined;
+  if (theme && typeof theme === "object" && theme.preset === "MIDNIGHT") theme.preset = "DEFAULT";
+  const header = (design.chrome as { header?: { items?: unknown } } | undefined)?.header;
+  if (header && Array.isArray(header.items)) {
+    header.items = header.items.filter((item) => (item as { type?: unknown })?.type !== "THEME_TOGGLE");
+  }
+}
+
 function migrateDesignInput(input: unknown) {
   if (!input || typeof input !== "object" || Array.isArray(input)) return input;
   const design = structuredClone(input) as Record<string, unknown>;
+  dropRetiredThemeFields(design);
   const surfaces = design.surfaces;
   if (!surfaces || typeof surfaces !== "object" || Array.isArray(surfaces)) return design;
   const nextSurfaces: Record<string, unknown> = {};
@@ -316,8 +326,6 @@ const statusPageDesignV2Schema = z
     templateKey: z.enum(PAGE_TEMPLATE_KEYS),
     theme: z.object({
       preset: z.enum(PAGE_THEME_PRESET_KEYS).default("DEFAULT"),
-      mode: z.enum(["SYSTEM", "LIGHT", "DARK"]).default("SYSTEM"),
-      allowVisitorMode: z.boolean().default(true),
       palette: z.object({
         brand: hexColor,
         accent: hexColor,
@@ -330,12 +338,6 @@ const statusPageDesignV2Schema = z
         partialOutage: hexColor,
         majorOutage: hexColor,
         maintenance: hexColor,
-      }),
-      darkPalette: z.object({
-        background: hexColor,
-        surface: hexColor,
-        text: hexColor,
-        mutedText: hexColor,
       }),
       typography: z.enum(["SYSTEM", "HUMANIST", "GEOMETRIC", "MONO"]).default("SYSTEM"),
       density: z.enum(["COMPACT", "COMFORTABLE", "SPACIOUS"]).default("COMFORTABLE"),
@@ -396,8 +398,6 @@ const statusPageDesignV2Schema = z
     const contrastPairs: Array<[string, string, string]> = [
       [design.theme.palette.text, design.theme.palette.background, "Light text/background"],
       [design.theme.palette.text, design.theme.palette.surface, "Light text/surface"],
-      [design.theme.darkPalette.text, design.theme.darkPalette.background, "Dark text/background"],
-      [design.theme.darkPalette.text, design.theme.darkPalette.surface, "Dark text/surface"],
     ];
     for (const [foreground, background, label] of contrastPairs) {
       if (contrastRatio(foreground, background) < 4.5) {
@@ -504,7 +504,6 @@ const standardHeader = [
   { id: "header-navigation", type: "NAVIGATION" as const, hidden: false },
   { id: "header-support", type: "SUPPORT" as const, hidden: false },
   { id: "header-subscribe", type: "SUBSCRIBE" as const, hidden: true },
-  { id: "header-theme", type: "THEME_TOGGLE" as const, hidden: false },
 ];
 const standardFooter = [
   { id: "footer-text", type: "CUSTOM_TEXT" as const, hidden: true },
@@ -547,8 +546,6 @@ function baseDesign(templateKey: PageTemplateKey, brand = "#0f8ca8"): StatusPage
     templateKey,
     theme: {
       preset: "DEFAULT",
-      mode: "SYSTEM",
-      allowVisitorMode: true,
       palette: {
         brand,
         accent: brand,
@@ -561,12 +558,6 @@ function baseDesign(templateKey: PageTemplateKey, brand = "#0f8ca8"): StatusPage
         partialOutage: COMPONENT_STATUS_COLOR.PARTIAL_OUTAGE,
         majorOutage: COMPONENT_STATUS_COLOR.MAJOR_OUTAGE,
         maintenance: COMPONENT_STATUS_COLOR.UNDER_MAINTENANCE,
-      },
-      darkPalette: {
-        background: "#090d13",
-        surface: "#111720",
-        text: "#edf3f8",
-        mutedText: "#a2adba",
       },
       typography: "SYSTEM",
       density: "COMFORTABLE",
@@ -670,7 +661,6 @@ export function templateDesign(templateKey: PageTemplateKey, brand = "#0f8ca8"):
       design.theme.contentWidth = "WIDE";
       break;
     case "DENSE_OPERATIONS":
-      design.theme.mode = "DARK";
       design.theme.density = "COMPACT";
       design.theme.contentWidth = "WIDE";
       design.theme.radius = "SMALL";
@@ -720,52 +710,38 @@ export function pageThemePreset(key: PageThemePresetKey): StatusPageDesign["them
       return theme;
     case "OCEAN":
       theme.palette = { ...theme.palette, brand: "#0369a1", accent: "#22a6c7", background: "#f0f9ff", surface: "#ffffff", text: "#0c3b58", mutedText: "#527086" };
-      theme.darkPalette = { background: "#06131d", surface: "#0c2230", text: "#e5f6ff", mutedText: "#9bc0d2" };
       theme.radius = "LARGE";
-      return theme;
-    case "MIDNIGHT":
-      theme.mode = "DARK";
-      theme.palette = { ...theme.palette, brand: "#60a5fa", accent: "#a78bfa", background: "#070b14", surface: "#111827", text: "#f8fafc", mutedText: "#a9b4c5" };
-      theme.darkPalette = { background: "#070b14", surface: "#111827", text: "#f8fafc", mutedText: "#a9b4c5" };
-      theme.shadow = "ELEVATED";
       return theme;
     case "EMERALD":
       theme.palette = { ...theme.palette, brand: "#047857", accent: "#22a875", background: "#f0fdf4", surface: "#ffffff", text: "#064e3b", mutedText: "#557568" };
-      theme.darkPalette = { background: "#061612", surface: "#0d2820", text: "#ecfdf5", mutedText: "#9bc6b6" };
       theme.radius = "LARGE";
       return theme;
     case "SUNSET":
       theme.palette = { ...theme.palette, brand: "#c2410c", accent: "#e79b13", background: "#fff7ed", surface: "#ffffff", text: "#5a2411", mutedText: "#8a6252" };
-      theme.darkPalette = { background: "#1b0d08", surface: "#2b1710", text: "#fff7ed", mutedText: "#d8aa96" };
       theme.typography = "HUMANIST";
       return theme;
     case "VIOLET":
       theme.palette = { ...theme.palette, brand: "#7c3aed", accent: "#db2777", background: "#faf5ff", surface: "#ffffff", text: "#3b1768", mutedText: "#755e8e" };
-      theme.darkPalette = { background: "#130b20", surface: "#221335", text: "#faf5ff", mutedText: "#c2add8" };
       theme.radius = "LARGE";
       theme.shadow = "ELEVATED";
       return theme;
     case "SLATE":
       theme.palette = { ...theme.palette, brand: "#334155", accent: "#64748b", background: "#f8fafc", surface: "#ffffff", text: "#0f172a", mutedText: "#64748b" };
-      theme.darkPalette = { background: "#0f172a", surface: "#1e293b", text: "#f8fafc", mutedText: "#a8b3c4" };
       theme.radius = "SMALL";
       theme.shadow = "NONE";
       return theme;
     case "HIGH_CONTRAST":
       theme.palette = { ...theme.palette, brand: "#005fcc", accent: "#005fcc", background: "#ffffff", surface: "#ffffff", text: "#000000", mutedText: "#333333" };
-      theme.darkPalette = { background: "#000000", surface: "#0a0a0a", text: "#ffffff", mutedText: "#d1d1d1" };
       theme.radius = "NONE";
       theme.shadow = "NONE";
       return theme;
     case "WARM_PAPER":
       theme.palette = { ...theme.palette, brand: "#9a3412", accent: "#b7791f", background: "#fffaf0", surface: "#fffef9", text: "#422006", mutedText: "#82644c" };
-      theme.darkPalette = { background: "#1a1009", surface: "#2a1b10", text: "#fffaf0", mutedText: "#d5b99e" };
       theme.typography = "HUMANIST";
       theme.radius = "SMALL";
       return theme;
     case "SOFT_BLUE":
       theme.palette = { ...theme.palette, brand: "#2563eb", accent: "#0891b2", background: "#f5f7ff", surface: "#ffffff", text: "#172554", mutedText: "#63709a" };
-      theme.darkPalette = { background: "#09112b", surface: "#111d3f", text: "#eef2ff", mutedText: "#a9b5d8" };
       theme.density = "SPACIOUS";
       theme.radius = "LARGE";
       return theme;
@@ -774,13 +750,7 @@ export function pageThemePreset(key: PageThemePresetKey): StatusPageDesign["them
 
 export function designWithThemePreset(design: StatusPageDesign, key: PageThemePresetKey) {
   const next = structuredClone(design);
-  const mode = next.theme.mode;
-  const allowVisitorMode = next.theme.allowVisitorMode;
   next.theme = pageThemePreset(key);
-  // Presets are color/appearance systems. Color mode and visitor override are
-  // independent choices and must survive a preset change.
-  next.theme.mode = mode;
-  next.theme.allowVisitorMode = allowVisitorMode;
   return statusPageDesignSchema.parse(next);
 }
 
@@ -788,8 +758,6 @@ export function legacyPageDesign(page: {
   brandColor?: string | null;
   layout?: string | null;
   themePreset?: string | null;
-  themeMode?: string | null;
-  allowThemeOverride?: boolean | null;
 }): StatusPageDesign {
   const templateKey: PageTemplateKey =
     PAGE_TEMPLATE_KEYS.includes(page.layout as PageTemplateKey)
@@ -800,15 +768,8 @@ export function legacyPageDesign(page: {
         ? "MINIMAL_ENTERPRISE"
         : "CENTERED_SUMMARY";
   const design = templateDesign(templateKey, page.brandColor || "#0f8ca8");
-  design.theme.mode = ["SYSTEM", "LIGHT", "DARK"].includes(page.themeMode ?? "")
-    ? (page.themeMode as "SYSTEM" | "LIGHT" | "DARK")
-    : "SYSTEM";
-  design.theme.allowVisitorMode = page.allowThemeOverride ?? true;
   if (PAGE_THEME_PRESET_KEYS.includes(page.themePreset as PageThemePresetKey)) {
-    const presetDesign = designWithThemePreset(design, page.themePreset as PageThemePresetKey);
-    presetDesign.theme.mode = design.theme.mode;
-    presetDesign.theme.allowVisitorMode = design.theme.allowVisitorMode;
-    return presetDesign;
+    return designWithThemePreset(design, page.themePreset as PageThemePresetKey);
   }
   if (page.themePreset === "CALM") {
     design.theme.palette.background = "#f7f7f4";
@@ -829,8 +790,6 @@ export function pageDesignFor(page: {
   brandColor?: string | null;
   layout?: string | null;
   themePreset?: string | null;
-  themeMode?: string | null;
-  allowThemeOverride?: boolean | null;
   logoUrl?: string | null;
   faviconUrl?: string | null;
   coverImageUrl?: string | null;

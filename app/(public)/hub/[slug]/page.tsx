@@ -220,8 +220,6 @@ export default async function HubPage({ params }: { params: Promise<{ slug: stri
         coverImageCropWidth={hub.coverImageCropWidth}
         coverImageCropHeight={hub.coverImageCropHeight}
         brandColor={hub.brandColor}
-        allowThemeOverride={hub.allowThemeOverride ?? true}
-        themeMode={hub.themeMode ?? "SYSTEM"}
         design={design}
         subscribeSlot={<SubscribeModal pageSlug={hub.slug} brandColor={design.theme.palette.brand} feedsEnabled={hub.type === "PUBLIC"} components={[]} />}
       />

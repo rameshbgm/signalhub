@@ -41,7 +41,7 @@ export default async function AccessPage({
 
   return (
     <PageDesignShell pageId={page.id} publishedVersion={page.publishedDesignVersion} design={design} customCss={scopeCustomCss(page.customCss, page.id)} language={page.language}>
-      <PublicHeader name={page.name} logoUrl={page.logoUrl} supportUrl={page.supportUrl} layout={page.layout} coverImageUrl={page.coverImageUrl} coverImageFit={page.coverImageFit} coverImagePositionX={page.coverImagePositionX} coverImagePositionY={page.coverImagePositionY} coverImageCropX={page.coverImageCropX} coverImageCropY={page.coverImageCropY} coverImageCropWidth={page.coverImageCropWidth} coverImageCropHeight={page.coverImageCropHeight} brandColor={page.brandColor} allowThemeOverride={page.allowThemeOverride ?? true} themeMode={page.themeMode ?? "SYSTEM"} design={design} />
+      <PublicHeader name={page.name} logoUrl={page.logoUrl} supportUrl={page.supportUrl} layout={page.layout} coverImageUrl={page.coverImageUrl} coverImageFit={page.coverImageFit} coverImagePositionX={page.coverImagePositionX} coverImagePositionY={page.coverImagePositionY} coverImageCropX={page.coverImageCropX} coverImageCropY={page.coverImageCropY} coverImageCropWidth={page.coverImageCropWidth} coverImageCropHeight={page.coverImageCropHeight} brandColor={page.brandColor} design={design} />
       <PageSurfaceLayout design={design} surface="access" renderBlock={renderBlock} />
       <PublicFooter removeBranding={page.removeBranding} termsUrl={page.termsUrl} privacyUrl={page.privacyUrl} supportUrl={page.supportUrl} design={design} />
     </PageDesignShell>

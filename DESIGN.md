@@ -56,7 +56,7 @@ SignalHub is an operations tool, not a decorative dashboard. The UI reads as a s
 
 Key characteristics:
 
-- Dark midnight enamel for signed-in operations; owner-selected palettes remain authoritative on public pages.
+- Light-only workspace (no dark theme); owner-selected palettes remain authoritative on public pages.
 - Fine route lines and square, mechanical dividers establish structure instead of floating rounded cards.
 - Signal-lime is scarce: reserve it for live, selected, confirmed, or primary action states.
 

@@ -204,8 +204,6 @@ export default async function PublicStatusPage({ params }: { params: Promise<{ s
         coverImageCropWidth={page.coverImageCropWidth}
         coverImageCropHeight={page.coverImageCropHeight}
         brandColor={page.brandColor}
-        allowThemeOverride={page.allowThemeOverride ?? true}
-        themeMode={page.themeMode ?? "SYSTEM"}
         design={design}
         subscribeSlot={
           <SubscribeModal

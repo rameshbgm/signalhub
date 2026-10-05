@@ -3,7 +3,6 @@
 import { useCallback, useState } from "react";
 import { PlatformActionForm } from "@/components/platform/PlatformActionForm";
 import { PlatformSubmitButton } from "@/components/platform/PlatformSubmitButton";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Radio } from "@/components/ui/radio";
 
@@ -14,22 +13,16 @@ export function PageAppearanceForm({
   presets,
   initialPreset,
   initialBrandColor,
-  initialMode,
-  initialAllowVisitorMode,
   customized,
 }: {
   action: (formData: FormData) => void | Promise<void>;
   presets: Preset[];
   initialPreset: string;
   initialBrandColor: string;
-  initialMode: "SYSTEM" | "LIGHT" | "DARK";
-  initialAllowVisitorMode: boolean;
   customized: boolean;
 }) {
   const [preset, setPreset] = useState(initialPreset);
   const [brandColor, setBrandColor] = useState(initialBrandColor);
-  const [mode, setMode] = useState(initialMode);
-  const [allowVisitorMode, setAllowVisitorMode] = useState(initialAllowVisitorMode);
   const [savedRevision, setSavedRevision] = useState(0);
   const selected = presets.find((item) => item.key === preset) ?? presets[0];
   const restoreControlledSelections = useCallback(() => {
@@ -71,18 +64,6 @@ export function PageAppearanceForm({
               <Input value={brandColor} onChange={(event) => setBrandColor(event.target.value)} pattern="#[0-9a-fA-F]{6}" aria-label="Brand color hex value" className="w-32 font-mono uppercase" />
             </span>
           </label>
-          <fieldset>
-            <legend className="text-xs font-semibold text-[var(--fg-soft)]">Visitor appearance</legend>
-            <div className="mt-2 grid gap-2 sm:grid-cols-3">
-              {[
-                ["SYSTEM", "Match device", "Use each visitor's light or dark preference."],
-                ["LIGHT", "Always light", "Keep the page in light mode."],
-                ["DARK", "Always dark", "Keep the page in dark mode."],
-              ].map(([value, label, description]) => <label key={value} className={`cursor-pointer border p-3 ${mode === value ? "border-[var(--cyan)] bg-[var(--cyan-soft)]" : "border-[var(--line)]"}`}><span className="flex items-center gap-2 text-sm font-semibold"><Radio name="themeMode" value={value} checked={mode === value} onChange={() => setMode(value as typeof mode)} />{label}</span><span className="mt-1 block pl-5 text-xs leading-5 text-[var(--fg-dim)]">{description}</span></label>)}
-            </div>
-          </fieldset>
-          {mode === "SYSTEM" && <label className="flex items-center gap-2 text-sm text-[var(--fg-soft)]"><Checkbox name="allowThemeOverride" checked={allowVisitorMode} onChange={(event) => setAllowVisitorMode(event.target.checked)} /> Let visitors switch light/dark</label>}
-          {mode !== "SYSTEM" && allowVisitorMode && <Input type="hidden" name="allowThemeOverride" value="on" />}
         </div>
         <aside className="overflow-hidden border border-[var(--line)] bg-[var(--surface-raised)] p-3" aria-label="Style preview">
           <p className="font-mono text-[10px] font-semibold uppercase tracking-wider text-[var(--fg-dim)]">Quick preview</p>

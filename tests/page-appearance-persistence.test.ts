@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 describe("page appearance persistence", () => {
-  it("re-applies controlled preset and visitor-mode selections after a successful server action", () => {
+  it("re-applies controlled preset selection after a successful server action", () => {
     const appearance = readFileSync("components/admin/PageAppearanceForm.tsx", "utf8");
     const actionForm = readFileSync("components/platform/PlatformActionForm.tsx", "utf8");
 

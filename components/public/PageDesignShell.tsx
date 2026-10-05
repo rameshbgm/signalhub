@@ -16,16 +16,12 @@ export function PageDesignShell({
   language: string;
   children: ReactNode;
 }) {
-  const { palette, darkPalette } = design.theme;
+  const { palette } = design.theme;
   const style = {
     "--design-bg": palette.background,
     "--design-surface": palette.surface,
     "--design-fg": palette.text,
     "--design-fg-soft": palette.mutedText,
-    "--design-dark-bg": darkPalette.background,
-    "--design-dark-surface": darkPalette.surface,
-    "--design-dark-fg": darkPalette.text,
-    "--design-dark-fg-soft": darkPalette.mutedText,
     "--page-brand": palette.brand,
     "--page-accent": palette.accent,
   } as CSSProperties;
@@ -37,7 +33,6 @@ export function PageDesignShell({
       data-published-version={publishedVersion}
       data-template={design.templateKey}
       data-theme-preset={design.theme.preset}
-      data-theme-mode={design.theme.mode}
       data-density={design.theme.density}
       data-content-width={design.theme.contentWidth}
       data-radius={design.theme.radius}

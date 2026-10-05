@@ -4,7 +4,6 @@ import { fetchWithTimeout } from "@/lib/client-fetch";
 
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
-import { ThemeToggle } from "@/components/ThemeToggle";
 import { useRouter } from "next/navigation";
 import { LogoutButton } from "@/components/admin/LogoutButton";
 import { ChevronDown } from "lucide-react";
@@ -89,7 +88,6 @@ export function OrgSwitcher({
         </span>
         <ChevronDown aria-hidden size={16} className={`text-[var(--cyan)] transition-transform ${open ? "rotate-180" : ""}`} />
       </Button>
-      <ThemeToggle />
       <LogoutButton compact className="lg:hidden" />
 
       {open && (

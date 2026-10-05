@@ -92,8 +92,6 @@ export async function createPage(formData: FormData) {
       removeBranding: false,
       customCss: null,
       themePreset: "DEFAULT",
-      themeMode: "SYSTEM",
-      allowThemeOverride: true,
       analyticsEnabled: type === "PUBLIC",
       publishedDesign: initialDesign,
       publishedDesignVersion: 1,

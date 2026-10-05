@@ -93,8 +93,6 @@ export default async function HistoryPage({ params }: { params: Promise<{ slug: 
         coverImageCropWidth={page.coverImageCropWidth}
         coverImageCropHeight={page.coverImageCropHeight}
         brandColor={page.brandColor}
-        allowThemeOverride={page.allowThemeOverride ?? true}
-        themeMode={page.themeMode ?? "SYSTEM"}
         design={design}
         subscribeSlot={<SubscribeModal pageSlug={page.slug} brandColor={design.theme.palette.brand} feedsEnabled={page.type === "PUBLIC"} components={[]} />}
       />

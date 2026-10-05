@@ -141,8 +141,7 @@ export async function publishDesignDraft(pageId: string, expectedRevision: numbe
       const changed = await transaction.updateTable("pages").set({
         publishedDesign: design, publishedDesignVersion: liveVersion, designPublishedAt: now,
         brandColor: design.theme.palette.brand, layout: design.templateKey,
-        themePreset: design.theme.preset, themeMode: design.theme.mode,
-        allowThemeOverride: design.theme.allowVisitorMode,
+        themePreset: design.theme.preset,
         logoUrl: presentation.logoUrl, faviconUrl: presentation.faviconUrl,
         coverImageUrl: presentation.coverImageUrl, coverImageFit: presentation.coverImageFit,
         coverImagePositionX: presentation.coverImagePositionX, coverImagePositionY: presentation.coverImagePositionY,

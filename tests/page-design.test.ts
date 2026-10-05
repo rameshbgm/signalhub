@@ -105,8 +105,8 @@ describe("status page design", () => {
     expect(components?.type === "COMPONENT_STATUS" && components.settings.showUptime).toBe(true);
   });
 
-  it("ships ten valid theme presets including the default", () => {
-    expect(PAGE_THEME_PRESET_KEYS).toHaveLength(10);
+  it("ships nine valid theme presets including the default", () => {
+    expect(PAGE_THEME_PRESET_KEYS).toHaveLength(9);
     expect(PAGE_THEME_PRESET_KEYS).toContain("DEFAULT");
     for (const key of PAGE_THEME_PRESET_KEYS) {
       const themed = designWithThemePreset(templateDesign("CENTERED_SUMMARY"), key);
@@ -119,16 +119,20 @@ describe("status page design", () => {
     }
   });
 
-  it("keeps color mode and visitor override independent from theme presets", () => {
-    const design = templateDesign("CENTERED_SUMMARY");
-    design.theme.mode = "LIGHT";
-    design.theme.allowVisitorMode = false;
-    const themed = designWithThemePreset(design, "MIDNIGHT");
+  it("maps retired dark-mode fields in stored designs to the light-only schema", () => {
+    const stored = JSON.parse(JSON.stringify(templateDesign("CENTERED_SUMMARY"))) as { theme: Record<string, unknown>; chrome: { header: { items: unknown[] } } };
+    stored.theme.preset = "MIDNIGHT";
+    stored.theme.mode = "DARK";
+    stored.theme.allowVisitorMode = true;
+    stored.theme.darkPalette = { background: "#070b14", surface: "#111827", text: "#f8fafc", mutedText: "#a9b4c5" };
+    stored.chrome.header.items.push({ id: "header-theme", type: "THEME_TOGGLE", hidden: false });
 
-    expect(themed.theme.preset).toBe("MIDNIGHT");
-    expect(themed.theme.mode).toBe("LIGHT");
-    expect(themed.theme.allowVisitorMode).toBe(false);
-    expect(themed.theme.palette.background).toBe("#070b14");
+    const parsed = statusPageDesignSchema.parse(stored);
+
+    expect(parsed.theme.preset).toBe("DEFAULT");
+    expect(parsed.theme).not.toHaveProperty("mode");
+    expect(parsed.theme).not.toHaveProperty("darkPalette");
+    expect(parsed.chrome.header.items.some((item) => (item.type as string) === "THEME_TOGGLE")).toBe(false);
   });
 
   it("detects unchanged normalized drafts before publishing a new version", () => {
@@ -222,17 +226,13 @@ describe("status page design", () => {
     expect(result.success).toBe(true);
   });
 
-  it("maps existing layouts and themes without dropping visitor preferences", () => {
+  it("maps existing layouts and themes", () => {
     const cover = legacyPageDesign({
       layout: "COVER",
       brandColor: "#abcdef",
       themePreset: "CALM",
-      themeMode: "DARK",
-      allowThemeOverride: false,
     });
     expect(cover.templateKey).toBe("ILLUSTRATED_HERO");
-    expect(cover.theme.mode).toBe("DARK");
-    expect(cover.theme.allowVisitorMode).toBe(false);
     expect(cover.theme.palette.brand).toBe("#abcdef");
     expect(cover.theme.palette.background).toBe("#f7f7f4");
   });

@@ -1230,9 +1230,7 @@ function ThemePanel({
         <label className="text-xs">Brand color
           <Input type="color" value={design.theme.palette.brand} onChange={(event) => updatePalette("brand", event.target.value)} className="mt-1 h-9 w-full p-1" />
         </label>
-        <Select label="Visitor appearance" value={design.theme.mode} onChange={(value) => updateTheme("mode", value as StatusPageDesign["theme"]["mode"])} options={["SYSTEM", "LIGHT", "DARK"]} />
       </div>
-      <Check label="Let visitors switch light/dark" checked={design.theme.allowVisitorMode} onChange={(value) => updateTheme("allowVisitorMode", value)} />
       <div className="my-4 border-t border-[var(--line)]" />
       <div className="grid grid-cols-2 gap-2">
         <Select label="Type" value={design.theme.typography} onChange={(value) => updateTheme("typography", value as StatusPageDesign["theme"]["typography"])} options={["SYSTEM", "HUMANIST", "GEOMETRIC", "MONO"]} />
@@ -1348,9 +1346,7 @@ function DesignPreview({
   onSelectBlock?: (id: string) => void;
   onSelectChrome?: () => void;
 }) {
-  const palette = design.theme.mode === "DARK"
-    ? { ...design.theme.palette, ...design.theme.darkPalette }
-    : design.theme.palette;
+  const palette = design.theme.palette;
   const breakpoint = viewport.toLowerCase() as PageDesignBreakpoint;
   const placements = pageGridPlacements(design, surface, breakpoint);
   const placementByBlock = new Map(placements.map((placement) => [placement.blockId, placement]));

@@ -10,7 +10,6 @@ describe("public support link placement", () => {
       <PublicHeader
         name="Status"
         supportUrl="https://example.com/support"
-        allowThemeOverride={false}
         design={design}
       />,
     );
@@ -52,7 +51,6 @@ describe("public support link placement", () => {
         name="Status"
         coverImageUrl="/assets/cover.png"
         coverImageFit="CONTAIN"
-        allowThemeOverride={false}
       />,
     );
 
@@ -70,7 +68,6 @@ describe("public support link placement", () => {
     const header = renderToStaticMarkup(
       <PublicHeader
         name="Status"
-        allowThemeOverride={false}
         design={design}
       />,
     );
