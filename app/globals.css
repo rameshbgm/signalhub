@@ -13,13 +13,13 @@
 
   --cyan: var(--color-primary);
   --cyan-soft: var(--color-primary-soft);
-  --green: #188038;
+  --green: #059669;
   --green-soft: #e6f4ea;
   --amber: #b06000;
   --amber-soft: #fef7e0;
   --orange: #c26401;
   --orange-soft: #fce8e6;
-  --red: #d93025;
+  --red: #e11d48;
   --red-soft: #fce8e6;
   --blue: var(--color-primary);
   --blue-soft: var(--color-primary-soft);
@@ -27,11 +27,11 @@
   --on-cyan: #ffffff;
   --on-green: #ffffff;
 
-  --hover-overlay: #f1f3f4;
-  --hover-overlay-strong: #e8eaed;
+  --hover-overlay: #f3edff;
+  --hover-overlay-strong: #ebe3ff;
   --panel-glass: rgba(255, 255, 255, 0.96);
   --input-overlay-bg: #ffffff;
-  --input-overlay-border: #c7cbd1;
+  --input-overlay-border: #d3cdea;
   --input-overlay-border-focus: var(--color-primary);
   --focus: var(--color-primary);
   --placeholder-overlay: var(--color-ink-dim);
@@ -121,89 +121,20 @@
 }
 
 body {
+  background: var(--bg);
+  color: var(--fg);
   font-family: var(--font-body-family);
-  transition: background-color 0.15s ease, color 0.15s ease;
 }
 
-/* Dispatch Strip Wall — the signed-in console is a shared operational horizon,
-   not a collection of isolated product pages. The public status surface keeps
-   its own palette under .status-theme. */
-
-/* Public pages inherit their owner-selected colours, but share a more precise
-   route-line chrome so they feel like the public face of the same system. */
-.status-dispatch-shell {
-  background-image:
-    linear-gradient(90deg, color-mix(in srgb, var(--page-brand, var(--cyan)) 6%, transparent) 1px, transparent 1px);
-  background-size: 7.5rem 100%;
+.font-mono {
+  font-family: var(--font-mono-family);
 }
 
-.status-public-header {
-  position: relative;
-  box-shadow: 0 1px 0 color-mix(in srgb, var(--page-brand, var(--cyan)) 18%, transparent);
+@layer utilities {
+  .status-dot {
+    @apply inline-block w-2.5 h-2.5 mr-2 align-middle;
+  }
 }
-
-.status-public-header::before {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: clamp(4rem, 13vw, 12rem);
-  height: 2px;
-  background: var(--page-brand, var(--cyan));
-  content: "";
-}
-
-.status-public-nav {
-  letter-spacing: 0.01em;
-}
-
-.status-public-nav a {
-  position: relative;
-  padding-bottom: 0.2rem;
-}
-
-.status-public-nav a::after {
-  position: absolute;
-  right: 0;
-  bottom: 0;
-  left: 0;
-  height: 1px;
-  background: currentColor;
-  content: "";
-  opacity: 0;
-  transform: scaleX(0.55);
-  transition: opacity 140ms ease, transform 140ms ease;
-}
-
-.status-public-nav a:hover::after,
-.status-public-nav a:focus-visible::after {
-  opacity: 0.8;
-  transform: scaleX(1);
-}
-
-.status-public-title {
-  letter-spacing: -0.035em;
-}
-
-.status-public-header--hero::before {
-  background: var(--page-brand, var(--cyan));
-}
-
-.status-public-footer {
-  position: relative;
-}
-
-.status-public-footer::before {
-  position: absolute;
-  top: -1px;
-  left: max(1rem, calc((100% - 80rem) / 2));
-  width: 4rem;
-  height: 1px;
-  background: var(--page-brand, var(--cyan));
-  content: "";
-}
-
-/* Console-wide resilience: grid/flex descendants may contain long domains,
-   IDs, and integration names, so they must be allowed to shrink on phones. */
 
 /* Every button gets a short click lock. Mutation/submit actions additionally
    show an accessible progress spinner until React completes them or the hard
@@ -273,45 +204,10 @@ button[data-button-busy="saving"]::after {
   }
 }
 
-.ui-file-trigger {
-  display: inline-flex;
-  min-height: 2rem;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid var(--line);
-  background: var(--surface-raised);
-  color: var(--fg);
-  cursor: pointer;
-  padding: 0.375rem 0.75rem;
-  font-size: 0.75rem;
-  font-weight: 600;
-  transition: border-color 140ms ease, background-color 140ms ease, color 140ms ease;
-}
-
-.ui-file-trigger:hover {
-  border-color: var(--cyan);
-  background: var(--cyan-soft);
-  color: var(--cyan);
-}
-
-@keyframes ui-reveal {
-  from { opacity: 0; transform: translateY(-0.25rem) scale(0.99); }
-  to { opacity: 1; transform: translateY(0) scale(1); }
-}
-
-@keyframes ui-fade {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-/* Keep the shared form primitives aligned with the console token system. */
-
-/* Keep native selects visually aligned with the rest of the console form
-   controls. The application Select primitive is used for interactive menus. */
 select:not([multiple]) {
   min-height: 2.5rem;
   height: auto;
-  border-radius: 0.25rem;
+  border-radius: var(--radius-control);
   color: var(--fg) !important;
   font-family: var(--font-body-family) !important;
   font-size: 1rem !important;
@@ -325,108 +221,6 @@ select:not([multiple]) {
 
 .font-mono {
   font-family: var(--font-mono-family);
-}
-
-@layer utilities {
-  .status-dot {
-    @apply inline-block w-2.5 h-2.5 mr-2 align-middle;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .pulse-dot::after {
-    animation: none !important;
-  }
-}
-
-/* Signal Workspace replacement layer. This intentionally supersedes the
-   former dark console treatment with a light, enterprise workspace system. */
-body {
-  background: var(--bg);
-  color: var(--fg);
-  font-family: var(--font-body-family);
-}
-
-/* Keep the compact page actions identical across anchors and form buttons. */
-.page-management-action-icon {
-  display: inline-flex !important;
-  width: 2.5rem !important;
-  min-width: 2.5rem !important;
-  height: 2.5rem !important;
-  min-height: 2.5rem !important;
-  align-items: center;
-  justify-content: center;
-  padding: 0 !important;
-}
-.page-management-action-icon svg { color: var(--cyan); transition: color 0.2s ease; }
-.page-management-action-icon[aria-label^="Delete"] svg { color: var(--red); }
-.page-management-action-icon[aria-label*="unavailable"] svg { color: var(--fg-dim); }
-
-.status-dispatch-shell { background: var(--bg) !important; background-image: none !important; }
-.status-public-header { box-shadow: 0 1px 0 var(--line); }
-.status-public-header::before { height: 3px; }
-.status-public-header :where(a, button) { border-radius: 0.5rem; }
-.status-public-title { font-family: var(--font-body-family); font-weight: 600; }
-.status-public-footer { background: var(--surface); }
-
-@media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after { scroll-behavior: auto !important; }
-}
-
-/* ---------- pulsing live dot ---------- */
-
-.pulse-dot {
-  position: relative;
-}
-.pulse-dot::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: 9999px;
-  background: var(--pulse-color, var(--cyan));
-  animation: pulse-ring 2.2s cubic-bezier(0.16, 1, 0.3, 1) infinite;
-}
-@keyframes pulse-ring {
-  0% {
-    transform: scale(1);
-    opacity: 0.7;
-  }
-  80%,
-  100% {
-    transform: scale(2.6);
-    opacity: 0;
-  }
-}
-
-/* ---------- console grid + scanline texture ---------- */
-
-.grain {
-  position: relative;
-}
-.grain::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  opacity: 0.5;
-  background-image:
-    linear-gradient(rgba(34, 211, 238, 0.05) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(34, 211, 238, 0.05) 1px, transparent 1px);
-  background-size: 32px 32px;
-}
-.grain::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  opacity: 0.4;
-  background: repeating-linear-gradient(
-    to bottom,
-    transparent 0,
-    transparent 3px,
-    rgba(0, 0, 0, 0.15) 3px,
-    rgba(0, 0, 0, 0.15) 4px
-  );
 }
 
 /* ---------- help tooltip ---------- */
@@ -483,72 +277,91 @@ body {
   }
 }
 
-/* Public operations surface. This layer changes the reading structure of the
-   published status page while leaving its data, block order, and owner palette
-   intact. Services read as one dispatch strip wall; incidents and metrics read
-   as evidence alongside it, not as unrelated floating cards. */
+/* Public status surface ("Prism"). Owners keep their palette through the
+   .status-theme variables; this layer only sets structure, rounding and motion. */
 .status-dispatch-shell {
-  --public-rule: color-mix(in srgb, var(--page-brand, var(--cyan)) 25%, var(--line));
-  --public-tint: color-mix(in srgb, var(--page-brand, var(--cyan)) 7%, var(--surface));
+  --public-rule: color-mix(in srgb, var(--page-brand, var(--cyan)) 18%, var(--line));
+  --public-tint: color-mix(in srgb, var(--page-brand, var(--cyan)) 6%, var(--surface));
   background:
-    linear-gradient(90deg, color-mix(in srgb, var(--page-brand, var(--cyan)) 5%, transparent) 1px, transparent 1px),
+    radial-gradient(60rem 30rem at 10% -10%, color-mix(in srgb, var(--page-brand, var(--cyan)) 10%, transparent), transparent 70%),
+    radial-gradient(50rem 26rem at 100% 0%, color-mix(in srgb, var(--page-brand, var(--cyan)) 6%, transparent), transparent 70%),
     var(--bg);
-  background-size: 6rem 100%;
+  background-repeat: no-repeat;
 }
 
-.status-dispatch-shell .status-public-header {
-  box-shadow: 0 1px 0 var(--public-rule);
+.status-public-header {
+  position: relative;
+  border-bottom: 0 !important;
+  background: color-mix(in srgb, var(--surface) 75%, transparent) !important;
+  backdrop-filter: blur(16px) saturate(1.5);
+  box-shadow: 0 1px 0 var(--public-rule, var(--line));
 }
 
-.status-dispatch-shell .status-public-header > div {
-  max-width: 90rem;
+.status-public-header::after {
+  position: absolute;
+  right: 0;
+  bottom: -1px;
+  left: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--page-brand, var(--cyan)), transparent);
+  content: "";
+  opacity: 0.6;
 }
 
-.status-dispatch-shell .status-public-header--hero {
-  min-height: 4.25rem;
+.status-public-header :where(a, button) { border-radius: 9999px; }
+
+.status-public-nav a {
+  position: relative;
+  transition: color 160ms ease;
 }
 
-.status-dispatch-shell .status-public-header--hero > div {
-  padding-block: 1.2rem;
+.status-public-nav a:hover { color: var(--page-brand, var(--cyan)); }
+
+.status-public-title {
+  font-weight: 800;
+  letter-spacing: -0.03em;
 }
 
-.status-dispatch-shell .status-public-header--hero:has(+ .public-ops-main) img[role="img"] {
-  max-height: 12rem;
+.status-public-footer {
+  background: transparent;
+  border-top-color: var(--public-rule, var(--line)) !important;
 }
 
 .public-ops-main {
-  max-width: 90rem !important;
-  padding-top: clamp(2.25rem, 4vw, 4rem) !important;
-  padding-bottom: clamp(3rem, 6vw, 6rem) !important;
+  max-width: 76rem !important;
+  padding-top: clamp(2rem, 4vw, 3.5rem) !important;
+  padding-bottom: clamp(3rem, 6vw, 5rem) !important;
 }
 
 .public-ops-intro {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(15rem, 0.38fr);
+  grid-template-columns: minmax(0, 1fr) minmax(15rem, 0.4fr);
   align-items: end;
   gap: 2rem;
-  border-bottom: 1px solid var(--public-rule);
-  padding-bottom: 1.5rem;
+  padding-bottom: 1.25rem;
+  animation: var(--animate-rise);
 }
 
 .public-ops-intro > p:first-child {
   grid-column: 1 / -1;
-  margin: 0 0 -1.35rem;
+  justify-self: start;
+  margin: 0 0 -1rem;
+  border-radius: 9999px;
+  background: var(--public-tint);
   color: var(--page-brand, var(--cyan));
-  font-family: var(--font-mono-family);
-  font-size: 0.65rem;
+  padding: 0.3rem 0.8rem;
+  font-size: 0.72rem;
   font-weight: 700;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
 .public-ops-intro h1 {
   margin: 0;
-  font-family: var(--font-mono-family);
-  font-size: clamp(2rem, 4vw, 3.65rem);
-  font-weight: 600;
-  letter-spacing: -0.055em;
-  line-height: 0.95;
+  font-size: clamp(2.1rem, 4.4vw, 3.6rem);
+  font-weight: 800;
+  letter-spacing: -0.045em;
+  line-height: 1;
 }
 
 .public-ops-intro p:last-child {
@@ -556,21 +369,19 @@ body {
   margin: 0;
   justify-self: end;
   color: var(--fg-soft);
-  font-size: 0.94rem;
-  line-height: 1.55;
+  font-size: 0.95rem;
+  line-height: 1.6;
 }
 
-.public-ops-grid {
-  gap: clamp(1.25rem, 2.8vw, 2.5rem) var(--page-block-gap);
-}
+.public-ops-grid { gap: clamp(1.25rem, 2.5vw, 2rem) var(--page-block-gap); }
 
 .public-ops-block {
   min-width: 0;
+  animation: var(--animate-rise);
 }
+.public-ops-block:empty { display: none !important; }
 
-/* Operational blocks are the page's primary read path. Let them occupy the
-   full control field instead of inheriting legacy template spans that leave a
-   blank half-page beside the service list. */
+/* Operational blocks are the page's primary read path, so they span the row. */
 .public-ops-block[data-page-block="OVERALL_STATUS"],
 .public-ops-block[data-page-block="COMPONENT_STATUS"],
 .public-ops-block[data-page-block="ACTIVE_INCIDENTS"],
@@ -584,153 +395,61 @@ body {
 
 .public-ops-block > .public-ops-section > h2,
 .public-ops-block > .public-ops-section > div > h2 {
-  display: flex;
-  align-items: baseline;
-  gap: 0.75rem;
   margin-bottom: 0.9rem;
-  border-bottom: 1px solid var(--public-rule);
-  padding-bottom: 0.65rem;
   color: var(--fg);
-  font-family: var(--font-mono-family);
-  font-size: 0.76rem;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
+  font-size: 1.15rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
 }
 
 .public-status-banner {
-  border-width: 1px 0 !important;
-  border-radius: 0 !important;
-  background: var(--public-tint) !important;
-  padding: 1.15rem 0.2rem !important;
+  border-radius: 1.5rem !important;
+  box-shadow: 0 18px 40px -22px color-mix(in srgb, var(--page-brand, var(--cyan)) 60%, transparent) !important;
+  padding: 1.25rem 1.5rem !important;
 }
 
 .public-status-banner p:first-child {
-  font-size: clamp(1.2rem, 2vw, 1.55rem);
+  font-size: clamp(1.2rem, 2vw, 1.5rem);
+  font-weight: 800;
   letter-spacing: -0.025em;
 }
 
 .public-status-banner svg { width: 2rem; height: 2rem; }
 
-.public-service-list {
-  border-width: 1px 0 !important;
-  border-radius: 0 !important;
-  background: transparent !important;
-  padding-inline: 0 !important;
+.public-service-list,
+.public-service-group,
+.public-incident-card,
+.public-metric,
+.public-subscribe-block {
+  border: 1px solid var(--public-rule) !important;
+  border-radius: 1.5rem !important;
+  background: var(--surface) !important;
+  box-shadow: 0 1px 2px rgb(15 23 42 / 0.04), 0 10px 30px -18px rgb(15 23 42 / 0.25);
 }
+
+.public-service-list { padding: 0.5rem 1.25rem !important; }
+.public-service-group { padding: 0.75rem 1.25rem !important; }
+.public-incident-card, .public-metric, .public-subscribe-block { padding: 1.25rem 1.5rem !important; }
+.public-incident-card + .public-incident-card { margin-top: 0.75rem; }
+.public-incident-card [data-incident-timeline="detailed"] { margin-top: 1.25rem; }
 
 .public-service-row {
-  min-height: 4.2rem;
+  min-height: 4rem;
   border-bottom-color: var(--public-rule) !important;
-  padding: 0.9rem 0.25rem !important;
+  padding: 0.85rem 0.25rem !important;
+  transition: background-color 200ms ease, transform 200ms ease;
 }
-
+.public-service-row:last-child { border-bottom: 0 !important; }
 .public-service-row:hover { background: var(--public-tint); }
 
-.public-service-row > div:first-child > div:first-child > span:first-child,
-.public-service-group h3 {
-  font-family: var(--font-mono-family);
-  font-size: 0.9rem;
-  letter-spacing: -0.01em;
-}
-
-.public-service-group {
-  border-radius: 0 !important;
-  border-width: 1px 0 !important;
-  background: transparent !important;
-}
-
-.public-service-group [role="button"] { border-radius: 0 !important; }
-
-.public-incident-card {
-  border-width: 1px 0 !important;
-  border-radius: 0 !important;
-  background: var(--public-tint) !important;
-  padding: 1.1rem 0 !important;
-}
-
-.public-incident-card + .public-incident-card { border-top: 0 !important; }
-
-.public-incident-card h3 { letter-spacing: -0.02em; }
-
-.public-incident-card [data-incident-timeline="detailed"] { margin-top: 1.5rem; }
-
-.public-metric {
-  border-width: 1px 0 !important;
-  border-radius: 0 !important;
-  background: var(--public-tint) !important;
-  padding: 1rem 0 !important;
-}
-
-.public-metric h4 {
-  font-family: var(--font-mono-family);
-  letter-spacing: 0.01em;
-}
-
-.public-subscribe-block {
-  border-width: 1px 0 !important;
-  border-radius: 0 !important;
-  background: var(--public-tint) !important;
-}
-
-.public-subscribe-trigger {
-  border-radius: 0 !important;
-  font-family: var(--font-mono-family);
-  font-size: 0.7rem;
-  font-weight: 700;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
-}
-
-.public-subscribe-dialog { border-radius: 0 !important; }
-
-.status-dispatch-shell .status-public-footer {
-  margin-top: 0;
-  border-top-color: var(--public-rule);
-}
+.public-subscribe-trigger { border-radius: 9999px !important; font-weight: 700; }
+.public-subscribe-dialog { border-radius: 1.75rem !important; }
 
 @media (max-width: 639px) {
-  .public-ops-intro {
-    display: block;
-  }
-
-  .public-ops-intro > p:first-child {
-    margin-bottom: 0.7rem;
-  }
-
-  .public-ops-intro p:last-child {
-    margin-top: 1rem;
-  }
-
+  .public-ops-intro { display: block; }
+  .public-ops-intro > p:first-child { margin-bottom: 0.8rem; }
+  .public-ops-intro p:last-child { margin-top: 1rem; }
   .public-status-banner { align-items: flex-start; }
-  .public-status-banner svg { margin-top: 0.1rem; }
 }
-
-/* Final enterprise tokens (kept at EOF so legacy surface rules cannot
-   reintroduce the retired dark/grid treatment). */
-
-.status-dispatch-shell { background: var(--bg) !important; background-image: none !important; }
-.grain::before, .grain::after { display: none; }
 
 .status-theme, .status-theme[data-typography="MONO"], .status-theme[data-typography="HUMANIST"], .status-theme[data-typography="GEOMETRIC"] { font-family: var(--font-body-family); }
-.status-theme :where(h1, h2, h3, h4, .font-mono) { font-family: var(--font-body-family); letter-spacing: -0.02em; }
-.public-ops-block {
-  border: 0 !important;
-  border-radius: 0 !important;
-  background: transparent !important;
-  box-shadow: none !important;
-  padding: 0 !important;
-}
-.public-ops-block:empty { display: none !important; }
-.public-status-banner {
-  border-width: 1px !important;
-  border-style: solid !important;
-  border-radius: 0.75rem !important;
-  box-shadow: none !important;
-  overflow: visible !important;
-}
-.public-service-group { border: 1px solid var(--line) !important; border-radius: 0.75rem !important; background: var(--surface) !important; padding: 0.75rem 1rem !important; }
-.public-service-row { border-bottom-color: var(--line) !important; }
-.public-service-row:last-child { border-bottom: 0 !important; }
-.public-incident-card, .public-metric, .public-subscribe-block { border: 1px solid var(--line) !important; border-radius: 0.75rem !important; background: var(--surface) !important; padding: 1rem !important; }
-.public-subscribe-trigger { border-radius: 0.5rem !important; font-family: var(--font-body-family); font-size: 0.875rem; letter-spacing: 0; text-transform: none; }

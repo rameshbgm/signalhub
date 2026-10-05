@@ -1,10 +1,10 @@
 # SignalHub design system
 
-Soft and vibrant, light only. A calm control plane for operators: generous radii, tinted icon tiles, layered soft shadows, short springy motion. Tokens live in `app/theme.css`; primitives live in `components/ui/`. This file is the contract for every screen.
+"Prism", light only. Lilac aurora canvas, white glass surfaces, a violet → fuchsia → orange brand gradient, pill controls, gradient icon orbs, staggered springy motion. Tokens live in `app/theme.css`; primitives live in `components/ui/`. This file is the contract for every screen.
 
 ## Shell
 
-- **Icon rail** (64px, `components/admin/AdminShell.tsx`): one colour tile per section. **Context panel** (240px): the active section's links, org switcher on top, user card at the bottom. **Top strip:** breadcrumb, panel toggle, Ctrl/Cmd+K jump palette. **Mobile:** bottom tab bar plus a section sheet.
+- **Floating glass top bar** (`components/admin/AdminShell.tsx`): brand, one pill per section (sections with several screens open a dropdown menu), search (Ctrl/Cmd+K jump palette), org switcher pill, account avatar menu with sign-out. **Section tabs:** gradient pills under the bar for the active section's screens. No side navigation. **Mobile:** floating glass dock plus a section sheet.
 - Navigation data is `NAV_SECTIONS` in `components/admin/AdminNav.tsx`. A new screen goes there with a `hue` and an optional `capability`.
 - Pages render inside `<main>`; do not add your own max-width wrapper or outer padding.
 
@@ -15,20 +15,20 @@ Soft and vibrant, light only. A calm control plane for operators: generous radii
 | Page canvas / card surface / inset surface | `bg-canvas` / `bg-surface` / `bg-sunken` |
 | Hairline / stronger border | `border-line` / `border-line-strong` |
 | Text: primary / secondary / dim | `text-ink` / `text-ink-soft` / `text-ink-dim` (dim is the lightest allowed for readable text) |
-| Brand | `bg-primary`, `text-primary`, `text-primary-ink`, `bg-primary-soft`, `hover:bg-primary-hover` |
+| Brand | `bg-prism` (gradient fill), `text-prism` (gradient text), `glass` (frosted panel), `bg-primary`, `text-primary`, `text-primary-ink`, `bg-primary-soft`, `hover:bg-primary-hover` |
 | Status | `text-ok-fg bg-ok-bg`, `text-warn-fg bg-warn-bg`, `text-danger-fg bg-danger-bg`, `text-info-fg bg-info-bg`; solids `bg-ok bg-warn bg-danger bg-info` |
-| Radius | `rounded-chip` (6) `rounded-control` (10) `rounded-card` (16) `rounded-sheet` (20) `rounded-full` |
+| Radius | `rounded-chip` (8) `rounded-control` (14) `rounded-card` (24) `rounded-sheet` (28) `rounded-full` (every button) |
 | Shadow | `shadow-card` `shadow-raised` `shadow-float` `shadow-primary` |
-| Motion | `animate-fade` `animate-rise` `animate-pop` `animate-drop` `animate-shimmer`; `duration-200 ease-soft`; springy hover uses `ease-spring` |
-| Fonts | Google Sans is the default; `font-mono` (Roboto Mono) only for IDs, tokens, URLs, code, slugs |
+| Motion | `animate-fade` `animate-rise` `animate-pop` `animate-drop` `animate-shimmer` `animate-float` `animate-gradient`, `.stagger` on a list container staggers its children; `duration-200 ease-soft`; springy hover uses `ease-spring` |
+| Fonts | Plus Jakarta Sans is the default; `font-mono` (JetBrains Mono) only for IDs, tokens, URLs, code, slugs |
 
-Type scale: `text-xs` 12, `text-sm` 14 (default body in dense UI), `text-base` 16, `text-lg` 18, `text-xl` 20, `text-2xl` 24, `text-3xl` 30; `text-2xs` is 11px and the smallest allowed. Weights 400, 500, 600. Headings use `font-semibold tracking-tight`. Never use arbitrary `text-[Npx]`.
+Type scale: `text-xs` 12, `text-sm` 14 (default body in dense UI), `text-base` 16, `text-lg` 18, `text-xl` 20, `text-2xl` 24, `text-3xl` 30; `text-2xs` is 11px and the smallest allowed. Weights 400-800. Page titles `font-extrabold`, card titles `font-bold`, labels `font-semibold`. Never use arbitrary `text-[Npx]`.
 
-Hues for icon tiles: `indigo sky emerald amber rose violet teal slate` (`Hue` type in `components/ui/icon-tile.tsx`). Section mapping: overview/pages indigo+violet, monitoring and metrics sky, incidents and maintenance amber, audience emerald, integrations and API teal, security rose, settings and help slate, platform violet.
+Hues for icon orbs (two-stop gradients, white icon): `indigo sky emerald amber rose violet teal slate` (`Hue` type in `components/ui/icon-tile.tsx`). Section mapping: overview/pages indigo+violet, monitoring and metrics sky, incidents and maintenance amber, audience emerald, integrations and API teal, security rose, settings and help slate, platform violet.
 
 ## Primitives (`components/ui/`)
 
-`Button` (variants `default secondary soft outline ghost destructive link`, sizes `default sm lg icon`, `loading`), `buttonVariants()` for link-styled buttons, `Input`, `Textarea`, `Select`, `Checkbox`, `Radio`, `Label`, `Field` (label + hint + error), `Card/CardHeader/CardTitle/CardDescription/CardContent`, `Badge`, `StatusBadge` (tone `ok warn danger info neutral`, optional `live`), `Table*`, `Dialog*`, `Tooltip`, `Accordion*`, `IconTile`, `PageHeader`, `EmptyState`, `Skeleton`, `Alert` (tone `ok warn danger info`). Prop APIs are stable; do not change them in a feature change.
+`Button` (variants `default secondary soft outline ghost destructive link`, sizes `default sm lg icon`, `loading`), `buttonVariants()` for link-styled buttons, `Input`, `Textarea`, `Select`, `Checkbox`, `Radio`, `Label`, `Field` (label + hint + error), `Card/CardHeader/CardTitle/CardDescription/CardContent`, `Badge`, `StatusBadge` (tone `ok warn danger info neutral`, optional `live`), `Table*`, `Dialog*`, `Tooltip`, `Accordion*`, `IconTile`, `PageHeader`, `EmptyState`, `Alert` (tone `ok warn danger info`). Prop APIs are stable; do not change them in a feature change.
 
 ## Screen anatomy
 
@@ -36,7 +36,7 @@ Hues for icon tiles: `indigo sky emerald amber rose violet teal slate` (`Hue` ty
 2. `PageHeader` with `title`, one-sentence `description`, `icon` + `hue` from the nav item, primary action in `actions`.
 3. Content in `Card` blocks. A block header is `CardHeader` (`CardTitle`, optional `CardDescription`, optional right-aligned action). Group related fields in one card; do not create a card per field.
 4. Forms: `Field` around each control, a `grid gap-4 sm:grid-cols-2` for short fields, one primary `Button` right-aligned in the card footer or below the fields. Destructive actions are `variant="destructive"` or a `ghost` with `hover:bg-danger-bg hover:text-danger-fg`, separated from the primary action.
-5. Lists of records: `Table` for comparable columns; stacked rows (`rounded-control border border-line px-3.5 py-3`) for 1-2 facts per record; always handle the empty case with `EmptyState` (icon, what belongs here, a next-step action).
+5. Lists of records: `Table` for comparable columns; stacked rows (`rounded-control bg-sunken/60 px-3.5 py-3`) for 1-2 facts per record; always handle the empty case with `EmptyState` (icon, what belongs here, a next-step action).
 6. Feedback: success, error, and notices use `Alert`; status labels use `StatusBadge` (dot plus text, never colour alone).
 7. A link that must look like a button: `<Link className={buttonVariants({ variant, size })}>`.
 

@@ -141,7 +141,7 @@ export function PublicHeader({
 
     return (
       <header
-        className="status-public-header status-public-header--hero relative grain overflow-hidden border-b border-[var(--line)] bg-[var(--bg)]"
+        className="status-public-header status-public-header--hero relative overflow-hidden border-b border-[var(--line)] bg-[var(--bg)]"
         style={effectiveCoverImageUrl ? coverImageStyle(
           effectiveCoverImageUrl,
           {

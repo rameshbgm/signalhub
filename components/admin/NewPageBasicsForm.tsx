@@ -34,7 +34,7 @@ export function NewPageBasicsForm({
         <Input id="page-name" name="name" placeholder="e.g. Customer status" className="h-12 text-base!" required maxLength={120} autoFocus />
       </Field>
 
-      <details className="group rounded-card border border-line bg-sunken/40 open:bg-surface">
+      <details className="group rounded-card bg-sunken/40 open:bg-surface">
         <summary className="flex cursor-pointer list-none items-center gap-3 rounded-card px-4 py-3.5 text-sm font-semibold text-ink outline-none focus-visible:ring-4 focus-visible:ring-primary/25 [&::-webkit-details-marker]:hidden">
           <IconTile icon={SlidersHorizontal} hue="slate" size="sm" />
           <span className="flex-1">Additional options</span>

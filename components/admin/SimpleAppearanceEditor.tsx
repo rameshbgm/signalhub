@@ -220,7 +220,7 @@ export function SimpleAppearanceEditor({
           {embedded ? (
             <header className="flex flex-wrap items-start justify-between gap-4">
               <div className="min-w-0">
-                <h2 className="text-xl font-semibold tracking-tight text-ink">Appearance</h2>
+                <h2 className="text-xl font-bold tracking-tight text-ink">Appearance</h2>
                 <p className="mt-1 max-w-2xl text-sm leading-6 text-ink-soft">{description}</p>
               </div>
               {stateBadges}
@@ -370,7 +370,7 @@ function LayoutSketch({ layout, selected }: { layout: PageTemplateKey; selected:
   const strong = selected ? "bg-primary/60" : "bg-ink-dim/40";
   const soft = selected ? "bg-primary/20" : "bg-line";
   return (
-    <span aria-hidden="true" className="block h-24 space-y-1.5 overflow-hidden rounded-control border border-line bg-surface p-2.5">
+    <span aria-hidden="true" className="block h-24 space-y-1.5 overflow-hidden rounded-control bg-surface ring-1 ring-line p-2.5">
       {layout === "ILLUSTRATED_HERO" ? (
         <>
           <span className="block h-9 rounded-chip bg-gradient-to-r from-primary/40 to-accent/40" />

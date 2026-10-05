@@ -134,7 +134,7 @@ export function SecurityManager({ enrollmentRequired }: { enrollmentRequired: bo
           )}
           {secret && (
             <div className="space-y-4">
-              <div className="rounded-control border border-line bg-sunken p-4">
+              <div className="rounded-control bg-sunken p-4">
                 <p className="mb-3 text-sm text-ink-soft">Add this key or URI to your authenticator application:</p>
                 <SecretField value={secret} copyValue={uri ?? secret} copyLabel="Copy setup URI" />
               </div>

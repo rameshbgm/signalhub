@@ -84,7 +84,7 @@ export default async function TeamPage() {
                         </summary>
                         <form
                           action={updateMemberRole.bind(null, m.id)}
-                          className="absolute left-0 z-20 mt-2 w-72 max-w-[calc(100vw-3rem)] space-y-4 rounded-card border border-line bg-surface p-4 shadow-float sm:left-auto sm:right-0"
+                          className="absolute left-0 z-20 mt-2 w-72 max-w-[calc(100vw-3rem)] space-y-4 rounded-card bg-surface shadow-card ring-1 ring-line/80 p-4 shadow-float sm:left-auto sm:right-0"
                         >
                           <Field label="Role" htmlFor={`role-${m.id}`}>
                             <Select aria-label="Role" id={`role-${m.id}`} name="role" defaultValue={m.role} className="w-full">

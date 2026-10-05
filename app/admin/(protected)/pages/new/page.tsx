@@ -36,7 +36,7 @@ export default async function NewPage({ searchParams }: { searchParams: Promise<
         <div className="p-6 sm:p-10">
           <header>
             <IconTile icon={PanelsTopLeft} hue="violet" size="lg" />
-            <h1 className="mt-5 text-2xl font-semibold tracking-tight text-ink sm:text-3xl">New page</h1>
+            <h1 className="mt-5 text-2xl font-extrabold tracking-tight text-ink sm:text-3xl">New page</h1>
             <p className="mt-2 max-w-xl text-sm leading-6 text-ink-soft">Start with a name. You can add services, control access, and shape the public experience next.</p>
           </header>
           <div className="mt-8">

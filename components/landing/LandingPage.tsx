@@ -201,7 +201,7 @@ function Reveal({
   );
 }
 
-export function LandingPage({ fontClassName }: { fontClassName: string }) {
+export function LandingPage() {
   const reduceMotion = useReducedMotion();
   const { scrollYProgress } = useScroll();
   const smoothProgress = useSpring(scrollYProgress, {
@@ -213,7 +213,7 @@ export function LandingPage({ fontClassName }: { fontClassName: string }) {
   const accentY = useTransform(scrollYProgress, [0, 0.35], [0, -72]);
 
   return (
-    <div className={`${styles.page} ${fontClassName}`}>
+    <div className={styles.page}>
       <motion.div
         className={styles.scrollProgress}
         style={{ scaleX: reduceMotion ? 0 : smoothProgress }}

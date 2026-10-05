@@ -124,7 +124,7 @@ export default async function MetricsPage({ searchParams }: { searchParams: Prom
                       {!m.visible && <StatusBadge tone="neutral">Hidden</StatusBadge>}
                     </div>
                     <p className="mt-2 text-xs text-ink-dim">Latest value</p>
-                    <p className="text-2xl font-semibold tabular-nums tracking-tight text-ink">
+                    <p className="text-2xl font-extrabold tabular-nums tracking-tight text-ink">
                       {m.points[0] ? `${formatMetricValue(m.points[0].value, m.decimals)}${m.suffix}` : "—"}
                     </p>
                   </div>

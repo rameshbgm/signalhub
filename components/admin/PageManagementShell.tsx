@@ -79,7 +79,7 @@ export function PageManagementShell({ page, actions, children }: { page: Managed
         />
       </div>
 
-      <nav ref={tabs} aria-label="Page management" className="w-full overflow-x-auto rounded-card border border-line bg-surface p-1.5 shadow-card [scrollbar-width:none] sm:w-fit sm:max-w-full [&::-webkit-scrollbar]:hidden">
+      <nav ref={tabs} aria-label="Page management" className="w-full overflow-x-auto rounded-card bg-surface shadow-card ring-1 ring-line/80 p-1.5 [scrollbar-width:none] sm:w-fit sm:max-w-full [&::-webkit-scrollbar]:hidden">
         <ul className="flex min-w-max gap-1">
           {visibleSections.map((section) => {
             const href = `${base}${section.suffix}`;

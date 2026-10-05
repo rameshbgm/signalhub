@@ -13,7 +13,7 @@ export function generateStaticParams() {
 }
 
 const navLink =
-  "group flex items-center gap-3 rounded-card border border-line bg-surface p-4 shadow-card outline-none transition-[border-color,box-shadow,transform] duration-200 ease-soft hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-raised focus-visible:ring-4 focus-visible:ring-primary/25";
+  "group flex items-center gap-3 rounded-card bg-surface shadow-card ring-1 ring-line/80 p-4 outline-none transition-[border-color,box-shadow,transform] duration-200 ease-soft hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-raised focus-visible:ring-4 focus-visible:ring-primary/25";
 
 export default async function HelpArticlePage({ params }: { params: Promise<{ category: string; article: string }> }) {
   const { category: categorySlug, article: articleSlug } = await params;
@@ -44,7 +44,7 @@ export default async function HelpArticlePage({ params }: { params: Promise<{ ca
           <CardContent className="space-y-8 p-6 sm:p-8">
             {article.body.map((section) => (
               <section key={section.heading}>
-                <h2 className="text-lg font-semibold tracking-tight text-ink">{section.heading}</h2>
+                <h2 className="text-lg font-bold tracking-tight text-ink">{section.heading}</h2>
                 {section.paragraphs.map((p, i) => (
                   <p key={i} className="mt-2 text-sm leading-7 text-ink-soft">
                     {p}

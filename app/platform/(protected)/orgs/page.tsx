@@ -260,7 +260,7 @@ export default async function PlatformOrgsPage({
                   {hasLifecycle && (
                     <tr>
                       <td colSpan={5} className="px-4 pb-4 pt-0">
-                        <div className="space-y-4 rounded-control border border-line bg-sunken/50 p-4">
+                        <div className="space-y-4 rounded-control bg-sunken/50 p-4">
                           <p className="text-sm font-semibold text-ink">Lifecycle</p>
                           {showSuspend && (
                             <PlatformActionForm

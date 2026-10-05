@@ -292,13 +292,13 @@ export function AssetUploader({
   const formats = kind === "FAVICON" ? "PNG, WebP or ICO." : "PNG, JPEG, WebP or AVIF.";
 
   return (
-    <div className="space-y-4 rounded-control border border-line bg-surface p-4">
+    <div className="space-y-4 rounded-control bg-surface ring-1 ring-line p-4">
       <div>
         <p className="text-sm font-semibold text-ink">{label}</p>
         <p className="mt-0.5 text-xs leading-5 text-ink-dim">{help}</p>
       </div>
       {!isCover && (
-        <div className="flex aspect-[16/5] w-full items-center justify-center overflow-hidden rounded-control border border-line bg-sunken">
+        <div className="flex aspect-[16/5] w-full items-center justify-center overflow-hidden rounded-control bg-sunken">
           {preview ? (
             <button type="button" onClick={() => setPreviewOpen(true)} aria-label={`Preview ${label.toLowerCase()}`} title="Preview image" className="group relative grid h-full w-full place-items-center outline-none focus-visible:ring-4 focus-visible:ring-inset focus-visible:ring-primary/25">
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -317,7 +317,7 @@ export function AssetUploader({
           <div className="space-y-3">
             <div
               className={cn(
-                "flex justify-center overflow-hidden rounded-control border border-line bg-sunken p-2",
+                "flex justify-center overflow-hidden rounded-control bg-sunken p-2",
                 simple ? "aspect-[16/5] w-full cursor-zoom-in outline-none transition-opacity hover:opacity-85 focus-visible:ring-4 focus-visible:ring-primary/25" : "max-h-[32rem]",
               )}
               role={simple ? "button" : undefined}
@@ -387,7 +387,7 @@ export function AssetUploader({
                 <div
                   role="img"
                   aria-label="Selected cover banner preview"
-                  className="aspect-[16/5] w-full rounded-control border border-line bg-sunken"
+                  className="aspect-[16/5] w-full rounded-control bg-sunken"
                   style={coverImageStyle(preview, {
                     fit: "COVER",
                     cropX: coverCrop.x,

@@ -12,9 +12,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 
 function StatTile({ label, value, icon, hue }: { label: string; value: number | string; icon: LucideIcon; hue: Hue }) {
   return (
-    <div className="rounded-card border border-line bg-surface p-5 shadow-card">
+    <div className="rounded-card bg-surface shadow-card ring-1 ring-line/80 p-5">
       <IconTile icon={icon} hue={hue} />
-      <p className="mt-4 text-3xl font-semibold tabular-nums tracking-tight text-ink">{value}</p>
+      <p className="mt-4 text-3xl font-extrabold tabular-nums tracking-tight text-ink">{value}</p>
       <p className="mt-0.5 text-sm text-ink-soft">{label}</p>
     </div>
   );

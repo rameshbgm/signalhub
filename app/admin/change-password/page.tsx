@@ -49,7 +49,7 @@ export default function ChangeTemporaryPasswordPage() {
 
   return (
     <AuthShell>
-      <h1 className="text-3xl font-semibold tracking-tight">Secure your account</h1>
+      <h1 className="text-3xl font-extrabold tracking-tight">Secure your account</h1>
       <p className="mt-2 text-sm leading-6 text-ink-soft">
         Replace the temporary password and add an email used only for account and operational communication.
       </p>

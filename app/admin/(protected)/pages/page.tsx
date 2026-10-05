@@ -67,7 +67,7 @@ export default async function PagesListPage() {
                       <StatusBadge tone={tone}>{state}</StatusBadge>
                     </div>
 
-                    <h2 className="mt-3 truncate text-lg font-semibold tracking-tight text-ink" title={page.name}>{page.name}</h2>
+                    <h2 className="mt-3 truncate text-lg font-bold tracking-tight text-ink" title={page.name}>{page.name}</h2>
                     <p className="mt-0.5 truncate font-mono text-xs text-ink-dim" title={`/${page.slug}`}>/{page.slug}</p>
 
                     <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">

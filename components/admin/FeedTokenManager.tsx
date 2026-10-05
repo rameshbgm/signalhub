@@ -115,7 +115,7 @@ export function FeedTokenManager({
           <fieldset>
             <legend className="mb-2 text-sm font-medium text-ink">Service scope</legend>
             <p className="mb-2 text-xs text-ink-dim">Leave every service unchecked to allow access to all services.</p>
-            <div className="grid max-h-40 gap-2 overflow-y-auto rounded-control border border-line bg-surface p-3 sm:grid-cols-2">
+            <div className="grid max-h-40 gap-2 overflow-y-auto rounded-control bg-surface ring-1 ring-line p-3 sm:grid-cols-2">
               {components.map((component) => (
                 <label key={component.id} className="flex items-center gap-2 text-sm text-ink-soft">
                   <Checkbox

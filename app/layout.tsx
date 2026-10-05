@@ -1,22 +1,20 @@
 import type { Metadata } from "next";
-import { Google_Sans, Roboto_Mono } from "next/font/google";
+import { JetBrains_Mono, Plus_Jakarta_Sans } from "next/font/google";
 import { AppProvider } from "@/components/AppProvider";
 import "./globals.css";
 
-const googleSans = Google_Sans({
+const jakarta = Plus_Jakarta_Sans({
   subsets: ["latin"],
   weight: "variable",
   display: "swap",
-  // No fallback-metric data exists for Google Sans, so skip the size-adjust fallback.
-  adjustFontFallback: false,
-  variable: "--font-google-sans",
+  variable: "--font-jakarta",
 });
 
-const robotoMono = Roboto_Mono({
+const jetbrains = JetBrains_Mono({
   subsets: ["latin"],
   weight: "variable",
   display: "swap",
-  variable: "--font-roboto-mono",
+  variable: "--font-jetbrains",
 });
 
 export const metadata: Metadata = {
@@ -50,8 +48,9 @@ export const metadata: Metadata = {
 };
 
 /* DESIGN CONTRACT
-   Direction: Soft and vibrant, light only. An icon rail with a contextual
-   panel, colour-tinted icon tiles, generous radii, and short springy motion.
+   Direction: "Prism", light only. A glass top navigation bar with section
+   menus, a violet-fuchsia-orange brand gradient, gradient icon orbs, pill
+   controls, and springy staggered motion.
    Tokens live in app/theme.css.
    Public pages retain their owner controls while sharing the same legibility. */
 export default function RootLayout({
@@ -60,7 +59,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${googleSans.variable} ${robotoMono.variable}`}>
+    <html lang="en" className={`${jakarta.variable} ${jetbrains.variable}`}>
       <body className="bg-canvas text-ink antialiased">
         <AppProvider>{children}</AppProvider>
       </body>

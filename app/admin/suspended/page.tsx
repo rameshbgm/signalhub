@@ -27,7 +27,7 @@ export default async function OrgSuspendedPage() {
   return (
     <AuthShell>
       <IconTile icon={PauseCircle} hue="rose" size="lg" />
-      <h1 className="mt-5 text-3xl font-semibold tracking-tight">Organization suspended</h1>
+      <h1 className="mt-5 text-3xl font-extrabold tracking-tight">Organization suspended</h1>
       <p className="mt-2 text-sm leading-6 text-ink-soft">
         {organization.name} has been suspended by a platform administrator. Contact support if you believe this is a mistake.
       </p>

@@ -59,7 +59,7 @@ export function IncidentTimelineEditor({
                   await action(update.id, formData);
                   setEditingId(null);
                 }}
-                className="space-y-4 rounded-card border border-line bg-sunken/50 p-4"
+                className="space-y-4 rounded-card bg-sunken/50 p-4"
               >
                 <Field label="Status" htmlFor={`timeline-status-${update.id}`} className="sm:max-w-xs">
                   <Select

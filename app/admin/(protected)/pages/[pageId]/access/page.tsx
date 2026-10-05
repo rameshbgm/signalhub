@@ -79,9 +79,9 @@ export default async function PageAccess({ params }: { params: Promise<{ pageId:
 }
 
 function AccessSummary({ title, description }: { title: string; description: string }) {
-  return <Card><CardContent className="flex items-start gap-4"><div className="rounded-control bg-danger-bg p-2.5 text-danger-fg"><LockKeyhole aria-hidden size={20} /></div><div><h2 className="text-lg font-semibold tracking-tight text-ink">{title}</h2><p className="mt-1 max-w-2xl text-sm leading-6 text-ink-soft">{description}</p></div></CardContent></Card>;
+  return <Card><CardContent className="flex items-start gap-4"><div className="rounded-control bg-danger-bg p-2.5 text-danger-fg"><LockKeyhole aria-hidden size={20} /></div><div><h2 className="text-lg font-bold tracking-tight text-ink">{title}</h2><p className="mt-1 max-w-2xl text-sm leading-6 text-ink-soft">{description}</p></div></CardContent></Card>;
 }
 
 function ComponentChoices({ components }: { components: Array<{ id: string; name: string }> }) {
-  return <fieldset className="space-y-2"><legend className="text-sm font-medium text-ink">Service access</legend><div className="flex flex-wrap gap-3 rounded-control border border-line bg-surface p-3">{components.map((component) => <label key={component.id} className="flex items-center gap-2 text-sm text-ink-soft"><Checkbox name="componentIds" value={component.id} />{component.name}</label>)}</div></fieldset>;
+  return <fieldset className="space-y-2"><legend className="text-sm font-medium text-ink">Service access</legend><div className="flex flex-wrap gap-3 rounded-control bg-surface ring-1 ring-line p-3">{components.map((component) => <label key={component.id} className="flex items-center gap-2 text-sm text-ink-soft"><Checkbox name="componentIds" value={component.id} />{component.name}</label>)}</div></fieldset>;
 }

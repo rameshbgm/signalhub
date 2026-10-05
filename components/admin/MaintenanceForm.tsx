@@ -118,7 +118,7 @@ export function MaintenanceForm({
               label="Notify subscribers"
               hint="When the window is scheduled and during automatic status transitions."
             />
-            <div className="space-y-3 rounded-control border border-line bg-sunken/50 p-3.5">
+            <div className="space-y-3 rounded-control bg-sunken/50 p-3.5">
               <CheckRow
                 name="sendReminder"
                 checked={sendReminder}

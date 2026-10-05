@@ -136,7 +136,7 @@ export default async function PlatformUsersPage({
                   {canMutate && (
                     <tr>
                       <td colSpan={4} className="px-4 pb-4 pt-0">
-                        <div className="rounded-control border border-line bg-sunken/50 p-4">
+                        <div className="rounded-control bg-sunken/50 p-4">
                           <PlatformActionForm
                             action={(user.disabled ? reactivateUser : disableUser).bind(
                               null,

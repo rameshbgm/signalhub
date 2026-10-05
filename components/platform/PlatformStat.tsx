@@ -5,7 +5,7 @@ import { IconTile, type Hue } from "@/components/ui/icon-tile";
 import { StatusBadge, type StatusTone } from "@/components/ui/status-badge";
 import { cn } from "@/lib/utils";
 
-const box = "rounded-card border border-line bg-surface p-4 shadow-card";
+const box = "rounded-card bg-surface shadow-card ring-1 ring-line/80 p-4";
 const linkBox = "block outline-none transition-[border-color,box-shadow,transform] duration-200 ease-soft hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-raised focus-visible:ring-4 focus-visible:ring-primary/25";
 
 /** A count or short value. `warn` and `danger` add a badge so the state never rests on colour alone. */

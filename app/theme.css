@@ -1,35 +1,38 @@
-/* SignalHub design tokens: light only.
+/* SignalHub "Prism" design tokens: light only.
+   Direction: airy lilac canvas, white glass surfaces, a violet → fuchsia →
+   orange brand gradient, pill controls, gradient icon orbs and springy motion.
    `static` keeps every token in the output so components can also read them
    through var(--token) in arbitrary values, not just through utilities. */
 @theme static {
   /* Surfaces and lines */
-  --color-canvas: #f6f7fb;
+  --color-canvas: #f7f5ff;
   --color-surface: #ffffff;
-  --color-sunken: #eff1f8;
-  --color-line: #e4e7f0;
-  --color-line-strong: #cdd2e0;
+  --color-sunken: #f1eefb;
+  --color-line: #e7e3f5;
+  --color-line-strong: #d3cdea;
 
-  /* Text. ink-dim stays at 4.8:1 on white; never go lighter for readable text. */
-  --color-ink: #0f172a;
-  --color-ink-soft: #475569;
-  --color-ink-dim: #64748b;
+  /* Text. ink-dim stays above 4.6:1 on white; never go lighter for readable text. */
+  --color-ink: #1a1033;
+  --color-ink-soft: #4b4466;
+  --color-ink-dim: #6b6585;
 
   /* Brand */
-  --color-primary: #4f46e5;
-  --color-primary-hover: #4338ca;
-  --color-primary-soft: #eef2ff;
-  --color-primary-ink: #4338ca;
+  --color-primary: #7c3aed;
+  --color-primary-hover: #6d28d9;
+  --color-primary-soft: #f3edff;
+  --color-primary-ink: #6d28d9;
   --color-on-primary: #ffffff;
-  --color-accent: #7c3aed;
+  --color-accent: #db2777;
+  --color-flare: #f97316;
 
   /* Status: solid colours match lib/status.ts; badge pairs are text/background */
-  --color-ok: #16a34a;
-  --color-ok-fg: #166534;
-  --color-ok-bg: #dcfce7;
-  --color-warn: #eab308;
+  --color-ok: #10b981;
+  --color-ok-fg: #047857;
+  --color-ok-bg: #d1fae5;
+  --color-warn: #f59e0b;
   --color-warn-fg: #92400e;
   --color-warn-bg: #fef3c7;
-  --color-danger: #dc2626;
+  --color-danger: #ef4444;
   --color-danger-fg: #b91c1c;
   --color-danger-bg: #fee2e2;
   --color-info: #3b82f6;
@@ -37,49 +40,51 @@
   --color-info-bg: #dbeafe;
 
   /* Fonts. The variables are set on <html> by next/font in app/layout.tsx. */
-  --font-sans: var(--font-google-sans), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-mono: var(--font-roboto-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-sans: var(--font-jakarta), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: var(--font-jetbrains), ui-monospace, SFMono-Regular, Menlo, monospace;
 
-  /* Type: Tailwind's 12/14/16/18/20/24/30/36 scale plus one small step. Nothing below 11px. */
+  /* Type: Tailwind's scale plus one small step. Nothing below 11px. */
   --text-2xs: 0.6875rem;
   --text-2xs--line-height: 1rem;
 
-  /* Radius */
-  --radius-chip: 0.375rem;
-  --radius-control: 0.625rem;
-  --radius-card: 1rem;
-  --radius-sheet: 1.25rem;
+  /* Radius: controls are pills, containers are generous. */
+  --radius-chip: 0.5rem;
+  --radius-control: 0.875rem;
+  --radius-card: 1.5rem;
+  --radius-sheet: 1.75rem;
 
-  /* Shadows: layered, low-contrast, cool-tinted */
-  --shadow-card: 0 1px 2px rgb(15 23 42 / 0.04), 0 1px 3px rgb(15 23 42 / 0.06);
-  --shadow-raised: 0 2px 4px rgb(15 23 42 / 0.04), 0 8px 20px -6px rgb(15 23 42 / 0.1);
-  --shadow-float: 0 4px 8px rgb(15 23 42 / 0.05), 0 24px 48px -12px rgb(15 23 42 / 0.2);
-  --shadow-primary: 0 1px 2px rgb(79 70 229 / 0.3), 0 6px 16px -4px rgb(79 70 229 / 0.4);
+  /* Shadows: violet-tinted and soft */
+  --shadow-card: 0 1px 2px rgb(76 29 149 / 0.04), 0 4px 16px -6px rgb(76 29 149 / 0.08);
+  --shadow-raised: 0 2px 6px rgb(76 29 149 / 0.06), 0 14px 30px -10px rgb(76 29 149 / 0.18);
+  --shadow-float: 0 6px 12px rgb(76 29 149 / 0.06), 0 30px 60px -16px rgb(76 29 149 / 0.3);
+  --shadow-primary: 0 2px 4px rgb(124 58 237 / 0.25), 0 10px 24px -8px rgb(219 39 119 / 0.5);
 
   /* Motion */
-  --ease-soft: cubic-bezier(0.2, 0.8, 0.2, 1);
-  --ease-spring: cubic-bezier(0.34, 1.32, 0.64, 1);
-  --duration-fast: 120ms;
-  --duration-base: 200ms;
-  --duration-slow: 320ms;
+  --ease-soft: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --duration-fast: 140ms;
+  --duration-base: 240ms;
+  --duration-slow: 420ms;
 
   --animate-rise: sh-rise var(--duration-slow) var(--ease-soft) both;
   --animate-pop: sh-pop var(--duration-base) var(--ease-spring) both;
   --animate-fade: sh-fade var(--duration-base) ease-out both;
   --animate-pulse-ring: sh-pulse-ring 2.4s ease-out infinite;
   --animate-shimmer: sh-shimmer 1.6s ease-in-out infinite;
-  --animate-bar-in: sh-bar-in 520ms var(--ease-soft) both;
+  --animate-bar-in: sh-bar-in 560ms var(--ease-soft) both;
   --animate-sheet: sh-sheet var(--duration-slow) var(--ease-soft) both;
-  --animate-drop: sh-drop var(--duration-base) var(--ease-soft) both;
+  --animate-drop: sh-drop var(--duration-base) var(--ease-spring) both;
+  --animate-float: sh-float 6s ease-in-out infinite;
+  --animate-gradient: sh-gradient 8s ease infinite;
 }
 
 @keyframes sh-rise {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: none; }
+  from { opacity: 0; transform: translateY(14px); filter: blur(2px); }
+  to { opacity: 1; transform: none; filter: none; }
 }
 
 @keyframes sh-pop {
-  from { opacity: 0; transform: scale(0.96); }
+  from { opacity: 0; transform: scale(0.92); }
   to { opacity: 1; transform: none; }
 }
 
@@ -89,12 +94,12 @@
 }
 
 @keyframes sh-pulse-ring {
-  0% { box-shadow: 0 0 0 0 color-mix(in srgb, currentColor 45%, transparent); }
-  70%, 100% { box-shadow: 0 0 0 8px transparent; }
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, currentColor 50%, transparent); }
+  70%, 100% { box-shadow: 0 0 0 9px transparent; }
 }
 
 @keyframes sh-bar-in {
-  from { opacity: 0; transform: scaleY(0.15); }
+  from { opacity: 0; transform: scaleY(0.1); }
   to { opacity: 1; transform: none; }
 }
 
@@ -104,7 +109,7 @@
 }
 
 @keyframes sh-drop {
-  from { opacity: 0; transform: translateY(-6px) scale(0.98); }
+  from { opacity: 0; transform: translateY(-10px) scale(0.96); }
   to { opacity: 1; transform: none; }
 }
 
@@ -113,28 +118,61 @@
   50% { opacity: 1; }
 }
 
-/* Icon tiles: <IconTile hue="sky"> sets data-hue; tile colours come from here
-   so components never hardcode a hue. */
+@keyframes sh-float {
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  50% { transform: translate3d(0, -14px, 0); }
+}
+
+@keyframes sh-gradient {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+/* Icon orbs: <IconTile hue="sky"> sets data-hue. Each hue is a two-stop
+   gradient (from/to) plus a soft wash, so components never hardcode colour. */
 [data-hue] {
+  --hue-from: #94a3b8;
+  --hue-to: #64748b;
   --hue-bg: #f1f5f9;
   --hue-fg: #475569;
 }
-[data-hue="indigo"] { --hue-bg: #eef2ff; --hue-fg: #4338ca; }
-[data-hue="sky"] { --hue-bg: #e0f2fe; --hue-fg: #0369a1; }
-[data-hue="emerald"] { --hue-bg: #dcfce7; --hue-fg: #15803d; }
-[data-hue="amber"] { --hue-bg: #fef3c7; --hue-fg: #b45309; }
-[data-hue="rose"] { --hue-bg: #ffe4e6; --hue-fg: #be123c; }
-[data-hue="violet"] { --hue-bg: #ede9fe; --hue-fg: #6d28d9; }
-[data-hue="teal"] { --hue-bg: #ccfbf1; --hue-fg: #0f766e; }
-[data-hue="slate"] { --hue-bg: #f1f5f9; --hue-fg: #475569; }
+[data-hue="indigo"] { --hue-from: #818cf8; --hue-to: #6d28d9; --hue-bg: #eef0ff; --hue-fg: #4f46e5; }
+[data-hue="sky"] { --hue-from: #38bdf8; --hue-to: #2563eb; --hue-bg: #e0f2fe; --hue-fg: #0369a1; }
+[data-hue="emerald"] { --hue-from: #34d399; --hue-to: #0d9488; --hue-bg: #d1fae5; --hue-fg: #047857; }
+[data-hue="amber"] { --hue-from: #fbbf24; --hue-to: #f97316; --hue-bg: #fef3c7; --hue-fg: #b45309; }
+[data-hue="rose"] { --hue-from: #fb7185; --hue-to: #db2777; --hue-bg: #ffe4e6; --hue-fg: #be123c; }
+[data-hue="violet"] { --hue-from: #c084fc; --hue-to: #7c3aed; --hue-bg: #f3e8ff; --hue-fg: #7e22ce; }
+[data-hue="teal"] { --hue-from: #2dd4bf; --hue-to: #0891b2; --hue-bg: #ccfbf1; --hue-fg: #0f766e; }
+[data-hue="slate"] { --hue-from: #60a5fa; --hue-to: #6366f1; --hue-bg: #eef2f7; --hue-fg: #475569; }
 
-/* Soft colour wash behind the console canvas. */
+/* Brand gradient fill and text. */
+@utility bg-prism {
+  background-image: linear-gradient(120deg, var(--color-primary), var(--color-accent) 55%, var(--color-flare));
+  background-size: 200% 200%;
+}
+@utility text-prism {
+  background-image: linear-gradient(100deg, var(--color-primary), var(--color-accent) 60%, var(--color-flare));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Aurora wash behind every signed-in and auth canvas. */
 @utility bg-wash {
   background-color: var(--color-canvas);
   background-image:
-    radial-gradient(56rem 26rem at 6% -8%, color-mix(in srgb, var(--color-primary) 9%, transparent), transparent 70%),
-    radial-gradient(44rem 22rem at 98% -12%, color-mix(in srgb, #0ea5e9 8%, transparent), transparent 70%);
+    radial-gradient(48rem 28rem at 0% -10%, color-mix(in srgb, var(--color-primary) 13%, transparent), transparent 70%),
+    radial-gradient(40rem 24rem at 100% -6%, color-mix(in srgb, var(--color-accent) 10%, transparent), transparent 70%),
+    radial-gradient(36rem 30rem at 60% 120%, color-mix(in srgb, #06b6d4 8%, transparent), transparent 70%);
+  background-attachment: fixed;
   background-repeat: no-repeat;
+}
+
+/* Frosted glass panel. */
+@utility glass {
+  background-color: color-mix(in srgb, var(--color-surface) 78%, transparent);
+  backdrop-filter: blur(18px) saturate(1.6);
+  -webkit-backdrop-filter: blur(18px) saturate(1.6);
 }
 
 @layer base {
@@ -143,21 +181,34 @@
     color: var(--color-ink);
     text-rendering: optimizeLegibility;
     -webkit-text-size-adjust: 100%;
+    font-feature-settings: "cv11", "ss01";
+  }
+
+  h1, h2, h3 {
+    letter-spacing: -0.02em;
   }
 
   ::selection {
-    background: color-mix(in srgb, var(--color-primary) 22%, transparent);
+    background: color-mix(in srgb, var(--color-accent) 22%, transparent);
   }
 
   /* One icon stroke everywhere: a CSS property beats the strokeWidth attribute. */
   .lucide {
-    stroke-width: 1.75;
+    stroke-width: 2;
   }
 
   :focus-visible {
     outline: 2px solid var(--color-primary);
     outline-offset: 2px;
   }
+
+  /* Staggered entrance for direct children of any `.stagger` container. */
+  .stagger > * { animation: var(--animate-rise); }
+  .stagger > *:nth-child(2) { animation-delay: 40ms; }
+  .stagger > *:nth-child(3) { animation-delay: 80ms; }
+  .stagger > *:nth-child(4) { animation-delay: 120ms; }
+  .stagger > *:nth-child(5) { animation-delay: 160ms; }
+  .stagger > *:nth-child(n + 6) { animation-delay: 200ms; }
 }
 
 @media (prefers-reduced-motion: reduce) {

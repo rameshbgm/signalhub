@@ -35,7 +35,7 @@ export default async function InvitationPage({
         <MailPlus aria-hidden size={12} />
         Organization invitation
       </span>
-      <h1 className="mt-4 text-3xl font-semibold tracking-tight">Join {invite.organizationName}</h1>
+      <h1 className="mt-4 text-3xl font-extrabold tracking-tight">Join {invite.organizationName}</h1>
       <p className="mt-2 text-sm leading-6 text-ink-soft">
         Continue as {invite.email}. This invitation expires 48 hours after it was issued.
       </p>

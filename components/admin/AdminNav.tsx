@@ -137,7 +137,7 @@ export function activeNav(sections: NavSection[], pathname: string) {
 export function AdminNavList({ section, pathname, onNavigate }: { section: NavSection; pathname: string; onNavigate?: () => void }) {
   return (
     <nav aria-label={`${section.label} navigation`}>
-      <ul className="space-y-1">
+      <ul className="stagger grid gap-1">
         {section.items.map((item) => {
           const active = isActivePath(pathname, item.href);
           return (
@@ -147,13 +147,13 @@ export function AdminNavList({ section, pathname, onNavigate }: { section: NavSe
                 onClick={onNavigate}
                 aria-current={active ? "page" : undefined}
                 className={cn(
-                  "group flex items-center gap-3 rounded-control px-2.5 py-2 text-sm font-medium outline-none transition-colors duration-150 focus-visible:ring-4 focus-visible:ring-primary/25",
-                  active ? "bg-surface text-ink shadow-card ring-1 ring-line" : "text-ink-soft hover:bg-surface/70 hover:text-ink",
+                  "group flex items-center gap-3 rounded-control px-2.5 py-2 text-sm font-semibold outline-none transition-all duration-200 ease-soft focus-visible:ring-4 focus-visible:ring-primary/25",
+                  active ? "bg-primary-soft text-primary-ink" : "text-ink-soft hover:translate-x-0.5 hover:bg-sunken hover:text-ink",
                 )}
               >
-                <IconTile icon={item.icon} hue={item.hue} size="sm" className={cn("transition-transform duration-200 ease-spring", !active && "group-hover:scale-110")} />
+                <IconTile icon={item.icon} hue={item.hue} size="sm" className="transition-transform duration-300 ease-spring group-hover:rotate-[-6deg] group-hover:scale-110" />
                 <span className="min-w-0 flex-1 truncate">{item.label}</span>
-                {active && <span aria-hidden="true" className="size-1.5 rounded-full bg-primary" />}
+                {active && <span aria-hidden="true" className="size-2 rounded-full bg-prism" />}
               </Link>
             </li>
           );

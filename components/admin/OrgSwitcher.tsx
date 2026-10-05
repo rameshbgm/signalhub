@@ -68,29 +68,29 @@ export function OrgSwitcher({
   }
 
   return (
-    <div ref={ref} className="relative border-b border-line p-3">
+    <div ref={ref} className="relative">
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
         aria-haspopup="menu"
-        className="flex w-full min-w-0 items-center gap-3 rounded-control px-2 py-2 text-left outline-none transition-colors duration-150 hover:bg-surface focus-visible:ring-4 focus-visible:ring-primary/25"
+        className="flex w-full min-w-0 items-center gap-2.5 rounded-full bg-surface py-1 pl-1 pr-3 text-left shadow-card ring-1 ring-line outline-none transition-all duration-200 ease-soft hover:-translate-y-px hover:shadow-raised focus-visible:ring-4 focus-visible:ring-primary/25"
       >
-        <span aria-hidden="true" className="grid size-9 shrink-0 place-items-center rounded-control bg-gradient-to-br from-emerald-400 to-teal-600 text-sm font-semibold text-white shadow-card">
+        <span aria-hidden="true" className="grid size-8 shrink-0 place-items-center rounded-full bg-gradient-to-br from-emerald-400 to-cyan-600 text-sm font-bold text-white">
           {orgName.slice(0, 1).toUpperCase()}
         </span>
         <span className="min-w-0 flex-1">
           <span className="block truncate text-sm font-semibold text-ink">{orgName}</span>
-          <span className="block text-xs text-ink-dim">Self-hosted</span>
+          <span className="block text-2xs font-medium text-ink-dim">Organization</span>
         </span>
         <ChevronsUpDown aria-hidden size={16} className="shrink-0 text-ink-dim" />
       </button>
 
       {open && (
-        <div role="menu" className="absolute inset-x-3 top-full z-40 mt-1 animate-drop rounded-card border border-line bg-surface p-1.5 shadow-float">
+        <div role="menu" className="absolute right-0 top-full z-50 mt-2 w-72 max-w-[calc(100vw-2rem)] origin-top-right animate-drop rounded-card bg-surface p-2 shadow-float ring-1 ring-line">
           {organizations.length > 1 && (
             <>
-              <p className="px-2.5 py-1 text-xs font-semibold text-ink-dim">Organizations</p>
+              <p className="px-2.5 py-1 text-2xs font-bold uppercase tracking-[0.08em] text-ink-dim">Organizations</p>
               {organizations.map((organization) => (
                 <button
                   key={organization.id}
@@ -98,7 +98,7 @@ export function OrgSwitcher({
                   role="menuitem"
                   disabled={switching || organization.id === orgId}
                   onClick={() => switchOrganization(organization.id)}
-                  className="flex w-full items-center justify-between gap-2 rounded-control px-2.5 py-2 text-left text-sm text-ink outline-none transition-colors hover:bg-sunken focus-visible:bg-sunken disabled:opacity-60"
+                  className="flex w-full items-center justify-between gap-2 rounded-control px-2.5 py-2 text-left text-sm text-ink outline-none transition-colors hover:bg-primary-soft focus-visible:bg-primary-soft disabled:opacity-60"
                 >
                   <span className="min-w-0 truncate">{organization.name}</span>
                   <span className="shrink-0 text-xs text-ink-dim">{organization.role.toLowerCase()}</span>
@@ -112,14 +112,14 @@ export function OrgSwitcher({
               {switchError}
             </p>
           )}
-          <p className="px-2.5 py-1 text-xs font-semibold text-ink-dim">Your pages</p>
+          <p className="px-2.5 py-1 text-2xs font-bold uppercase tracking-[0.08em] text-ink-dim">Your pages</p>
           {canConfigurePages &&
             pages.map((p) => (
               <Link
                 key={p.id}
                 href={`/organization/pages/${p.id}`}
                 onClick={() => setOpen(false)}
-                className="block truncate rounded-control px-2.5 py-2 text-sm text-ink outline-none transition-colors hover:bg-sunken focus-visible:bg-sunken"
+                className="block truncate rounded-control px-2.5 py-2 text-sm text-ink outline-none transition-colors hover:bg-primary-soft focus-visible:bg-primary-soft"
               >
                 {p.name}
               </Link>

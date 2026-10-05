@@ -14,8 +14,8 @@ const tones: Record<StatusTone, { pill: string; dot: string }> = {
 /** Status is always a dot plus a label, never colour alone. `live` adds a soft pulse. */
 export function StatusBadge({ tone = "neutral", live = false, className, children, ...props }: HTMLAttributes<HTMLSpanElement> & { tone?: StatusTone; live?: boolean }) {
   return (
-    <span {...props} className={cn("inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium", tones[tone].pill, className)}>
-      <span aria-hidden="true" className={cn("size-1.5 rounded-full", tones[tone].dot, live && "animate-pulse-ring text-current")} />
+    <span {...props} className={cn("inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold", tones[tone].pill, className)}>
+      <span aria-hidden="true" className={cn("size-2 rounded-full", tones[tone].dot, live && "animate-pulse-ring text-current")} />
       {children}
     </span>
   );

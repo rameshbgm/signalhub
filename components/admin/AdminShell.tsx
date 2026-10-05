@@ -2,12 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { Activity, ChevronRight, PanelLeftClose, PanelLeftOpen, PanelsTopLeft, Search, X } from "lucide-react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Activity, ChevronDown, PanelsTopLeft, Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { IconTile } from "@/components/ui/icon-tile";
 import { LogoutButton } from "@/components/admin/LogoutButton";
-import { activeNav, AdminNavList, visibleSections, type NavSection } from "@/components/admin/AdminNav";
+import { activeNav, AdminNavList, isActivePath, visibleSections, type NavSection } from "@/components/admin/AdminNav";
 import { CommandPalette, type PaletteEntry } from "@/components/admin/CommandPalette";
 import { cn } from "@/lib/utils";
 import type { Capability } from "@/lib/identity";
@@ -17,25 +17,91 @@ type ShellPage = { id: string; name: string };
 
 function BrandMark({ className }: { className?: string }) {
   return (
-    <span aria-hidden="true" className={cn("inline-grid size-10 place-items-center rounded-control bg-gradient-to-br from-primary to-accent text-white shadow-primary", className)}>
-      <Activity size={20} strokeWidth={2.25} />
+    <span aria-hidden="true" className={cn("inline-grid size-9 place-items-center rounded-[0.8rem] bg-prism text-white shadow-primary animate-gradient", className)}>
+      <Activity size={18} strokeWidth={2.5} />
     </span>
   );
 }
 
-function UserCard({ user }: { user: ShellUser }) {
+function Avatar({ name, className }: { name: string; className?: string }) {
   return (
-    <div className="space-y-2 border-t border-line p-3">
-      <div className="flex min-w-0 items-center gap-2.5 px-1">
-        <span aria-hidden="true" className="grid size-9 shrink-0 place-items-center rounded-full bg-gradient-to-br from-sky-400 to-primary text-sm font-semibold text-white">
-          {user.name.slice(0, 1).toUpperCase()}
-        </span>
-        <div className="min-w-0">
-          <p className="truncate text-sm font-semibold text-ink">{user.name}</p>
-          <p className="truncate text-xs text-ink-dim">{user.email}</p>
+    <span aria-hidden="true" className={cn("grid size-8 shrink-0 place-items-center rounded-full bg-gradient-to-br from-fuchsia-500 to-orange-400 text-sm font-bold text-white", className)}>
+      {name.slice(0, 1).toUpperCase()}
+    </span>
+  );
+}
+
+/** Closes a popover on outside click or Escape. */
+function useDismiss(open: boolean, close: () => void) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (event: MouseEvent) => { if (ref.current && !ref.current.contains(event.target as Node)) close(); };
+    const onKey = (event: KeyboardEvent) => { if (event.key === "Escape") close(); };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => { document.removeEventListener("mousedown", onDown); document.removeEventListener("keydown", onKey); };
+  }, [open, close]);
+  return ref;
+}
+
+function UserMenu({ user }: { user: ShellUser }) {
+  const [open, setOpen] = useState(false);
+  const ref = useDismiss(open, () => setOpen(false));
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        aria-label="Account menu"
+        aria-expanded={open}
+        onClick={() => setOpen((value) => !value)}
+        className="grid place-items-center rounded-full outline-none ring-2 ring-transparent transition-all duration-200 hover:ring-accent/30 focus-visible:ring-4 focus-visible:ring-primary/25"
+      >
+        <Avatar name={user.name} className="size-9" />
+      </button>
+      {open && (
+        <div className="absolute right-0 top-full z-50 mt-2 w-64 origin-top-right animate-drop rounded-card bg-surface p-2 shadow-float ring-1 ring-line">
+          <div className="flex items-center gap-3 rounded-control bg-gradient-to-r from-primary-soft to-transparent p-3">
+            <Avatar name={user.name} className="size-10" />
+            <div className="min-w-0">
+              <p className="truncate text-sm font-bold text-ink">{user.name}</p>
+              <p className="truncate text-xs text-ink-dim">{user.email}</p>
+            </div>
+          </div>
+          <div className="mt-1"><LogoutButton /></div>
         </div>
-      </div>
-      <LogoutButton />
+      )}
+    </div>
+  );
+}
+
+function SectionMenu({ section, active, pathname }: { section: NavSection; active: boolean; pathname: string }) {
+  const [open, setOpen] = useState(false);
+  const ref = useDismiss(open, () => setOpen(false));
+  const Icon = section.icon;
+  const single = section.items.length === 1;
+  const trigger = cn(
+    "group relative flex h-9 items-center gap-1.5 whitespace-nowrap rounded-full px-3 text-sm font-semibold outline-none transition-all duration-200 ease-soft focus-visible:ring-4 focus-visible:ring-primary/25",
+    active ? "bg-ink text-white shadow-raised" : "text-ink-soft hover:bg-surface hover:text-ink hover:shadow-card",
+  );
+  const icon = <span data-hue={section.hue} className={cn("transition-transform duration-300 ease-spring group-hover:scale-125", active ? "text-[var(--hue-from)]" : "text-[var(--hue-to)]")}><Icon aria-hidden size={16} /></span>;
+
+  if (single) {
+    const item = section.items[0];
+    return <Link href={item.href} aria-current={isActivePath(pathname, item.href) ? "page" : undefined} className={trigger}>{icon}{section.label}</Link>;
+  }
+  return (
+    <div ref={ref} className="relative">
+      <button type="button" aria-expanded={open} aria-haspopup="true" onClick={() => setOpen((value) => !value)} className={trigger}>
+        {icon}
+        {section.label}
+        <ChevronDown aria-hidden size={14} className={cn("transition-transform duration-200", open && "rotate-180")} />
+      </button>
+      {open && (
+        <div className="absolute left-0 top-full z-50 mt-2 w-72 origin-top-left animate-drop rounded-card bg-surface p-2 shadow-float ring-1 ring-line">
+          <AdminNavList section={section} pathname={pathname} onNavigate={() => setOpen(false)} />
+        </div>
+      )}
     </div>
   );
 }
@@ -59,7 +125,6 @@ export function AdminShell({
   const current = activeNav(sections, pathname);
   const activeSection: NavSection | undefined = current?.section ?? sections[0];
 
-  const [panelOpen, setPanelOpen] = useState(true);
   const [sheet, setSheet] = useState<{ path: string; id: string } | null>(null);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const sheetSection = sheet && sheet.path === pathname ? sections.find((section) => section.id === sheet.id) : undefined;
@@ -89,107 +154,87 @@ export function AdminShell({
     return () => { document.body.style.overflow = previous; document.removeEventListener("keydown", onKey); };
   }, [sheetSection]);
 
-  const skipLink = <a href="#main" className="sr-only z-[4000] rounded-control bg-surface px-3 py-2 text-sm font-semibold text-primary-ink shadow-float focus:not-sr-only focus:fixed focus:left-3 focus:top-3">Skip to content</a>;
+  const skipLink = <a href="#main" className="sr-only z-[4000] rounded-full bg-surface px-4 py-2 text-sm font-semibold text-primary-ink shadow-float focus:not-sr-only focus:fixed focus:left-3 focus:top-3">Skip to content</a>;
+  const brand = (
+    <Link href="/organization" className="flex shrink-0 items-center gap-2.5 rounded-control text-[0.95rem] font-extrabold tracking-tight outline-none focus-visible:ring-4 focus-visible:ring-primary/25">
+      <BrandMark /> <span>Signal<span className="text-prism">Hub</span></span>
+    </Link>
+  );
 
   if (focusedFlow) {
     return (
       <div className="min-h-screen bg-wash text-ink">
         {skipLink}
-        <div className="flex h-14 items-center px-4 sm:px-8">
-          <Link href="/organization" className="flex items-center gap-2.5 text-sm font-semibold tracking-tight">
-            <BrandMark className="size-8" /> SignalHub
-          </Link>
-        </div>
-        <main id="main">{children}</main>
+        <div className="flex h-16 items-center px-4 sm:px-8">{brand}</div>
+        <main id="main" className="animate-rise">{children}</main>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-wash text-ink lg:flex">
+    <div className="min-h-screen bg-wash text-ink">
       {skipLink}
 
-      {/* Icon rail */}
-      <nav aria-label="Sections" className="sticky top-0 z-30 hidden h-screen w-[4.5rem] shrink-0 flex-col items-center gap-2 border-r border-line bg-surface/80 py-4 backdrop-blur lg:flex">
-        <Link href="/organization" aria-label="SignalHub dashboard" className="mb-3 rounded-control outline-none focus-visible:ring-4 focus-visible:ring-primary/25">
-          <BrandMark />
-        </Link>
-        {sections.map((section) => {
-          const active = activeSection?.id === section.id;
-          const Icon = section.icon;
-          return (
-            <Link
-              key={section.id}
-              href={section.items[0].href}
-              aria-label={section.label}
-              aria-current={active ? "true" : undefined}
-              data-hue={section.hue}
-              className="group relative grid size-11 place-items-center rounded-control outline-none focus-visible:ring-4 focus-visible:ring-primary/25"
+      {/* Top bar */}
+      <header className="sticky top-0 z-40 px-3 pt-3 sm:px-5">
+        <div className="glass mx-auto flex h-14 max-w-[92rem] items-center gap-3 rounded-full py-2 pl-3 pr-2 shadow-raised ring-1 ring-white/70 sm:pl-4">
+          {brand}
+          <nav aria-label="Sections" className="ml-2 hidden min-w-0 items-center gap-0.5 lg:flex">
+            {sections.map((section) => (
+              <SectionMenu key={section.id} section={section} active={activeSection?.id === section.id} pathname={pathname} />
+            ))}
+          </nav>
+          <div className="ml-auto flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setPaletteOpen(true)}
+              aria-label="Jump to a screen or page"
+              className="flex h-9 items-center gap-2 rounded-full bg-sunken px-3 text-sm text-ink-dim outline-none transition-all duration-200 hover:bg-primary-soft hover:text-primary-ink focus-visible:ring-4 focus-visible:ring-primary/25 2xl:w-56"
             >
-              <span aria-hidden="true" className={cn("absolute -left-[0.9rem] h-5 w-1 rounded-r-full bg-[var(--hue-fg)] transition-all duration-200 ease-soft", active ? "opacity-100" : "h-2 opacity-0")} />
-              <span className={cn("grid size-10 place-items-center rounded-control bg-[var(--hue-bg)] text-[var(--hue-fg)] ring-1 ring-inset ring-black/5 transition-all duration-200 ease-spring", active ? "scale-100 shadow-raised" : "scale-90 opacity-70 group-hover:scale-100 group-hover:opacity-100")}>
-                <Icon size={20} />
-              </span>
-              <span role="presentation" className="pointer-events-none absolute left-full z-50 ml-3 translate-x-[-4px] whitespace-nowrap rounded-control bg-ink px-2.5 py-1.5 text-xs font-medium text-white opacity-0 shadow-float transition-all duration-150 ease-soft group-hover:translate-x-0 group-hover:opacity-100 group-focus-visible:translate-x-0 group-focus-visible:opacity-100">
-                {section.label}
-              </span>
-            </Link>
-          );
-        })}
-      </nav>
-
-      {/* Context panel */}
-      {panelOpen && activeSection && (
-        <aside aria-label={`${activeSection.label} panel`} className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col border-r border-line bg-sunken/50 backdrop-blur lg:flex">
-          {orgSwitcher}
-          <div className="min-h-0 flex-1 overflow-y-auto px-3 py-4">
-            <p className="mb-2 px-2.5 text-xs font-semibold text-ink-dim">{activeSection.label}</p>
-            <AdminNavList section={activeSection} pathname={pathname} />
+              <Search aria-hidden size={15} />
+              <span className="hidden flex-1 text-left 2xl:inline">Search…</span>
+              <kbd className="hidden rounded-md bg-surface px-1.5 py-0.5 font-mono text-2xs font-semibold text-ink-soft shadow-card 2xl:inline">⌘K</kbd>
+            </button>
+            <div className="hidden max-w-52 sm:block">{orgSwitcher}</div>
+            <UserMenu user={user} />
           </div>
-          <UserCard user={user} />
-        </aside>
+        </div>
+      </header>
+
+      {/* In-section tabs */}
+      {activeSection && activeSection.items.length > 1 && (
+        <div className="mx-auto hidden max-w-[92rem] px-5 pt-5 lg:block lg:px-10">
+          <nav aria-label={`${activeSection.label} screens`} className="flex flex-wrap gap-1.5">
+            {activeSection.items.map((item) => {
+              const active = isActivePath(pathname, item.href);
+              const Icon = item.icon;
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  aria-current={active ? "page" : undefined}
+                  data-hue={item.hue}
+                  className={cn(
+                    "group flex h-8 items-center gap-1.5 rounded-full px-3 text-xs font-semibold outline-none transition-all duration-200 ease-soft focus-visible:ring-4 focus-visible:ring-primary/25",
+                    active ? "bg-gradient-to-r from-[var(--hue-from)] to-[var(--hue-to)] text-white shadow-[0_6px_16px_-8px_var(--hue-to)]" : "bg-surface/70 text-ink-soft ring-1 ring-line hover:-translate-y-px hover:text-[var(--hue-fg)] hover:ring-[var(--hue-from)]",
+                  )}
+                >
+                  <Icon aria-hidden size={14} className="transition-transform duration-300 ease-spring group-hover:scale-125" />
+                  {item.label}
+                </Link>
+              );
+            })}
+          </nav>
+        </div>
       )}
 
-      <div className="min-w-0 flex-1">
-        {/* Top strip */}
-        <div className="sticky top-0 z-20 flex h-14 items-center gap-3 border-b border-line/70 bg-canvas/80 px-4 backdrop-blur sm:px-6 lg:px-8">
-          <div className="hidden lg:block">
-            <Button type="button" variant="ghost" size="icon" className="size-9" aria-label={panelOpen ? "Hide panel" : "Show panel"} aria-pressed={panelOpen} onClick={() => setPanelOpen((open) => !open)}>
-              {panelOpen ? <PanelLeftClose aria-hidden size={18} /> : <PanelLeftOpen aria-hidden size={18} />}
-            </Button>
-          </div>
-          <Link href="/organization" className="flex items-center gap-2 text-sm font-semibold tracking-tight lg:hidden">
-            <BrandMark className="size-8" /> SignalHub
-          </Link>
-          <p className="hidden min-w-0 items-center gap-1.5 text-sm text-ink-soft lg:flex" aria-label="Current location">
-            {current ? (
-              <>
-                <span>{current.section.label}</span>
-                <ChevronRight aria-hidden size={14} className="shrink-0 text-ink-dim" />
-                <span className="truncate font-semibold text-ink">{current.item.label}</span>
-              </>
-            ) : <span className="font-semibold text-ink">SignalHub</span>}
-          </p>
-          <button
-            type="button"
-            onClick={() => setPaletteOpen(true)}
-            aria-label="Jump to a screen or page"
-            className="ml-auto flex h-9 items-center gap-2 rounded-control border border-line-strong bg-surface px-3 text-sm text-ink-dim shadow-card outline-none transition-[border-color,box-shadow] duration-200 hover:border-primary/40 focus-visible:ring-4 focus-visible:ring-primary/25 sm:w-64"
-          >
-            <Search aria-hidden size={15} />
-            <span className="hidden flex-1 text-left sm:inline">Search or jump to…</span>
-            <kbd className="hidden rounded-chip border border-line bg-sunken px-1.5 py-0.5 text-2xs font-medium text-ink-soft sm:inline">⌘K</kbd>
-          </button>
-        </div>
+      <main id="main" className="mx-auto w-full max-w-[92rem] px-4 pb-32 pt-6 sm:px-6 lg:px-10 lg:pb-14 lg:pt-7">
+        <div key={pathname} className="animate-rise">{children}</div>
+      </main>
 
-        <main id="main" className="mx-auto w-full max-w-[88rem] px-4 pb-28 pt-6 sm:px-6 lg:px-10 lg:pb-12 lg:pt-8">
-          <div key={pathname} className="animate-fade">{children}</div>
-        </main>
-      </div>
-
-      {/* Mobile bottom bar */}
-      <nav aria-label="Sections" className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-surface/90 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden">
-        <ul className="mx-auto flex max-w-xl items-stretch justify-around px-1">
+      {/* Mobile dock */}
+      <nav aria-label="Sections" className="fixed inset-x-3 bottom-3 z-30 pb-[env(safe-area-inset-bottom)] lg:hidden">
+        <ul className="glass mx-auto flex max-w-xl items-stretch justify-around rounded-[1.75rem] p-1.5 shadow-float ring-1 ring-white/70">
           {sections.map((section) => {
             const active = activeSection?.id === section.id;
             const Icon = section.icon;
@@ -200,12 +245,10 @@ export function AdminShell({
                   aria-haspopup="dialog"
                   aria-current={active ? "true" : undefined}
                   onClick={() => setSheet({ path: pathname, id: section.id })}
-                  className="flex h-16 w-full flex-col items-center justify-center gap-1 rounded-control outline-none focus-visible:ring-4 focus-visible:ring-inset focus-visible:ring-primary/25"
+                  className={cn("flex h-14 w-full flex-col items-center justify-center gap-0.5 rounded-[1.4rem] outline-none transition-all duration-200 focus-visible:ring-4 focus-visible:ring-inset focus-visible:ring-primary/25", active ? "bg-gradient-to-br from-[var(--hue-from)] to-[var(--hue-to)] text-white shadow-[0_8px_18px_-8px_var(--hue-to)]" : "text-ink-dim")}
                 >
-                  <span className={cn("grid h-7 w-10 place-items-center rounded-full transition-colors duration-200", active ? "bg-[var(--hue-bg)] text-[var(--hue-fg)]" : "text-ink-dim")}>
-                    <Icon size={20} />
-                  </span>
-                  <span className={cn("max-w-full truncate text-2xs font-medium", active ? "text-ink" : "text-ink-dim")}>{section.tabLabel ?? section.label}</span>
+                  <Icon aria-hidden size={20} />
+                  <span className="max-w-full truncate text-2xs font-semibold">{section.tabLabel ?? section.label}</span>
                 </button>
               </li>
             );
@@ -215,20 +258,21 @@ export function AdminShell({
 
       {/* Mobile sheet */}
       {sheetSection && (
-        <div className="fixed inset-0 z-40 flex animate-fade items-end bg-ink/40 backdrop-blur-sm lg:hidden" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setSheet(null); }}>
-          <div role="dialog" aria-modal="true" aria-label={`${sheetSection.label} menu`} className="max-h-[85vh] w-full animate-sheet overflow-y-auto rounded-t-sheet border-t border-line bg-surface pb-[env(safe-area-inset-bottom)] shadow-float">
-            <div className="flex items-center justify-between px-5 pb-1 pt-4">
+        <div className="fixed inset-0 z-50 flex animate-fade items-end bg-ink/30 backdrop-blur-md lg:hidden" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setSheet(null); }}>
+          <div role="dialog" aria-modal="true" aria-label={`${sheetSection.label} menu`} className="max-h-[85vh] w-full animate-sheet overflow-y-auto rounded-t-sheet bg-surface pb-[env(safe-area-inset-bottom)] shadow-float">
+            <div className="mx-auto mt-2.5 h-1.5 w-10 rounded-full bg-line-strong" />
+            <div className="flex items-center justify-between px-5 pb-2 pt-3">
               <div className="flex items-center gap-3">
                 <IconTile icon={sheetSection.icon} hue={sheetSection.hue} />
-                <h2 className="text-lg font-semibold tracking-tight">{sheetSection.label}</h2>
+                <h2 className="text-lg font-extrabold tracking-tight">{sheetSection.label}</h2>
               </div>
               <Button type="button" variant="ghost" size="icon" aria-label="Close menu" onClick={() => setSheet(null)}><X aria-hidden size={18} /></Button>
             </div>
-            <div className="mt-2 border-y border-line bg-sunken/50">{orgSwitcher}</div>
+            <div className="px-4 pb-2 sm:hidden">{orgSwitcher}</div>
             <div className="px-3 py-3">
               <AdminNavList section={sheetSection} pathname={pathname} onNavigate={() => setSheet(null)} />
             </div>
-            <UserCard user={user} />
+            <div className="border-t border-line p-3"><LogoutButton /></div>
           </div>
         </div>
       )}
