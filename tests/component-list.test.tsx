@@ -76,7 +76,7 @@ describe("component directory customization", () => {
     expect(html).toContain("Authoritative DNS");
     expect(html).toContain("sm:grid-cols-2 lg:grid-cols-3");
     expect(html).toContain("Show details for Authoritative DNS");
-    expect(html).toContain("ui-reveal");
+    expect(html).toContain("animate-fade");
     expect(html).toContain("<input");
     expect(html).toContain("inline-flex");
   });

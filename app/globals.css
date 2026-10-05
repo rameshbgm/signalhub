@@ -56,6 +56,22 @@
   --cyan: var(--page-brand, #0f8ca8);
   --cyan-soft: color-mix(in srgb, var(--page-brand, #0f8ca8) 12%, transparent);
   --on-cyan: #ffffff;
+  /* Re-point the shared design tokens at the owner's palette so the ui
+     primitives (Button, Card, Input, Dialog) follow the page design. */
+  --color-canvas: var(--bg);
+  --color-surface: var(--surface);
+  --color-sunken: var(--surface-raised);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-bright);
+  --color-ink: var(--fg);
+  --color-ink-soft: var(--fg-soft);
+  --color-ink-dim: var(--fg-dim);
+  --color-primary: var(--cyan);
+  --color-primary-hover: color-mix(in srgb, var(--cyan) 85%, #000);
+  --color-primary-soft: var(--cyan-soft);
+  --color-primary-ink: var(--cyan);
+  --color-on-primary: var(--on-cyan);
+  --shadow-primary: 0 1px 2px color-mix(in srgb, var(--cyan) 30%, transparent), 0 6px 16px -4px color-mix(in srgb, var(--cyan) 40%, transparent);
   --status-operational: #16a34a;
   --status-degraded: #eab308;
   --status-partial: #f97316;
@@ -499,115 +515,6 @@ button[data-button-busy="saving"]::after {
   }
 }
 
-.ui-select-menu {
-  position: fixed !important;
-  z-index: 2000;
-  box-sizing: border-box;
-  min-width: 0;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  border: 1px solid var(--line) !important;
-  border-radius: 0.3rem !important;
-  background: var(--surface) !important;
-  color: var(--fg) !important;
-  font-family: var(--font-body-family) !important;
-  font-size: 1rem !important;
-  box-shadow: 0 14px 35px rgba(15, 23, 42, 0.16) !important;
-  padding: 0.35rem !important;
-  animation: ui-reveal 160ms ease-out;
-}
-
-.ui-select-option {
-  display: flex;
-  width: 100%;
-  min-height: 2.5rem;
-  align-items: center;
-  gap: 0.75rem;
-  border: 0;
-  border-radius: 0.2rem;
-  background: transparent;
-  color: var(--fg);
-  cursor: pointer;
-  font: inherit;
-  text-align: left;
-  transition: background-color 100ms ease, color 100ms ease;
-}
-
-.ui-select-option:hover,
-.ui-select-option.is-active {
-  background: var(--surface-raised);
-}
-
-.ui-select-option.is-selected {
-  background: var(--cyan-soft);
-  color: var(--fg);
-  font-weight: 600;
-}
-
-.ui-select-option:disabled {
-  cursor: not-allowed;
-  opacity: 0.45;
-}
-
-.ui-tooltip-anchor {
-  position: relative;
-  display: inline-flex;
-}
-
-.ui-tooltip {
-  position: absolute;
-  bottom: calc(100% + 0.5rem);
-  left: 50%;
-  z-index: 2100;
-  width: max-content;
-  max-width: min(22rem, calc(100vw - 2rem));
-  transform: translateX(-50%) translateY(0.25rem);
-  border: 1px solid var(--line-bright);
-  background: var(--surface-raised);
-  color: var(--fg);
-  font-size: 0.75rem;
-  opacity: 0;
-  pointer-events: none;
-  box-shadow: 0 12px 28px rgba(2, 9, 17, 0.2);
-  transition: opacity 140ms ease, transform 140ms ease;
-}
-
-.ui-tooltip-anchor:hover .ui-tooltip,
-.ui-tooltip-anchor:focus-within .ui-tooltip {
-  transform: translateX(-50%);
-  opacity: 1;
-}
-
-.ui-dialog-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 2500;
-  display: grid;
-  place-items: center;
-  padding: 1rem;
-  background: rgba(2, 9, 17, 0.72);
-  animation: ui-fade 140ms ease-out;
-}
-
-.ui-dialog-surface {
-  width: min(32rem, 100%);
-  border: 1px solid var(--line-bright);
-  background: var(--surface);
-  color: var(--fg);
-  padding: 1.25rem;
-  box-shadow: 0 22px 60px rgba(2, 9, 17, 0.36);
-  animation: ui-reveal 180ms ease-out;
-}
-
-.ui-spinner {
-  width: 0.9rem;
-  height: 0.9rem;
-  border: 2px solid currentColor;
-  border-right-color: transparent;
-  border-radius: 999px;
-  animation: button-busy-spin 700ms linear infinite;
-}
-
 .ui-file-trigger {
   display: inline-flex;
   min-height: 2rem;
@@ -639,13 +546,6 @@ button[data-button-busy="saving"]::after {
   to { opacity: 1; }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .ui-select-menu,
-  .ui-dialog-backdrop,
-  .ui-dialog-surface,
-  .ui-tooltip,
-  .ui-spinner { animation: none; transition: none; }
-}
 
 /* Keep the shared form primitives aligned with the console token system. */
 .app-console-main :where(input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]), textarea) {
@@ -661,9 +561,6 @@ button[data-button-busy="saving"]::after {
   box-shadow: 0 0 0 2px var(--cyan-soft);
 }
 
-@media (max-width: 639px) {
-  .ui-select-option { min-height: 2.75rem; }
-}
 
 /* Keep native selects visually aligned with the rest of the console form
    controls. The application Select primitive is used for interactive menus. */

@@ -7,7 +7,7 @@ export function Radio({ className, ...props }: InputHTMLAttributes<HTMLInputElem
       {...props}
       type="radio"
       className={cn(
-        "h-4 w-4 shrink-0 cursor-pointer border border-[var(--line-bright)] bg-[var(--input-overlay-bg)] accent-[var(--cyan)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus)] disabled:cursor-not-allowed disabled:opacity-50",
+        "size-4 shrink-0 cursor-pointer border border-line-strong bg-surface accent-primary transition-shadow focus-visible:ring-4 focus-visible:ring-primary/25 disabled:cursor-not-allowed disabled:opacity-50",
         className,
       )}
     />
