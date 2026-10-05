@@ -1,4 +1,12 @@
 import Link from "next/link";
+import { AlertTriangle, Boxes, CheckCircle2, CircleHelp, ExternalLink, LayoutDashboard, PanelsTopLeft, Plus, ShieldCheck, UsersRound, Wrench, XOctagon, type LucideIcon } from "lucide-react";
+import { buttonVariants } from "@/components/ui/button";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
+import { IconTile, type Hue } from "@/components/ui/icon-tile";
+import { PageHeader } from "@/components/ui/page-header";
+import { StatusBadge } from "@/components/ui/status-badge";
+import { cn } from "@/lib/utils";
 import { requireSession } from "@/lib/require-session";
 import { database } from "@/lib/postgres/client";
 import { getScopedPages } from "@/lib/admin-guard";
@@ -128,126 +136,146 @@ export default async function AdminDashboard() {
   const healthBanner = overallHealth ? overallBanner([overallHealth]) : null;
   const canConfigurePages = sessionHasCapability(session, "page.configure");
 
+  const tone = healthTone(overallHealth);
+  const HeroIcon = HERO_ICON[overallHealth ?? "UNKNOWN"];
+  const canManageSubscribers = sessionHasCapability(session, "subscriber.manage");
+  const canManageIncidents = sessionHasCapability(session, "incident.update");
+
   return (
-    <div>
-      <div className="mb-8 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="font-mono text-2xl font-semibold tracking-tight text-[var(--fg)]">Dashboard</h1>
-          <p className="mt-1 text-sm text-[var(--fg-soft)]">Everything happening across {org.name}, at a glance.</p>
+    <div className="space-y-8">
+      <PageHeader title="Dashboard" description={`Everything happening across ${org.name}, at a glance.`} icon={LayoutDashboard} hue="indigo" />
+
+      <section aria-label="Overall health" className={cn("flex flex-wrap items-center gap-5 rounded-sheet border p-6 shadow-card sm:p-7", HERO_TONE[tone])}>
+        <IconTile icon={HeroIcon} hue={HERO_HUE[tone]} size="lg" className="size-14 rounded-card" />
+        <div className="min-w-0 flex-1">
+          <p className="flex items-center gap-2.5 text-xl font-semibold tracking-tight text-ink sm:text-2xl">
+            {tone === "ok" && <span aria-hidden="true" className="size-2.5 shrink-0 rounded-full bg-ok text-ok animate-pulse-ring" />}
+            {healthBanner?.label ?? "Health data unavailable"}
+          </p>
+          <p className="mt-1 text-sm text-ink-soft">
+            {pages.length === 0
+              ? "Create a page to start tracking the health of your services."
+              : `Tracking ${plural(pages.length, "page")}, ${plural(componentDocs.length, "component")}, and ${plural(monitorDocs.length, "active monitor")}.`}
+          </p>
         </div>
-        <div
-          className={`flex w-fit items-center gap-2 border px-3.5 py-1.5 font-mono text-xs font-semibold uppercase tracking-wide ${
-            overallHealth === "OPERATIONAL"
-              ? "border-[var(--green)]/20 bg-[var(--green-soft)] text-[var(--green)]"
-              : overallHealth
-                ? "border-[var(--amber)]/20 bg-[var(--amber-soft)] text-[var(--amber)]"
-                : "border-[var(--line-bright)] bg-[var(--surface)] text-[var(--fg-soft)]"
-          }`}
-        >
-          <span
-            className={`h-1.5 w-1.5 rounded-full ${
-              overallHealth === "OPERATIONAL"
-                ? "bg-[var(--green)] pulse-dot"
-                : overallHealth
-                  ? "bg-[var(--amber)]"
-                  : "bg-[var(--fg-dim)]"
-            }`}
-            style={
-              overallHealth === "OPERATIONAL"
-                ? ({ "--pulse-color": "var(--green)" } as React.CSSProperties)
-                : undefined
-            }
-          />
-          {healthBanner?.label ?? "Health data unavailable"}
-        </div>
+      </section>
+
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <StatTile label="Pages" value={pages.length} icon={PanelsTopLeft} hue="violet" href="/organization/pages" />
+        <StatTile label="Components" value={componentDocs.length} icon={Boxes} hue="sky" />
+        <StatTile label="Subscribers" value={subscriberCount} icon={UsersRound} hue="emerald" href={canManageSubscribers ? "/organization/subscribers" : undefined} />
+        <StatTile label="Upcoming maintenance" value={upcomingMaintenance} icon={Wrench} hue="amber" href={canManageIncidents ? "/organization/maintenance" : undefined} />
       </div>
 
-      <div className="grid grid-cols-2 gap-4 mb-10 sm:grid-cols-4">
-        <StatCard label="Pages" value={pages.length} />
-        <StatCard label="Components" value={componentDocs.length} />
-        <StatCard label="Subscribers" value={subscriberCount} />
-        <StatCard label="Upcoming Maintenance" value={upcomingMaintenance} />
-      </div>
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Card>
+          <CardHeader className="h-16 flex-row items-center justify-between py-0">
+            <h2 className="text-base font-semibold">Open incidents</h2>
+            {openIncidents.length > 0 && <StatusBadge tone="warn">{openIncidents.length} open</StatusBadge>}
+          </CardHeader>
+          <CardContent>
+            {openIncidents.length === 0 ? (
+              <EmptyState icon={CheckCircle2} hue="emerald" title="No open incidents" description="Everything is running normally. Incidents you declare will appear here." className="border-0 bg-transparent py-8" />
+            ) : (
+              <ul className="space-y-2">
+                {openIncidents.map((inc) => (
+                  <li key={inc.id}>
+                    <Link href={`/organization/incidents/${inc.id}`} className="group flex items-center justify-between gap-3 rounded-control border border-line px-3.5 py-3 text-sm outline-none transition-[border-color,box-shadow] duration-200 hover:border-primary/40 hover:shadow-raised focus-visible:ring-4 focus-visible:ring-primary/25">
+                      <span className="min-w-0 truncate font-medium text-ink">{inc.name}</span>
+                      <StatusBadge tone="warn">{titleCase(inc.status)}</StatusBadge>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
 
-      <div className="grid lg:grid-cols-2 gap-8">
-        <div>
-          <h2 className="font-mono text-base font-semibold text-[var(--fg)] mb-3">Open Incidents</h2>
-          {openIncidents.length === 0 ? (
-            <div className="border border-dashed border-[var(--line)] p-6 text-center">
-              <p className="text-sm text-[var(--fg-soft)]">No open incidents. All clear.</p>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {openIncidents.map((inc) => (
-                <Link
-                  key={inc.id}
-                  href={`/organization/incidents/${inc.id}`}
-                  className="flex items-center justify-between border border-[var(--line)] bg-[var(--surface)] p-3.5 text-sm transition-colors hover:border-[var(--line-bright)]"
-                >
-                  <span className="font-medium text-[var(--fg)]">{inc.name}</span>
-                  <span className="bg-[var(--amber-soft)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--amber)]">{inc.status}</span>
-                </Link>
-              ))}
-            </div>
-          )}
-        </div>
-
-        <div>
-          <h2 className="font-mono text-base font-semibold text-[var(--fg)] mb-3">Your Pages</h2>
-          <div className="space-y-2">
-            {pages.map((p) => (
-              <div key={p.id} className="flex items-center justify-between border border-[var(--line)] bg-[var(--surface)] p-3.5 text-sm">
-                <div className="flex min-w-0 items-center gap-2.5">
-                  <span
-                    className="h-1.5 w-1.5 shrink-0 rounded-full"
-                    role="img"
-                    aria-label={
-                      pageHealthById.get(p.id)
-                        ? COMPONENT_STATUS_LABEL[pageHealthById.get(p.id)!]
-                        : "Health data unavailable"
-                    }
-                    title={
-                      pageHealthById.get(p.id)
-                        ? COMPONENT_STATUS_LABEL[pageHealthById.get(p.id)!]
-                        : "Health data unavailable"
-                    }
-                    style={{
-                      backgroundColor: pageHealthById.get(p.id)
-                        ? COMPONENT_STATUS_COLOR[pageHealthById.get(p.id)!]
-                        : "var(--fg-dim)",
-                    }}
-                  />
-                  <div className="min-w-0">
-                    <span className="font-medium text-[var(--fg)]">{p.name}</span>
-                    <span className="text-xs text-[var(--fg-dim)] ml-2">
-                      {p.type}
-                      {p.isHub ? " · hub" : ""}
-                    </span>
-                  </div>
-                </div>
-                <div className="flex shrink-0 items-center gap-2 text-xs font-semibold">
-                  {p.publicVisible !== false && <a href={publicPagePath(p)} target="_blank" rel="noreferrer" className="inline-flex min-h-8 items-center justify-center border border-transparent px-2.5 py-1 text-[var(--fg-soft)] hover:border-[var(--line)] hover:text-[var(--fg)]">View</a>}
-                  {canConfigurePages && <Link
-                    href={`/organization/pages/${p.id}`}
-                    className="inline-flex min-h-8 items-center justify-center border border-[var(--cyan)]/30 px-2.5 py-1 text-xs font-semibold text-[var(--cyan)] transition-colors hover:bg-[var(--cyan-soft)]"
-                  >
-                    Manage
-                  </Link>}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
+        <Card>
+          <CardHeader className="h-16 flex-row items-center justify-between py-0">
+            <h2 className="text-base font-semibold">Your pages</h2>
+            {canConfigurePages && <Link href="/organization/pages/new" className={buttonVariants({ variant: "soft", size: "sm" })}><Plus aria-hidden size={14} />New page</Link>}
+          </CardHeader>
+          <CardContent>
+            {pages.length === 0 ? (
+              <EmptyState icon={PanelsTopLeft} hue="violet" title="No pages yet" description="A status page shows your customers what is up, what is down, and what you are doing about it." className="border-0 bg-transparent py-8" action={canConfigurePages ? <Link href="/organization/pages/new" className={buttonVariants()}>Create a page</Link> : undefined} />
+            ) : (
+              <ul className="space-y-2">
+                {pages.map((p) => {
+                  const health = pageHealthById.get(p.id);
+                  const label = health ? COMPONENT_STATUS_LABEL[health] : "Health data unavailable";
+                  return (
+                    <li key={p.id} className="flex items-center justify-between gap-3 rounded-control border border-line px-3.5 py-3 text-sm">
+                      <div className="flex min-w-0 items-center gap-3">
+                        <span role="img" aria-label={label} title={label} className="size-2.5 shrink-0 rounded-full" style={{ backgroundColor: health ? COMPONENT_STATUS_COLOR[health] : "var(--color-ink-dim)" }} />
+                        <div className="min-w-0">
+                          <p className="truncate font-medium text-ink">{p.name}</p>
+                          <p className="text-xs text-ink-dim">{titleCase(p.type)}{p.isHub ? " hub" : ""}</p>
+                        </div>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-1.5">
+                        {p.publicVisible !== false && <a href={publicPagePath(p)} target="_blank" rel="noreferrer" className={buttonVariants({ variant: "ghost", size: "sm" })}>View<ExternalLink aria-hidden size={13} /></a>}
+                        {canConfigurePages && <Link href={`/organization/pages/${p.id}`} className={buttonVariants({ variant: "secondary", size: "sm" })}>Manage</Link>}
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
 }
 
-function StatCard({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="border border-[var(--line)] bg-[var(--surface)] p-4">
-      <p className="font-mono text-3xl font-semibold text-[var(--fg)]">{value}</p>
-      <p className="mt-0.5 text-xs text-[var(--fg-dim)]">{label}</p>
-    </div>
+type HealthTone = "ok" | "warn" | "danger" | "info" | "neutral";
+
+function healthTone(status: ComponentStatus | null): HealthTone {
+  if (status === null) return "neutral";
+  if (status === "OPERATIONAL") return "ok";
+  if (status === "MAJOR_OUTAGE") return "danger";
+  if (status === "UNDER_MAINTENANCE") return "info";
+  return "warn";
+}
+
+const HERO_TONE: Record<HealthTone, string> = {
+  ok: "border-ok/20 bg-gradient-to-br from-ok-bg/70 via-surface to-surface",
+  warn: "border-warn/30 bg-gradient-to-br from-warn-bg/70 via-surface to-surface",
+  danger: "border-danger/20 bg-gradient-to-br from-danger-bg/70 via-surface to-surface",
+  info: "border-info/20 bg-gradient-to-br from-info-bg/70 via-surface to-surface",
+  neutral: "border-line bg-surface",
+};
+
+const HERO_HUE: Record<HealthTone, Hue> = { ok: "emerald", warn: "amber", danger: "rose", info: "sky", neutral: "slate" };
+
+const HERO_ICON: Record<ComponentStatus | "UNKNOWN", LucideIcon> = {
+  OPERATIONAL: ShieldCheck,
+  DEGRADED_PERFORMANCE: AlertTriangle,
+  PARTIAL_OUTAGE: AlertTriangle,
+  MAJOR_OUTAGE: XOctagon,
+  UNDER_MAINTENANCE: Wrench,
+  UNKNOWN: CircleHelp,
+};
+
+function plural(count: number, noun: string) {
+  return `${count} ${noun}${count === 1 ? "" : "s"}`;
+}
+
+function titleCase(value: string) {
+  const text = value.replaceAll("_", " ").toLowerCase();
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+function StatTile({ label, value, icon, hue, href }: { label: string; value: number; icon: LucideIcon; hue: Hue; href?: string }) {
+  const content = (
+    <>
+      <IconTile icon={icon} hue={hue} />
+      <p className="mt-4 text-3xl font-semibold tabular-nums tracking-tight text-ink">{value}</p>
+      <p className="mt-0.5 text-sm text-ink-soft">{label}</p>
+    </>
   );
+  const box = "rounded-card border border-line bg-surface p-5 shadow-card";
+  if (!href) return <div className={box}>{content}</div>;
+  return <Link href={href} className={cn(box, "block outline-none transition-[border-color,box-shadow,transform] duration-200 ease-soft hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-raised focus-visible:ring-4 focus-visible:ring-primary/25")}>{content}</Link>;
 }

@@ -68,6 +68,9 @@
   --animate-fade: sh-fade var(--duration-base) ease-out both;
   --animate-pulse-ring: sh-pulse-ring 2.4s ease-out infinite;
   --animate-shimmer: sh-shimmer 1.6s ease-in-out infinite;
+  --animate-bar-in: sh-bar-in 520ms var(--ease-soft) both;
+  --animate-sheet: sh-sheet var(--duration-slow) var(--ease-soft) both;
+  --animate-drop: sh-drop var(--duration-base) var(--ease-soft) both;
 }
 
 @keyframes sh-rise {
@@ -88,6 +91,21 @@
 @keyframes sh-pulse-ring {
   0% { box-shadow: 0 0 0 0 color-mix(in srgb, currentColor 45%, transparent); }
   70%, 100% { box-shadow: 0 0 0 8px transparent; }
+}
+
+@keyframes sh-bar-in {
+  from { opacity: 0; transform: scaleY(0.15); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes sh-sheet {
+  from { transform: translateY(100%); }
+  to { transform: none; }
+}
+
+@keyframes sh-drop {
+  from { opacity: 0; transform: translateY(-6px) scale(0.98); }
+  to { opacity: 1; transform: none; }
 }
 
 @keyframes sh-shimmer {

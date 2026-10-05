@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
 import {
   BellRing,
   BookOpen,
@@ -16,111 +15,150 @@ import {
   Settings2,
   ShieldCheck,
   Siren,
+  Sparkles,
   UsersRound,
   Wrench,
+  Building2,
   type LucideIcon,
 } from "lucide-react";
+import { IconTile, type Hue } from "@/components/ui/icon-tile";
+import { cn } from "@/lib/utils";
 import type { Capability } from "@/lib/identity";
 
-type NavItem = {
+export type NavItem = {
   href: string;
   label: string;
   icon: LucideIcon;
+  hue: Hue;
   capability?: Capability;
 };
 
-const GROUPS: Array<{ label: string; iconClass: string; items: NavItem[] }> = [
+export type NavSection = {
+  id: string;
+  label: string;
+  /** Shorter name for the mobile tab bar, where each tab is about 65px wide. */
+  tabLabel?: string;
+  icon: LucideIcon;
+  hue: Hue;
+  items: NavItem[];
+};
+
+export const NAV_SECTIONS: NavSection[] = [
   {
+    id: "workspace",
     label: "Workspace",
-    iconClass: "text-[var(--cyan)]",
+    icon: LayoutDashboard,
+    hue: "indigo",
     items: [
-      { href: "/organization", label: "Dashboard", icon: LayoutDashboard },
-      { href: "/organization/pages", label: "Pages", icon: PanelsTopLeft },
+      { href: "/organization", label: "Dashboard", icon: LayoutDashboard, hue: "indigo" },
+      { href: "/organization/pages", label: "Pages", icon: PanelsTopLeft, hue: "violet" },
     ],
   },
   {
+    id: "operate",
     label: "Operate",
-    iconClass: "text-[var(--amber)]",
+    icon: Siren,
+    hue: "amber",
     items: [
-      { href: "/organization/incidents", label: "Incidents", icon: Siren, capability: "incident.update" },
-      { href: "/organization/maintenance", label: "Maintenance", icon: Wrench, capability: "incident.update" },
-      { href: "/organization/monitors", label: "Monitors", icon: MonitorDot, capability: "monitor.manage" },
-      { href: "/organization/metrics", label: "Metrics", icon: Gauge, capability: "monitor.manage" },
+      { href: "/organization/incidents", label: "Incidents", icon: Siren, hue: "amber", capability: "incident.update" },
+      { href: "/organization/maintenance", label: "Maintenance", icon: Wrench, hue: "amber", capability: "incident.update" },
+      { href: "/organization/monitors", label: "Monitors", icon: MonitorDot, hue: "sky", capability: "monitor.manage" },
+      { href: "/organization/metrics", label: "Metrics", icon: Gauge, hue: "sky", capability: "monitor.manage" },
     ],
   },
   {
+    id: "audience",
     label: "Audience",
-    iconClass: "text-[var(--green)]",
+    icon: UsersRound,
+    hue: "emerald",
     items: [
-      { href: "/organization/subscribers", label: "Subscribers", icon: UsersRound, capability: "subscriber.manage" },
-      { href: "/organization/notifications", label: "Destinations", icon: BellRing, capability: "integration.manage" },
-      { href: "/organization/analytics", label: "Analytics", icon: ChartNoAxesCombined, capability: "analytics.view" },
+      { href: "/organization/subscribers", label: "Subscribers", icon: UsersRound, hue: "emerald", capability: "subscriber.manage" },
+      { href: "/organization/notifications", label: "Destinations", icon: BellRing, hue: "teal", capability: "integration.manage" },
+      { href: "/organization/analytics", label: "Analytics", icon: ChartNoAxesCombined, hue: "violet", capability: "analytics.view" },
     ],
   },
   {
+    id: "tools",
     label: "Tools",
-    iconClass: "text-[var(--blue)]",
+    icon: Sparkles,
+    hue: "teal",
     items: [
-      { href: "/organization/embed", label: "SignalHub Embed", icon: Code2, capability: "integration.manage" },
-      { href: "/organization/api-keys", label: "API Keys", icon: KeyRound, capability: "integration.manage" },
-      { href: "/organization/help", label: "Help Center", icon: BookOpen },
+      { href: "/organization/embed", label: "SignalHub Embed", icon: Code2, hue: "teal", capability: "integration.manage" },
+      { href: "/organization/api-keys", label: "API Keys", icon: KeyRound, hue: "teal", capability: "integration.manage" },
+      { href: "/organization/help", label: "Help Center", icon: BookOpen, hue: "slate" },
     ],
   },
   {
+    id: "organization",
     label: "Organization",
-    iconClass: "text-[var(--orange)]",
+    tabLabel: "Settings",
+    icon: Building2,
+    hue: "rose",
     items: [
-      { href: "/organization/security", label: "Security", icon: ShieldCheck },
-      { href: "/organization/team", label: "Users & Roles", icon: UsersRound, capability: "team.manage" },
-      { href: "/organization/settings", label: "Settings", icon: Settings2, capability: "organization.manage" },
+      { href: "/organization/security", label: "Security", icon: ShieldCheck, hue: "rose" },
+      { href: "/organization/team", label: "Users & Roles", icon: UsersRound, hue: "indigo", capability: "team.manage" },
+      { href: "/organization/settings", label: "Settings", icon: Settings2, hue: "slate", capability: "organization.manage" },
     ],
   },
   {
+    id: "platform",
     label: "Platform",
-    iconClass: "text-[var(--red)]",
+    icon: Landmark,
+    hue: "violet",
     items: [
-      { href: "/organization/platform", label: "Platform administration", icon: Landmark, capability: "organization.manage" },
+      { href: "/organization/platform", label: "Platform administration", icon: Landmark, hue: "violet", capability: "organization.manage" },
     ],
   },
 ];
 
-export function AdminNav({ capabilities }: { capabilities: Capability[] }) {
-  const pathname = usePathname();
+/** Sections with at least one item the signed-in role may open. */
+export function visibleSections(capabilities: Capability[]): NavSection[] {
   const allowed = new Set(capabilities);
+  return NAV_SECTIONS
+    .map((section) => ({ ...section, items: section.items.filter((item) => !item.capability || allowed.has(item.capability)) }))
+    .filter((section) => section.items.length > 0);
+}
 
+export function isActivePath(pathname: string, href: string) {
+  return href === "/organization" ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);
+}
+
+/** The section and item for the current route; the longest matching href wins. */
+export function activeNav(sections: NavSection[], pathname: string) {
+  let best: { section: NavSection; item: NavItem } | undefined;
+  for (const section of sections) {
+    for (const item of section.items) {
+      if (isActivePath(pathname, item.href) && (!best || item.href.length > best.item.href.length)) best = { section, item };
+    }
+  }
+  return best;
+}
+
+export function AdminNavList({ section, pathname, onNavigate }: { section: NavSection; pathname: string; onNavigate?: () => void }) {
   return (
-    <nav aria-label="Organization navigation" className="dispatch-nav">
-      {GROUPS.map((group) => {
-        const items = group.items.filter((item) => !item.capability || allowed.has(item.capability));
-        if (items.length === 0) return null;
-        return (
-        <section key={group.label} className="dispatch-nav-group">
-          <p className="dispatch-nav-label">{group.label}</p>
-          <div className="dispatch-nav-items">
-            {items.map((item) => {
-              const active = item.href === "/organization"
-                ? pathname === item.href
-                : pathname === item.href || pathname.startsWith(`${item.href}/`);
-              const Icon = item.icon;
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={`dispatch-nav-link ${
-                    active
-                      ? "dispatch-nav-link--active"
-                      : ""
-                  }`}
-                >
-                  <Icon size={14} strokeWidth={active ? 2.4 : 1.8} aria-hidden className={`${group.iconClass} transition-colors ${active ? "drop-shadow-[0_0_5px_currentColor]" : ""}`} />
-                  {item.label}
-                </Link>
-              );
-            })}
-          </div>
-        </section>
-        );
-      })}
+    <nav aria-label={`${section.label} navigation`}>
+      <ul className="space-y-1">
+        {section.items.map((item) => {
+          const active = isActivePath(pathname, item.href);
+          return (
+            <li key={item.href}>
+              <Link
+                href={item.href}
+                onClick={onNavigate}
+                aria-current={active ? "page" : undefined}
+                className={cn(
+                  "group flex items-center gap-3 rounded-control px-2.5 py-2 text-sm font-medium outline-none transition-colors duration-150 focus-visible:ring-4 focus-visible:ring-primary/25",
+                  active ? "bg-surface text-ink shadow-card ring-1 ring-line" : "text-ink-soft hover:bg-surface/70 hover:text-ink",
+                )}
+              >
+                <IconTile icon={item.icon} hue={item.hue} size="sm" className={cn("transition-transform duration-200 ease-spring", !active && "group-hover:scale-110")} />
+                <span className="min-w-0 flex-1 truncate">{item.label}</span>
+                {active && <span aria-hidden="true" className="size-1.5 rounded-full bg-primary" />}
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
     </nav>
   );
 }

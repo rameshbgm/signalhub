@@ -5,9 +5,7 @@ import { fetchWithTimeout } from "@/lib/client-fetch";
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { LogoutButton } from "@/components/admin/LogoutButton";
-import { ChevronDown } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { ChevronsUpDown } from "lucide-react";
 
 export function OrgSwitcher({
   orgName,
@@ -70,78 +68,75 @@ export function OrgSwitcher({
   }
 
   return (
-    <div ref={ref} className="dispatch-org-switcher relative flex items-center gap-2 border-b border-[var(--line)] px-3 py-3">
-      <Button
+    <div ref={ref} className="relative border-b border-line p-3">
+      <button
         type="button"
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
         aria-haspopup="menu"
-        variant="ghost"
-        className="h-auto min-w-0 flex-1 justify-start gap-2.5 rounded-none px-2 py-2 text-left"
+        className="flex w-full min-w-0 items-center gap-3 rounded-control px-2 py-2 text-left outline-none transition-colors duration-150 hover:bg-surface focus-visible:ring-4 focus-visible:ring-primary/25"
       >
-        <span className="flex h-8 w-8 shrink-0 items-center justify-center bg-[var(--cyan)] font-mono text-xs font-bold text-[var(--on-cyan)]">
+        <span aria-hidden="true" className="grid size-9 shrink-0 place-items-center rounded-control bg-gradient-to-br from-emerald-400 to-teal-600 text-sm font-semibold text-white shadow-card">
           {orgName.slice(0, 1).toUpperCase()}
         </span>
-        <span className="min-w-0 flex-1 text-left">
-          <span className="block truncate font-mono text-sm font-semibold text-[var(--fg)]">{orgName}</span>
-          <span className="block text-[11px] uppercase tracking-wide text-[var(--fg-dim)]">Self-hosted</span>
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-sm font-semibold text-ink">{orgName}</span>
+          <span className="block text-xs text-ink-dim">Self-hosted</span>
         </span>
-        <ChevronDown aria-hidden size={16} className={`text-[var(--cyan)] transition-transform ${open ? "rotate-180" : ""}`} />
-      </Button>
-      <LogoutButton compact className="lg:hidden" />
+        <ChevronsUpDown aria-hidden size={16} className="shrink-0 text-ink-dim" />
+      </button>
 
       {open && (
-        <div role="menu" className="absolute left-3 right-3 top-full z-20 mt-1 border border-[var(--line-bright)] bg-[var(--surface-raised)] py-1.5 shadow-xl">
+        <div role="menu" className="absolute inset-x-3 top-full z-40 mt-1 animate-drop rounded-card border border-line bg-surface p-1.5 shadow-float">
           {organizations.length > 1 && (
             <>
-              <p className="px-3 py-1 font-mono text-[10px] uppercase tracking-wider text-[var(--fg-dim)]">Organizations</p>
+              <p className="px-2.5 py-1 text-xs font-semibold text-ink-dim">Organizations</p>
               {organizations.map((organization) => (
-                <Button
+                <button
                   key={organization.id}
                   type="button"
                   role="menuitem"
                   disabled={switching || organization.id === orgId}
                   onClick={() => switchOrganization(organization.id)}
-                  variant="ghost"
-                  size="sm"
-                  className="h-auto w-full justify-start rounded-none px-3 py-1.5 text-left text-sm font-normal text-[var(--fg)] disabled:opacity-60"
+                  className="flex w-full items-center justify-between gap-2 rounded-control px-2.5 py-2 text-left text-sm text-ink outline-none transition-colors hover:bg-sunken focus-visible:bg-sunken disabled:opacity-60"
                 >
-                  {organization.name} <span className="text-[10px] uppercase text-[var(--fg-dim)]">{organization.role}</span>
-                </Button>
+                  <span className="min-w-0 truncate">{organization.name}</span>
+                  <span className="shrink-0 text-xs text-ink-dim">{organization.role.toLowerCase()}</span>
+                </button>
               ))}
-              <div className="my-1 border-t border-[var(--line)]" />
+              <div className="my-1 h-px bg-line" />
             </>
           )}
           {switchError && (
-            <p role="alert" className="px-3 py-1.5 text-xs text-[var(--red)]">
+            <p role="alert" className="px-2.5 py-1.5 text-xs text-danger-fg">
               {switchError}
             </p>
           )}
-          <p className="px-3 py-1 font-mono text-[10px] uppercase tracking-wider text-[var(--fg-dim)]">Your pages</p>
+          <p className="px-2.5 py-1 text-xs font-semibold text-ink-dim">Your pages</p>
           {canConfigurePages &&
             pages.map((p) => (
               <Link
                 key={p.id}
                 href={`/organization/pages/${p.id}`}
                 onClick={() => setOpen(false)}
-                className="flex items-center gap-2 px-3 py-1.5 text-sm text-[var(--fg)] hover:bg-[var(--hover-overlay)]"
+                className="block truncate rounded-control px-2.5 py-2 text-sm text-ink outline-none transition-colors hover:bg-sunken focus-visible:bg-sunken"
               >
                 {p.name}
               </Link>
             ))}
           {!canConfigurePages && pages.length > 0 && (
-            <p className="px-3 py-1.5 text-xs text-[var(--fg-dim)]">
+            <p className="px-2.5 py-1.5 text-xs text-ink-dim">
               Open the Pages screen to inspect public views.
             </p>
           )}
-          {pages.length === 0 && <p className="px-3 py-1.5 text-xs text-[var(--fg-dim)]">No pages yet</p>}
-          <div className="mt-1 border-t border-[var(--line)] pt-1">
+          {pages.length === 0 && <p className="px-2.5 py-1.5 text-xs text-ink-dim">No pages yet.</p>}
+          <div className="mt-1 border-t border-line pt-1">
             <Link
               href="/organization/pages"
               onClick={() => setOpen(false)}
-              className="block px-3 py-1.5 text-sm font-semibold text-[var(--cyan)] hover:bg-[var(--hover-overlay)]"
+              className="block rounded-control px-2.5 py-2 text-sm font-semibold text-primary-ink outline-none transition-colors hover:bg-primary-soft focus-visible:bg-primary-soft"
             >
-              {canConfigurePages ? "Manage all pages →" : "View all pages →"}
+              {canConfigurePages ? "Manage all pages" : "View all pages"}
             </Link>
           </div>
         </div>

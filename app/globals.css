@@ -128,158 +128,6 @@ body {
 /* Dispatch Strip Wall — the signed-in console is a shared operational horizon,
    not a collection of isolated product pages. The public status surface keeps
    its own palette under .status-theme. */
-.dispatch-shell {
-  min-height: 100vh;
-  background:
-    linear-gradient(90deg, rgba(215, 239, 75, 0.035) 1px, transparent 1px),
-    linear-gradient(rgba(215, 239, 75, 0.025) 1px, transparent 1px),
-    var(--bg);
-  background-size: 88px 88px;
-}
-
-.dispatch-command-deck {
-  position: sticky;
-  top: 0;
-  z-index: 20;
-  display: flex;
-  min-height: 100vh;
-  width: 17rem;
-  flex: 0 0 17rem;
-  align-items: stretch;
-  flex-direction: column;
-  border-right: 1px solid var(--line-bright);
-  background: rgba(18, 36, 58, 0.96);
-  box-shadow: 0 16px 34px rgba(2, 9, 17, 0.24);
-}
-
-.dispatch-command-deck::before {
-  position: absolute;
-  top: 0;
-  right: 0;
-  left: 0;
-  height: 3px;
-  background: linear-gradient(90deg, var(--cyan) 0 58%, transparent 58% 64%, var(--cyan) 64% 100%);
-  content: "";
-}
-
-.dispatch-command-deck > :first-child {
-  min-width: 0;
-  border-bottom: 1px solid var(--line) !important;
-  border-right: 0 !important;
-}
-
-.dispatch-operator {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  gap: 0.75rem;
-  margin-top: auto;
-  padding: 0.75rem 1rem;
-  border-top: 1px solid var(--line);
-}
-
-.dispatch-operator > :last-child {
-  margin-left: auto;
-}
-
-.dispatch-nav {
-  display: block;
-  min-width: 0;
-  flex: 1;
-  overflow-y: auto;
-  scrollbar-width: thin;
-}
-
-.dispatch-nav-group {
-  display: block;
-  min-width: 0;
-  padding: 0.7rem 0;
-  border-bottom: 1px solid var(--line);
-}
-
-.dispatch-nav-group:last-child { border-bottom: 0; }
-
-.dispatch-nav-label {
-  margin: 0 0 0.36rem;
-  padding-inline: 0.42rem;
-  color: var(--fg-dim);
-  font-family: var(--font-mono-family);
-  font-size: 0.56rem;
-  font-weight: 700;
-  letter-spacing: 0.16em;
-  line-height: 1;
-  text-transform: uppercase;
-}
-
-.dispatch-nav-items {
-  display: grid;
-  gap: 0.14rem;
-}
-
-.dispatch-nav-link {
-  display: flex;
-  min-height: 2.2rem;
-  align-items: center;
-  gap: 0.34rem;
-  padding: 0.45rem 0.5rem;
-  color: var(--fg-soft);
-  font-size: 0.78rem;
-  font-weight: 600;
-  line-height: 1.1;
-  text-decoration: none;
-  transition: background-color 120ms ease, color 120ms ease;
-}
-
-.dispatch-nav-link:hover {
-  background: var(--hover-overlay);
-  color: var(--fg);
-}
-
-.dispatch-nav-link--active {
-  background: var(--cyan);
-  color: var(--on-cyan);
-}
-
-.dispatch-nav-link:focus-visible,
-.dispatch-command-deck a:focus-visible,
-.dispatch-command-deck button:focus-visible {
-  outline: 2px solid var(--cyan);
-  outline-offset: 2px;
-}
-
-.app-console-main {
-  position: relative;
-}
-
-.app-console-main > div {
-  position: relative;
-}
-
-.app-console-main > div::before {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: clamp(4rem, 12vw, 13rem);
-  height: 1px;
-  background: var(--cyan);
-  content: "";
-}
-
-.app-console-main :where(input:not([type="checkbox"]):not([type="radio"]), textarea, select) {
-  border-radius: 0 !important;
-  border-color: var(--input-overlay-border);
-  background-color: var(--input-overlay-bg);
-  color: var(--fg);
-}
-
-.app-console-main :where(input:not([type="checkbox"]):not([type="radio"]), textarea, select):focus {
-  border-color: var(--input-overlay-border-focus);
-  box-shadow: 0 0 0 2px var(--cyan-soft);
-}
-
-.app-console-main :where(input, textarea)::placeholder {
-  color: var(--placeholder-overlay);
-}
 
 /* Public pages inherit their owner-selected colours, but share a more precise
    route-line chrome so they feel like the public face of the same system. */
@@ -354,98 +202,8 @@ body {
   content: "";
 }
 
-@media (max-width: 1199px) {
-  .dispatch-command-deck { width: 15.5rem; flex-basis: 15.5rem; }
-
-  .dispatch-operator {
-    padding-inline: 0.75rem;
-  }
-}
-
-@media (max-width: 1023px) {
-  .dispatch-command-deck {
-    display: block;
-    min-height: 100%;
-    width: 100%;
-    flex-basis: auto;
-    position: relative;
-    top: auto;
-    border-right: 0;
-    background: var(--surface);
-  }
-
-  .dispatch-command-deck::before {
-    background: linear-gradient(90deg, var(--cyan) 0 45%, transparent 45%);
-  }
-
-  .dispatch-command-deck > :first-child {
-    min-width: 0;
-    border-right: 0;
-  }
-
-  .dispatch-nav {
-    display: block;
-    overflow: visible;
-    padding: 0.75rem;
-  }
-
-  .dispatch-nav-group {
-    display: block;
-    padding: 0.8rem 0;
-    border-right: 0;
-    border-bottom: 1px solid var(--line);
-  }
-
-  .dispatch-nav-group:last-child {
-    border-bottom: 0;
-  }
-
-  .dispatch-nav-label {
-    padding-inline: 0.45rem;
-  }
-
-  .dispatch-nav-items {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 0.25rem;
-  }
-
-  .dispatch-nav-link {
-    min-height: 2.45rem;
-    padding: 0.55rem;
-    font-size: 0.82rem;
-  }
-
-  .dispatch-operator {
-    display: flex;
-    margin: 0;
-    border-top: 1px solid var(--line);
-  }
-
-  .dispatch-operator > div {
-    display: block;
-  }
-}
-
 /* Console-wide resilience: grid/flex descendants may contain long domains,
    IDs, and integration names, so they must be allowed to shrink on phones. */
-.app-console-main :where(.grid, form) > * {
-  min-width: 0;
-}
-
-.app-console-main :where(input, textarea, pre, code) {
-  max-width: 100%;
-}
-
-.app-console-main :where(h1, h2, h3, p, a, code) {
-  overflow-wrap: anywhere;
-}
-
-@media (max-width: 639px) {
-  .app-console-main :where(input:not([type="checkbox"]):not([type="radio"]), textarea) {
-    font-size: 1rem;
-  }
-}
 
 /* Every button gets a short click lock. Mutation/submit actions additionally
    show an accessible progress spinner until React completes them or the hard
@@ -546,21 +304,7 @@ button[data-button-busy="saving"]::after {
   to { opacity: 1; }
 }
 
-
 /* Keep the shared form primitives aligned with the console token system. */
-.app-console-main :where(input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]), textarea) {
-  border-radius: 0.2rem;
-  background: var(--input-overlay-bg);
-  color: var(--fg);
-  outline: none;
-  transition: border-color 140ms ease, box-shadow 140ms ease;
-}
-
-.app-console-main :where(input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]), textarea):focus {
-  border-color: var(--input-overlay-border-focus);
-  box-shadow: 0 0 0 2px var(--cyan-soft);
-}
-
 
 /* Keep native selects visually aligned with the rest of the console form
    controls. The application Select primitive is used for interactive menus. */
@@ -603,53 +347,6 @@ body {
   font-family: var(--font-body-family);
 }
 
-.dispatch-shell {
-  display: grid !important;
-  grid-template-columns: 16rem minmax(0, 1fr);
-  background: var(--bg) !important;
-}
-
-.dispatch-command-deck {
-  position: sticky;
-  top: 0;
-  width: auto !important;
-  min-height: 100vh;
-  border-right: 1px solid var(--line) !important;
-  background: var(--surface) !important;
-  box-shadow: 1px 0 0 rgba(32, 33, 36, 0.02) !important;
-}
-
-.dispatch-command-deck::before { display: none; }
-.dispatch-command-deck > :first-child { border-bottom: 1px solid var(--line) !important; }
-
-.dispatch-nav { padding: 1rem 0.75rem; }
-.dispatch-nav-group { padding: 0.75rem 0; border-bottom: 0; }
-.dispatch-nav-label {
-  padding-inline: 0.75rem;
-  color: var(--fg-dim);
-  font-family: var(--font-body-family);
-  font-size: 0.6875rem;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-.dispatch-nav-items { gap: 0.2rem; }
-.dispatch-nav-link {
-  min-height: 2.5rem;
-  gap: 0.75rem;
-  border-radius: 0.5rem;
-  padding: 0.625rem 0.75rem;
-  color: var(--fg-soft);
-  font-family: var(--font-body-family);
-  font-size: 0.875rem;
-  font-weight: 500;
-}
-.dispatch-nav-link:hover { background: var(--hover-overlay); color: var(--fg); }
-.dispatch-nav-link--active { background: var(--cyan-soft); color: var(--cyan); font-weight: 600; }
-.dispatch-nav-link--active svg { color: var(--cyan); }
-.dispatch-operator { padding: 1rem 0.875rem; border-top: 1px solid var(--line); }
-.dispatch-operator > div > span { border: 0; border-radius: 50%; background: var(--cyan-soft); color: var(--cyan); }
-
 /* Keep the compact page actions identical across anchors and form buttons. */
 .page-management-action-icon {
   display: inline-flex !important;
@@ -665,52 +362,12 @@ body {
 .page-management-action-icon[aria-label^="Delete"] svg { color: var(--red); }
 .page-management-action-icon[aria-label*="unavailable"] svg { color: var(--fg-dim); }
 
-.app-console-main { background: var(--bg); }
-.app-console-main > div::before { display: none; }
-.app-console-main :where(input:not([type="checkbox"]):not([type="radio"]), textarea, select) {
-  border-radius: 0.5rem !important;
-  border-color: var(--input-overlay-border);
-  background: var(--surface);
-  color: var(--fg);
-}
-.app-console-main :where(input:not([type="checkbox"]):not([type="radio"]), textarea, select):focus {
-  border-color: var(--input-overlay-border-focus);
-  box-shadow: 0 0 0 3px var(--cyan-soft);
-}
-.app-console-main input[type="color"] {
-  display: block;
-  box-sizing: border-box;
-  border-radius: 0.5rem !important;
-  padding: 0.25rem !important;
-}
-.app-console-main button:not([aria-label="Close navigation"]) { border-radius: 0.5rem; }
-.app-console-main :where(section, article, aside):not(.status-public-header):not(.status-public-footer) { border-radius: 0.75rem; }
-
-.enterprise-topbar {
-  display: flex;
-  min-height: 3.5rem;
-  align-items: center;
-  gap: 0.75rem;
-  border-bottom: 1px solid var(--line);
-  background: var(--surface);
-  padding: 0 2rem;
-}
-.enterprise-topbar__brand { color: var(--fg); font-size: 1rem; font-weight: 600; letter-spacing: -0.02em; }
-.enterprise-topbar__context { color: var(--fg-dim); font-size: 0.8125rem; }
-.enterprise-topbar__context::before { content: "/"; margin-right: 0.75rem; color: var(--line-bright); }
-
 .status-dispatch-shell { background: var(--bg) !important; background-image: none !important; }
 .status-public-header { box-shadow: 0 1px 0 var(--line); }
 .status-public-header::before { height: 3px; }
 .status-public-header :where(a, button) { border-radius: 0.5rem; }
 .status-public-title { font-family: var(--font-body-family); font-weight: 600; }
 .status-public-footer { background: var(--surface); }
-
-@media (max-width: 1023px) {
-  .dispatch-shell { display: block !important; }
-  .dispatch-command-deck { min-height: 100%; }
-  .enterprise-topbar { display: none; }
-}
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; }
@@ -1051,20 +708,10 @@ body {
 
 /* Final enterprise tokens (kept at EOF so legacy surface rules cannot
    reintroduce the retired dark/grid treatment). */
-.dispatch-shell { background: var(--bg) !important; }
-.dispatch-shell--focused { display: block !important; grid-template-columns: minmax(0, 1fr) !important; }
-.dispatch-command-deck { background: var(--surface) !important; box-shadow: 1px 0 0 rgba(32, 33, 36, 0.02) !important; }
+
 .status-dispatch-shell { background: var(--bg) !important; background-image: none !important; }
 .grain::before, .grain::after { display: none; }
-.app-console-main { background: var(--bg); }
-.app-console-main :where(h1, h2, h3, h4) { font-family: var(--font-body-family); letter-spacing: -0.025em; }
-.dispatch-access { font-family: var(--font-body-family); }
-.dispatch-access :where(h1, h2, h3, .font-mono) { font-family: var(--font-body-family); letter-spacing: -0.025em; }
-.dispatch-access main { max-width: 78rem; border-color: var(--line); }
-.dispatch-access section { background: var(--surface) !important; }
-.dispatch-access input { border-radius: 0.5rem; }
-.dispatch-access button, .dispatch-access a[class*="border"] { border-radius: 0.5rem; }
-.dispatch-org-switcher button { border-radius: 0.5rem; }
+
 .status-theme, .status-theme[data-typography="MONO"], .status-theme[data-typography="HUMANIST"], .status-theme[data-typography="GEOMETRIC"] { font-family: var(--font-body-family); }
 .status-theme :where(h1, h2, h3, h4, .font-mono) { font-family: var(--font-body-family); letter-spacing: -0.02em; }
 .public-ops-block {

@@ -50,12 +50,12 @@ export function LogoutButton({
           title={error ?? "Sign out"}
           variant="ghost"
           size="icon"
-          className={`h-8 w-8 rounded-none border border-[var(--line)] text-[var(--fg-soft)] transition-colors hover:border-[var(--red)]/50 hover:bg-[var(--red-soft)] hover:text-[var(--red)] ${className}`}
+          className={`size-9 hover:bg-danger-bg hover:text-danger-fg [&_svg]:text-current ${className}`}
         >
-          <LogOut aria-hidden size={15} />
+          <LogOut aria-hidden size={16} />
         </Button>
         {error && (
-          <span role="alert" className="absolute right-0 top-full z-30 mt-1 w-56 border border-[var(--red)]/30 bg-[var(--surface-raised)] p-2 text-xs text-[var(--red)]">
+          <span role="alert" className="absolute right-0 top-full z-30 mt-1 w-56 rounded-control border border-danger/30 bg-danger-bg p-2 text-xs text-danger-fg">
             {error}
           </span>
         )}
@@ -70,12 +70,12 @@ export function LogoutButton({
         disabled={pending}
         onClick={() => void logout()}
         variant="ghost"
-        className={`flex w-full items-center justify-between rounded-none border border-transparent px-2 py-2 text-left font-mono text-xs font-medium text-[var(--fg-soft)] transition-colors hover:border-[var(--red)]/30 hover:bg-[var(--red-soft)] hover:text-[var(--red)] ${className}`}
+        className={`w-full !justify-between px-3 text-ink-soft hover:bg-danger-bg hover:text-danger-fg [&_svg]:text-current ${className}`}
       >
         <span>{pending ? "Signing out…" : "Sign out"}</span>
-        <LogOut aria-hidden size={14} />
+        <LogOut aria-hidden size={16} />
       </Button>
-      {error && <p role="alert" className="px-2 pt-1 text-xs text-[var(--red)]">{error}</p>}
+      {error && <p role="alert" className="px-3 pt-1 text-xs text-danger-fg">{error}</p>}
     </div>
   );
 }

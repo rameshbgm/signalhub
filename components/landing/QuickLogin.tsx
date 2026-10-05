@@ -60,39 +60,37 @@ export function QuickLogin() {
   }
 
   return (
-    <section className="mt-5 border border-[var(--cyan)]/30 bg-[var(--surface)] p-3">
+    <section className="mt-6 rounded-card border border-dashed border-primary/40 bg-primary-soft/50 p-4">
       <div className="flex items-center justify-between gap-3">
-        <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--cyan)]">
-          Development quick login
-        </p>
-        <span className="text-[9px] uppercase tracking-wider text-[var(--fg-dim)]">Local only</span>
+        <p className="text-sm font-semibold text-primary-ink">Development quick login</p>
+        <span className="rounded-full bg-surface px-2 py-0.5 text-2xs font-medium text-ink-soft ring-1 ring-line">Local only</span>
       </div>
-      <div className="mt-2 grid gap-2">
+      <div className="mt-3 grid gap-2">
         {accounts.map((account) => (
           <Button
             key={account.key}
             type="button"
             onClick={() => login(account)}
             disabled={busy !== null}
-            variant="outline"
+            variant="secondary"
             loading={busy === account.key}
-            className="h-auto min-h-10 justify-between py-2 text-left"
+            className="h-auto min-h-11 !justify-between py-2 text-left"
           >
             <span className="min-w-0">
-              <span className="block text-xs font-semibold text-[var(--fg)]">
+              <span className="block text-sm font-semibold text-ink">
                 {busy === account.key ? "Signing in…" : account.name}
               </span>
-              <span className="block truncate text-[10px] text-[var(--fg-dim)]">
+              <span className="block truncate text-xs font-normal text-ink-dim">
                 {account.description}
               </span>
             </span>
-            <span className="shrink-0 font-mono text-[10px] font-semibold text-[var(--cyan)]">
-              {account.role.replaceAll("_", " ")}
+            <span className="shrink-0 text-xs font-semibold text-primary-ink">
+              {account.role.replaceAll("_", " ").toLowerCase()}
             </span>
           </Button>
         ))}
       </div>
-      {error && <p role="alert" className="mt-2 text-xs text-[var(--red)]">{error}</p>}
+      {error && <p role="alert" className="mt-2 text-xs text-danger-fg">{error}</p>}
     </section>
   );
 }

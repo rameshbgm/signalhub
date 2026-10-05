@@ -1,6 +1,4 @@
 import { requireSession } from "@/lib/require-session";
-import { LogoutButton } from "@/components/admin/LogoutButton";
-import { AdminNav } from "@/components/admin/AdminNav";
 import { OrgSwitcher } from "@/components/admin/OrgSwitcher";
 import { getUserOrganizations } from "@/lib/memberships";
 import { redirect } from "next/navigation";
@@ -18,8 +16,12 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   ]);
   const organizations = userOrganizations;
 
-  const sidebar = (
-      <aside className="dispatch-command-deck">
+  return (
+    <AdminShell
+      capabilities={capabilities}
+      user={{ name: session.name, email: session.email }}
+      pages={pages.map((p) => ({ id: p.id, name: p.name }))}
+      orgSwitcher={
         <OrgSwitcher
           orgId={org.id}
           orgName={org.name}
@@ -27,21 +29,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           pages={pages.map((p) => ({ id: p.id, name: p.name, slug: p.slug }))}
           canConfigurePages={capabilities.includes("page.configure")}
         />
-        <AdminNav capabilities={capabilities} />
-        <div className="dispatch-operator">
-          <div className="flex min-w-0 items-center gap-2.5">
-            <span className="flex h-8 w-8 shrink-0 items-center justify-center border border-[var(--line-bright)] bg-[var(--surface-raised)] font-mono text-xs font-semibold text-[var(--fg)]">
-              {session.name.slice(0, 1).toUpperCase()}
-            </span>
-            <div className="min-w-0">
-              <p className="truncate text-sm font-semibold text-[var(--fg)]">{session.name}</p>
-              <p className="truncate text-xs text-[var(--fg-dim)]">{session.email}</p>
-            </div>
-          </div>
-          <LogoutButton />
-        </div>
-      </aside>
+      }
+    >
+      {children}
+    </AdminShell>
   );
-
-  return <AdminShell sidebar={sidebar}>{children}</AdminShell>;
 }
