@@ -1,141 +1,60 @@
----
-name: SignalHub
-description: A calm, precise workspace for self-hosted status operations.
-colors:
-  canvas: "#f8fafd"
-  surface: "#ffffff"
-  surface-subtle: "#f1f3f6"
-  text: "#202124"
-  text-muted: "#5f6368"
-  action-blue: "#1a73e8"
-  healthy: "#188038"
-  caution: "#b06000"
-  incident: "#d93025"
-typography:
-  display:
-    fontFamily: "Google Sans, Inter, Roboto, Arial, sans-serif"
-    fontSize: "clamp(2.25rem, 4vw, 4rem)"
-    fontWeight: 600
-    lineHeight: 1.08
-    letterSpacing: "-0.035em"
-  body:
-    fontFamily: "Google Sans, Inter, Roboto, Arial, sans-serif"
-    fontSize: "1rem"
-    lineHeight: 1.5
-  label:
-    fontFamily: "SFMono-Regular, Roboto Mono, Consolas, monospace"
-    fontSize: "0.7rem"
-    fontWeight: 700
-    letterSpacing: "0.16em"
-rounded:
-  command: "8px"
-spacing:
-  strip: "8px"
-  field: "16px"
-  deck: "28px"
-components:
-  button-primary:
-    backgroundColor: "{colors.action-blue}"
-    textColor: "#ffffff"
-    rounded: "{rounded.command}"
-    padding: "10px 18px"
-  input-default:
-    backgroundColor: "{colors.surface}"
-    textColor: "{colors.text}"
-    rounded: "{rounded.command}"
-    padding: "12px 16px"
----
+# SignalHub design system
 
-# Design System: SignalHub
+Soft and vibrant, light only. A calm control plane for operators: generous radii, tinted icon tiles, layered soft shadows, short springy motion. Tokens live in `app/theme.css`; primitives live in `components/ui/`. This file is the contract for every screen.
 
-## Overview
+## Shell
 
-**Creative North Star: "Dispatch Strip Wall"**
+- **Icon rail** (64px, `components/admin/AdminShell.tsx`): one colour tile per section. **Context panel** (240px): the active section's links, org switcher on top, user card at the bottom. **Top strip:** breadcrumb, panel toggle, Ctrl/Cmd+K jump palette. **Mobile:** bottom tab bar plus a section sheet.
+- Navigation data is `NAV_SECTIONS` in `components/admin/AdminNav.tsx`. A new screen goes there with a `hue` and an optional `capability`.
+- Pages render inside `<main>`; do not add your own max-width wrapper or outer padding.
 
-SignalHub is an operations tool, not a decorative dashboard. The UI reads as a shared control horizon: current condition and actions occupy the broad work field, while a persistent left Signal Rail keeps routes immediately reachable. Status surfaces carry the same precision while continuing to honor each page owner’s palette and presentation choices.
+## Tokens (Tailwind utilities generated from `app/theme.css`)
 
-Key characteristics:
+| Use | Utility |
+|---|---|
+| Page canvas / card surface / inset surface | `bg-canvas` / `bg-surface` / `bg-sunken` |
+| Hairline / stronger border | `border-line` / `border-line-strong` |
+| Text: primary / secondary / dim | `text-ink` / `text-ink-soft` / `text-ink-dim` (dim is the lightest allowed for readable text) |
+| Brand | `bg-primary`, `text-primary`, `text-primary-ink`, `bg-primary-soft`, `hover:bg-primary-hover` |
+| Status | `text-ok-fg bg-ok-bg`, `text-warn-fg bg-warn-bg`, `text-danger-fg bg-danger-bg`, `text-info-fg bg-info-bg`; solids `bg-ok bg-warn bg-danger bg-info` |
+| Radius | `rounded-chip` (6) `rounded-control` (10) `rounded-card` (16) `rounded-sheet` (20) `rounded-full` |
+| Shadow | `shadow-card` `shadow-raised` `shadow-float` `shadow-primary` |
+| Motion | `animate-fade` `animate-rise` `animate-pop` `animate-drop` `animate-shimmer`; `duration-200 ease-soft`; springy hover uses `ease-spring` |
+| Fonts | Google Sans is the default; `font-mono` (Roboto Mono) only for IDs, tokens, URLs, code, slugs |
 
-- Light-only workspace (no dark theme); owner-selected palettes remain authoritative on public pages.
-- Fine route lines and square, mechanical dividers establish structure instead of floating rounded cards.
-- Signal-lime is scarce: reserve it for live, selected, confirmed, or primary action states.
+Type scale: `text-xs` 12, `text-sm` 14 (default body in dense UI), `text-base` 16, `text-lg` 18, `text-xl` 20, `text-2xl` 24, `text-3xl` 30; `text-2xs` is 11px and the smallest allowed. Weights 400, 500, 600. Headings use `font-semibold tracking-tight`. Never use arbitrary `text-[Npx]`.
 
-## Colors
+Hues for icon tiles: `indigo sky emerald amber rose violet teal slate` (`Hue` type in `components/ui/icon-tile.tsx`). Section mapping: overview/pages indigo+violet, monitoring and metrics sky, incidents and maintenance amber, audience emerald, integrations and API teal, security rose, settings and help slate, platform violet.
 
-The palette is a controlled night shift: cool navy structure, warm porcelain reading text, and restrained signal colors for meaningful state.
+## Primitives (`components/ui/`)
 
-### Primary
+`Button` (variants `default secondary soft outline ghost destructive link`, sizes `default sm lg icon`, `loading`), `buttonVariants()` for link-styled buttons, `Input`, `Textarea`, `Select`, `Checkbox`, `Radio`, `Label`, `Field` (label + hint + error), `Card/CardHeader/CardTitle/CardDescription/CardContent`, `Badge`, `StatusBadge` (tone `ok warn danger info neutral`, optional `live`), `Table*`, `Dialog*`, `Tooltip`, `Accordion*`, `IconTile`, `PageHeader`, `EmptyState`, `Skeleton`, `Alert` (tone `ok warn danger info`). Prop APIs are stable; do not change them in a feature change.
 
-- **Signal Lime** (`#d7ef4b`): selection, live indicators, confirmed operational state, and primary actions.
-- **Route Blue** (`#79b9ee`): secondary information and non-urgent navigational emphasis.
+## Screen anatomy
 
-### Neutral
+1. `<div className="space-y-8">` root.
+2. `PageHeader` with `title`, one-sentence `description`, `icon` + `hue` from the nav item, primary action in `actions`.
+3. Content in `Card` blocks. A block header is `CardHeader` (`CardTitle`, optional `CardDescription`, optional right-aligned action). Group related fields in one card; do not create a card per field.
+4. Forms: `Field` around each control, a `grid gap-4 sm:grid-cols-2` for short fields, one primary `Button` right-aligned in the card footer or below the fields. Destructive actions are `variant="destructive"` or a `ghost` with `hover:bg-danger-bg hover:text-danger-fg`, separated from the primary action.
+5. Lists of records: `Table` for comparable columns; stacked rows (`rounded-control border border-line px-3.5 py-3`) for 1-2 facts per record; always handle the empty case with `EmptyState` (icon, what belongs here, a next-step action).
+6. Feedback: success, error, and notices use `Alert`; status labels use `StatusBadge` (dot plus text, never colour alone).
+7. A link that must look like a button: `<Link className={buttonVariants({ variant, size })}>`.
 
-- **Midnight Enamel** (`#0c1828`): canvas and broad operating field.
-- **Deep Surface** (`#12243a`): command deck and durable container surface.
-- **Raised Surface** (`#17304a`): quiet interactive elevation.
-- **Porcelain** (`#f3f1e9`): primary text on dark operational surfaces.
+## Rules
 
-**The Signal Rule.** Do not use lime as decoration. It must describe a real selection, confirmation, live system state, or primary commit action.
+- Replace legacy styling when you touch a file. Mapping: `bg-[var(--surface)]` to `bg-surface`; `bg-[var(--surface-raised)]` and `hover-overlay` to `bg-sunken`; `text-[var(--fg)]`, `--fg-soft`, `--fg-dim` to `text-ink`, `text-ink-soft`, `text-ink-dim`; `border-[var(--line)]` to `border-line`; `--line-bright` to `border-line-strong`; `--cyan` and `--blue` to `primary`; `--green`, `--amber`, `--red` to the status utilities above.
+- Banned in new code: `font-mono` on headings or labels, `uppercase` with `tracking-*` eyebrows, `text-[Npx]`, `rounded-none`, hand-built card boxes (`border bg-[var(--surface)] p-4`), unicode glyphs as icons (`✓ ← → ↗`; use lucide icons with `aria-hidden`), inline `style` for colour except data-driven values.
+- Icons are lucide-react only, `size={16}` in controls, `20` in tiles, no `strokeWidth` prop (a global rule sets 1.75). Pair a coloured `IconTile` with a section or a card heading when it helps scanning, not on every row.
+- Copy: sentence case, plain verbs, name the outcome ("Save changes", not "Submit"), keep one name per action across the flow, use `…` and curly quotes, no exclamation marks. Errors say what failed and how to fix it. Do not change copy that tests, `lib/help-content.ts`, or `public/docs/user-manual.html` rely on unless you update them in the same change.
+- Motion: hover and focus transitions only (`duration-200`), one `animate-fade` page entrance is already applied by the shell. No scattered fade-ins on cards. Everything must respect reduced motion (global rule in `theme.css`).
+- Accessibility: visible focus ring (`focus-visible:ring-4 focus-visible:ring-primary/25`, already in primitives), 44px touch targets on mobile for primary controls, every input has a label, status never relies on colour alone, text contrast at least 4.5:1.
+- Responsive: design for 390px first. No horizontal page scroll; tables sit in the `Table` wrapper which scrolls itself.
+- Never change behaviour: server actions, data loading, authorization, routes, form field names, and ARIA/label text that tests assert stay as they are.
 
-## Typography
+## Public status pages
 
-**Display Font:** Arial Narrow / Roboto Condensed / Avenir Next / Segoe UI, sans-serif.
-**Body Font:** Arial Narrow / Roboto Condensed / Avenir Next / Segoe UI, sans-serif.
-**Label/Mono Font:** SFMono-Regular / Roboto Mono / Consolas, monospace.
+Public pages render inside `.status-theme`, which re-points the same token utilities (`bg-surface`, `text-ink`, `bg-primary`) at the page owner's palette from the design editor (`lib/page-design.ts`, `PageDesignShell`). Use the same utilities there and never hardcode brand colours.
 
-Display type is tightly tracked and decisive. Monospace is an operational annotation layer for checkpoints, labels, dates, and state — never a substitute for every paragraph.
+## Light only
 
-### Hierarchy
-
-- **Display** (600, `clamp(2.7rem, 6vw, 5.6rem)`, 0.9): first-view entry and high-priority public messaging.
-- **Headline** (600, 1.8–3rem, 1.05): page condition and key operating focus.
-- **Body** (400, 1rem, 1.5): explanatory information and form help.
-- **Label** (700, 0.56–0.7rem, uppercase, `0.16em`): deck groups, checkpoints, and metadata.
-
-## Layout
-
-On wide screens, the persistent left Signal Rail groups routes by operating domain and keeps them visible as compact vertical strips. Main content uses the remaining broad work field with a short signal line at its origin, then allows each operational screen to use the width it needs.
-
-On small screens, the command deck becomes a compact drawer with two-column route links. Forms must remain at least 1rem text size and no route, hostname, or identifier may force horizontal scrolling.
-
-## Elevation & Depth
-
-Depth is conveyed through tonal layering, rules, and the route grid rather than soft shadows. The command deck has one purposeful ambient shadow to hold it above the operating field; ordinary pages, cards, and strip rows are flat.
-
-## Shapes
-
-Square edges are the default. Borders are thin mechanical dividers, not decorative containers. Do not introduce pill controls or soft, large-radius card grids into the operations console. Public pages may use their owner-defined radius settings.
-
-## Components
-
-### Buttons
-
-- **Primary:** signal-lime fill, midnight text, square corners, concise label.
-- **Secondary:** transparent or deep-surface fill with a visible rule.
-- **Focus:** a two-pixel lime outline with separation from the component edge.
-
-### Cards / Containers
-
-- **Style:** flat deep surfaces divided by one-pixel rules.
-- **Use:** group related information only; prefer strip rows and spacing where a container adds no meaning.
-
-### Inputs / Fields
-
-- **Style:** square fields on a translucent midnight input surface.
-- **Focus:** lime border and a quiet lime halo.
-- **States:** keep error coral and disabled text visibly muted without removing legibility.
-
-### Navigation
-
-- **Left Signal Rail:** group label above direct vertical route links; selected route receives the lime field.
-- **Mobile:** compact drawer with grouped, two-column routes and the same selected-state language.
-
-## Do's and Don'ts
-
-- Do keep the current operational condition and the actions that change it close together.
-- Do use lines, labels, and repeatable strip rhythm to create hierarchy.
-- Do preserve public-page owner controls and custom palettes.
-- Don't turn the Signal Rail into a generic icon-only sidebar or hide routine routes behind nested menus.
-- Don't use generic soft shadows, glass cards, neon effects, or decorative gradients as the primary visual language.
-- Don't use lime, amber, or coral solely to make a screen feel colorful.
+There is no dark theme. Do not add `dark:` variants, theme toggles, or `prefers-color-scheme` rules.
