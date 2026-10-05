@@ -1,17 +1,18 @@
 @import "tailwindcss";
+@import "./theme.css";
 
 :root {
-  --bg: #f8fafd;
-  --surface: #ffffff;
-  --surface-raised: #f1f3f6;
-  --line: #dfe3eb;
-  --line-bright: #b9c1cf;
-  --fg: #202124;
-  --fg-soft: #5f6368;
-  --fg-dim: #80868b;
+  --bg: var(--color-canvas);
+  --surface: var(--color-surface);
+  --surface-raised: var(--color-sunken);
+  --line: var(--color-line);
+  --line-bright: var(--color-line-strong);
+  --fg: var(--color-ink);
+  --fg-soft: var(--color-ink-soft);
+  --fg-dim: var(--color-ink-dim);
 
-  --cyan: #1a73e8;
-  --cyan-soft: #e8f0fe;
+  --cyan: var(--color-primary);
+  --cyan-soft: var(--color-primary-soft);
   --green: #188038;
   --green-soft: #e6f4ea;
   --amber: #b06000;
@@ -20,8 +21,8 @@
   --orange-soft: #fce8e6;
   --red: #d93025;
   --red-soft: #fce8e6;
-  --blue: #1a73e8;
-  --blue-soft: #e8f0fe;
+  --blue: var(--color-primary);
+  --blue-soft: var(--color-primary-soft);
 
   --on-cyan: #ffffff;
   --on-green: #ffffff;
@@ -31,12 +32,12 @@
   --panel-glass: rgba(255, 255, 255, 0.96);
   --input-overlay-bg: #ffffff;
   --input-overlay-border: #c7cbd1;
-  --input-overlay-border-focus: #1a73e8;
-  --focus: #1a73e8;
-  --placeholder-overlay: #80868b;
+  --input-overlay-border-focus: var(--color-primary);
+  --focus: var(--color-primary);
+  --placeholder-overlay: var(--color-ink-dim);
 
-  --font-body-family: "Google Sans", "Inter", Roboto, Arial, sans-serif;
-  --font-mono-family: "SFMono-Regular", "Roboto Mono", Consolas, monospace;
+  --font-body-family: var(--font-sans);
+  --font-mono-family: var(--font-mono);
 
   color-scheme: light;
 }

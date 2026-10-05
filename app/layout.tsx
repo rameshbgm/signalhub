@@ -1,6 +1,23 @@
 import type { Metadata } from "next";
+import { Google_Sans, Roboto_Mono } from "next/font/google";
 import { AppProvider } from "@/components/AppProvider";
 import "./globals.css";
+
+const googleSans = Google_Sans({
+  subsets: ["latin"],
+  weight: "variable",
+  display: "swap",
+  // No fallback-metric data exists for Google Sans, so skip the size-adjust fallback.
+  adjustFontFallback: false,
+  variable: "--font-google-sans",
+});
+
+const robotoMono = Roboto_Mono({
+  subsets: ["latin"],
+  weight: "variable",
+  display: "swap",
+  variable: "--font-roboto-mono",
+});
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://signalhub.at"),
@@ -33,9 +50,9 @@ export const metadata: Metadata = {
 };
 
 /* DESIGN CONTRACT
-   Direction: Signal Workspace — a calm, light enterprise control plane.
-   Operators get a persistent workspace rail, a clear top context bar, and
-   flat white work surfaces with Google-style hierarchy and blue actions.
+   Direction: Soft and vibrant, light only. An icon rail with a contextual
+   panel, colour-tinted icon tiles, generous radii, and short springy motion.
+   Tokens live in app/theme.css.
    Public pages retain their owner controls while sharing the same legibility. */
 export default function RootLayout({
   children,
@@ -43,8 +60,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <body className="bg-[var(--bg)] text-[var(--fg)] antialiased">
+    <html lang="en" className={`${googleSans.variable} ${robotoMono.variable}`}>
+      <body className="bg-canvas text-ink antialiased">
         <AppProvider>{children}</AppProvider>
       </body>
     </html>
