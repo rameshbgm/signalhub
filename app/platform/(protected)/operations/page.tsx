@@ -1,3 +1,4 @@
+import { Activity, Ban, CheckCheck, CheckCircle2, ClipboardCheck, Cpu, Hourglass, Inbox, ListChecks, Mail, Send, Terminal } from "lucide-react";
 import { database } from "@/lib/postgres/client";
 import { requirePlatformPageCapability } from "@/lib/platform-page-guard";
 import { hasPlatformCapability } from "@/lib/platform-policy";
@@ -12,8 +13,16 @@ import { retryNotificationDelivery, updatePlatformRetention } from "./actions";
 import { PlatformActionForm } from "@/components/platform/PlatformActionForm";
 import { PlatformSubmitButton } from "@/components/platform/PlatformSubmitButton";
 import { effectiveRetention, RETENTION_BOUNDS } from "@/lib/retention";
+import { Alert } from "@/components/ui/alert";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Field } from "@/components/ui/field";
+import { IconTile } from "@/components/ui/icon-tile";
 import { Input } from "@/components/ui/input";
+import { PageHeader } from "@/components/ui/page-header";
+import { StatusBadge, type StatusTone } from "@/components/ui/status-badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { PlatformStat } from "@/components/platform/PlatformStat";
 
 export default async function PlatformOperationsPage() {
   const actor = await requirePlatformPageCapability("operations.read");
@@ -47,198 +56,229 @@ export default async function PlatformOperationsPage() {
   const platformRetention = await effectiveRetention(null);
 
   return (
-    <div className="max-w-6xl space-y-8">
-      <div>
-        <h1 className="font-mono text-2xl font-semibold text-[var(--fg)]">Operations</h1>
-        <p className="mt-1 text-sm text-[var(--fg-soft)]">
-          Runtime and durable queue visibility. Only safe, idempotent retry operations are exposed.
-        </p>
-      </div>
+    <div className="space-y-8">
+      <PageHeader
+        title="Operations"
+        description="Runtime and durable queue visibility. Only safe, idempotent retry operations are exposed."
+        icon={Activity}
+        hue="violet"
+      />
 
-      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Summary label="Queued deliveries" value={queued} />
-        <Summary label="Processing" value={processing} />
-        <Summary label="Blocked by freeze" value={blocked} tone={blocked ? "warning" : "normal"} />
-        <Summary label="Delivered" value={delivered} />
-        <Summary label="Dead-letter" value={deadLetterCount} tone={deadLetterCount ? "error" : "normal"} />
-        <Summary
+      <section aria-label="Runtime summary" className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <PlatformStat label="Queued deliveries" value={queued} icon={Send} />
+        <PlatformStat label="Processing" value={processing} icon={Hourglass} />
+        <PlatformStat label="Blocked by freeze" value={blocked} icon={Ban} tone={blocked ? "warn" : "normal"} />
+        <PlatformStat label="Delivered" value={delivered} icon={CheckCheck} />
+        <PlatformStat label="Dead-letter" value={deadLetterCount} icon={Inbox} tone={deadLetterCount ? "danger" : "normal"} />
+        <PlatformStat
           label={`Migrations (${migrationState.verifiedCount}/${migrationState.expectedCount})`}
           value={migrationState.current ? "Current" : "Required"}
-          tone={migrationState.current ? "normal" : "error"}
+          icon={ClipboardCheck}
+          tone={migrationState.current ? "normal" : "danger"}
         />
-        <Summary label="SMTP" value={!smtp.configured ? "Not configured" : smtp.ok ? "Reachable" : "Unavailable"} tone={!smtp.configured ? "warning" : smtp.ok ? "normal" : "error"} />
-        <Summary label="Workers seen" value={workers.length} />
+        <PlatformStat label="SMTP" value={!smtp.configured ? "Not configured" : smtp.ok ? "Reachable" : "Unavailable"} icon={Mail} tone={!smtp.configured ? "warn" : smtp.ok ? "normal" : "danger"} />
+        <PlatformStat label="Workers seen" value={workers.length} icon={Cpu} />
       </section>
 
       {!migrationState.current && (
-        <section
-          role="alert"
-          className="border border-[var(--red)]/40 bg-[var(--red-soft)] p-4"
-        >
-          <h2 className="font-mono text-sm font-semibold text-[var(--fg)]">
-            Migration state requires deployment attention
-          </h2>
-          <p className="mt-2 text-xs text-[var(--fg-soft)]">
-            {migrationIssueSummary(migrationState)}. Run the migration CLI from your deployment
-            environment; migrations cannot be executed from this console.
-          </p>
-        </section>
+        <Alert tone="danger" title="Migration state requires deployment attention">
+          {migrationIssueSummary(migrationState)}. Run the migration CLI from your deployment
+          environment; migrations cannot be executed from this console.
+        </Alert>
       )}
 
-      <section className="space-y-3">
-        <div>
-          <h2 className="font-mono text-lg font-semibold text-[var(--fg)]">Platform jobs</h2>
-          <p className="mt-1 text-xs text-[var(--fg-soft)]">
+      <Card>
+        <CardHeader>
+          <CardTitle>Platform jobs</CardTitle>
+          <CardDescription>
             Organization purges are leased, retryable, and leave durable job and tombstone records.
-          </p>
-        </div>
-        <div className="space-y-2">
-          {platformJobs.map((job) => (
-            <article key={job.id} className="border border-[var(--line)] bg-[var(--surface)] p-4">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <p className="font-semibold text-[var(--fg)]">Purge {job.organizationSlug}</p>
-                    <JobState value={job.status} />
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {platformJobs.length === 0 ? (
+            <EmptyState icon={ListChecks} hue="violet" title="No platform jobs yet" description="No platform jobs have been queued." className="border-0 bg-transparent py-8" />
+          ) : (
+            <ul className="space-y-2">
+              {platformJobs.map((job) => (
+                <li key={job.id} className="rounded-control border border-line px-3.5 py-3">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="font-medium text-ink">Purge <span className="font-mono text-sm">{job.organizationSlug}</span></p>
+                        <StatusBadge tone={JOB_TONE[job.status] ?? "warn"}>{titleCase(job.status)}</StatusBadge>
+                      </div>
+                      <p className="mt-1 text-xs text-ink-dim">
+                        Attempt {job.attempts}/{job.maxAttempts} · queued {job.createdAt.toLocaleString()}
+                      </p>
+                      <p className="mt-2 text-sm text-ink-soft">{job.reason}</p>
+                      {job.lastError && <p className="mt-2 text-sm text-danger-fg">{job.lastError}</p>}
+                    </div>
+                    {canRetry &&
+                      job.status === "FAILED" &&
+                      job.attempts >= job.maxAttempts && (
+                      <PlatformActionForm
+                        action={retryPlatformJob.bind(null, job.id)}
+                        successMessage="Platform job queued for retry."
+                        className="flex items-end gap-3 sm:shrink-0"
+                      >
+                        <Field label="Retry reason" htmlFor={`job-retry-${job.id}`} className="min-w-48 flex-1 sm:w-56 sm:flex-none">
+                          <Input
+                            id={`job-retry-${job.id}`}
+                            name="reason"
+                            minLength={10}
+                            required
+                            placeholder="Retry reason"
+                          />
+                        </Field>
+                        <PlatformSubmitButton pendingLabel="Queueing…" variant="secondary">
+                          Retry
+                        </PlatformSubmitButton>
+                      </PlatformActionForm>
+                      )}
                   </div>
-                  <p className="mt-1 text-xs text-[var(--fg-dim)]">
-                    attempt {job.attempts}/{job.maxAttempts} · queued {job.createdAt.toLocaleString()}
-                  </p>
-                  <p className="mt-2 text-xs text-[var(--fg-soft)]">{job.reason}</p>
-                  {job.lastError && <p className="mt-2 text-xs text-[var(--red)]">{job.lastError}</p>}
-                </div>
-                {canRetry &&
-                  job.status === "FAILED" &&
-                  job.attempts >= job.maxAttempts && (
-                  <PlatformActionForm
-                    action={retryPlatformJob.bind(null, job.id)}
-                    successMessage="Platform job queued for retry."
-                    className="flex flex-wrap gap-2"
-                  >
-                    <Input
-                      name="reason"
-                      minLength={10}
-                      required
-                      placeholder="Retry reason"
-                      className="h-8 w-40 px-2 py-1.5 text-xs"
-                    />
-                    <PlatformSubmitButton pendingLabel="Queueing…" className="border border-[var(--amber)]/40 px-3 py-1.5 text-xs font-semibold text-[var(--amber)]">
-                      Retry
-                    </PlatformSubmitButton>
-                  </PlatformActionForm>
-                  )}
-              </div>
-            </article>
-          ))}
-          {platformJobs.length === 0 && <Empty text="No platform jobs have been queued." />}
-        </div>
-      </section>
+                </li>
+              ))}
+            </ul>
+          )}
+        </CardContent>
+      </Card>
 
-      <section className="space-y-3">
-        <div>
-          <h2 className="font-mono text-lg font-semibold text-[var(--fg)]">Dead-letter deliveries</h2>
-          <p className="mt-1 text-xs text-[var(--fg-soft)]">
+      <Card>
+        <CardHeader>
+          <CardTitle>Dead-letter deliveries</CardTitle>
+          <CardDescription>
             Terminal delivery failures do not count as transient health failures. Retry resets the bounded attempt counter.
-          </p>
-        </div>
-        <div className="space-y-2">
-          {deadLetterJobs.map((job) => (
-            <article key={job.id} className="border border-[var(--line)] bg-[var(--surface)] p-4">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                <div>
-                  <p className="font-semibold text-[var(--fg)]">{job.subject}</p>
-                  <p className="mt-1 text-xs text-[var(--fg-dim)]">
-                    {job.channel} · {redactContact(job.contact)} · {job.attempts} attempts
-                  </p>
-                  <p className="mt-2 text-xs text-[var(--red)]">{job.lastError ?? "Delivery exhausted"}</p>
-                </div>
-                {canRetry && (
-                  <PlatformActionForm
-                    action={retryNotificationDelivery.bind(null, job.id)}
-                    successMessage="Notification delivery queued for retry."
-                    className="flex flex-wrap gap-2"
-                  >
-                    <Input
-                      name="reason"
-                      minLength={10}
-                      required
-                      placeholder="Retry reason"
-                      className="h-8 w-40 px-2 py-1.5 text-xs"
-                    />
-                    <PlatformSubmitButton pendingLabel="Queueing…" className="border border-[var(--amber)]/40 px-3 py-1.5 text-xs font-semibold text-[var(--amber)]">Retry</PlatformSubmitButton>
-                  </PlatformActionForm>
-                )}
-              </div>
-            </article>
-          ))}
-          {deadLetterJobs.length === 0 && <Empty text="No terminal delivery failures." />}
-        </div>
-      </section>
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {deadLetterJobs.length === 0 ? (
+            <EmptyState icon={CheckCircle2} hue="emerald" title="No terminal delivery failures" description="Deliveries that exhaust their retries will appear here." className="border-0 bg-transparent py-8" />
+          ) : (
+            <ul className="space-y-2">
+              {deadLetterJobs.map((job) => (
+                <li key={job.id} className="rounded-control border border-line px-3.5 py-3">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="min-w-0">
+                      <p className="font-medium text-ink">{job.subject}</p>
+                      <p className="mt-1 text-xs text-ink-dim">
+                        {job.channel} · {redactContact(job.contact)} · {job.attempts} attempts
+                      </p>
+                      <p className="mt-2 text-sm text-danger-fg">{job.lastError ?? "Delivery exhausted"}</p>
+                    </div>
+                    {canRetry && (
+                      <PlatformActionForm
+                        action={retryNotificationDelivery.bind(null, job.id)}
+                        successMessage="Notification delivery queued for retry."
+                        className="flex items-end gap-3 sm:shrink-0"
+                      >
+                        <Field label="Retry reason" htmlFor={`delivery-retry-${job.id}`} className="min-w-48 flex-1 sm:w-56 sm:flex-none">
+                          <Input
+                            id={`delivery-retry-${job.id}`}
+                            name="reason"
+                            minLength={10}
+                            required
+                            placeholder="Retry reason"
+                          />
+                        </Field>
+                        <PlatformSubmitButton pendingLabel="Queueing…" variant="secondary">Retry</PlatformSubmitButton>
+                      </PlatformActionForm>
+                    )}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </CardContent>
+      </Card>
 
-      <section className="space-y-3">
-        <h2 className="font-mono text-lg font-semibold text-[var(--fg)]">Worker heartbeats</h2>
-        <div className="border border-[var(--line)] bg-[var(--surface)]">
-          <Table className="min-w-[650px] text-left text-xs">
-            <TableHeader className="bg-[var(--bg)] font-mono text-[10px] uppercase tracking-wide text-[var(--fg-dim)]">
-              <TableRow><TableHead className="px-4 py-3">Worker</TableHead><TableHead className="px-4 py-3">State</TableHead><TableHead className="px-4 py-3">Last heartbeat</TableHead><TableHead className="px-4 py-3">Loop / error</TableHead></TableRow>
+      <Card className="overflow-hidden">
+        <CardHeader>
+          <CardTitle>Worker heartbeats</CardTitle>
+          <CardDescription>The 20 most recent workers, newest first. A worker is healthy when it reports ready within 30 seconds.</CardDescription>
+        </CardHeader>
+        {workers.length === 0 ? (
+          <EmptyState icon={Cpu} hue="violet" title="No worker heartbeats yet" description="No worker heartbeat has been recorded." className="border-0 bg-transparent py-8" />
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Worker</TableHead>
+                <TableHead>State</TableHead>
+                <TableHead>Last heartbeat</TableHead>
+                <TableHead className="max-md:hidden">Loop / error</TableHead>
+              </TableRow>
             </TableHeader>
-            <TableBody className="divide-y divide-[var(--line)]">
+            <TableBody>
               {workers.map((worker) => {
                 const fresh = worker.lastSeenAt > new Date(renderedAt - 30_000);
+                const loop = worker.lastError ?? (worker.lastLoopAt ? `loop ${worker.lastLoopAt.toLocaleString()}` : "No loop telemetry yet");
                 return (
                   <TableRow key={worker.id}>
-                    <TableCell className="px-4 py-3 font-mono text-[var(--fg)]">{worker.workerId}</TableCell>
-                    <TableCell className={`px-4 py-3 font-semibold ${fresh && worker.status === "READY" ? "text-[var(--green)]" : "text-[var(--red)]"}`}>{worker.status}</TableCell>
-                    <TableCell className="px-4 py-3 text-[var(--fg-soft)]">{worker.lastSeenAt.toLocaleString()}</TableCell>
-                    <TableCell className="px-4 py-3 text-[var(--fg-soft)]">{worker.lastError ?? (worker.lastLoopAt ? `loop ${worker.lastLoopAt.toLocaleString()}` : "No loop telemetry yet")}</TableCell>
+                    <TableCell className="text-ink">
+                      <span className="break-all font-mono text-xs">{worker.workerId}</span>
+                      <p className="mt-1 text-xs text-ink-dim md:hidden">{loop}</p>
+                    </TableCell>
+                    <TableCell>
+                      <StatusBadge tone={fresh && worker.status === "READY" ? "ok" : "danger"}>{titleCase(worker.status)}</StatusBadge>
+                    </TableCell>
+                    <TableCell className="text-xs">{worker.lastSeenAt.toLocaleString()}</TableCell>
+                    <TableCell className="text-xs max-md:hidden">{loop}</TableCell>
                   </TableRow>
                 );
               })}
-              {workers.length === 0 && <TableRow><TableCell colSpan={4} className="px-4 py-6 text-center text-[var(--fg-dim)]">No worker heartbeat has been recorded.</TableCell></TableRow>}
             </TableBody>
           </Table>
-        </div>
-      </section>
-
-      <section className="border border-[var(--line)] bg-[var(--surface)] p-4">
-        <h2 className="font-mono text-sm font-semibold text-[var(--fg)]">Deployment-owned operations</h2>
-        <p className="mt-2 text-xs leading-5 text-[var(--fg-soft)]">
-          Database backups, restore drills, process restarts, secret rotation, and migration execution are intentionally read-only here. Current expected migration: <code className="text-[var(--cyan)]">{LATEST_MIGRATION_ID}</code>. Use your deployment runbook and CLI so infrastructure permissions remain outside the web process.
-        </p>
-      </section>
-      <section className="border border-[var(--line)] bg-[var(--surface)] p-4">
-        <h2 className="font-mono text-sm font-semibold">Platform retention defaults</h2>
-        <p className="mt-1 text-xs text-[var(--fg-dim)]">Organizations may override these values within the displayed hard bounds.</p>
-        {canRetry ? (
-          <PlatformActionForm action={updatePlatformRetention} successMessage="Retention defaults updated" className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-            {Object.entries(RETENTION_BOUNDS).map(([key, bounds]) => (
-              <label key={key} className="text-[10px] text-[var(--fg-soft)]">
-                {key.replace(/([A-Z])/g, " $1")}
-                <Input type="number" name={key} min={bounds.min} max={bounds.max} defaultValue={platformRetention[key as keyof typeof platformRetention]} className="mt-1 h-8 px-2 py-1.5 text-xs" />
-              </label>
-            ))}
-            <PlatformSubmitButton pendingLabel="Saving…" className="bg-[var(--cyan)] px-3 py-2 text-xs font-semibold text-[var(--on-cyan)] sm:col-span-2 lg:col-span-5">Save defaults</PlatformSubmitButton>
-          </PlatformActionForm>
-        ) : (
-          <pre className="mt-3 text-xs">{JSON.stringify(platformRetention, null, 2)}</pre>
         )}
-      </section>
+      </Card>
+
+      <Card>
+        <CardContent className="flex items-start gap-4">
+          <IconTile icon={Terminal} hue="slate" />
+          <div className="min-w-0">
+            <h2 className="text-base font-semibold tracking-tight text-ink">Deployment-owned operations</h2>
+            <p className="mt-1 text-sm leading-6 text-ink-soft">
+              Database backups, restore drills, process restarts, secret rotation, and migration execution are intentionally read-only here. Current expected migration: <code className="rounded-chip bg-sunken px-1.5 py-0.5 font-mono text-xs text-ink">{LATEST_MIGRATION_ID}</code>. Use your deployment runbook and CLI so infrastructure permissions remain outside the web process.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Platform retention defaults</CardTitle>
+          <CardDescription>Organizations may override these values within the displayed hard bounds.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {canRetry ? (
+            <PlatformActionForm action={updatePlatformRetention} successMessage="Retention defaults updated" className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              {Object.entries(RETENTION_BOUNDS).map(([key, bounds]) => (
+                <Field key={key} label={retentionLabel(key)} htmlFor={`retention-${key}`} hint={`${bounds.min} to ${bounds.max} days`}>
+                  <Input id={`retention-${key}`} type="number" name={key} min={bounds.min} max={bounds.max} defaultValue={platformRetention[key as keyof typeof platformRetention]} />
+                </Field>
+              ))}
+              <div className="flex justify-end sm:col-span-2 lg:col-span-4">
+                <PlatformSubmitButton pendingLabel="Saving…">Save defaults</PlatformSubmitButton>
+              </div>
+            </PlatformActionForm>
+          ) : (
+            <pre className="overflow-auto rounded-control bg-sunken p-4 font-mono text-xs text-ink-soft">{JSON.stringify(platformRetention, null, 2)}</pre>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
 
-function Summary({ label, value, tone = "normal" }: { label: string; value: string | number; tone?: "normal" | "warning" | "error" }) {
-  const color = tone === "error" ? "var(--red)" : tone === "warning" ? "var(--amber)" : "var(--cyan)";
-  return <div className="border border-[var(--line)] bg-[var(--surface)] p-3"><p className="text-xs text-[var(--fg-dim)]">{label}</p><p className="mt-2 font-mono text-lg font-semibold" style={{ color }}>{value}</p></div>;
+const JOB_TONE: Record<string, StatusTone> = { SUCCEEDED: "ok", FAILED: "danger", PROCESSING: "info", QUEUED: "warn", CANCELLED: "neutral" };
+
+function titleCase(value: string) {
+  const text = value.replaceAll("_", " ").toLowerCase();
+  return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
-function JobState({ value }: { value: string }) {
-  const color = value === "SUCCEEDED" ? "text-[var(--green)]" : value === "FAILED" ? "text-[var(--red)]" : "text-[var(--amber)]";
-  return <span className={`bg-[var(--bg)] px-2 py-0.5 text-[10px] font-semibold ${color}`}>{value}</span>;
-}
-
-function Empty({ text }: { text: string }) {
-  return <p className="border border-[var(--line)] bg-[var(--surface)] p-4 text-sm text-[var(--fg-dim)]">{text}</p>;
+function retentionLabel(key: string) {
+  const words = key.replace(/Days$/, "").replace(/([A-Z])/g, " $1").trim().toLowerCase();
+  return `${words.charAt(0).toUpperCase()}${words.slice(1)} (days)`;
 }
 
 function redactContact(value: string) {

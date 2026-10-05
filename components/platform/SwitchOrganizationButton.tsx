@@ -4,6 +4,8 @@ import { fetchWithTimeout } from "@/lib/client-fetch";
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { ArrowRight } from "lucide-react";
+import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 
 export function SwitchOrganizationButton({ organizationId }: { organizationId: string }) {
@@ -36,13 +38,14 @@ export function SwitchOrganizationButton({ organizationId }: { organizationId: s
         type="button"
         onClick={switchOrganization}
         disabled={pending}
-        variant="outline"
+        variant="secondary"
         size="sm"
         loading={pending}
       >
         {pending ? "Opening…" : "Open organization"}
+        {!pending && <ArrowRight aria-hidden size={14} />}
       </Button>
-      {error && <p role="alert" className="mt-1 text-xs text-[var(--red)]">{error}</p>}
+      {error && <Alert tone="danger" className="mt-2">{error}</Alert>}
     </div>
   );
 }

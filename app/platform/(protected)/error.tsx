@@ -1,7 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
+import { AlertTriangle, RotateCw } from "lucide-react";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { IconTile } from "@/components/ui/icon-tile";
 
 export default function PlatformError({
   error,
@@ -11,30 +14,30 @@ export default function PlatformError({
   reset: () => void;
 }) {
   return (
-    <div role="alert" className="max-w-2xl border border-[var(--red)]/40 bg-[var(--red-soft)] p-5">
-      <h1 className="font-mono text-lg font-semibold text-[var(--fg)]">
-        The platform action could not be completed
-      </h1>
-      <p className="mt-2 text-sm text-[var(--fg-soft)]">
-        {error.message || "The underlying state changed or the operation failed."}
-      </p>
-      {error.digest && (
-        <p className="mt-2 font-mono text-[10px] text-[var(--fg-dim)]">Reference {error.digest}</p>
-      )}
-      <div className="mt-4 flex gap-2">
-        <Button
-          type="button"
-          onClick={reset}
-          variant="outline"
-          size="sm"
-          className="text-[var(--cyan)]"
-        >
-          Reload current state
-        </Button>
-        <Link href="/organization/platform" className="border border-[var(--line)] px-3 py-2 text-xs font-semibold">
-          Platform overview
-        </Link>
-      </div>
-    </div>
+    <Card role="alert" className="max-w-2xl">
+      <CardContent className="flex flex-col gap-4 p-6 sm:flex-row sm:items-start">
+        <IconTile icon={AlertTriangle} hue="rose" size="lg" />
+        <div className="min-w-0">
+          <h1 className="text-xl font-semibold tracking-tight text-ink">
+            The platform action could not be completed
+          </h1>
+          <p className="mt-1.5 text-sm leading-6 text-ink-soft">
+            {error.message || "The underlying state changed or the operation failed."}
+          </p>
+          {error.digest && (
+            <p className="mt-2 text-xs text-ink-dim">Reference <span className="font-mono">{error.digest}</span></p>
+          )}
+          <div className="mt-5 flex flex-wrap gap-2">
+            <Button type="button" onClick={reset} variant="secondary" size="sm">
+              <RotateCw aria-hidden size={14} />
+              Reload current state
+            </Button>
+            <Link href="/organization/platform" className={buttonVariants({ variant: "ghost", size: "sm" })}>
+              Platform overview
+            </Link>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   );
 }

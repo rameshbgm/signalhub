@@ -1,7 +1,7 @@
 "use client";
 
 import { useFormStatus } from "react-dom";
-import { Button } from "@/components/ui/button";
+import { Button, type ButtonSize, type ButtonVariant } from "@/components/ui/button";
 
 export function PlatformSubmitButton({
   children,
@@ -10,6 +10,8 @@ export function PlatformSubmitButton({
   className = "",
   disabled = false,
   title,
+  variant,
+  size,
 }: {
   children: React.ReactNode;
   pendingLabel?: string;
@@ -17,18 +19,22 @@ export function PlatformSubmitButton({
   className?: string;
   disabled?: boolean;
   title?: string;
+  variant?: ButtonVariant;
+  size?: ButtonSize;
 }) {
   const { pending } = useFormStatus();
   return (
     <Button
       type="submit"
+      variant={variant}
+      size={size}
       disabled={disabled || pending}
       loading={pending}
       onClick={(event) => {
         if (confirmMessage && !window.confirm(confirmMessage)) event.preventDefault();
       }}
       title={title}
-      className={`${className} disabled:cursor-wait disabled:opacity-50`}
+      className={className}
     >
       {pending ? pendingLabel : children}
     </Button>

@@ -1,18 +1,25 @@
 import Link from "next/link";
+import { Landmark } from "lucide-react";
+import { buttonVariants } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { IconTile } from "@/components/ui/icon-tile";
 
 export default function RetiredPlatformInvitePage() {
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[var(--bg)] p-6 text-[var(--fg)]">
-      <section className="max-w-lg border border-[var(--line)] bg-[var(--surface)] p-8">
-        <p className="font-mono text-xs uppercase tracking-widest text-[var(--fg-dim)]">Platform access</p>
-        <h1 className="mt-3 font-mono text-2xl font-semibold">Platform invitations have been retired</h1>
-        <p className="mt-3 text-sm leading-6 text-[var(--fg-soft)]">
-          Platform invitations have been retired. An Admin can create users directly from Users &amp; Roles.
-        </p>
-        <Link href="/login" className="mt-6 inline-flex bg-[var(--cyan)] px-4 py-2 text-sm font-semibold text-[var(--on-cyan)]">
-          Platform sign in
-        </Link>
-      </section>
+    <main className="grid min-h-screen place-items-center bg-wash p-6 text-ink">
+      <Card className="w-full max-w-md animate-rise rounded-sheet shadow-raised">
+        <CardContent className="p-8">
+          <IconTile icon={Landmark} hue="violet" size="lg" />
+          <p className="mt-5 text-sm font-medium text-ink-dim">Platform access</p>
+          <h1 className="mt-1 text-2xl font-semibold tracking-tight">Platform invitations have been retired</h1>
+          <p className="mt-3 text-sm leading-6 text-ink-soft">
+            Platform invitations have been retired. An Admin can create users directly from Users &amp; Roles.
+          </p>
+          <Link href="/login" className={buttonVariants({ className: "mt-6" })}>
+            Platform sign in
+          </Link>
+        </CardContent>
+      </Card>
     </main>
   );
 }

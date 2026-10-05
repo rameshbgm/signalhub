@@ -8,6 +8,13 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Fingerprint } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Field } from "@/components/ui/field";
+import { PageHeader } from "@/components/ui/page-header";
+import { StatusBadge } from "@/components/ui/status-badge";
 import {
   createIdentityConnection,
   setIdentityConnectionEnabled,
@@ -24,87 +31,79 @@ export default async function IdentityPage() {
   const orgNames = new Map(organizations.map((org) => [org.id, org.name]));
 
   return (
-    <div className="max-w-5xl space-y-8">
-      <div>
-        <h1 className="font-mono text-xl font-semibold">Enterprise identity</h1>
-        <p className="mt-1 text-sm text-[var(--fg-soft)]">
-          Organization OIDC and SAML connections with SCIM provisioning into fixed roles and page scopes.
-        </p>
-      </div>
+    <div className="space-y-8">
+      <PageHeader title="Enterprise identity" icon={Fingerprint} hue="violet" description="Organization OIDC and SAML connections with SCIM provisioning into fixed roles and page scopes." />
 
       {canManage && (
-        <section className="border border-[var(--line)] bg-[var(--surface)] p-5">
-          <h2 className="font-mono text-sm font-semibold">Add identity connection</h2>
-          <p className="mt-1 text-xs text-[var(--fg-dim)]">
-            Provider credentials are encrypted. For SAML, configure the generated metadata URL at your IdP.
-          </p>
+        <Card>
+          <CardHeader><CardTitle>Add identity connection</CardTitle><CardDescription>Provider credentials are encrypted. For SAML, configure the generated metadata URL at your IdP.</CardDescription></CardHeader>
+          <CardContent>
           <PlatformActionForm
             action={createIdentityConnection}
             successMessage="Identity connection created"
-            className="mt-4 grid gap-3 sm:grid-cols-2"
+            className="grid gap-4 sm:grid-cols-2"
           >
-            <Input name="name" placeholder="Connection name" required />
-            <Input name="slug" placeholder="Stable slug" required pattern="[a-z0-9-]+" />
-            <Select aria-label="Connection type" name="type" className="border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm">
+            <Field label="Connection name" htmlFor="identity-name" required><Input id="identity-name" name="name" required /></Field>
+            <Field label="Stable slug" htmlFor="identity-slug" required><Input id="identity-slug" name="slug" required pattern="[a-z0-9-]+" /></Field>
+            <Field label="Connection type" htmlFor="identity-type"><Select id="identity-type" name="type">
               <option value="OIDC">OpenID Connect</option>
               <option value="SAML">SAML 2.0</option>
-            </Select>
-            <Select aria-label="Organization" name="orgId" className="border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm">
+            </Select></Field>
+            <Field label="Organization" htmlFor="identity-org"><Select id="identity-org" name="orgId">
               <option value="">Choose organization</option>
               {organizations.map((org) => <option key={org.id} value={org.id}>{org.name}</option>)}
-            </Select>
-            <Select aria-label="Default role" name="defaultRole" defaultValue="VIEWER" className="border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm">
+            </Select></Field>
+            <Field label="Default role" htmlFor="identity-role"><Select id="identity-role" name="defaultRole" defaultValue="VIEWER">
               <option value="VIEWER">Default: Viewer</option>
               <option value="RESPONDER">Default: Responder</option>
               <option value="INCIDENT_MANAGER">Default: Incident manager</option>
               <option value="ADMIN">Default: Admin</option>
-            </Select>
-            <Input name="issuer" placeholder="OIDC issuer or SAML SP entity ID" required />
-            <Input name="clientId" placeholder="OIDC client ID (OIDC only)" />
-            <Input name="clientSecret" type="password" placeholder="OIDC client secret (OIDC only)" />
-            <Input name="entryPoint" placeholder="SAML IdP SSO URL (SAML only)" />
-            <Textarea name="idpCertificate" placeholder="SAML IdP signing certificate (SAML only)" rows={3} className="font-mono text-xs sm:col-span-2" />
-            <Textarea name="privateKey" placeholder="SAML SP private key for signed requests/encrypted assertions (optional)" rows={3} className="font-mono text-xs" />
-            <Textarea name="spCertificate" placeholder="SAML SP public certificate matching the private key (optional)" rows={3} className="font-mono text-xs" />
-            <Input name="acceptedAcrValues" placeholder="Accepted acr values, comma-separated" />
-            <Input name="acceptedAmrValues" placeholder="Accepted amr values, comma-separated" />
-            <Textarea
+            </Select></Field>
+            <Field label="OIDC issuer or SAML SP entity ID" htmlFor="identity-issuer" required><Input id="identity-issuer" name="issuer" required /></Field>
+            <Field label="OIDC client ID" htmlFor="identity-client-id"><Input id="identity-client-id" name="clientId" /></Field>
+            <Field label="OIDC client secret" htmlFor="identity-client-secret"><Input id="identity-client-secret" name="clientSecret" type="password" /></Field>
+            <Field label="SAML IdP SSO URL" htmlFor="identity-entry"><Input id="identity-entry" name="entryPoint" /></Field>
+            <Field label="SAML IdP signing certificate" htmlFor="identity-idp-cert" className="sm:col-span-2"><Textarea id="identity-idp-cert" name="idpCertificate" rows={3} className="font-mono text-xs" /></Field>
+            <Field label="SAML SP private key" htmlFor="identity-private-key" hint="Optional. Used for signed requests or encrypted assertions."><Textarea id="identity-private-key" name="privateKey" rows={3} className="font-mono text-xs" /></Field>
+            <Field label="SAML SP public certificate" htmlFor="identity-sp-cert" hint="Optional. Must match the private key."><Textarea id="identity-sp-cert" name="spCertificate" rows={3} className="font-mono text-xs" /></Field>
+            <Field label="Accepted acr values" htmlFor="identity-acr" hint="Separate values with commas."><Input id="identity-acr" name="acceptedAcrValues" /></Field>
+            <Field label="Accepted amr values" htmlFor="identity-amr" hint="Separate values with commas."><Input id="identity-amr" name="acceptedAmrValues" /></Field>
+            <Field label="Role mappings JSON" htmlFor="identity-role-mappings" className="sm:col-span-2"><Textarea id="identity-role-mappings"
               name="roleMappings"
               defaultValue="[]"
               rows={3}
-              aria-label="Role mappings JSON"
-              className="font-mono text-xs sm:col-span-2"
-            />
-            <label className="flex items-center gap-2 text-xs"><Checkbox name="allowJitProvisioning" /> Allow organization JIT provisioning</label>
+              className="font-mono text-xs"
+            /></Field>
+            <label className="flex items-center gap-2 text-sm text-ink-soft sm:col-span-2"><Checkbox name="allowJitProvisioning" /> Allow organization JIT provisioning</label>
             <Input type="hidden" name="scopes" value="openid email profile groups" />
-            <Button type="submit">Create connection</Button>
+            <div className="flex justify-end sm:col-span-2"><Button type="submit">Create connection</Button></div>
           </PlatformActionForm>
-        </section>
+          </CardContent>
+        </Card>
       )}
 
-      <section className="space-y-3">
+      <section className="space-y-3" aria-label="Identity connections">
         {connections.map((connection) => (
-          <article key={connection.id} className="border border-[var(--line)] bg-[var(--surface)] p-4">
+          <Card key={connection.id}>
+          <CardContent>
             <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <div className="flex items-center gap-2">
-                  <h2 className="font-mono text-sm font-semibold">{connection.name}</h2>
-                  <span className="bg-[var(--bg)] px-1.5 py-0.5 text-[10px]">{connection.type}</span>
-                  <span className={connection.enabled ? "text-xs text-[var(--green)]" : "text-xs text-[var(--red)]"}>
-                    {connection.enabled ? "Enabled" : "Disabled"}
-                  </span>
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h2 className="text-base font-semibold text-ink">{connection.name}</h2>
+                  <Badge>{connection.type}</Badge>
+                  <StatusBadge tone={connection.enabled ? "ok" : "neutral"}>{connection.enabled ? "Enabled" : "Disabled"}</StatusBadge>
                 </div>
-                <p className="mt-1 text-xs text-[var(--fg-dim)]">
+                <p className="mt-1 text-xs text-ink-dim">
                   {orgNames.get(connection.orgId ?? "") ?? "Unknown organization"}
                   {" · "}{connection.slug}
                 </p>
-                <code className="mt-2 block break-all text-[10px] text-[var(--fg-soft)]">
+                <code className="mt-2 block break-all font-mono text-xs text-ink-soft">
                   {connection.type === "OIDC"
                     ? `/api/auth/oidc/${connection.slug}/callback`
                     : `/api/auth/saml/${connection.slug}/metadata`}
                 </code>
                 {connection.lastTestedAt && (
-                  <p className={`mt-1 text-xs ${connection.lastTestOk ? "text-[var(--green)]" : "text-[var(--red)]"}`}>
+                  <p className={`mt-1 text-xs ${connection.lastTestOk ? "text-ok-fg" : "text-danger-fg"}`}>
                     Last test: {connection.lastTestOk ? "passed" : connection.lastError ?? "failed"}
                   </p>
                 )}
@@ -122,16 +121,17 @@ export default async function IdentityPage() {
               )}
             </div>
             {canManage && (
-              <div className="mt-3 border-t border-[var(--line)] pt-3">
-                <p className="mb-2 text-xs text-[var(--fg-dim)]">
+              <div className="mt-4 border-t border-line pt-4">
+                <p className="mb-2 text-xs text-ink-dim">
                   SCIM base URL: <code>/api/scim/v2/{connection.slug}</code>
                 </p>
                 <ScimTokenManager connectionId={connection.id} />
               </div>
             )}
-          </article>
+          </CardContent>
+          </Card>
         ))}
-        {!connections.length && <p className="border border-[var(--line)] p-4 text-sm text-[var(--fg-dim)]">No identity connections configured.</p>}
+        {!connections.length && <EmptyState icon={Fingerprint} hue="violet" title="No identity connections configured" description="Add an OIDC or SAML connection to enable enterprise sign-in for an organization." />}
       </section>
     </div>
   );

@@ -1,7 +1,10 @@
 "use client";
 
 import { useActionState } from "react";
+import { Plus } from "lucide-react";
+import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import {
   createOrganization,
@@ -15,48 +18,33 @@ export function CreateOrganizationForm() {
 
   if (state.ok) {
     return (
-      <div className="border border-[var(--green)]/40 bg-[var(--green-soft)] p-4">
-        <h3 className="font-mono text-sm font-semibold text-[var(--fg)]">
-          {state.organizationName} is ready
-        </h3>
-        <p className="mt-1 text-xs text-[var(--fg-soft)]">
-          Open it from the organization directory, then create users and assign roles from Users &amp; Roles.
-        </p>
-      </div>
+      <Alert tone="ok" title={`${state.organizationName} is ready`}>
+        Open it from the organization directory, then create users and assign roles from Users &amp; Roles.
+      </Alert>
     );
   }
 
   return (
-    <form action={action} className="grid gap-3 border border-[var(--line)] bg-[var(--surface)] p-4 sm:grid-cols-2">
-      <div>
-        <label htmlFor="organization-name" className="text-xs font-semibold text-[var(--fg)]">
-          Organization name
-        </label>
+    <form action={action} className="grid gap-4 sm:grid-cols-2">
+      <Field label="Organization name" htmlFor="organization-name" required>
         <Input
           id="organization-name"
           name="name"
           required
           maxLength={120}
-          className="mt-1"
         />
-      </div>
-      <div>
-        <label htmlFor="organization-slug" className="text-xs font-semibold text-[var(--fg)]">
-          Slug
-        </label>
+      </Field>
+      <Field label="Slug" htmlFor="organization-slug" hint="Lowercase letters, numbers, and hyphens. Leave empty to generate it from the name.">
         <Input
           id="organization-slug"
           name="slug"
           maxLength={80}
           placeholder="generated from name"
           pattern="[a-z0-9]+(?:-[a-z0-9]+)*"
-          className="mt-1 font-mono"
+          className="font-mono"
         />
-      </div>
-      <div className="sm:col-span-2">
-        <label htmlFor="organization-reason" className="text-xs font-semibold text-[var(--fg)]">
-          Provisioning reason
-        </label>
+      </Field>
+      <Field label="Provisioning reason" htmlFor="organization-reason" required hint="Recorded in the platform audit log." className="sm:col-span-2">
         <Input
           id="organization-reason"
           name="reason"
@@ -64,20 +52,20 @@ export function CreateOrganizationForm() {
           minLength={10}
           maxLength={500}
           placeholder="Customer request or internal ticket"
-          className="mt-1"
         />
-      </div>
+      </Field>
       {state.error && (
-        <p role="alert" className="text-xs text-[var(--red)] sm:col-span-2">
+        <Alert tone="danger" className="sm:col-span-2">
           {state.error}
-        </p>
+        </Alert>
       )}
-      <div className="sm:col-span-2">
+      <div className="flex justify-end sm:col-span-2">
         <Button
           type="submit"
           disabled={pending}
           loading={pending}
         >
+          {!pending && <Plus aria-hidden size={16} />}
           {pending ? "Creating…" : "Create organization"}
         </Button>
       </div>

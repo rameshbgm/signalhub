@@ -2,11 +2,19 @@ import { database } from "@/lib/postgres/client";
 import { Select } from "@/components/ui/select";
 import { requirePlatformPageCapability } from "@/lib/platform-page-guard";
 import Link from "next/link";
+import { ArrowRight, Download, Funnel, Plus, ScrollText, Webhook } from "lucide-react";
 import { hasPlatformCapability } from "@/lib/platform-policy";
 import { PlatformActionForm } from "@/components/platform/PlatformActionForm";
 import { createAuditSink, setAuditSinkEnabled } from "./actions";
-import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { PageHeader } from "@/components/ui/page-header";
+import { StatusBadge } from "@/components/ui/status-badge";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 export default async function PlatformAuditPage({
   searchParams,
@@ -52,112 +60,175 @@ export default async function PlatformAuditPage({
   const deadLetters = new Map(deadLetterCounts.map((entry) => [entry.sinkId, Number(entry.count)]));
 
   return (
-    <div className="max-w-6xl space-y-6">
-      <div>
-        <h1 className="font-mono text-2xl font-semibold text-[var(--fg)]">Platform audit</h1>
-        <p className="mt-1 text-sm text-[var(--fg-soft)]">
-          Append-only operator, authentication, support, lifecycle, and worker job evidence.
-        </p>
-        <div className="mt-2 flex gap-3 text-xs">
-          <Link href="/api/platform/audit/export?format=csv" className="text-[var(--cyan)]">Export CSV</Link>
-          <Link href="/api/platform/audit/export?format=json" className="text-[var(--cyan)]">Export JSON</Link>
-        </div>
-      </div>
-      <form className="grid gap-2 border border-[var(--line)] bg-[var(--surface)] p-3 sm:grid-cols-[1fr_16rem_auto]">
-        <Input
-          name="q"
-          defaultValue={query}
-          placeholder="Actor, target ID, or reason"
-          aria-label="Search audit"
-        />
-        <Select
-          name="action"
-          defaultValue={action}
-          aria-label="Filter by action"
-          className="border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-xs"
-        >
-          <option value="">All actions</option>
-          {actions.sort().map((value) => <option key={value} value={value}>{value}</option>)}
-        </Select>
-        <Button type="submit" variant="outline" size="sm" className="text-[var(--cyan)]">Filter</Button>
-      </form>
+    <div className="space-y-8">
+      <PageHeader
+        title="Platform audit"
+        description="Append-only operator, authentication, support, lifecycle, and worker job evidence."
+        icon={ScrollText}
+        hue="violet"
+        actions={
+          <>
+            <Link href="/api/platform/audit/export?format=csv" className={buttonVariants({ variant: "secondary" })}>
+              <Download aria-hidden size={16} />
+              Export CSV
+            </Link>
+            <Link href="/api/platform/audit/export?format=json" className={buttonVariants({ variant: "secondary" })}>
+              <Download aria-hidden size={16} />
+              Export JSON
+            </Link>
+          </>
+        }
+      />
 
-      <section className="space-y-3 border border-[var(--line)] bg-[var(--surface)] p-4">
-        <div>
-          <h2 className="font-mono text-sm font-semibold">External SIEM sinks</h2>
-          <p className="mt-1 text-xs text-[var(--fg-dim)]">
+      <Card>
+        <CardContent>
+          <form className="grid items-end gap-4 sm:grid-cols-[1fr_16rem_auto]">
+            <Field label="Search audit" htmlFor="audit-search">
+              <Input
+                id="audit-search"
+                name="q"
+                defaultValue={query}
+                placeholder="Actor, target ID, or reason"
+              />
+            </Field>
+            <Field label="Filter by action" htmlFor="audit-action">
+              <Select id="audit-action" name="action" defaultValue={action}>
+                <option value="">All actions</option>
+                {actions.sort().map((value) => <option key={value} value={value}>{value}</option>)}
+              </Select>
+            </Field>
+            <Button type="submit" variant="secondary">
+              <Funnel aria-hidden size={16} />
+              Filter
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>External SIEM sinks</CardTitle>
+          <CardDescription>
             Sealed audit entries are delivered by the worker over signed HTTPS with retries and dead-letter visibility.
-          </p>
-        </div>
-        {canManage && (
-          <PlatformActionForm action={createAuditSink} successMessage="Audit sink created" className="grid gap-2 sm:grid-cols-2">
-            <Input name="name" placeholder="Sink name" required />
-            <Input name="url" type="url" placeholder="https://siem.example/events" required />
-            <Input name="secret" type="password" minLength={32} placeholder="HMAC signing secret (32+ characters)" required />
-            <Select aria-label="Audit sink organization" name="orgId" className="border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-xs">
-              <option value="">Platform audit</option>
-              {sinkOrganizations.map((org) => <option key={org.id} value={org.id}>{org.name}</option>)}
-            </Select>
-            <Button type="submit" size="sm" className="sm:col-span-2">Add sink</Button>
-          </PlatformActionForm>
-        )}
-        <div className="divide-y divide-[var(--line)] border border-[var(--line)]">
-          {sinks.map((sink) => (
-            <div key={sink.id} className="flex flex-wrap items-center justify-between gap-3 p-3 text-xs">
-              <div>
-                <p className="font-semibold">{sink.name} · {sink.enabled ? "Enabled" : "Disabled"}</p>
-                <p className="mt-1 text-[var(--fg-dim)]">{sink.orgId ? sinkOrgNames.get(sink.orgId) ?? "Purged organization" : "Platform"} · {new URL(sink.url).host}</p>
-                {deadLetters.get(sink.id) ? <p className="mt-1 text-[var(--red)]">{deadLetters.get(sink.id)} dead-letter deliveries</p> : null}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {canManage && (
+            <PlatformActionForm action={createAuditSink} successMessage="Audit sink created" className="grid gap-4 sm:grid-cols-2" messageClassName="sm:col-span-2">
+              <Field label="Sink name" htmlFor="sink-name" required>
+                <Input id="sink-name" name="name" placeholder="Sink name" required />
+              </Field>
+              <Field label="Endpoint URL" htmlFor="sink-url" required>
+                <Input id="sink-url" name="url" type="url" placeholder="https://siem.example/events" required />
+              </Field>
+              <Field label="HMAC signing secret" htmlFor="sink-secret" required hint="At least 32 characters.">
+                <Input id="sink-secret" name="secret" type="password" minLength={32} placeholder="HMAC signing secret (32+ characters)" required />
+              </Field>
+              <Field label="Audit sink organization" htmlFor="sink-org">
+                <Select id="sink-org" name="orgId">
+                  <option value="">Platform audit</option>
+                  {sinkOrganizations.map((org) => <option key={org.id} value={org.id}>{org.name}</option>)}
+                </Select>
+              </Field>
+              <div className="flex justify-end sm:col-span-2">
+                <Button type="submit">
+                  <Plus aria-hidden size={16} />
+                  Add sink
+                </Button>
               </div>
-              {canManage && (
-                <PlatformActionForm action={setAuditSinkEnabled.bind(null, sink.id)} successMessage={sink.enabled ? "Sink disabled" : "Sink enabled"}>
-                  <Input type="hidden" name="enabled" value={String(!sink.enabled)} />
-                  <Button type="submit" variant="outline" size="sm">{sink.enabled ? "Disable" : "Enable"}</Button>
-                </PlatformActionForm>
-              )}
-            </div>
-          ))}
-          {!sinks.length && <p className="p-3 text-xs text-[var(--fg-dim)]">No external audit sinks configured.</p>}
-        </div>
-      </section>
+            </PlatformActionForm>
+          )}
 
-      <div className="space-y-2">
-        {entries.map((entry) => (
-          <article key={entry.id} className="border border-[var(--line)] bg-[var(--surface)] p-4">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-              <div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <h2 className="font-mono text-sm font-semibold text-[var(--fg)]">{entry.action}</h2>
-                  <span className="bg-[var(--bg)] px-2 py-0.5 text-[10px] font-semibold text-[var(--fg-soft)]">{entry.actorRole}</span>
-                </div>
-                <p className="mt-1 text-xs text-[var(--fg-soft)]">
-                  {entry.actorEmail} → {entry.targetType}:{entry.targetId}
-                </p>
-                {entry.organizationId && (
-                  <p className="mt-1 text-xs text-[var(--fg-dim)]">
-                    Organization: {organizationNames.get(entry.organizationId) ?? `${entry.organizationId} (purged)`}
-                  </p>
-                )}
-                {entry.reason && <p className="mt-2 text-sm text-[var(--fg)]">{entry.reason}</p>}
-                {hasMetadata(entry.metadata) && (
-                  <details className="mt-2">
-                    <summary className="cursor-pointer text-xs text-[var(--cyan)]">Metadata</summary>
-                    <pre className="mt-2 max-h-56 overflow-auto border border-[var(--line)] bg-[var(--bg)] p-2 text-[10px] text-[var(--fg-soft)]">
-                      {JSON.stringify(entry.metadata, null, 2)}
-                    </pre>
-                  </details>
-                )}
-              </div>
-              <time className="shrink-0 text-xs text-[var(--fg-dim)]">{entry.createdAt.toLocaleString()}</time>
-            </div>
-          </article>
-        ))}
-        {entries.length === 0 && (
-          <p className="border border-[var(--line)] bg-[var(--surface)] p-4 text-sm text-[var(--fg-dim)]">
-            No audit entries match these filters.
-          </p>
+          {sinks.length ? (
+            <ul className="space-y-2">
+              {sinks.map((sink) => (
+                <li key={sink.id} className="flex flex-wrap items-center justify-between gap-3 rounded-control border border-line px-3.5 py-3">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="font-medium text-ink">{sink.name}</p>
+                      <StatusBadge tone={sink.enabled ? "ok" : "neutral"}>{sink.enabled ? "Enabled" : "Disabled"}</StatusBadge>
+                    </div>
+                    <p className="mt-1 text-xs text-ink-dim">{sink.orgId ? sinkOrgNames.get(sink.orgId) ?? "Purged organization" : "Platform"} · <span className="font-mono">{new URL(sink.url).host}</span></p>
+                    {deadLetters.get(sink.id) ? <p className="mt-1 text-xs font-medium text-danger-fg">{deadLetters.get(sink.id)} dead-letter deliveries</p> : null}
+                  </div>
+                  {canManage && (
+                    <PlatformActionForm action={setAuditSinkEnabled.bind(null, sink.id)} successMessage={sink.enabled ? "Sink disabled" : "Sink enabled"}>
+                      <input type="hidden" name="enabled" value={String(!sink.enabled)} />
+                      <Button type="submit" variant="outline" size="sm">{sink.enabled ? "Disable" : "Enable"}</Button>
+                    </PlatformActionForm>
+                  )}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <EmptyState icon={Webhook} hue="violet" title="No external audit sinks configured" description="Add a sink to forward sealed audit entries to your SIEM." className="py-8" />
+          )}
+        </CardContent>
+      </Card>
+
+      <Card className="overflow-hidden">
+        <CardHeader>
+          <CardTitle>Audit log</CardTitle>
+          <CardDescription>Showing {entries.length} entr{entries.length === 1 ? "y" : "ies"}, newest first.</CardDescription>
+        </CardHeader>
+        {entries.length === 0 ? (
+          <EmptyState
+            icon={ScrollText}
+            hue="violet"
+            title={query || action ? "No audit entries match these filters" : "No audit entries yet"}
+            description={query || action ? "Clear the filters to see all platform activity." : "Operator actions are recorded here as they happen."}
+            action={query || action ? <Link href="/organization/platform/audit" className={buttonVariants({ variant: "secondary" })}>Clear filters</Link> : undefined}
+            className="border-0 bg-transparent py-12"
+          />
+        ) : (
+          <Table className="min-w-[44rem]">
+            <TableHeader>
+              <TableRow>
+                <TableHead>When</TableHead>
+                <TableHead>Action</TableHead>
+                <TableHead>Actor and target</TableHead>
+                <TableHead>Reason and details</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {entries.map((entry) => (
+                <TableRow key={entry.id} className="align-top">
+                  <TableCell className="whitespace-nowrap text-xs">
+                    <time dateTime={entry.createdAt.toISOString()}>{entry.createdAt.toLocaleString()}</time>
+                  </TableCell>
+                  <TableCell>
+                    <p className="break-all font-mono text-xs font-medium text-ink">{entry.action}</p>
+                    <Badge className="mt-1.5">{entry.actorRole}</Badge>
+                  </TableCell>
+                  <TableCell className="text-xs">
+                    <p className="break-all text-ink">{entry.actorEmail}</p>
+                    <p className="mt-1 flex items-start gap-1 text-ink-soft">
+                      <ArrowRight aria-hidden size={12} className="mt-0.5 shrink-0" />
+                      <span className="break-all font-mono">{entry.targetType}:{entry.targetId}</span>
+                    </p>
+                    {entry.organizationId && (
+                      <p className="mt-1 text-ink-dim">
+                        Organization: {organizationNames.get(entry.organizationId) ?? `${entry.organizationId} (purged)`}
+                      </p>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {entry.reason && <p className="text-sm text-ink">{entry.reason}</p>}
+                    {hasMetadata(entry.metadata) && (
+                      <details className={entry.reason ? "mt-2" : undefined}>
+                        <summary className="w-fit cursor-pointer rounded-chip text-xs font-medium text-primary-ink outline-none focus-visible:ring-4 focus-visible:ring-primary/25">Metadata</summary>
+                        <pre className="mt-2 max-h-56 overflow-auto rounded-control bg-sunken p-3 font-mono text-2xs text-ink-soft">
+                          {JSON.stringify(entry.metadata, null, 2)}
+                        </pre>
+                      </details>
+                    )}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
         )}
-      </div>
+      </Card>
     </div>
   );
 }

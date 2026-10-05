@@ -3,7 +3,9 @@
 import { fetchWithTimeout } from "@/lib/client-fetch";
 
 import { useState } from "react";
+import { RotateCw } from "lucide-react";
 import { CopyButton } from "@/components/CopyButton";
+import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 
 export function ScimTokenManager({ connectionId }: { connectionId: string }) {
@@ -32,7 +34,7 @@ export function ScimTokenManager({ connectionId }: { connectionId: string }) {
   }
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
       <Button
         type="button"
         onClick={() => void rotate()}
@@ -41,16 +43,16 @@ export function ScimTokenManager({ connectionId }: { connectionId: string }) {
         size="sm"
         loading={pending}
       >
+        {!pending && <RotateCw aria-hidden size={14} />}
         {pending ? "Rotating…" : "Rotate SCIM token"}
       </Button>
       {secret && (
-        <div className="border border-[var(--amber)]/40 bg-[var(--amber-soft)] p-2 text-xs">
-          <p className="font-semibold">Copy this token now. It will not be shown again.</p>
-          <code className="mt-1 block break-all">{secret}</code>
-          <CopyButton value={secret} label="Copy token" className="mt-1 font-semibold text-[var(--cyan)]" />
-        </div>
+        <Alert tone="warn" title="Copy this token now. It will not be shown again.">
+          <code className="mt-1 block break-all rounded-control bg-surface px-3 py-2 font-mono text-xs text-ink">{secret}</code>
+          <CopyButton value={secret} label="Copy token" errorClassName="text-xs text-danger-fg" className="mt-2" />
+        </Alert>
       )}
-      {error && <p role="alert" className="text-xs text-[var(--red)]">{error}</p>}
+      {error && <Alert tone="danger">{error}</Alert>}
     </div>
   );
 }

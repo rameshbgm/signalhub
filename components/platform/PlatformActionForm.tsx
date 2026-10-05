@@ -2,6 +2,8 @@
 
 import { useActionState, useEffect, type ComponentPropsWithoutRef, type ReactNode } from "react";
 import { runPlatformActionWithFeedback } from "@/app/platform/(protected)/action-feedback";
+import { Alert } from "@/components/ui/alert";
+import { cn } from "@/lib/utils";
 
 type PlatformAction = (formData: FormData) => void | Promise<void>;
 
@@ -45,23 +47,21 @@ export function PlatformActionForm({
     <form
       action={formAction}
       {...formProps}
-      className={`${formClassName} ${formClassName.includes("flex") ? "flex-wrap" : ""}`.trim()}
+      className={cn(formClassName, formClassName.includes("flex") && "flex-wrap")}
     >
       {children}
-      <p
+      <div
         aria-atomic="true"
         aria-live={feedback.status === "error" ? "assertive" : "polite"}
         role={feedback.status === "error" ? "alert" : "status"}
-        className={`w-full basis-full text-xs ${
-          feedback.status === "error"
-            ? "text-[var(--red)]"
-            : feedback.status === "success"
-              ? "text-[var(--green)]"
-              : ""
-        } ${messageClassName}`}
+        className={cn("w-full basis-full", messageClassName)}
       >
-        {feedback.message}
-      </p>
+        {feedback.status !== "idle" && (
+          <Alert tone={feedback.status === "error" ? "danger" : "ok"} role={undefined}>
+            {feedback.message}
+          </Alert>
+        )}
+      </div>
     </form>
   );
 }
