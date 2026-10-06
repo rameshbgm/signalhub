@@ -148,9 +148,9 @@ export default async function PublicStatusPage({ params }: { params: Promise<{ s
       case "HISTORY_PREVIEW":
         return (
           <section className="public-ops-section">
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-              <h2 className="text-lg font-semibold">{block.settings.heading}</h2>
-              <Link href={`${basePath}/history`} className="text-sm underline" style={{ color: "var(--page-brand)" }}>Incident history</Link>
+            <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
+              <h2 className="m-0 text-lg font-semibold">{block.settings.heading}</h2>
+              <Link href={`${basePath}/history`} className="text-sm font-medium underline-offset-4 hover:underline" style={{ color: "var(--page-brand)" }}>View incident history →</Link>
             </div>
             <PastIncidentsByDay incidents={past} pageSlug={incidentPageSlug} days={block.settings.days} locale={page.language} timeZone={page.timezone} />
           </section>

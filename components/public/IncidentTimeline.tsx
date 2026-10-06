@@ -215,6 +215,14 @@ export function PastIncidentsByDay({
     });
   }
 
+  if (!buckets.length) {
+    return (
+      <p className="page-panel border border-dashed border-[var(--line)] bg-[var(--surface)] px-4 py-5 text-sm text-[var(--fg-soft)]">
+        No incidents reported in the past {days} {days === 1 ? "day" : "days"}.
+      </p>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {buckets.map((b) => (

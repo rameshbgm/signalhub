@@ -2,8 +2,10 @@
 
 import { fetchWithTimeout } from "@/lib/client-fetch";
 
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type FormEvent } from "react";
+import { createPortal } from "react-dom";
 import { Bell, X } from "lucide-react";
+import { themeVariables } from "@/components/public/theme-variables";
 import { recordPublicEvent } from "@/components/public/PublicAnalytics";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -28,6 +30,7 @@ export function SubscribeModal({
   feedBasePath?: string;
 }) {
   const [open, setOpen] = useState(false);
+  const [theme, setTheme] = useState<CSSProperties>({});
   const [tab, setTab] = useState<"email" | "sms" | "feed">("email");
   const [capabilities, setCapabilities] = useState<{
     email: { enabled: boolean; reason: string | null };
@@ -76,7 +79,12 @@ export function SubscribeModal({
       }
     }
     document.addEventListener("keydown", keyDown);
-    return () => document.removeEventListener("keydown", keyDown);
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", keyDown);
+      document.body.style.overflow = previousOverflow;
+    };
   }, [open]);
 
   function close() {
@@ -89,7 +97,8 @@ export function SubscribeModal({
       <Button
         ref={triggerRef}
         type="button"
-        onClick={() => {
+        onClick={(event) => {
+          setTheme(themeVariables(event.currentTarget));
           setOpen(true);
           recordPublicEvent(pageSlug, "SUBSCRIPTION_START");
         }}
@@ -100,9 +109,11 @@ export function SubscribeModal({
         <Bell aria-hidden size={16} />
         Subscribe to Updates
       </Button>
-      {open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onMouseDown={(event) => event.target === event.currentTarget && close()}>
-          <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="subscribe-title" className="public-subscribe-dialog w-full max-w-md border border-[var(--line-bright)] bg-[var(--surface)] p-6 shadow-xl">
+      {/* Portaled to <body> so a transformed page panel cannot trap the
+          full-screen overlay inside itself; theme variables travel with it. */}
+      {open && createPortal(
+        <div className="fixed inset-0 z-[2200] flex items-center justify-center bg-black/60 p-4" style={theme} onMouseDown={(event) => event.target === event.currentTarget && close()}>
+          <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="subscribe-title" className="public-subscribe-dialog max-h-[calc(100dvh-2rem)] w-full max-w-md overflow-y-auto border border-[var(--line-bright)] bg-[var(--surface)] p-6 text-[var(--fg)] shadow-xl" style={{ borderRadius: "calc(var(--page-radius, 8px) + 4px)" }}>
             <div className="mb-5 flex items-center justify-between">
               <h3 id="subscribe-title" className="font-mono text-lg font-semibold text-[var(--fg)]">Get notified</h3>
               <Button type="button" variant="ghost" size="icon" onClick={close} className="h-9 w-9 text-[var(--fg-dim)] hover:text-[var(--fg)]" aria-label="Close subscription dialog"><X aria-hidden size={17} /></Button>
@@ -137,7 +148,8 @@ export function SubscribeModal({
             {tab === "feed" && <FeedTab pageSlug={pageSlug} feedBasePath={feedBasePath} />}
             <p className="mt-4 text-xs text-[var(--fg-dim)]">Every verified subscription includes a private unsubscribe link.</p>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </>
   );
@@ -198,12 +210,14 @@ function ContactTab({
   const [stage, setStage] = useState<"form" | "otp" | "done">("form");
   const [code, setCode] = useState("");
   const [message, setMessage] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const isEmail = channel === "EMAIL";
 
   async function post(path: string, body: Record<string, unknown>) {
     setLoading(true);
     setMessage(null);
+    setNotice(null);
     try {
       const response = await fetchWithTimeout(path, {
         method: "POST",
@@ -231,20 +245,66 @@ function ContactTab({
       </div>
     );
   }
+  const trimmedContact = contact.trim();
+  const requestCode = () => post("/api/v1/subscribe/request-otp", { pageSlug, channel, contact: trimmedContact, componentIds: selected });
+
+  async function submitContact(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!trimmedContact || loading) return;
+    if (await requestCode()) {
+      setCode("");
+      setStage("otp");
+    }
+  }
+
+  async function submitCode(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!/^\d{6}$/.test(code) || loading) return;
+    if (await post("/api/v1/subscribe/verify-otp", { pageSlug, channel, contact: trimmedContact, code })) setStage("done");
+  }
+
+  async function resendCode() {
+    if (await requestCode()) {
+      setCode("");
+      setNotice(`A new code was sent to ${trimmedContact}.`);
+    }
+  }
+
   if (stage === "otp") {
     return (
-      <div>
-        <p className="mb-2 text-sm text-[var(--fg-soft)]">Enter the six-digit code sent to {contact}.</p>
+      <form onSubmit={submitCode} noValidate>
+        <p className="mb-3 text-sm text-[var(--fg-soft)]">
+          Enter the six-digit code sent to <strong className="text-[var(--fg)]">{trimmedContact}</strong>. It expires in 10 minutes{isEmail ? "; check your spam folder if it has not arrived" : ""}.
+        </p>
         <label className="sr-only" htmlFor="subscription-code">Verification code</label>
-        <Input id="subscription-code" inputMode="numeric" autoComplete="one-time-code" value={code} onChange={(event) => setCode(event.target.value)} placeholder="123456" className={`${inputClass} mb-2`} />
+        <Input
+          id="subscription-code"
+          inputMode="numeric"
+          autoComplete="one-time-code"
+          maxLength={6}
+          autoFocus
+          value={code}
+          onChange={(event) => setCode(event.target.value.replace(/\D/g, "").slice(0, 6))}
+          placeholder="123456"
+          className={`${inputClass} mb-2 text-center font-mono text-lg tracking-[0.4em]`}
+        />
         {message && <p role="alert" className="mb-2 text-xs text-[var(--red)]">{message}</p>}
-        <Button type="button" loading={loading} disabled={!/^\d{6}$/.test(code)} onClick={async () => (await post("/api/v1/subscribe/verify-otp", { pageSlug, channel, contact, code })) && setStage("done")} className="w-full py-2.5 font-medium text-[var(--bg)]" style={{ backgroundColor: brandColor }}>{loading ? "Verifying…" : "Verify & Subscribe"}</Button>
-      </div>
+        {notice && !message && <p role="status" className="mb-2 text-xs text-[var(--fg-soft)]">{notice}</p>}
+        <Button type="submit" loading={loading} disabled={!/^\d{6}$/.test(code)} className="w-full py-2.5 font-medium text-white" style={{ backgroundColor: brandColor }}>{loading ? "Verifying…" : "Verify & subscribe"}</Button>
+        <div className="mt-3 flex items-center justify-between gap-3 text-xs">
+          <button type="button" className="text-[var(--fg-soft)] underline-offset-4 hover:underline" onClick={() => { setStage("form"); setMessage(null); setNotice(null); }}>
+            Use a different {isEmail ? "address" : "number"}
+          </button>
+          <button type="button" disabled={loading} className="font-medium underline-offset-4 hover:underline disabled:opacity-50" style={{ color: brandColor }} onClick={() => void resendCode()}>
+            Resend code
+          </button>
+        </div>
+      </form>
     );
   }
   return (
-    <div>
-      <label className="sr-only" htmlFor={`subscription-${channel.toLowerCase()}`}>{isEmail ? "Email address" : "Phone number"}</label>
+    <form onSubmit={submitContact} noValidate>
+      <label className="mb-1.5 block text-xs font-medium text-[var(--fg-soft)]" htmlFor={`subscription-${channel.toLowerCase()}`}>{isEmail ? "Email address" : "Phone number (international format)"}</label>
       <Input
         id={`subscription-${channel.toLowerCase()}`}
         value={contact}
@@ -257,8 +317,8 @@ function ContactTab({
       />
       <ComponentPicker components={components} selected={selected} onChange={setSelected} />
       {message && <p role="alert" className="mb-2 text-xs text-[var(--red)]">{message}</p>}
-      <Button type="button" loading={loading} disabled={!contact} onClick={async () => (await post("/api/v1/subscribe/request-otp", { pageSlug, channel, contact, componentIds: selected })) && setStage("otp")} className="w-full py-2.5 font-medium text-[var(--bg)]" style={{ backgroundColor: brandColor }}>{loading ? "Sending…" : "Send verification code"}</Button>
-    </div>
+      <Button type="submit" loading={loading} disabled={!trimmedContact} className="w-full py-2.5 font-medium text-white" style={{ backgroundColor: brandColor }}>{loading ? "Sending…" : "Send verification code"}</Button>
+    </form>
   );
 }
 

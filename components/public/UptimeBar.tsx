@@ -1,6 +1,8 @@
 "use client";
 
-import { Tooltip } from "@/components/ui/tooltip";
+import { useEffect, useId, useState, type CSSProperties } from "react";
+import { createPortal } from "react-dom";
+import { themeVariables } from "@/components/public/theme-variables";
 import { COMPONENT_STATUS_COLOR, COMPONENT_STATUS_LABEL, type ComponentStatus, type DailyUptimeBucket } from "@/lib/status";
 import type { UptimeBarSize, UptimeBarStyle, UptimeIconStyle } from "@/lib/page-design";
 
@@ -28,7 +30,24 @@ export function UptimeBar({
       ? "!h-6 !min-h-6 !w-6 !min-w-6 !max-w-6"
       : "!h-12 !min-h-12 !w-full !min-w-0";
   const fixedSize = size !== "RESPONSIVE";
-  const gap = style === "SOLID" ? "gap-0" : size === "RESPONSIVE" ? "gap-1.5" : "gap-1";
+  const gap = style === "SOLID" ? "gap-0" : size === "RESPONSIVE" ? "gap-1 sm:gap-1.5" : "gap-1";
+  // Ninety bars cannot fit a phone-width card, so small screens show the last 30 days.
+  const mobileDays = Math.min(days.length, MOBILE_DAYS);
+
+  const tooltipId = useId();
+  const [active, setActive] = useState<{ day: DailyUptimeBucket; rect: DOMRect; theme: CSSProperties } | null>(null);
+
+  // A fixed tooltip would drift from its bar while scrolling, so hide it.
+  useEffect(() => {
+    if (!active) return;
+    const hide = () => setActive(null);
+    window.addEventListener("scroll", hide, true);
+    window.addEventListener("resize", hide);
+    return () => {
+      window.removeEventListener("scroll", hide, true);
+      window.removeEventListener("resize", hide);
+    };
+  }, [active]);
 
   return (
     <div className="mt-2 min-w-0 max-w-full">
@@ -38,19 +57,27 @@ export function UptimeBar({
           data-uptime-style={style}
           data-uptime-size={size}
           data-uptime-icon={iconStyle}
-          className={`${fixedSize ? "flex min-w-max" : "grid min-w-0 w-full"} ${gap} bg-[var(--bg)] p-[2px]`}
-          style={fixedSize ? undefined : { gridTemplateColumns: `repeat(${Math.max(days.length, 1)}, minmax(0, 1fr))` }}
+          className={`${fixedSize ? "flex min-w-max" : "grid min-w-0 w-full grid-cols-[repeat(var(--uptime-days),minmax(0,1fr))] max-sm:grid-cols-[repeat(var(--uptime-mobile-days),minmax(0,1fr))]"} ${gap} bg-[var(--bg)] p-[2px]`}
+          style={fixedSize ? undefined : { "--uptime-days": Math.max(days.length, 1), "--uptime-mobile-days": Math.max(mobileDays, 1) } as CSSProperties}
+          onMouseLeave={() => setActive(null)}
         >
-          {days.map((day) => {
+          {days.map((day, index) => {
             const label = day.uptimePct === null
               ? `${day.date}: No uptime data`
               : `${day.date}: ${COMPONENT_STATUS_LABEL[day.status]}, ${day.uptimePct.toFixed(2)}% uptime`;
             const hasInformation = day.uptimePct !== null;
-            const segment = (
+            const show = (element: HTMLElement) => setActive({ day, rect: element.getBoundingClientRect(), theme: themeVariables(element) });
+            return (
               <span
+                key={day.date}
                 tabIndex={hasInformation ? 0 : undefined}
                 aria-label={hasInformation ? label : undefined}
-                className={`${segmentSize} ${segmentRadius} inline-flex items-center justify-center outline-none transition-opacity ${hasInformation ? "cursor-help hover:opacity-80 focus:z-10 focus:ring-2 focus:ring-inset focus:ring-[var(--fg)]" : ""}`}
+                aria-describedby={hasInformation && active?.day.date === day.date ? tooltipId : undefined}
+                onMouseEnter={hasInformation ? (event) => show(event.currentTarget) : () => setActive(null)}
+                onFocus={hasInformation ? (event) => show(event.currentTarget) : undefined}
+                onBlur={() => setActive(null)}
+                onKeyDown={(event) => { if (event.key === "Escape") setActive(null); }}
+                className={`${!fixedSize && index < days.length - mobileDays ? "max-sm:hidden" : ""} ${segmentSize} ${segmentRadius} inline-flex items-center justify-center outline-none transition-[opacity,transform] ${hasInformation ? "cursor-help hover:opacity-80 focus:z-10 focus:ring-2 focus:ring-inset focus:ring-[var(--fg)]" : ""} ${active?.day.date === day.date ? "opacity-80" : ""}`}
                 style={{
                   backgroundColor: day.uptimePct === null ? "var(--line-bright)" : statusColor(day.status),
                   color: contrastColor(day.status),
@@ -59,16 +86,17 @@ export function UptimeBar({
                 {indicator(day.status, iconStyle)}
               </span>
             );
-            return hasInformation ? (
-              <Tooltip key={day.date} content={{ children: <DayDetails day={day} />, className: "!w-80 !max-w-[calc(100vw-2rem)] !p-5" }}>
-                {segment}
-              </Tooltip>
-            ) : <span key={day.date} className="contents">{segment}</span>;
           })}
         </div>
       </div>
+      {/* Portaled to <body>: a transformed card ancestor would otherwise become
+          the containing block and misplace or clip a fixed tooltip. */}
+      {active && createPortal(<DayTooltip id={tooltipId} day={active.day} anchor={active.rect} theme={active.theme} />, document.body)}
       <div className="mt-2 grid min-w-0 grid-cols-[auto_1fr_auto_1fr_auto] items-center gap-3 text-[11px] font-mono text-[var(--fg-dim)]">
-        <span>{days.length} days ago</span>
+        <span>
+          <span className="sm:hidden">{mobileDays} days ago</span>
+          <span className="max-sm:hidden">{days.length} days ago</span>
+        </span>
         <span aria-hidden="true" className="h-px bg-[var(--line-bright)]" />
         <span className="whitespace-nowrap text-center font-medium text-[var(--fg-soft)]">
           {uptimePct === null ? "No uptime data" : `${uptimePct.toFixed(2)}% uptime`}
@@ -80,14 +108,52 @@ export function UptimeBar({
   );
 }
 
+const MOBILE_DAYS = 30;
+const TOOLTIP_WIDTH = 288;
+const VIEWPORT_MARGIN = 12;
+
+/**
+ * Positioned against the viewport (not the card), so it is never clipped by
+ * the card's rounded overflow and flips below the bar near the top edge.
+ * The page theme variables are copied from the bar, since it renders in <body>.
+ */
+function DayTooltip({ id, day, anchor, theme }: { id: string; day: DailyUptimeBucket; anchor: DOMRect; theme: CSSProperties }) {
+  const viewportWidth = typeof window === "undefined" ? 1024 : window.innerWidth;
+  const width = Math.min(TOOLTIP_WIDTH, viewportWidth - VIEWPORT_MARGIN * 2);
+  const center = anchor.left + anchor.width / 2;
+  const left = Math.min(Math.max(center - width / 2, VIEWPORT_MARGIN), viewportWidth - width - VIEWPORT_MARGIN);
+  const placeAbove = anchor.top > 190;
+  const arrowLeft = Math.min(Math.max(center - left, 14), width - 14);
+  const position: CSSProperties = placeAbove
+    ? { left, width, bottom: window.innerHeight - anchor.top + 10 }
+    : { left, width, top: anchor.bottom + 10 };
+  return (
+    <div
+      id={id}
+      role="tooltip"
+      className="pointer-events-none fixed z-[2100] border border-[var(--line-bright)] bg-[var(--surface)] p-4 text-[var(--fg)] shadow-[0_12px_32px_rgb(15_23_42/0.18)]"
+      style={{ ...theme, ...position, borderRadius: "calc(var(--page-radius, 10px) + 2px)" }}
+    >
+      <span
+        aria-hidden="true"
+        className="absolute size-3 rotate-45 border-[var(--line-bright)] bg-[var(--surface)]"
+        style={placeAbove
+          ? { left: arrowLeft - 6, bottom: -7, borderRightWidth: 1, borderBottomWidth: 1 }
+          : { left: arrowLeft - 6, top: -7, borderLeftWidth: 1, borderTopWidth: 1 }}
+      />
+      <DayDetails day={day} />
+    </div>
+  );
+}
+
 function DayDetails({ day }: { day: DailyUptimeBucket }) {
   const notes = day.details.filter((detail) => detail.note);
   const affectedMs = day.details.reduce((total, detail) => total + detail.durationMs, 0);
   return (
     <div>
-      <p className="text-base font-semibold text-[var(--fg)]">{formatDay(day.date)}</p>
-      <div className="mt-4 flex items-center gap-3 bg-[var(--bg)] p-3">
-        <span aria-hidden="true" className="text-xl" style={{ color: statusColor(day.status) }}>{statusSymbol(day.status)}</span>
+      <p className="text-sm font-semibold text-[var(--fg)]">{formatDay(day.date)}</p>
+      <div className="mt-3 flex items-center gap-3 rounded-[var(--page-radius,8px)] bg-[var(--bg)] px-3 py-2.5">
+        <span aria-hidden="true" className="inline-flex size-7 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white" style={{ backgroundColor: statusColor(day.status), color: contrastColor(day.status) }}>{statusSymbol(day.status)}</span>
         <div className="min-w-0 flex-1">
           <strong className="block text-sm text-[var(--fg)]">{day.uptimePct === null ? "No uptime data" : COMPONENT_STATUS_LABEL[day.status]}</strong>
           {day.uptimePct !== null && <span className="mt-0.5 block text-xs text-[var(--fg-soft)]">{day.uptimePct.toFixed(2)}% uptime</span>}

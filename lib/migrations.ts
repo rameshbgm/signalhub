@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
+import { runMigrations as runGraphileMigrations } from "graphile-worker";
 import { postgresPool } from "@/lib/postgres/client";
 import {
   evaluateMigrationState,
@@ -77,4 +78,8 @@ export async function runMigrations() {
   } finally {
     client.release();
   }
+  // Web requests enqueue jobs with graphile_worker.add_job, so the queue schema
+  // must exist before any web process serves traffic, not only after the
+  // first worker has started.
+  await runGraphileMigrations({ pgPool: postgresPool });
 }

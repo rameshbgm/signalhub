@@ -209,7 +209,8 @@ export function PublicFooter({
       <div className={`${design ? contentWidthClass(design) : "max-w-4xl"} mx-auto px-4 sm:px-6 flex flex-wrap items-center justify-between gap-5`}>
         {design?.chrome.footer.items.filter((item) => !item.hidden).map((item) => {
           if (item.type === "CUSTOM_TEXT" && design.chrome.footer.customText) return <span key={item.id}>{design.chrome.footer.customText}</span>;
-          if (item.type === "LINKS") return <span key={item.id} className="flex gap-5">{design.chrome.footer.links.map((link) => <a key={link.url} href={link.url} className="hover:text-[var(--fg-soft)]">{link.label}</a>)}</span>;
+          // Empty groups would still take a flex slot and push the others off-center.
+          if (item.type === "LINKS" && design.chrome.footer.links.length) return <span key={item.id} className="flex gap-5">{design.chrome.footer.links.map((link) => <a key={link.url} href={link.url} className="hover:text-[var(--fg-soft)]">{link.label}</a>)}</span>;
           if (item.type === "LEGAL" && (safeTermsUrl || safePrivacyUrl || safeSupportUrl)) return (
             <span key={item.id} className="flex gap-5">
               {safeSupportUrl && (

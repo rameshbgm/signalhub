@@ -4,6 +4,7 @@ import { database, type DatabaseExecutor } from "@/lib/postgres/client";
 import type { NotificationJobTable, PageRow } from "@/lib/postgres/schema";
 import { canNotifyHubSubscribersFromChild } from "@/lib/public-surface-policy";
 import { enqueueJobSweep, JOB_TASKS } from "@/lib/jobs";
+import { publicAppUrl } from "@/lib/url";
 
 function postgresExecutor(candidate?: DatabaseExecutor | object): DatabaseExecutor {
   return candidate && "selectFrom" in candidate
@@ -33,6 +34,19 @@ function deduplicationKey(event: NotifyEvent, target: string) {
 }
 
 type SourcePageLabel = Pick<PageRow, "id" | "name" | "slug">;
+
+/**
+ * Every subscriber message must carry an unsubscribe link. Development falls
+ * back to the local origin; a production install without NEXT_PUBLIC_APP_URL
+ * still delivers, but without a link it cannot build.
+ */
+function unsubscribeBaseUrl() {
+  try {
+    return publicAppUrl().replace(/\/+$/, "");
+  } catch {
+    return null;
+  }
+}
 
 function notificationPayload(event: NotifyEvent, sourcePage?: SourcePageLabel) {
   return {
@@ -80,6 +94,7 @@ async function buildNotificationJobs(
     .where("verifiedAt", "is not", null)
     .execute();
   const now = new Date();
+  const appUrl = unsubscribeBaseUrl();
   const common = {
     eventType: event.eventType,
     payload: notificationPayload(event, sourcePage),
@@ -110,9 +125,7 @@ async function buildNotificationJobs(
         subject: event.subject,
         body: [
           event.body,
-          process.env.NEXT_PUBLIC_APP_URL
-            ? `Manage or unsubscribe: ${process.env.NEXT_PUBLIC_APP_URL.replace(/\/+$/, "")}/api/v1/subscribe/unsubscribe/${subscriber.unsubscribeToken}`
-            : null,
+          appUrl ? `Manage or unsubscribe: ${appUrl}/api/v1/subscribe/unsubscribe/${subscriber.unsubscribeToken}` : null,
         ].filter(Boolean).join("\n\n"),
         deduplicationKey: deduplicationKey(event, `subscriber:${subscriber.id}`),
       })),
