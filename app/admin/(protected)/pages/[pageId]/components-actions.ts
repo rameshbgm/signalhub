@@ -12,6 +12,7 @@ import { deleteComponentCascade } from "@/lib/cascade";
 import { setComponentStatus } from "@/lib/component-status";
 import { fenceActiveOrganizationMutation } from "@/lib/organization-mutation";
 import { database, withDatabaseTransaction } from "@/lib/postgres/client";
+import { publicPagePath } from "@/lib/public-path";
 import { COMPONENT_STATUSES, type ComponentStatus } from "@/lib/status";
 import { generateAutomationToken } from "@/lib/tokens";
 
@@ -24,32 +25,55 @@ async function assertStatusPage(pageId: string, orgId: string) {
   return page;
 }
 
+/**
+ * Public pages are cached between visits, so every service or group change must
+ * refresh the public page (and its hub) as well as the admin screens.
+ */
+async function revalidatePageSurfaces(page: { id: string; slug: string; isHub: boolean; hubParentId: string | null }) {
+  revalidatePath(`/organization/pages/${page.id}`, "layout");
+  revalidatePath(publicPagePath(page), "layout");
+  if (page.hubParentId) {
+    const hub = await database.selectFrom("pages").select("slug").where("id", "=", page.hubParentId).executeTakeFirst();
+    if (hub) revalidatePath(publicPagePath({ slug: hub.slug, isHub: true }), "layout");
+  }
+}
+
+export type GroupResult =
+  | { ok: true; group: { id: string; name: string } }
+  | { ok: false; error: string };
+
 export async function createGroup(pageId: string, formData: FormData) {
   const session = await requireCapability("page.configure", pageId);
   await assertPageInOrg(pageId, session.orgId);
-  await assertStatusPage(pageId, session.orgId);
+  const page = await assertStatusPage(pageId, session.orgId);
   const name = String(formData.get("name") ?? "").trim();
-  if (!name) throw new Error("Group name is required");
-  await withDatabaseTransaction(async (transaction) => {
+  if (!name) return { ok: false, error: "Enter a group name" } satisfies GroupResult;
+  if (name.length > 120) return { ok: false, error: "Group names must be 120 characters or fewer" } satisfies GroupResult;
+  const group = await withDatabaseTransaction(async (transaction) => {
     await fenceActiveOrganizationMutation(session.orgId, transaction);
+    const duplicate = await transaction.selectFrom("componentGroups").select("id")
+      .where("pageId", "=", pageId).where(sql<string>`lower(name)`, "=", name.toLowerCase()).executeTakeFirst();
+    if (duplicate) return null;
     const orderRow = await transaction.selectFrom("componentGroups")
       .select(sql<number>`coalesce(max("order"), -1) + 1`.as("nextOrder"))
       .where("pageId", "=", pageId).executeTakeFirstOrThrow();
-    await transaction.insertInto("componentGroups").values({
+    return transaction.insertInto("componentGroups").values({
       pageId,
       name,
       description: "",
       order: Number(orderRow.nextOrder),
       collapsed: false,
-    }).execute();
+    }).returning(["id", "name"]).executeTakeFirstOrThrow();
   });
-  revalidatePath(`/organization/pages/${pageId}`);
+  if (!group) return { ok: false, error: `A group named "${name}" already exists` } satisfies GroupResult;
+  await revalidatePageSurfaces(page);
+  return { ok: true, group } satisfies GroupResult;
 }
 
 export async function deleteGroup(pageId: string, groupId: string) {
   const session = await requireCapability("page.configure", pageId);
   await assertPageInOrg(pageId, session.orgId);
-  await assertStatusPage(pageId, session.orgId);
+  const page = await assertStatusPage(pageId, session.orgId);
   await assertGroupInPage(groupId, pageId);
   await withDatabaseTransaction(async (transaction) => {
     await fenceActiveOrganizationMutation(session.orgId, transaction);
@@ -58,17 +82,21 @@ export async function deleteGroup(pageId: string, groupId: string) {
       .returning("id").executeTakeFirst();
     if (!removed) throw new Error("Component group changed; reload and retry");
   });
-  revalidatePath(`/organization/pages/${pageId}`);
+  await revalidatePageSurfaces(page);
+  return { ok: true } as const;
 }
 
 export async function createComponent(pageId: string, formData: FormData) {
   const session = await requireCapability("page.configure", pageId);
   await assertPageInOrg(pageId, session.orgId);
-  await assertStatusPage(pageId, session.orgId);
+  const page = await assertStatusPage(pageId, session.orgId);
   const groupId = String(formData.get("groupId") ?? "") || null;
   if (groupId) await assertGroupInPage(groupId, pageId);
   const name = String(formData.get("name") ?? "").trim();
-  if (!name) throw new Error("Component name is required");
+  if (!name) throw new Error("Service name is required");
+  if (name.length > 120) throw new Error("Service names must be 120 characters or fewer");
+  const description = String(formData.get("description") ?? "").trim();
+  if (description.length > 1_000) throw new Error("Descriptions must be 1,000 characters or fewer");
   const automationToken = generateAutomationToken();
   await withDatabaseTransaction(async (transaction) => {
     await fenceActiveOrganizationMutation(session.orgId, transaction);
@@ -79,7 +107,7 @@ export async function createComponent(pageId: string, formData: FormData) {
       pageId,
       groupId,
       name,
-      description: String(formData.get("description") ?? ""),
+      description,
       status: "OPERATIONAL",
       order: Number(orderRow.nextOrder),
       visible: true,
@@ -100,7 +128,7 @@ export async function createComponent(pageId: string, formData: FormData) {
       note: null,
     }).execute();
   });
-  revalidatePath(`/organization/pages/${pageId}`);
+  await revalidatePageSurfaces(page);
 }
 
 export async function updateComponentStatus(pageId: string, componentId: string, formData: FormData) {
@@ -113,24 +141,26 @@ export async function updateComponentStatus(pageId: string, componentId: string,
   if (note.length > 1_000) throw new Error("Status notes must be 1,000 characters or fewer");
   await assertComponentInPage(componentId, pageId);
   await setComponentStatus(componentId, status, { note: note || null });
-  revalidatePath(`/organization/pages/${pageId}`);
-  revalidatePath(`/${page.slug}`);
+  await revalidatePageSurfaces(page);
 }
 
 export async function updateComponentDetails(pageId: string, componentId: string, formData: FormData) {
   const session = await requireCapability("page.configure", pageId);
   await assertPageInOrg(pageId, session.orgId);
-  await assertStatusPage(pageId, session.orgId);
+  const page = await assertStatusPage(pageId, session.orgId);
   await assertComponentInPage(componentId, pageId);
   const groupId = String(formData.get("groupId") ?? "") || null;
   if (groupId) await assertGroupInPage(groupId, pageId);
   const name = String(formData.get("name") ?? "").trim();
-  if (!name) throw new Error("Component name is required");
+  if (!name) throw new Error("Service name is required");
+  if (name.length > 120) throw new Error("Service names must be 120 characters or fewer");
+  const description = String(formData.get("description") ?? "").trim();
+  if (description.length > 1_000) throw new Error("Descriptions must be 1,000 characters or fewer");
   await withDatabaseTransaction(async (transaction) => {
     await fenceActiveOrganizationMutation(session.orgId, transaction);
     const changed = await transaction.updateTable("components").set({
       name,
-      description: String(formData.get("description") ?? ""),
+      description,
       visible: formData.get("visible") === "on",
       showUptime: formData.get("showUptime") === "on",
       groupId,
@@ -138,7 +168,7 @@ export async function updateComponentDetails(pageId: string, componentId: string
       .returning("id").executeTakeFirst();
     if (!changed) throw new Error("Component not found on this page");
   });
-  revalidatePath(`/organization/pages/${pageId}`);
+  await revalidatePageSurfaces(page);
 }
 
 export async function reorderComponentOrder(pageId: string, orderedIds: string[]) {
@@ -161,16 +191,15 @@ export async function reorderComponentOrder(pageId: string, orderedIds: string[]
         .where("pageId", "=", pageId).where("id", "in", orderedIds).execute();
     }
   });
-  revalidatePath(`/organization/pages/${pageId}`);
-  revalidatePath(`/${page.slug}`, "layout");
+  await revalidatePageSurfaces(page);
   return { ok: true } as const;
 }
 
 export async function deleteComponent(pageId: string, componentId: string) {
   const session = await requireCapability("page.configure", pageId);
   await assertPageInOrg(pageId, session.orgId);
-  await assertStatusPage(pageId, session.orgId);
+  const page = await assertStatusPage(pageId, session.orgId);
   await assertComponentInPage(componentId, pageId);
   await deleteComponentCascade(componentId, session.orgId, pageId);
-  revalidatePath(`/organization/pages/${pageId}`);
+  await revalidatePageSurfaces(page);
 }

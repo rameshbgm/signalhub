@@ -46,7 +46,23 @@ describe("component detail settings", () => {
   it("refreshes the service list and exposes explicit edit and confirmed delete actions", () => {
     const contentSource = readFileSync("app/admin/(protected)/pages/[pageId]/content/page.tsx", "utf8");
     expect(contentSource).toContain('key={components.map((component) => component.id).join(":")}');
-    expect(contentSource).toContain(">Edit</a>");
+    expect(contentSource).toContain("Edit name, description, and group");
     expect(contentSource).toContain("This action cannot be undone.");
+  });
+
+  it("manages groups from the group field and refreshes the public page after changes", () => {
+    const contentSource = readFileSync("app/admin/(protected)/pages/[pageId]/content/page.tsx", "utf8");
+    const pickerSource = readFileSync("components/admin/ServiceGroupSelect.tsx", "utf8");
+    const actionSource = readFileSync("app/admin/(protected)/pages/[pageId]/components-actions.ts", "utf8");
+    expect(contentSource).not.toContain("Service groups</CardTitle>");
+    expect(contentSource).toContain("<ServiceGroupSelect");
+    expect(pickerSource).toContain('aria-label="Manage service groups"');
+    expect(pickerSource).toContain("createPortal(");
+    expect(pickerSource).toContain("router.refresh()");
+    // Every service and group mutation refreshes the cached public page.
+    for (const action of ["createGroup", "deleteGroup", "createComponent", "updateComponentStatus", "updateComponentDetails", "deleteComponent"]) {
+      const body = actionSource.slice(actionSource.indexOf(`export async function ${action}`));
+      expect(body.slice(0, body.indexOf("\n}\n"))).toContain("revalidatePageSurfaces(page)");
+    }
   });
 });

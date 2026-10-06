@@ -51,7 +51,8 @@ describe("unified page creation workflow", () => {
     const notificationsPage = source("app/admin/(protected)/pages/[pageId]/notifications/page.tsx");
     const notifications = source("components/admin/PageNotificationsSection.tsx");
     for (const label of ["Overview", "Content", "Appearance", "Access", "Notifications", "Settings"]) expect(shell).toContain(label);
-    expect(overview).toContain("Incident readiness");
+    expect(overview).not.toContain("Incident readiness");
+    expect(overview).toContain("Manage services");
     expect(appearance).toContain("SimpleAppearanceEditor");
     expect(shell).toContain("Services & groups");
     expect(shell).toContain("Status pages");

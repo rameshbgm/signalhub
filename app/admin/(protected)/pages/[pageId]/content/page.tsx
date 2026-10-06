@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Boxes, FolderTree, Layers3, Pencil, Plus, Trash2 } from "lucide-react";
+import { Boxes, ChevronDown, Layers3, Pencil, Plus, Trash2 } from "lucide-react";
 import { ComponentOrderList } from "@/components/admin/ComponentOrderList";
 import { PageSubmitButton } from "@/components/admin/PageSubmitButton";
+import { ServiceGroupSelect } from "@/components/admin/ServiceGroupSelect";
 import { dangerGhost, formMessage } from "@/components/admin/page-management-styles";
 import { Select } from "@/components/ui/select";
 import { PlatformActionForm } from "@/components/platform/PlatformActionForm";
@@ -10,7 +11,7 @@ import { assertPageInOrg, requireCapability } from "@/lib/admin-guard";
 import { database } from "@/lib/postgres/client";
 import { COMPONENT_STATUSES, COMPONENT_STATUS_LABEL, type ComponentStatus } from "@/lib/status";
 import { attachChildPage, detachChildPage } from "../../actions";
-import { createComponent, createGroup, deleteComponent, deleteGroup, updateComponentDetails, updateComponentStatus } from "../components-actions";
+import { createComponent, deleteComponent, updateComponentDetails, updateComponentStatus } from "../components-actions";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -98,123 +99,100 @@ async function StatusPageContent({ pageId }: { pageId: string }) {
     database.selectFrom("componentGroups").selectAll().where("pageId", "=", pageId).orderBy("order").execute(),
     database.selectFrom("components").selectAll().where("pageId", "=", pageId).orderBy("order").execute(),
   ]);
+  const groupOptions = groups.map((group) => ({
+    id: group.id,
+    name: group.name,
+    serviceCount: components.filter((component) => component.groupId === group.id).length,
+  }));
+  const groupName = new Map(groups.map((group) => [group.id, group.name]));
 
   return (
-    <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
-      <Card>
-        <CardHeader>
-          <CardTitle>Services</CardTitle>
-          <CardDescription>Services are the systems whose health appears on this status page.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-5">
-          <PlatformActionForm action={createComponent.bind(null, pageId)} successMessage="Service added" className="grid gap-4 rounded-control bg-sunken/60 p-4 sm:grid-cols-2" messageClassName={formMessage}>
-            <Field label="Service name" htmlFor="new-service-name" required>
-              <Input id="new-service-name" name="name" required maxLength={120} placeholder="e.g. Public API" />
-            </Field>
-            <Field label="Group" htmlFor="new-service-group">
-              <Select id="new-service-group" aria-label="Service group" name="groupId" className="w-full"><option value="">No group</option>{groups.map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}</Select>
-            </Field>
-            <Field label="Description" htmlFor="new-service-description" hint="Optional." className="sm:col-span-2">
-              <Input id="new-service-description" name="description" maxLength={500} />
-            </Field>
-            <div className="flex justify-end sm:col-span-2">
-              <PageSubmitButton pendingLabel="Adding…"><Plus aria-hidden size={16} />Add service</PageSubmitButton>
-            </div>
-          </PlatformActionForm>
+    <Card>
+      <CardHeader>
+        <CardTitle>Services</CardTitle>
+        <CardDescription>Services are the systems whose health appears on this status page. Use the + next to a group field to add or manage groups.</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        <PlatformActionForm action={createComponent.bind(null, pageId)} successMessage="Service added" className="grid gap-4 rounded-control border border-line bg-sunken/50 p-4 sm:grid-cols-2 sm:p-5" messageClassName={formMessage}>
+          <Field label="Service name" htmlFor="new-service-name" required>
+            <Input id="new-service-name" name="name" required maxLength={120} placeholder="e.g. Public API" />
+          </Field>
+          <Field label="Group" htmlFor="new-service-group">
+            <ServiceGroupSelect pageId={pageId} groups={groupOptions} id="new-service-group" />
+          </Field>
+          <Field label="Description" htmlFor="new-service-description" className="sm:col-span-2">
+            <Input id="new-service-description" name="description" maxLength={1000} placeholder="Optional. Shown to visitors next to the service." />
+          </Field>
+          <div className="flex justify-end sm:col-span-2">
+            <PageSubmitButton pendingLabel="Adding…"><Plus aria-hidden size={16} />Add service</PageSubmitButton>
+          </div>
+        </PlatformActionForm>
 
-          {components.length > 0 ? (
-            <ComponentOrderList key={components.map((component) => component.id).join(":")} pageId={pageId} components={components.map((component) => ({ id: component.id, name: component.name }))}>
-              {components.map((component) => (
-                <article key={component.id} className="p-4 sm:p-5">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <h3 className="truncate text-base font-semibold tracking-tight text-ink">{component.name}</h3>
-                        <StatusBadge tone={statusTone(component.status as ComponentStatus)}>{COMPONENT_STATUS_LABEL[component.status as ComponentStatus]}</StatusBadge>
-                        {!component.visible && <Badge>Hidden</Badge>}
-                      </div>
-                      <p className="mt-1 text-xs text-ink-dim">{component.groupId ? groups.find((group) => group.id === component.groupId)?.name ?? "—" : "Ungrouped"}</p>
+        {components.length > 0 ? (
+          <ComponentOrderList key={components.map((component) => component.id).join(":")} pageId={pageId} components={components.map((component) => ({ id: component.id, name: component.name }))}>
+            {components.map((component) => (
+              <article key={component.id} className="space-y-4 p-4 sm:p-5">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0 space-y-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h3 className="truncate text-base font-semibold tracking-tight text-ink">{component.name}</h3>
+                      <StatusBadge tone={statusTone(component.status as ComponentStatus)}>{COMPONENT_STATUS_LABEL[component.status as ComponentStatus]}</StatusBadge>
+                      {!component.visible && <Badge>Hidden</Badge>}
                     </div>
-                    <div className="flex items-center gap-1">
-                      <a href={`#service-details-${component.id}`} className={buttonVariants({ variant: "ghost", size: "sm" })}><Pencil aria-hidden size={14} />Edit</a>
-                      <form action={deleteComponent.bind(null, pageId, component.id)}>
-                        <PageSubmitButton variant="ghost" size="sm" className={dangerGhost} pendingLabel="Deleting…" confirmMessage={`Delete ${component.name}? This action cannot be undone.`}><Trash2 aria-hidden size={14} />Delete</PageSubmitButton>
-                      </form>
-                    </div>
+                    <p className="text-xs text-ink-dim">
+                      {component.groupId ? groupName.get(component.groupId) ?? "Ungrouped" : "Ungrouped"}
+                      {component.description && <> · <span className="text-ink-soft">{component.description}</span></>}
+                    </p>
                   </div>
-                  <div className="mt-4 grid items-start gap-5 border-t border-line pt-4 lg:grid-cols-2">
-                    <PlatformActionForm action={updateComponentStatus.bind(null, pageId, component.id)} successMessage="Status updated" className="flex items-end gap-2" messageClassName={formMessage}>
-                      <Field label="Public status" htmlFor={`status-${component.id}`} className="min-w-0 flex-1">
-                        <Select id={`status-${component.id}`} aria-label={`Public status for ${component.name}`} name="status" defaultValue={component.status} className="w-full">{COMPONENT_STATUSES.map((status) => <option key={status} value={status}>{COMPONENT_STATUS_LABEL[status]}</option>)}</Select>
-                      </Field>
-                      <PageSubmitButton variant="secondary" pendingLabel="Updating…">Update</PageSubmitButton>
-                    </PlatformActionForm>
-                    <PlatformActionForm id={`service-details-${component.id}`} action={updateComponentDetails.bind(null, pageId, component.id)} successMessage="Service details saved" className="grid scroll-mt-24 gap-4 sm:grid-cols-2" messageClassName={formMessage}>
-                      <Field label="Name" htmlFor={`name-${component.id}`}>
-                        <Input id={`name-${component.id}`} name="name" defaultValue={component.name} required maxLength={120} />
-                      </Field>
-                      <Field label="Description" htmlFor={`description-${component.id}`}>
-                        <Input id={`description-${component.id}`} name="description" defaultValue={component.description} maxLength={1000} />
-                      </Field>
-                      <Field label="Group" htmlFor={`group-${component.id}`} className="sm:col-span-2">
-                        <Select id={`group-${component.id}`} aria-label={`Group for ${component.name}`} name="groupId" defaultValue={component.groupId ?? ""} className="w-full"><option value="">No group</option>{groups.map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}</Select>
-                      </Field>
-                      <div className="flex flex-wrap gap-x-6 gap-y-2 sm:col-span-2">
+                  <form action={deleteComponent.bind(null, pageId, component.id)}>
+                    <PageSubmitButton variant="ghost" size="sm" className={dangerGhost} pendingLabel="Deleting…" confirmMessage={`Delete ${component.name}? This action cannot be undone.`}><Trash2 aria-hidden size={14} />Delete</PageSubmitButton>
+                  </form>
+                </div>
+
+                <PlatformActionForm action={updateComponentStatus.bind(null, pageId, component.id)} successMessage="Status updated" className="flex flex-col gap-2 border-t border-line pt-4 sm:flex-row sm:items-end" messageClassName={formMessage}>
+                  <Field label="Public status" htmlFor={`status-${component.id}`} className="min-w-0 sm:w-72">
+                    <Select id={`status-${component.id}`} aria-label={`Public status for ${component.name}`} name="status" defaultValue={component.status} className="w-full">{COMPONENT_STATUSES.map((status) => <option key={status} value={status}>{COMPONENT_STATUS_LABEL[status]}</option>)}</Select>
+                  </Field>
+                  <PageSubmitButton variant="secondary" pendingLabel="Updating…" className="sm:w-auto">Update status</PageSubmitButton>
+                </PlatformActionForm>
+
+                <details className="group rounded-control border border-line">
+                  <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-3.5 py-2.5 text-sm font-medium text-ink-soft hover:text-ink [&::-webkit-details-marker]:hidden">
+                    <span className="inline-flex items-center gap-2"><Pencil aria-hidden size={14} />Edit name, description, and group</span>
+                    <ChevronDown aria-hidden size={16} className="transition-transform group-open:rotate-180" />
+                  </summary>
+                  <PlatformActionForm id={`service-details-${component.id}`} action={updateComponentDetails.bind(null, pageId, component.id)} successMessage="Service details saved" className="grid gap-4 border-t border-line p-4 sm:grid-cols-2" messageClassName={formMessage}>
+                    <Field label="Name" htmlFor={`name-${component.id}`} required>
+                      <Input id={`name-${component.id}`} name="name" defaultValue={component.name} required maxLength={120} />
+                    </Field>
+                    <Field label="Group" htmlFor={`group-${component.id}`}>
+                      <ServiceGroupSelect pageId={pageId} groups={groupOptions} id={`group-${component.id}`} defaultValue={component.groupId ?? ""} ariaLabel={`Group for ${component.name}`} />
+                    </Field>
+                    <Field label="Description" htmlFor={`description-${component.id}`} className="sm:col-span-2">
+                      <Input id={`description-${component.id}`} name="description" defaultValue={component.description} maxLength={1000} />
+                    </Field>
+                    <div className="flex flex-col gap-3 sm:col-span-2 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="flex flex-wrap gap-x-6 gap-y-2">
                         <label className="flex items-center gap-2 text-sm text-ink-soft"><Checkbox name="visible" defaultChecked={component.visible} /> Visible publicly</label>
                         <label className="flex items-center gap-2 text-sm text-ink-soft"><Checkbox name="showUptime" defaultChecked={component.showUptime} /> Show uptime</label>
                       </div>
-                      <div className="flex justify-end sm:col-span-2">
-                        <PageSubmitButton variant="secondary" pendingLabel="Saving…">Save service</PageSubmitButton>
-                      </div>
-                    </PlatformActionForm>
-                  </div>
-                </article>
-              ))}
-            </ComponentOrderList>
-          ) : (
-            <EmptyState
-              icon={Boxes}
-              hue="sky"
-              title="No services yet"
-              description="Add the first service to make this page publishable."
-              action={<a href="#new-service-name" className={buttonVariants()}><Plus aria-hidden size={16} />Add a service</a>}
-            />
-          )}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Service groups</CardTitle>
-          <CardDescription>Groups are optional. Use them to organize related services on the public page.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-5">
-          <PlatformActionForm action={createGroup.bind(null, pageId)} successMessage="Service group added" className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end" messageClassName={formMessage}>
-            <Field label="Group name" htmlFor="new-group-name">
-              <Input id="new-group-name" name="name" required maxLength={120} placeholder="e.g. Core platform" />
-            </Field>
-            <PageSubmitButton variant="secondary" pendingLabel="Adding…" className="w-full sm:w-auto"><Plus aria-hidden size={16} />Add group</PageSubmitButton>
-          </PlatformActionForm>
-          {groups.length > 0 ? (
-            <ul className="space-y-2">
-              {groups.map((group) => {
-                const count = components.filter((component) => component.groupId === group.id).length;
-                return (
-                  <li key={group.id} className="flex items-center justify-between gap-3 rounded-control border border-line px-3.5 py-2.5 text-sm">
-                    <div className="min-w-0">
-                      <p className="truncate font-medium text-ink">{group.name}</p>
-                      <p className="text-xs text-ink-dim">{count} {count === 1 ? "service" : "services"}</p>
+                      <PageSubmitButton pendingLabel="Saving…">Save service</PageSubmitButton>
                     </div>
-                    <form action={deleteGroup.bind(null, pageId, group.id)}><Button type="submit" variant="ghost" size="sm" className={dangerGhost}><Trash2 aria-hidden size={14} />Delete</Button></form>
-                  </li>
-                );
-              })}
-            </ul>
-          ) : (
-            <EmptyState icon={FolderTree} hue="slate" title="No groups yet" description="Add a group to organize related services." className="border-0 bg-transparent px-0! py-6!" />
-          )}
-        </CardContent>
-      </Card>
-    </div>
+                  </PlatformActionForm>
+                </details>
+              </article>
+            ))}
+          </ComponentOrderList>
+        ) : (
+          <EmptyState
+            icon={Boxes}
+            hue="sky"
+            title="No services yet"
+            description="Add the first service to make this page publishable."
+            action={<a href="#new-service-name" className={buttonVariants()}><Plus aria-hidden size={16} />Add a service</a>}
+          />
+        )}
+      </CardContent>
+    </Card>
   );
 }

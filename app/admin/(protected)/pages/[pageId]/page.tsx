@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Boxes, Layers3, LayoutGrid, Palette, Rocket, TriangleAlert, Wrench } from "lucide-react";
+import { Boxes, Layers3, LayoutGrid, Palette, Rocket } from "lucide-react";
 import { assertPageInOrg, requireCapability } from "@/lib/admin-guard";
 import { database } from "@/lib/postgres/client";
 import { SetupSteps, type SetupStep } from "@/components/admin/SetupSteps";
@@ -27,7 +27,7 @@ export default async function PageOverview({ params }: { params: Promise<{ pageI
     { label: "Publish", state: hasServices ? "current" : "todo" },
   ];
 
-  return <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+  return <div className="grid items-start gap-6">
     <Card>
       <CardHeader className="flex-row items-start gap-3.5">
         <IconTile icon={draft ? Rocket : page.isHub ? Layers3 : LayoutGrid} hue={draft ? "amber" : "violet"} />
@@ -57,19 +57,6 @@ export default async function PageOverview({ params }: { params: Promise<{ pageI
           <Link href={`/organization/pages/${pageId}/content`} className={buttonVariants()}><Boxes aria-hidden size={16} />{page.isHub ? "Manage status pages" : "Manage services"}</Link>
           <Link href={`/organization/pages/${pageId}/appearance`} className={buttonVariants({ variant: "secondary" })}><Palette aria-hidden size={16} />Customize page</Link>
         </div>
-      </CardContent>
-    </Card>
-    <Card>
-      <CardHeader className="flex-row items-start gap-3.5">
-        <IconTile icon={TriangleAlert} hue="amber" />
-        <div className="min-w-0">
-          <CardTitle>Incident readiness</CardTitle>
-          <CardDescription className="mt-1">Incidents and maintenance remain organization-wide operational workflows.</CardDescription>
-        </div>
-      </CardHeader>
-      <CardContent className="flex flex-wrap gap-3">
-        <Link href="/organization/incidents" className={buttonVariants({ variant: "outline" })}><TriangleAlert aria-hidden size={16} />Incidents</Link>
-        <Link href="/organization/maintenance" className={buttonVariants({ variant: "outline" })}><Wrench aria-hidden size={16} />Maintenance</Link>
       </CardContent>
     </Card>
   </div>;

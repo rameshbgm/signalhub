@@ -8,22 +8,23 @@ import { Check, ChevronLeft, Eye, ImageIcon, LayoutTemplate, Palette, Send } fro
 import { Alert } from "@/components/ui/alert";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Field } from "@/components/ui/field";
 import { IconTile } from "@/components/ui/icon-tile";
 import { PageHeader } from "@/components/ui/page-header";
-import { Select } from "@/components/ui/select";
 import { StatusBadge, type StatusTone } from "@/components/ui/status-badge";
 import { AssetUploader } from "@/components/admin/AssetUploader";
 import { cn } from "@/lib/utils";
 import {
   PAGE_TEMPLATE_LABELS,
+  PAGE_THEME_PRESET_DESCRIPTIONS,
   PAGE_THEME_PRESET_KEYS,
   PAGE_THEME_PRESET_LABELS,
   applyPageTemplateLayout,
   designWithThemePreset,
+  pageThemePreset,
   sameStatusPageDesign,
   statusPageDesignSchema,
   type PageTemplateKey,
+  type PageThemePresetKey,
   type StatusPageDesign,
 } from "@/lib/page-design";
 import { publishDesignDraft, saveDesignDraft } from "@/app/admin/(protected)/pages/[pageId]/design/actions";
@@ -148,8 +149,8 @@ export function SimpleAppearanceEditor({
     commit(applyPageTemplateLayout(design, key));
   }
 
-  function selectPreset(key: string) {
-    commit(designWithThemePreset(design, key as StatusPageDesign["theme"]["preset"]));
+  function selectPreset(key: PageThemePresetKey) {
+    commit(designWithThemePreset(design, key));
   }
 
   function updatePresentation(patch: Partial<StatusPageDesign["presentation"]>) {
@@ -299,16 +300,39 @@ export function SimpleAppearanceEditor({
                 <IconTile icon={Palette} hue="violet" />
                 <div className="min-w-0">
                   <CardTitle id="style-heading">Style</CardTitle>
-                  <CardDescription>Choose a preset to set the page colors and visual tone.</CardDescription>
+                  <CardDescription>Each card previews the colors, corners, and depth your visitors will see.</CardDescription>
                 </div>
               </div>
             </CardHeader>
             <CardContent>
-              <Field label="Style preset" htmlFor="style-preset" className="max-w-md">
-                <Select id="style-preset" aria-label="Style preset" value={design.theme.preset} onChange={(event) => selectPreset(event.target.value)} className="w-full">
-                  {PAGE_THEME_PRESET_KEYS.map((preset) => <option key={preset} value={preset}>{PAGE_THEME_PRESET_LABELS[preset]}</option>)}
-                </Select>
-              </Field>
+              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3" role="radiogroup" aria-labelledby="style-heading">
+                {PAGE_THEME_PRESET_KEYS.map((preset) => {
+                  const selected = design.theme.preset === preset;
+                  return (
+                    <button
+                      key={preset}
+                      type="button"
+                      role="radio"
+                      aria-checked={selected}
+                      aria-label={`${PAGE_THEME_PRESET_LABELS[preset]} style`}
+                      onClick={() => selectPreset(preset)}
+                      className={cn(
+                        "group flex flex-col overflow-hidden rounded-card border text-left outline-none transition-[border-color,box-shadow] duration-200 ease-soft focus-visible:ring-4 focus-visible:ring-primary/25",
+                        selected ? "border-primary shadow-card ring-1 ring-primary" : "border-line-strong hover:border-primary/40",
+                      )}
+                    >
+                      <StylePreview preset={preset} />
+                      <span className="flex items-start justify-between gap-2 border-t border-line bg-surface px-4 py-3">
+                        <span className="min-w-0">
+                          <span className="block text-sm font-semibold text-ink">{PAGE_THEME_PRESET_LABELS[preset]}</span>
+                          <span className="mt-0.5 block text-xs leading-5 text-ink-soft">{PAGE_THEME_PRESET_DESCRIPTIONS[preset]}</span>
+                        </span>
+                        {selected && <Check aria-hidden size={16} className="mt-0.5 shrink-0 text-primary" />}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
             </CardContent>
           </Card>
         </section>
@@ -362,6 +386,41 @@ export function SimpleAppearanceEditor({
         </section>
       </div>
     </>
+  );
+}
+
+const PREVIEW_RADIUS: Record<StatusPageDesign["theme"]["radius"], number> = { NONE: 0, SMALL: 3, MEDIUM: 6, LARGE: 9 };
+
+/**
+ * A miniature public status page drawn from the preset's real theme values, so
+ * the tile is the preview: background, card surface, brand banner, text, and
+ * corner radius all match what visitors will see.
+ */
+function StylePreview({ preset }: { preset: PageThemePresetKey }) {
+  const theme = pageThemePreset(preset);
+  const { palette } = theme;
+  const radius = PREVIEW_RADIUS[theme.radius] ?? 6;
+  const shadow = theme.shadow === "NONE" ? "none" : theme.shadow === "ELEVATED" ? "0 6px 16px rgb(15 23 42 / 0.12)" : "0 1px 3px rgb(15 23 42 / 0.10)";
+  const services = ["API", "Dashboard", "Webhooks"];
+  return (
+    <span aria-hidden="true" className="block p-3.5" style={{ background: palette.background }}>
+      <span className="mb-2 flex items-center gap-1.5">
+        <span className="block size-3" style={{ background: palette.brand, borderRadius: Math.min(radius, 4) }} />
+        <span className="block h-1.5 w-14 rounded-full" style={{ background: palette.text, opacity: 0.75 }} />
+      </span>
+      <span className="block overflow-hidden" style={{ background: palette.surface, borderRadius: radius, boxShadow: shadow, border: `1px solid ${palette.text}14` }}>
+        <span className="flex items-center gap-1.5 px-2.5 py-2" style={{ background: palette.brand }}>
+          <span className="block size-2 rounded-full bg-white/90" />
+          <span className="block h-1.5 w-20 rounded-full bg-white/85" />
+        </span>
+        {services.map((service, index) => (
+          <span key={service} className="flex items-center justify-between gap-2 px-2.5 py-1.5" style={{ borderTop: index ? `1px solid ${palette.text}12` : undefined }}>
+            <span className="block h-1.5 rounded-full" style={{ width: `${44 - index * 8}%`, background: palette.mutedText, opacity: 0.7 }} />
+            <span className="block size-2 rounded-full" style={{ background: index === 2 ? palette.accent : "#16a34a" }} />
+          </span>
+        ))}
+      </span>
+    </span>
   );
 }
 

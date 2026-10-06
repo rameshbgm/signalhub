@@ -154,13 +154,18 @@ export async function publishDesignDraft(pageId: string, expectedRevision: numbe
       await transaction.updateTable("pageDesignDrafts").set({
         basePublishedVersion: liveVersion, updatedBy: session.userId, updatedAt: now,
       }).where("id", "=", draft.id).where("revision", "=", draft.revision).execute();
-      return { conflict: false as const, revision: draft.revision, liveVersion, unchanged: false, slug: page.slug };
+      return { conflict: false as const, revision: draft.revision, liveVersion, unchanged: false, slug: page.slug, hubParentId: page.hubParentId };
     });
     if (result.conflict) return { ok: false, error: "The design or live page changed in another session", conflict: true, revision: result.revision };
     if (!result.unchanged) {
       revalidatePath(`/${result.slug}`, "layout");
       revalidatePath(`/hub/${result.slug}`, "layout");
       revalidatePath(`/api/v1/embed/${result.slug}`);
+      // A hub shows its member pages, so their new look must reach it too.
+      if ("hubParentId" in result && result.hubParentId) {
+        const hub = await database.selectFrom("pages").select("slug").where("id", "=", result.hubParentId).executeTakeFirst();
+        if (hub) revalidatePath(`/hub/${hub.slug}`, "layout");
+      }
     }
     revalidatePath(`/organization/pages/${pageId}/appearance`);
     revalidatePath(`/organization/pages/${pageId}/design`);
