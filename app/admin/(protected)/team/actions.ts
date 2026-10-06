@@ -19,6 +19,7 @@ import {
   transitionRemovesActiveAdmin,
   withOrganizationAdminInvariantTransaction,
 } from "@/lib/team-owner-safety";
+import { recordTenantAudit } from "@/lib/tenant-audit";
 import { publicAppUrl } from "@/lib/url";
 
 const INVITATION_LIFETIME_MS = 48 * 60 * 60_000;
@@ -72,12 +73,16 @@ async function audit(
   metadata: unknown,
   now = new Date()
 ) {
-  void transaction;
-  void session;
-  void action;
-  void target;
-  void metadata;
-  void now;
+  await recordTenantAudit(transaction, session.orgId, {
+    actorEmail: session.email,
+    actorId: session.userId,
+    actorMembershipRole: session.role,
+    action,
+    targetType: "membership",
+    targetId: target,
+    metadata: { ...(metadata && typeof metadata === "object" ? metadata : {}), ...(session.supportSessionId ? { supportSessionId: session.supportSessionId } : {}) },
+    createdAt: now,
+  });
 }
 
 function scopedPages(role: MembershipRole, pageIds: string[]) {

@@ -102,7 +102,7 @@ export interface PlatformAuditLogTable {
   id: Generated<string>;
   actorId: string | null;
   actorEmail: string;
-  actorRole: "ADMIN" | "SYSTEM";
+  actorRole: "ADMIN" | "SYSTEM" | "TENANT";
   action: string;
   targetType: string;
   targetId: string;

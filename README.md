@@ -29,8 +29,9 @@ The public project landing page is [signalhub.at](https://signalhub.at).
 - **Control identity and access:** OIDC, SAML, SCIM 2.0, MFA, fixed RBAC,
   page-scoped roles, scoped API keys, CIDR policies, and a local break-glass
   Admin are built in.
-- **Create verifiable evidence:** tenant and platform audits are sealed into
-  SHA-256 chains, exportable, and deliverable to a SIEM over signed HTTPS.
+- **Create verifiable evidence:** organization and installation actions are
+  sealed into one SHA-256 audit chain, exportable, and deliverable to a SIEM
+  over signed HTTPS (per organization or installation-wide).
 - **Avoid license-driven scaling costs:** Apache-2.0 permits internal use,
   modification, and redistribution without per-seat or per-status-page
   application license fees. Infrastructure and operational costs still apply.
@@ -95,9 +96,11 @@ The public project landing page is [signalhub.at](https://signalhub.at).
 
 - Platform retention defaults with bounded organization overrides.
 - Checksummed organization data exports and asset manifests.
-- Tenant and platform audit CSV/JSON export.
-- Per-scope SHA-256 audit chains with retention checkpoints.
-- Signed HTTPS SIEM delivery with retries and dead-letter state.
+- Audit CSV/JSON export covering organization (tenant) and installation actions;
+  tenant entries carry the organization and the member's role.
+- A sealed SHA-256 audit chain with retention checkpoints.
+- Signed HTTPS SIEM delivery with retries and dead-letter state; organization
+  sinks receive only that organization's entries.
 - Structured logs with redaction, request IDs, Prometheus metrics, and optional
   OpenTelemetry export.
 
@@ -156,9 +159,12 @@ Tenant roles:
 | Role | Core scope |
 | --- | --- |
 | Admin | All organization and installation-administration capabilities |
-| Incident Manager | Incident lifecycle, subscribers, analytics, and audit |
+| Incident Manager | Incident lifecycle, subscribers, and analytics |
 | Responder | Incident updates, monitors, components, and analytics |
-| Viewer | Read-only analytics and audit |
+| Viewer | Read-only analytics |
+
+Every member's sensitive actions are recorded on the audit chain; reading and
+exporting it is an installation-administration capability.
 
 Installation administration:
 
@@ -348,11 +354,11 @@ npm run signalhubctl -- audit
 npm run statusctl -- audit
 ```
 
-Verify a tenant chain:
+Seal pending entries and verify the audit chain:
 
 ```bash
-npm run signalhubctl -- audit --org <organization-id>
-npm run statusctl -- audit --org <organization-id>
+npm run signalhubctl -- audit --seal
+npm run statusctl -- audit
 ```
 
 ## Backups and recovery

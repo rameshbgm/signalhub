@@ -430,7 +430,7 @@
             <tr><td>Operations</td><td>Worker readiness, platform jobs, retries, delivery state, migrations, and retention.</td><td>Understand the failure before retrying; avoid duplicate external effects.</td></tr>
             <tr><td>Configuration</td><td>Enable destination providers and review runtime/storage capability.</td><td>Provider enablement affects what every organization can configure.</td></tr>
             <tr><td>Identity</td><td>OIDC, SAML, SCIM tokens, JIT/group mappings.</td><td>Test before enforcement; rotate tokens after exposure.</td></tr>
-            <tr><td>Platform Audit</td><td>Installation-wide evidence, export, chain state, and audit sinks.</td><td>Validate sink signatures/retries and preserve evidence during retention.</td></tr>
+            <tr><td>Platform Audit</td><td>Installation and organization (tenant) evidence on one sealed chain, export, chain state, and audit sinks. Organization sinks receive only their organization's entries.</td><td>Validate sink signatures/retries and preserve evidence during retention.</td></tr>
           </tbody>
         </table>
 

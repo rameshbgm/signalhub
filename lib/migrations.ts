@@ -30,7 +30,7 @@ async function migrationManifest(): Promise<MigrationManifestEntry[]> {
   }));
 }
 
-export const LATEST_MIGRATION_ID = "006_remove_monitor_templates.sql";
+export const LATEST_MIGRATION_ID = "007_tenant_audit_actor.sql";
 
 export async function inspectMigrationState(): Promise<MigrationInspection> {
   const manifest = await migrationManifest();

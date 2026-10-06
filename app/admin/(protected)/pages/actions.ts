@@ -14,6 +14,7 @@ import { publicPagePath } from "@/lib/public-path";
 import type { DatabaseTransaction } from "@/lib/postgres/client";
 import type { PageTable } from "@/lib/postgres/schema";
 import { sanitizePageHtml } from "@/lib/safe-page-html";
+import { recordTenantAudit } from "@/lib/tenant-audit";
 import { generateAutomationToken } from "@/lib/tokens";
 
 type AdminSession = Awaited<ReturnType<typeof requireCapability>>;
@@ -33,11 +34,15 @@ function slugify(input: string) {
 }
 
 async function audit(transaction: DatabaseTransaction, session: AdminSession, action: string, target: string, metadata: unknown = null) {
-  void transaction;
-  void session;
-  void action;
-  void target;
-  void metadata;
+  await recordTenantAudit(transaction, session.orgId, {
+    actorEmail: session.email,
+    actorId: session.userId,
+    actorMembershipRole: session.role,
+    action,
+    targetType: "page",
+    targetId: target,
+    metadata: { ...(metadata && typeof metadata === "object" ? metadata : {}), ...(session.supportSessionId ? { supportSessionId: session.supportSessionId } : {}) },
+  });
 }
 
 export async function createPage(formData: FormData) {
