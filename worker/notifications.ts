@@ -5,6 +5,7 @@ import { decryptSecret } from "@/lib/encryption";
 import { BlockedAddressError, guardedFetch } from "@/lib/guarded-fetch";
 import { smtpTransport, verifySmtp } from "@/lib/smtp";
 import { deliverDestination, deliverSms, ProviderHttpError } from "@/lib/notification-providers";
+import { MANAGE_LINK_LABEL, UNSUBSCRIBE_LINK_LABEL } from "@/lib/notify";
 import { startLeaseHeartbeat } from "@/worker/lease-heartbeat";
 
 const NOTIFICATION_LEASE_MILLISECONDS = 30_000;
@@ -82,18 +83,43 @@ function notificationHtml(input: {
   brandColor: string;
   subject: string;
   body: string;
+  links?: { manage: string | null; unsubscribe: string | null };
 }) {
   const paragraphs = input.body
     .split(/\n{2,}/)
     .map((part) => `<p style="margin:0 0 16px;color:#344054;line-height:1.6">${escapeHtml(part).replace(/\n/g, "<br>")}</p>`)
     .join("");
+  const linkStyle = `color:${escapeHtml(input.brandColor)};text-decoration:underline`;
+  const footerLinks = [
+    input.links?.manage ? `<a href="${escapeHtml(input.links.manage)}" style="${linkStyle}">Manage preferences</a>` : null,
+    input.links?.unsubscribe ? `<a href="${escapeHtml(input.links.unsubscribe)}" style="${linkStyle}">Unsubscribe</a>` : null,
+  ].filter(Boolean).join(" &nbsp;·&nbsp; ");
+  const footer = footerLinks
+    ? `<div style="padding:14px 24px;border-top:1px solid #eaecf0;font-size:12px;line-height:1.6;color:#667085">You receive these updates because you subscribed to ${escapeHtml(input.pageName)}.<br>${footerLinks}</div>`
+    : "";
   return `<!doctype html><html><body style="margin:0;background:#f3f6f9;font-family:Arial,sans-serif;color:#101828">
 <div style="max-width:600px;margin:32px auto;background:#fff;border:1px solid #dfe5ec">
 <div style="padding:20px 24px;border-top:4px solid ${escapeHtml(input.brandColor)}">
 ${input.logoUrl ? `<img src="${escapeHtml(input.logoUrl)}" alt="${escapeHtml(input.pageName)}" style="display:block;max-width:180px;max-height:48px;margin-bottom:16px">` : ""}
 <div style="font-size:13px;color:#667085;margin-bottom:8px">${escapeHtml(input.pageName)}</div>
 <h1 style="font-size:22px;line-height:1.35;margin:0 0 18px">${escapeHtml(input.subject)}</h1>${paragraphs}
-</div></div></body></html>`;
+</div>${footer}</div></body></html>`;
+}
+
+/**
+ * Splits the subscription footer that lib/notify.ts appends from the message
+ * body, so the HTML can render it as links and the headers can carry the
+ * one-click unsubscribe URL.
+ */
+export function subscriptionFooter(body: string) {
+  const manage = new RegExp(`^${MANAGE_LINK_LABEL} (\\S+)$`, "m").exec(body)?.[1] ?? null;
+  const unsubscribe = new RegExp(`^${UNSUBSCRIBE_LINK_LABEL} (\\S+)$`, "m").exec(body)?.[1] ?? null;
+  const content = body
+    .split("\n")
+    .filter((line) => !line.startsWith(`${MANAGE_LINK_LABEL} `) && !line.startsWith(`${UNSUBSCRIBE_LINK_LABEL} `))
+    .join("\n")
+    .trimEnd();
+  return { content, manage, unsubscribe };
 }
 
 async function postJson(url: string, body: string, headers: Record<string, string> = {}) {
@@ -124,22 +150,29 @@ async function deliver(job: NotificationJobRow) {
         .select(["name", "logoUrl", "brandColor", "emailFromName", "emailReplyTo", "emailFooter"])
         .where("id", "=", job.pageId)
         .executeTakeFirst();
-      const body = page?.emailFooter ? `${job.body}\n\n${page.emailFooter}` : job.body;
-      const unsubscribeUrl = /Manage or unsubscribe: (\S+)/.exec(job.body)?.[1];
+      const footer = subscriptionFooter(job.body);
+      const withPageFooter = (text: string) => (page?.emailFooter ? `${text}\n\n${page.emailFooter}` : text);
       result = await smtpTransport().sendMail({
         from: senderAddress(page?.emailFromName ?? null),
         ...(page?.emailReplyTo ? { replyTo: page.emailReplyTo } : {}),
         to: job.contact,
         subject: job.subject,
-        text: body,
+        // Plain text keeps the links verbatim; HTML renders them as a footer.
+        text: withPageFooter(job.body),
         html: notificationHtml({
           pageName: page?.name ?? "SignalHub",
           logoUrl: page?.logoUrl ?? null,
           brandColor: page?.brandColor ?? "#0f9fab",
           subject: job.subject,
-          body,
+          body: withPageFooter(footer.content),
+          links: { manage: footer.manage, unsubscribe: footer.unsubscribe },
         }),
-        ...(unsubscribeUrl ? { list: { unsubscribe: unsubscribeUrl } } : {}),
+        // RFC 2369 + RFC 8058: mail clients show their own one-click
+        // Unsubscribe button, which POSTs to the unsubscribe URL.
+        ...(footer.unsubscribe ? {
+          list: { unsubscribe: footer.unsubscribe },
+          headers: { "List-Unsubscribe-Post": "List-Unsubscribe=One-Click" },
+        } : {}),
       });
     } catch (error) {
       throw smtpDeliveryError(error);

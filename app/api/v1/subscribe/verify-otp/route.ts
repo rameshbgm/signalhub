@@ -4,8 +4,10 @@ import { z } from "zod";
 import { checkPageAccess } from "@/lib/access";
 import { apiError, routeError, validationError } from "@/lib/api-response";
 import { canonicalizeEmail } from "@/lib/identity";
+import { enqueueDirectNotification, withSubscriptionFooter } from "@/lib/notify";
 import { fenceActiveOrganizationMutation } from "@/lib/organization-mutation";
 import { getPublicPageBySlug } from "@/lib/pages";
+import { subscriptionLinks } from "@/lib/subscriptions";
 import { withDatabaseTransaction } from "@/lib/postgres/client";
 import { isPageOrganizationActive } from "@/lib/public-page";
 import { consumeRateLimit, RateLimitError, requestIp } from "@/lib/rate-limit";
@@ -45,7 +47,12 @@ export async function POST(request: NextRequest) {
           .where("id", "=", currentOtp.id).execute();
         return false;
       }
-      await transaction.insertInto("subscribers").values({
+      const existing = await transaction.selectFrom("subscribers").select("id")
+        .where("pageId", "=", page.id).where("channel", "=", parsed.data.channel).where("contact", "=", contact)
+        .executeTakeFirst();
+      // Proving control of the address again re-confirms consent, so a
+      // returning subscriber is released from quarantine with new choices.
+      const subscriber = await transaction.insertInto("subscribers").values({
         pageId: page.id,
         channel: parsed.data.channel,
         contact,
@@ -59,13 +66,30 @@ export async function POST(request: NextRequest) {
         verified: true,
         quarantined: false,
         componentIds: currentOtp.componentIds,
-      })).execute();
+      })).returning(["id", "unsubscribeToken"]).executeTakeFirstOrThrow();
       await transaction.deleteFrom("subscriptionOtps").where("pageId", "=", page.id)
         .where("channel", "=", parsed.data.channel).where("contact", "=", contact).execute();
-      return true;
+      if (parsed.data.channel === "EMAIL") {
+        const scope = currentOtp.componentIds.length
+          ? `You will receive updates about ${currentOtp.componentIds.length} selected service${currentOtp.componentIds.length === 1 ? "" : "s"}, plus page-wide announcements.`
+          : "You will receive every incident and maintenance update for this page.";
+        await enqueueDirectNotification({
+          pageId: page.id,
+          contact,
+          subject: `You're subscribed to ${page.name}`,
+          body: withSubscriptionFooter(
+            `${existing ? "Your subscription has been updated." : `Thanks for subscribing to ${page.name} status updates.`}\n\n${scope}`,
+            subscriptionLinks(page, subscriber.unsubscribeToken),
+          ),
+          eventType: "subscription.confirmed",
+          eventId: `${subscriber.id}:${currentOtp.id}`,
+          channel: "EMAIL",
+        }, transaction);
+      }
+      return { alreadySubscribed: Boolean(existing), scoped: currentOtp.componentIds.length > 0 };
     });
     if (!verified) return apiError(400, "INVALID_OTP", "Invalid or expired verification code");
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true, ...verified });
   } catch (error) {
     if (error instanceof RateLimitError) {
       const response = apiError(429, "RATE_LIMITED", "Too many verification attempts");

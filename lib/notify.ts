@@ -4,7 +4,7 @@ import { database, type DatabaseExecutor } from "@/lib/postgres/client";
 import type { NotificationJobTable, PageRow } from "@/lib/postgres/schema";
 import { canNotifyHubSubscribersFromChild } from "@/lib/public-surface-policy";
 import { enqueueJobSweep, JOB_TASKS } from "@/lib/jobs";
-import { publicAppUrl } from "@/lib/url";
+import { subscriptionLinks } from "@/lib/subscriptions";
 
 function postgresExecutor(candidate?: DatabaseExecutor | object): DatabaseExecutor {
   return candidate && "selectFrom" in candidate
@@ -35,17 +35,18 @@ function deduplicationKey(event: NotifyEvent, target: string) {
 
 type SourcePageLabel = Pick<PageRow, "id" | "name" | "slug">;
 
+export const MANAGE_LINK_LABEL = "Manage preferences:";
+export const UNSUBSCRIBE_LINK_LABEL = "Unsubscribe:";
+
 /**
- * Every subscriber message must carry an unsubscribe link. Development falls
- * back to the local origin; a production install without NEXT_PUBLIC_APP_URL
- * still delivers, but without a link it cannot build.
+ * Every subscriber message ends with a preferences link and an unsubscribe
+ * link. The worker turns these lines into an HTML footer and the
+ * List-Unsubscribe headers. Development falls back to the local origin; a
+ * production install without NEXT_PUBLIC_APP_URL still delivers, without links.
  */
-function unsubscribeBaseUrl() {
-  try {
-    return publicAppUrl().replace(/\/+$/, "");
-  } catch {
-    return null;
-  }
+export function withSubscriptionFooter(body: string, links: { manage: string; unsubscribe: string } | null) {
+  if (!links) return body;
+  return `${body}\n\n${MANAGE_LINK_LABEL} ${links.manage}\n${UNSUBSCRIBE_LINK_LABEL} ${links.unsubscribe}`;
 }
 
 function notificationPayload(event: NotifyEvent, sourcePage?: SourcePageLabel) {
@@ -94,7 +95,8 @@ async function buildNotificationJobs(
     .where("verifiedAt", "is not", null)
     .execute();
   const now = new Date();
-  const appUrl = unsubscribeBaseUrl();
+  const targetPage = await executor.selectFrom("pages").select(["slug", "isHub"])
+    .where("id", "=", event.pageId).executeTakeFirst();
   const common = {
     eventType: event.eventType,
     payload: notificationPayload(event, sourcePage),
@@ -123,10 +125,7 @@ async function buildNotificationJobs(
         channel: subscriber.channel,
         contact: subscriber.contact,
         subject: event.subject,
-        body: [
-          event.body,
-          appUrl ? `Manage or unsubscribe: ${appUrl}/api/v1/subscribe/unsubscribe/${subscriber.unsubscribeToken}` : null,
-        ].filter(Boolean).join("\n\n"),
+        body: withSubscriptionFooter(event.body, targetPage ? subscriptionLinks(targetPage, subscriber.unsubscribeToken) : null),
         deduplicationKey: deduplicationKey(event, `subscriber:${subscriber.id}`),
       })),
     ...endpoints.map((endpoint) => ({

@@ -4,7 +4,7 @@ import { fetchWithTimeout } from "@/lib/client-fetch";
 
 import { useEffect, useRef, useState, type CSSProperties, type FormEvent } from "react";
 import { createPortal } from "react-dom";
-import { Bell, X } from "lucide-react";
+import { Bell, CircleCheck, X } from "lucide-react";
 import { themeVariables } from "@/components/public/theme-variables";
 import { recordPublicEvent } from "@/components/public/PublicAnalytics";
 import { Button } from "@/components/ui/button";
@@ -212,6 +212,7 @@ function ContactTab({
   const [message, setMessage] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [lastResponse, setLastResponse] = useState<{ alreadySubscribed?: boolean; scoped?: boolean }>({});
   const isEmail = channel === "EMAIL";
 
   async function post(path: string, body: Record<string, unknown>) {
@@ -226,6 +227,7 @@ function ContactTab({
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) setMessage(data.error?.message ?? "Something went wrong");
+      else setLastResponse(data);
       return response.ok;
     } catch {
       setMessage("Unable to reach the subscription service. Check your connection and try again.");
@@ -236,7 +238,7 @@ function ContactTab({
   }
 
   if (stage === "done") {
-    return <SubscriptionComplete pageSlug={pageSlug} channel={channel} />;
+    return <SubscriptionComplete pageSlug={pageSlug} channel={channel} alreadySubscribed={Boolean(lastResponse.alreadySubscribed)} scoped={Boolean(lastResponse.scoped)} />;
   }
   if (!enabled && stage === "form") {
     return (
@@ -322,9 +324,23 @@ function ContactTab({
   );
 }
 
-function SubscriptionComplete({ pageSlug, channel }: { pageSlug: string; channel: "EMAIL" | "SMS" }) {
+function SubscriptionComplete({ pageSlug, channel, alreadySubscribed, scoped }: { pageSlug: string; channel: "EMAIL" | "SMS"; alreadySubscribed: boolean; scoped: boolean }) {
   useEffect(() => recordPublicEvent(pageSlug, "SUBSCRIPTION_COMPLETE"), [pageSlug]);
-  return <p role="status" className="text-sm text-[var(--cyan)]">You’re subscribed. Incident updates will arrive by {channel === "EMAIL" ? "email" : "SMS"}.</p>;
+  const isEmail = channel === "EMAIL";
+  return (
+    <div role="status" className="space-y-2 text-sm">
+      <p className="flex items-center gap-2 font-semibold text-[var(--fg)]">
+        <CircleCheck aria-hidden size={18} className="shrink-0 text-[#16a34a]" />
+        {alreadySubscribed ? "Your subscription is updated" : "You’re subscribed"}
+      </p>
+      <p className="text-[var(--fg-soft)]">
+        {scoped ? "Updates for the services you chose" : "Every incident and maintenance update"} will arrive by {isEmail ? "email" : "text message"}.
+        {isEmail
+          ? " We sent a confirmation email; every message includes links to change your preferences or unsubscribe."
+          : " Every message includes a link to change your preferences or unsubscribe."}
+      </p>
+    </div>
+  );
 }
 
 function FeedTab({ pageSlug, feedBasePath }: { pageSlug: string; feedBasePath?: string }) {

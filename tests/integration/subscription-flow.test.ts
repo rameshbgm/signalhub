@@ -103,5 +103,43 @@ describe.skipIf(!enabled)("visitor subscription flow", () => {
       .where("pageId", "=", pageId).where("eventType", "=", "incident.created").executeTakeFirstOrThrow();
     expect(job.contact).toBe(contact);
     expect(job.body).toContain("/api/v1/subscribe/unsubscribe/");
+    expect(job.body).toContain(`/${slug}/subscription/`);
+  });
+
+  it("confirms the subscription by email with preference and unsubscribe links", async () => {
+    const confirmation = await modules.client.database.selectFrom("notificationJobs").selectAll()
+      .where("pageId", "=", pageId).where("eventType", "=", "subscription.confirmed").executeTakeFirstOrThrow();
+    expect(confirmation.contact).toBe(contact);
+    expect(confirmation.subject).toBe("You're subscribed to Subscription page");
+    expect(confirmation.body).toContain("Manage preferences:");
+    expect(confirmation.body).toContain("Unsubscribe:");
+  });
+
+  it("lets the subscriber change services and unsubscribe with the private token", async () => {
+    const subscriptions = await import("../../lib/subscriptions");
+    const { database } = modules.client;
+    const subscriber = await database.selectFrom("subscribers").select(["unsubscribeToken"])
+      .where("pageId", "=", pageId).where("contact", "=", contact).executeTakeFirstOrThrow();
+    const { generateAutomationToken } = await import("../../lib/tokens");
+    const token = generateAutomationToken();
+    const component = await database.insertInto("components").values({
+      pageId, name: "Checkout", description: "", status: "OPERATIONAL", order: 0, visible: true,
+      showUptime: true, manualStatus: "OPERATIONAL", isThirdParty: false, thirdPartyProvider: null,
+      automationTokenHash: token.hash, automationTokenPrefix: token.prefix, automationTokenLastFour: token.lastFour,
+    } as never).returning("id").executeTakeFirstOrThrow();
+
+    expect(await subscriptions.updateSubscriptionScope(subscriber.unsubscribeToken, [component.id])).toEqual({ ok: true });
+    const narrowed = await database.selectFrom("subscribers").select("componentIds")
+      .where("unsubscribeToken", "=", subscriber.unsubscribeToken).executeTakeFirstOrThrow();
+    expect(narrowed.componentIds).toEqual([component.id]);
+
+    // A service from another page is refused.
+    const foreign = await subscriptions.updateSubscriptionScope(subscriber.unsubscribeToken, ["00000000-0000-4000-8000-000000000000"]);
+    expect(foreign.ok).toBe(false);
+
+    expect(await subscriptions.unsubscribe(subscriber.unsubscribeToken)).toEqual({ ok: true, removed: true });
+    // Repeating it is harmless, as RFC 8058 one-click requires.
+    expect(await subscriptions.unsubscribe(subscriber.unsubscribeToken)).toEqual({ ok: true, removed: false });
+    expect(await subscriptions.findSubscription(subscriber.unsubscribeToken)).toBeUndefined();
   });
 });

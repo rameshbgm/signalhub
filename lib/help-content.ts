@@ -192,8 +192,15 @@ export const HELP_CATEGORIES: HelpCategory[] = [
           {
             heading: "Adding subscribers",
             paragraphs: [
-              "Visitors verify email subscriptions with a one-time code. Administrators manage Slack, Teams, and generic webhook integrations separately and can bulk-import email addresses.",
+              "Visitors verify email subscriptions with a one-time code and receive a confirmation email. Administrators manage Slack, Teams, and generic webhook integrations separately and can import email addresses after confirming those people agreed to receive updates.",
               "Quarantine a subscriber to stop notifications without deleting them; Export CSV downloads the full list for a page.",
+            ],
+          },
+          {
+            heading: "Preferences and unsubscribing",
+            paragraphs: [
+              "Every subscriber message links to a preferences page, styled like the status page, where the subscriber can follow all services or only chosen ones, or unsubscribe. Mail clients also show their own one-click Unsubscribe button.",
+              "If an email address is permanently refused by the receiving server, delivery stops and the subscriber is quarantined automatically. Subscribing again releases the quarantine.",
             ],
           },
         ],
