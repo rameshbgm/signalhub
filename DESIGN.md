@@ -1,10 +1,10 @@
 # SignalHub design system
 
-Professional console, light only. Neutral canvas, white bordered surfaces, restrained radii (6px controls, 10px cards), solid violet primary, gradient reserved for the logo and icon tiles, quick subtle motion. Tokens live in `app/theme.css`; primitives live in `components/ui/`. This file is the contract for every screen.
+Professional console, light only. Neutral canvas, white bordered surfaces, restrained radii (6px controls, 10px cards), solid violet primary, gradient reserved for hero accents; icons always bare, quick subtle motion. Tokens live in `app/theme.css`; primitives live in `components/ui/`. This file is the contract for every screen.
 
 ## Shell
 
-- **Sidebar** (256px, collapsible to a 68px icon column, `components/admin/AdminShell.tsx`): brand, org switcher, every section as a small uppercase group label with its screens below (gradient icon tile + label; active item has a primary-soft fill and a left accent bar), user footer with sign-out. **Header** (56px): sidebar toggle, breadcrumb, Ctrl/Cmd+K search. **Mobile:** menu button opens the same sidebar as a left drawer.
+- **Sidebar** (256px, collapsible to a 68px icon column, `components/admin/AdminShell.tsx`): brand, org switcher, every section as a small uppercase group label with its screens below (coloured icon + label; active item has a primary-soft fill and a left accent bar), user footer with sign-out. **Header** (56px): sidebar toggle, breadcrumb, Ctrl/Cmd+K search. **Mobile:** menu button opens the same sidebar as a left drawer.
 - Navigation data is `NAV_SECTIONS` in `components/admin/AdminNav.tsx`. A new screen goes there with a `hue` and an optional `capability`.
 - Pages render inside `<main>`; do not add your own max-width wrapper or outer padding.
 
@@ -24,7 +24,7 @@ Professional console, light only. Neutral canvas, white bordered surfaces, restr
 
 Type scale: `text-xs` 12, `text-sm` 14 (default body in dense UI), `text-base` 16, `text-lg` 18, `text-xl` 20, `text-2xl` 24, `text-3xl` 30; `text-2xs` is 11px and the smallest allowed. Weights 400-800. Page titles `text-2xl font-bold`, card titles `font-semibold`, labels `font-medium`. Never use arbitrary `text-[Npx]`.
 
-Hues for icon tiles (two-stop gradients, white icon): `indigo sky emerald amber rose violet teal slate` (`Hue` type in `components/ui/icon-tile.tsx`). Section mapping: overview/pages indigo+violet, monitoring and metrics sky, incidents and maintenance amber, audience emerald, integrations and API teal, security rose, settings and help slate, platform violet.
+Hues for icons (plain coloured icon, never inside a tile or filled box): `indigo sky emerald amber rose violet teal slate` (`Hue` type in `components/ui/icon-tile.tsx`). Section mapping: overview/pages indigo+violet, monitoring and metrics sky, incidents and maintenance amber, audience emerald, integrations and API teal, security rose, settings and help slate, platform violet.
 
 ## Primitives (`components/ui/`)
 
