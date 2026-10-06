@@ -318,19 +318,19 @@ export const HELP_CATEGORIES: HelpCategory[] = [
       {
         slug: "security",
         title: "Security",
-        summary: "Manage local password policy, MFA, SSO connections, SCIM provisioning, sessions, and organization access controls.",
+        summary: "Manage your multi-factor authentication and the devices signed in to your account.",
         body: [
           {
-            heading: "Authentication policy",
+            heading: "Multi-factor authentication",
             paragraphs: [
-              "Use Security to review allowed sign-in methods and identity connections. Changes affect how organization members authenticate, so keep at least one tested administrator path available while configuring SSO.",
+              "Enroll an authenticator app from Security. When MFA is required, you must finish enrollment before other console actions are available.",
               "New local users receive a temporary password and must change it at first sign-in. Existing SSO or password identities retain their configured authentication method.",
             ],
           },
           {
             heading: "SSO and SCIM",
             paragraphs: [
-              "Configure OIDC or SAML with the callback and metadata values displayed by SignalHub, then test the connection before enforcing it. SCIM tokens are credentials: copy them once, store them securely, scope them to the intended connection, and rotate them after exposure.",
+              "Single sign-on (OIDC or SAML) and SCIM provisioning are configured by installation Admins under installation administration, not on this page. Ask them to test a connection before enforcing it and to rotate SCIM tokens after any exposure.",
             ],
           },
           {

@@ -6,28 +6,16 @@ import { redirect } from "next/navigation";
 import { requireCapability, assertPageInOrg } from "@/lib/admin-guard";
 import { hashPassword } from "@/lib/auth";
 import { deletePageCascade, withTransaction } from "@/lib/cascade";
-import { sanitizeCustomCss } from "@/lib/custom-css";
 import { fenceActiveOrganizationMutation } from "@/lib/organization-mutation";
 import { templateDesign } from "@/lib/page-design";
 import { isValidTimeZone } from "@/lib/page-locale";
 import { publicPagePath } from "@/lib/public-path";
 import type { DatabaseTransaction } from "@/lib/postgres/client";
 import type { PageTable } from "@/lib/postgres/schema";
-import { sanitizePageHtml } from "@/lib/safe-page-html";
 import { recordTenantAudit } from "@/lib/tenant-audit";
 import { generateAutomationToken } from "@/lib/tokens";
 
 type AdminSession = Awaited<ReturnType<typeof requireCapability>>;
-type OnboardingStep = "WELCOME" | "COMPONENTS" | "LOGO" | "NOTIFICATIONS" | "INVITE_TEAM" | "INCIDENTS" | "COMPLETE";
-
-const onboardingPath: Record<Exclude<OnboardingStep, "COMPLETE">, string> = {
-  WELCOME: "welcome",
-  COMPONENTS: "components",
-  LOGO: "logo",
-  NOTIFICATIONS: "notifications",
-  INVITE_TEAM: "invite-team",
-  INCIDENTS: "incidents",
-};
 
 function slugify(input: string) {
   return input.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
@@ -155,19 +143,6 @@ export async function createPage(formData: FormData) {
   redirect(`/organization/pages/${pageId}`);
 }
 
-export async function advancePageSetup(pageId: string, nextStep: OnboardingStep) {
-  const session = await requireCapability("page.configure", pageId);
-  await assertPageInOrg(pageId, session.orgId);
-  if (!(nextStep in onboardingPath) && nextStep !== "COMPLETE") throw new Error("Invalid setup step");
-  await withTransaction(async (transaction) => {
-    await fenceActiveOrganizationMutation(session.orgId, transaction);
-    await transaction.updateTable("pages").set({ onboardingStep: nextStep })
-      .where("id", "=", pageId).where("orgId", "=", session.orgId).executeTakeFirstOrThrow();
-  });
-  if (nextStep === "COMPLETE") return;
-  redirect(`/organization/pages/${pageId}/setup/${onboardingPath[nextStep as Exclude<OnboardingStep, "COMPLETE">]}`);
-}
-
 export async function finishPageSetup(pageId: string) {
   const session = await requireCapability("page.configure", pageId);
   await assertPageInOrg(pageId, session.orgId);
@@ -268,12 +243,18 @@ export async function updatePageInfo(pageId: string, formData: FormData) {
   if (!name || name.length > 120) throw new Error("Page name is required");
   const timezone = String(formData.get("timezone") ?? "UTC").trim() || "UTC";
   if (!isValidTimeZone(timezone)) throw new Error(`Unknown time zone "${timezone}". Use an IANA name such as Europe/Berlin.`);
+  const headline = String(formData.get("headline") ?? page.headline ?? "").trim();
+  if (headline.length > 180) throw new Error("Headline must be 180 characters or fewer");
+  const aboutText = String(formData.get("aboutText") ?? page.aboutText ?? "").trim();
+  if (aboutText.length > 4_000) throw new Error("About text must be 4,000 characters or fewer");
   const values = {
     name,
     organizationName: String(formData.get("organizationName") ?? "").trim(),
     companyUrl: optionalUrl(formData.get("companyUrl")),
     defaultSmsCountryCode: String(formData.get("defaultSmsCountryCode") ?? "+1").trim(),
     timezone,
+    headline,
+    aboutText,
     noindex: formData.get("noindex") === "on",
     ...(formData.has("supportUrl") ? { supportUrl: optionalUrl(formData.get("supportUrl")) } : {}),
     ...(formData.has("privacyUrl") ? { privacyUrl: optionalUrl(formData.get("privacyUrl")) } : {}),
@@ -288,43 +269,27 @@ export async function updatePageInfo(pageId: string, formData: FormData) {
   revalidatePath(`/${page.slug}`, "layout");
 }
 
-export async function updatePageCustomization(pageId: string, formData: FormData) {
-  const session = await requireCapability("page.configure", pageId);
-  const page = await assertPageInOrg(pageId, session.orgId);
-  const layout = String(formData.get("layout") ?? "STANDARD");
-  if (!['STANDARD', 'COVER'].includes(layout)) throw new Error("Invalid page layout");
-  const brandColor = String(formData.get("brandColor") ?? "#2563eb");
-  if (!/^#[0-9a-f]{6}$/i.test(brandColor)) throw new Error("Use a six-digit color value");
-  await withTransaction(async (transaction) => {
-    await fenceActiveOrganizationMutation(session.orgId, transaction);
-    await transaction.updateTable("pages").set({
-      layout,
-      brandColor,
-      headline: String(formData.get("headline") ?? "Service status").trim(),
-      aboutText: String(formData.get("aboutText") ?? "").trim(),
-      customCss: sanitizeCustomCss(String(formData.get("customCss") ?? "")),
-      headerHtml: sanitizePageHtml(String(formData.get("headerHtml") ?? "")),
-      footerHtml: sanitizePageHtml(String(formData.get("footerHtml") ?? "")),
-    }).where("id", "=", pageId).where("orgId", "=", session.orgId).executeTakeFirstOrThrow();
-    await audit(transaction, session, "UPDATE_PAGE_CUSTOMIZATION", pageId);
-  });
-  revalidatePath(`/organization/pages/${pageId}/your-page/customize`);
-  revalidatePath(`/${page.slug}`, "layout");
-}
-
 export async function updateEmailCustomization(pageId: string, formData: FormData) {
   const session = await requireCapability("page.configure", pageId);
   await assertPageInOrg(pageId, session.orgId);
+  const emailFromName = optionalText(formData.get("emailFromName"));
+  // The sender name goes into an email header, so reject header-breaking characters.
+  if (emailFromName && (emailFromName.length > 80 || /[\r\n"<>]/.test(emailFromName))) {
+    throw new Error("Sender name must be 80 characters or fewer without quotes, angle brackets, or line breaks");
+  }
+  const emailReplyTo = optionalText(formData.get("emailReplyTo"));
+  if (emailReplyTo && (emailReplyTo.length > 254 || !/^[^\s@<>"]+@[^\s@<>"]+\.[^\s@<>"]+$/.test(emailReplyTo))) {
+    throw new Error("Enter a valid reply-to email address");
+  }
+  const emailFooter = optionalText(formData.get("emailFooter"));
+  if (emailFooter && emailFooter.length > 1_000) throw new Error("Email footer must be 1,000 characters or fewer");
   await withTransaction(async (transaction) => {
     await fenceActiveOrganizationMutation(session.orgId, transaction);
-    await transaction.updateTable("pages").set({
-      emailFromName: optionalText(formData.get("emailFromName")),
-      emailReplyTo: optionalText(formData.get("emailReplyTo")),
-      emailFooter: optionalText(formData.get("emailFooter")),
-    }).where("id", "=", pageId).where("orgId", "=", session.orgId).executeTakeFirstOrThrow();
+    await transaction.updateTable("pages").set({ emailFromName, emailReplyTo, emailFooter })
+      .where("id", "=", pageId).where("orgId", "=", session.orgId).executeTakeFirstOrThrow();
     await audit(transaction, session, "UPDATE_EMAIL_CUSTOMIZATION", pageId);
   });
-  revalidatePath(`/organization/pages/${pageId}/your-page/customize/emails`);
+  revalidatePath(`/organization/pages/${pageId}/notifications`);
 }
 
 export async function deletePage(pageId: string, formData: FormData) {

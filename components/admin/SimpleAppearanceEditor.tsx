@@ -4,12 +4,15 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Check, ChevronLeft, Eye, ImageIcon, LayoutTemplate, Palette, Send } from "lucide-react";
+import { Check, ChevronLeft, Eye, ImageIcon, LayoutTemplate, Link2, Palette, Send } from "lucide-react";
 import { Alert } from "@/components/ui/alert";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Field } from "@/components/ui/field";
 import { IconTile } from "@/components/ui/icon-tile";
+import { Input } from "@/components/ui/input";
 import { PageHeader } from "@/components/ui/page-header";
+import { Textarea } from "@/components/ui/textarea";
 import { StatusBadge, type StatusTone } from "@/components/ui/status-badge";
 import { AssetUploader } from "@/components/admin/AssetUploader";
 import { cn } from "@/lib/utils";
@@ -19,6 +22,7 @@ import {
   PAGE_THEME_PRESET_KEYS,
   PAGE_THEME_PRESET_LABELS,
   applyPageTemplateLayout,
+  contrastRatio,
   designWithThemePreset,
   pageThemePreset,
   sameStatusPageDesign,
@@ -85,6 +89,7 @@ export function SimpleAppearanceEditor({
   const [saveState, setSaveState] = useState<"SAVED" | "DIRTY" | "SAVING" | "CONFLICT" | "ERROR">("SAVED");
   const [message, setMessage] = useState("");
   const [actionsMount, setActionsMount] = useState<HTMLElement | null>(null);
+  const [brandError, setBrandError] = useState<string | null>(null);
 
   function commit(next: StatusPageDesign) {
     if (sameStatusPageDesign(design, next)) return;
@@ -157,6 +162,26 @@ export function SimpleAppearanceEditor({
     const next = cloneDesign(design);
     next.presentation = { ...next.presentation, ...patch };
     commit(statusPageDesignSchema.parse(next));
+  }
+
+  /** Validates through the design schema so an invalid value never reaches the draft. */
+  function tryCommit(mutate: (next: StatusPageDesign) => void) {
+    const next = cloneDesign(design);
+    mutate(next);
+    const parsed = statusPageDesignSchema.safeParse(next);
+    if (!parsed.success) return parsed.error.issues[0]?.message ?? "This value is not valid";
+    commit(parsed.data);
+    return null;
+  }
+
+  function selectBrandColor(color: string) {
+    // Buttons and banners put white text on the brand color (WCAG AA for UI text).
+    if (contrastRatio("#ffffff", color) < 3) {
+      setBrandError("Choose a darker color so white button text stays readable.");
+      return;
+    }
+    setBrandError(null);
+    tryCommit((next) => { next.theme.palette.brand = color; });
   }
 
   const currentLayout = SIMPLE_LAYOUTS.find((layout) => layout.key === design.templateKey);
@@ -333,9 +358,28 @@ export function SimpleAppearanceEditor({
                   );
                 })}
               </div>
+              <div className="mt-5 flex flex-col gap-3 border-t border-line pt-5 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-ink">Brand color</p>
+                  <p className="text-xs leading-5 text-ink-soft">Used for buttons, links, and banners. Choosing a style resets it to that style&apos;s color.</p>
+                  {brandError && <p role="alert" className="mt-1 text-xs text-danger-fg">{brandError}</p>}
+                </div>
+                <label className="flex shrink-0 items-center gap-3 rounded-control border border-line-strong bg-surface px-3 py-1.5 shadow-card">
+                  <input
+                    type="color"
+                    aria-label="Brand color"
+                    value={design.theme.palette.brand}
+                    onChange={(event) => selectBrandColor(event.target.value)}
+                    className="size-7 cursor-pointer rounded border-0 bg-transparent p-0"
+                  />
+                  <span className="font-mono text-sm uppercase text-ink">{design.theme.palette.brand}</span>
+                </label>
+              </div>
             </CardContent>
           </Card>
         </section>
+
+        <VisitorDetailsCard design={design} tryCommit={tryCommit} />
 
         <section aria-labelledby="brand-heading">
           <Card>
@@ -386,6 +430,91 @@ export function SimpleAppearanceEditor({
         </section>
       </div>
     </>
+  );
+}
+
+type VisitorField = {
+  key: "supportUrl" | "termsUrl" | "privacyUrl" | "seoTitle" | "seoDescription";
+  label: string;
+  placeholder: string;
+  hint?: string;
+  multiline?: boolean;
+  maxLength?: number;
+};
+
+const VISITOR_FIELDS: VisitorField[] = [
+  { key: "supportUrl", label: "Support link", placeholder: "https://support.example.com or mailto:help@example.com" },
+  { key: "termsUrl", label: "Terms of service", placeholder: "https://example.com/terms" },
+  { key: "privacyUrl", label: "Privacy policy", placeholder: "https://example.com/privacy" },
+  { key: "seoTitle", label: "Search title", placeholder: "Defaults to the page name and headline", maxLength: 160 },
+  { key: "seoDescription", label: "Search description", placeholder: "Defaults to the about text", hint: "Shown by search engines and link previews.", multiline: true, maxLength: 320 },
+];
+
+function visitorValue(design: StatusPageDesign, key: VisitorField["key"]) {
+  if (key === "seoTitle") return design.seo.title;
+  if (key === "seoDescription") return design.seo.description;
+  return design.presentation[key] ?? "";
+}
+
+/**
+ * Links shown in the public footer plus search metadata. Each field keeps its
+ * own text while typing and only reaches the draft once it validates, so a
+ * half-typed URL never blocks autosave or publishing.
+ */
+function VisitorDetailsCard({ design, tryCommit }: { design: StatusPageDesign; tryCommit: (mutate: (next: StatusPageDesign) => void) => string | null }) {
+  const [values, setValues] = useState(() => Object.fromEntries(VISITOR_FIELDS.map((field) => [field.key, visitorValue(design, field.key)])) as Record<VisitorField["key"], string>);
+  const [errors, setErrors] = useState<Partial<Record<VisitorField["key"], string>>>({});
+
+  function save(key: VisitorField["key"]) {
+    const raw = values[key].trim();
+    if (raw === visitorValue(design, key)) {
+      setErrors((current) => ({ ...current, [key]: undefined }));
+      return;
+    }
+    const error = tryCommit((next) => {
+      if (key === "seoTitle") next.seo.title = raw;
+      else if (key === "seoDescription") next.seo.description = raw;
+      else next.presentation[key] = raw || null;
+    });
+    setErrors((current) => ({ ...current, [key]: error ?? undefined }));
+  }
+
+  return (
+    <section aria-labelledby="visitor-heading">
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-3.5">
+            <IconTile icon={Link2} hue="emerald" />
+            <div className="min-w-0">
+              <CardTitle id="visitor-heading">Visitor links &amp; search</CardTitle>
+              <CardDescription>Footer links and how the page appears in search results. Saved with your draft and published together.</CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-4 sm:grid-cols-2">
+            {VISITOR_FIELDS.map((field) => {
+              const id = `visitor-${field.key}`;
+              const common = {
+                id,
+                value: values[field.key],
+                placeholder: field.placeholder,
+                maxLength: field.maxLength,
+                "aria-invalid": errors[field.key] ? true : undefined,
+                onBlur: () => save(field.key),
+              };
+              return (
+                <Field key={field.key} label={field.label} htmlFor={id} hint={field.hint} error={errors[field.key]} className={field.multiline ? "sm:col-span-2" : undefined}>
+                  {field.multiline
+                    ? <Textarea {...common} rows={2} onChange={(event) => setValues((current) => ({ ...current, [field.key]: event.target.value }))} />
+                    : <Input {...common} onChange={(event) => setValues((current) => ({ ...current, [field.key]: event.target.value }))} onKeyDown={(event) => { if (event.key === "Enter") save(field.key); }} />}
+                </Field>
+              );
+            })}
+          </div>
+        </CardContent>
+      </Card>
+    </section>
   );
 }
 

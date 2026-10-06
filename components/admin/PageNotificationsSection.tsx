@@ -5,13 +5,20 @@ import { enabledDestinationChannels } from "@/lib/platform-configuration";
 import { secretLabel } from "@/lib/secrets";
 import { NotificationDestinationManager } from "@/components/admin/NotificationDestinationManager";
 import { WebhookEndpointManager } from "@/components/admin/WebhookEndpointManager";
+import { PlatformActionForm } from "@/components/platform/PlatformActionForm";
+import { PlatformSubmitButton } from "@/components/platform/PlatformSubmitButton";
+import { updateEmailCustomization } from "@/app/admin/(protected)/pages/actions";
+import { Field } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Alert } from "@/components/ui/alert";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { IconTile } from "@/components/ui/icon-tile";
 import { StatusBadge } from "@/components/ui/status-badge";
 
 export async function PageNotificationsSection({ pageId }: { pageId: string }) {
-  const [endpointDocs, destinations, capabilities, enabledChannels] = await Promise.all([
+  const [page, endpointDocs, destinations, capabilities, enabledChannels] = await Promise.all([
+    database.selectFrom("pages").select(["name", "emailFromName", "emailReplyTo", "emailFooter"]).where("id", "=", pageId).executeTakeFirst(),
     database.selectFrom("webhookEndpoints").selectAll().where("pageId", "=", pageId).execute(),
     database.selectFrom("notificationDestinations").selectAll().where("pageId", "=", pageId).orderBy("createdAt").execute(),
     subscriptionCapabilities(),
@@ -51,6 +58,29 @@ export async function PageNotificationsSection({ pageId }: { pageId: string }) {
               </li>
             ))}
           </ul>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Email branding</CardTitle>
+          <CardDescription>How subscriber emails from this page are signed. The page logo and brand color are used automatically.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <PlatformActionForm action={updateEmailCustomization.bind(null, pageId)} successMessage="Email branding saved" className="grid gap-4 sm:grid-cols-2">
+            <Field label="Sender name" htmlFor="email-from-name" hint={`Shown as the sender, e.g. "${page?.name ?? "Acme"} Status".`}>
+              <Input id="email-from-name" name="emailFromName" defaultValue={page?.emailFromName ?? ""} maxLength={80} placeholder={page?.name ?? ""} />
+            </Field>
+            <Field label="Reply-to address" htmlFor="email-reply-to" hint="Where replies go. Leave empty to use the server default.">
+              <Input id="email-reply-to" name="emailReplyTo" type="email" defaultValue={page?.emailReplyTo ?? ""} maxLength={254} placeholder="support@example.com" />
+            </Field>
+            <Field label="Footer" htmlFor="email-footer" hint="Plain text added to every email, e.g. your company address." className="sm:col-span-2">
+              <Textarea id="email-footer" name="emailFooter" defaultValue={page?.emailFooter ?? ""} maxLength={1000} rows={2} />
+            </Field>
+            <div className="flex justify-end sm:col-span-2">
+              <PlatformSubmitButton pendingLabel="Saving…">Save email branding</PlatformSubmitButton>
+            </div>
+          </PlatformActionForm>
         </CardContent>
       </Card>
 

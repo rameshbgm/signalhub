@@ -5,6 +5,7 @@ import { assertPageInOrg, requireCapability } from "@/lib/admin-guard";
 import { deletePage, updatePageInfo } from "../../actions";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field } from "@/components/ui/field";
 
@@ -22,6 +23,8 @@ export default async function PageSettings({ params }: { params: Promise<{ pageI
           <PlatformActionForm action={updatePageInfo.bind(null, pageId)} successMessage="Page settings saved" className="space-y-5">
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label="Page name" htmlFor="page-name" required><Input id="page-name" name="name" defaultValue={page.name} required maxLength={120} /></Field>
+              <Field label="Headline" htmlFor="page-headline" hint="The large title on the public page."><Input id="page-headline" name="headline" defaultValue={page.headline ?? ""} maxLength={180} placeholder="Service status" /></Field>
+              <Field label="About this page" htmlFor="page-about" hint="Optional. Shown under the headline and used as the default search description." className="sm:col-span-2"><Textarea id="page-about" name="aboutText" defaultValue={page.aboutText ?? ""} maxLength={4000} rows={3} /></Field>
               <Field label="Organization name" htmlFor="organization-name"><Input id="organization-name" name="organizationName" defaultValue={page.organizationName} maxLength={120} /></Field>
               <Field label="Company website" htmlFor="company-website"><Input id="company-website" name="companyUrl" defaultValue={page.companyUrl ?? ""} inputMode="url" /></Field>
               <Field label="Timezone" htmlFor="page-timezone" hint="IANA name such as Europe/Berlin. Used for public dates and maintenance windows.">

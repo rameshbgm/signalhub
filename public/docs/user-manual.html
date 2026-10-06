@@ -152,7 +152,7 @@
       <article id="start" data-search="start first login bootstrap dashboard setup checklist onboarding">
         <p class="kicker">01 · Start here</p>
         <h2>From first login to a working status page</h2>
-        <p>SignalHub separates public status experiences from the authenticated organization console. Operators sign in at <code>/login</code> and use canonical console URLs under <code>/organization</code>. Visitors use a page slug, custom domain, hub, feed, embed, badge, or public API.</p>
+        <p>SignalHub separates public status experiences from the authenticated organization console. Operators sign in at <code>/login</code> and use canonical console URLs under <code>/organization</code>. Visitors use a page slug, hub, feed, embed, badge, or public API.</p>
 
         <div class="callout success"><strong>Recommended first outcome:</strong> create one page, add one service, publish it, declare and resolve a test incident, verify delivery, and only then connect production monitors.</div>
 
@@ -211,7 +211,7 @@
             <tr><td>Monitoring · Monitors</td><td>Check availability and optionally reconcile component status.</td><td>Create a check; inspect history and thresholds.</td></tr>
             <tr><td>Integrations · SignalHub Embed</td><td>Show incident state on another website.</td><td>Copy the script or badge snippet.</td></tr>
             <tr><td>Integrations · API Keys</td><td>Automate management actions without a browser session.</td><td>Create a scoped, expiring, CIDR-limited key.</td></tr>
-            <tr><td>Organization · Security</td><td>Manage MFA, sessions, SSO, SCIM, and identity policy.</td><td>Enroll, test, rotate, or revoke.</td></tr>
+            <tr><td>Organization · Security</td><td>Manage your MFA enrollment and active sessions.</td><td>Enroll, review, or revoke. SSO and SCIM are configured by installation Admins.</td></tr>
             <tr><td>Organization · Users &amp; Roles</td><td>Grant or remove organization access.</td><td>Create a user; change role or page scope.</td></tr>
             <tr><td>Organization · Settings</td><td>Change organization details and review lifecycle policy.</td><td>Update contact information or contact installation Admins.</td></tr>
             <tr><td>Platform</td><td>Admin-only installation management across organizations.</td><td>Inspect runtime, identity, global users, configuration, and audit.</td></tr>
@@ -236,24 +236,24 @@
         <h3>Page creation and publication</h3>
         <ol class="steps">
           <li>Open <strong>Pages → Create page</strong>, select page or hub, choose a stable slug, and optionally assign a parent hub.</li>
-          <li>Open <strong>Content</strong>. For a status page, create groups and services, set their visibility, and order them in the way customers understand. For a hub, create or attach child pages.</li>
-          <li>Open <strong>Appearance</strong>. Choose a Standard, Banner, or Compact layout, then set a style, brand color, logo, site icon, and optional cover image.</li>
+          <li>Open <strong>Services &amp; groups</strong>. For a status page, add services, use the <strong>+</strong> next to any Group field to add or manage groups, set visibility, and drag services into the order customers understand. For a hub, create or attach child pages.</li>
+          <li>Open <strong>Appearance</strong>. Choose a Standard, Banner, or Compact layout, then pick a style tile (each tile previews its colors), adjust the brand color, add footer links and search details, and upload a logo, site icon, and optional cover image. Changes autosave as a draft until you select <strong>Publish changes</strong>.</li>
           <li>For private or audience pages, open <strong>Access</strong> and configure allowed identities/groups and component scope. Test with a non-Admin account.</li>
-          <li>Open <strong>Notifications</strong> to review subscriber channels, team destinations, feeds, and webhooks for the page.</li>
-          <li>Open <strong>Settings</strong> to confirm page name, locale, description, public visibility, and destructive controls.</li>
-          <li>Use the overview checklist to publish. A status page needs at least one visible service; a hub can publish its page directory.</li>
+          <li>Open <strong>Notifications</strong> to review subscriber channels, set the email sender name, reply-to address, and footer, and manage team destinations and webhooks.</li>
+          <li>Open <strong>Settings</strong> to set the page name, headline, about text, time zone (used for dates and maintenance windows), search-engine indexing, and destructive controls.</li>
+          <li>Publish from the overview. A status page needs at least one visible service; a hub can publish its page directory.</li>
         </ol>
 
         <h3>Page-management tabs</h3>
         <table>
           <thead><tr><th>Tab</th><th>Purpose</th><th>Operational advice</th></tr></thead>
           <tbody>
-            <tr><td>Overview</td><td>Readiness checklist, publication state, quick links.</td><td>Use before launch and after major design changes.</td></tr>
-            <tr><td>Content</td><td>Services/groups for a page; child pages for a hub.</td><td>Prefer customer language over internal system names.</td></tr>
-            <tr><td>Appearance</td><td>Layout, style, and brand assets.</td><td>Choose the clearest layout, let drafts autosave, and publish deliberately.</td></tr>
+            <tr><td>Overview</td><td>Setup steps, publication state, access type, and quick links.</td><td>Use before launch and after major design changes.</td></tr>
+            <tr><td>Services &amp; groups</td><td>Services and groups for a page; child pages for a hub.</td><td>Prefer customer language over internal system names.</td></tr>
+            <tr><td>Appearance</td><td>Layout, style, brand color, footer links, search details, and brand assets.</td><td>Choose the clearest layout, let drafts autosave, and publish deliberately.</td></tr>
             <tr><td>Access</td><td>Private/audience identities, groups, and component visibility.</td><td>Test least-privilege access in a private session.</td></tr>
-            <tr><td>Notifications</td><td>Page delivery and integration overview.</td><td>Verify providers and worker readiness before launch.</td></tr>
-            <tr><td>Settings</td><td>Metadata, visibility, locale, and page lifecycle.</td><td>Treat slug/domain changes as customer-facing changes.</td></tr>
+            <tr><td>Notifications</td><td>Subscriber channels, email branding, team destinations, and webhooks.</td><td>Verify providers and worker readiness before launch.</td></tr>
+            <tr><td>Settings</td><td>Name, headline, about text, time zone, indexing, and page lifecycle.</td><td>Deleting a page is permanent; export what you need first.</td></tr>
           </tbody>
         </table>
 
@@ -502,7 +502,7 @@
         <h2>SignalHub terms</h2>
         <dl>
           <dt><strong>Organization</strong></dt><dd>A tenant boundary containing memberships, pages, incidents, monitors, subscribers, integrations, and audit data.</dd>
-          <dt><strong>Status page</strong></dt><dd>A visitor-facing service-health experience identified by a slug or custom domain.</dd>
+          <dt><strong>Status page</strong></dt><dd>A visitor-facing service-health experience identified by its slug.</dd>
           <dt><strong>Hub</strong></dt><dd>A parent directory of status pages for a portfolio, business unit, region, or brand.</dd>
           <dt><strong>Service / component</strong></dt><dd>A customer-understandable capability whose effective health may come from manual state, incidents, maintenance, and monitors.</dd>
           <dt><strong>Incident</strong></dt><dd>An unplanned service-impact record with status, severity/impact, affected services, updates, resolution, and optional postmortem.</dd>

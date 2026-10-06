@@ -888,7 +888,7 @@ export function applyPageTemplateLayout(design: StatusPageDesign, templateKey: P
   return statusPageDesignSchema.parse(next);
 }
 
-function contrastRatio(foreground: string, background: string) {
+export function contrastRatio(foreground: string, background: string) {
   const lighter = Math.max(luminance(foreground), luminance(background));
   const darker = Math.min(luminance(foreground), luminance(background));
   return (lighter + 0.05) / (darker + 0.05);

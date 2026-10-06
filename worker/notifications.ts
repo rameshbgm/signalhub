@@ -46,6 +46,16 @@ function escapeHtml(value: string) {
   }[character]!));
 }
 
+/**
+ * Keeps the configured SMTP mailbox (deliverability, SPF/DKIM) and only
+ * replaces the display name with the page's sender name when one is set.
+ */
+export function senderAddress(displayName: string | null, configured = process.env.SMTP_FROM ?? "SignalHub <signalhub@localhost>") {
+  if (!displayName) return configured;
+  const address = /<([^>]+)>/.exec(configured)?.[1] ?? configured.trim();
+  return { name: displayName, address };
+}
+
 function notificationHtml(input: {
   pageName: string;
   logoUrl: string | null;
@@ -91,21 +101,25 @@ async function deliver(job: NotificationJobRow) {
     try {
       const page = await database
         .selectFrom("pages")
-        .select(["name", "logoUrl", "brandColor"])
+        .select(["name", "logoUrl", "brandColor", "emailFromName", "emailReplyTo", "emailFooter"])
         .where("id", "=", job.pageId)
         .executeTakeFirst();
+      const body = page?.emailFooter ? `${job.body}\n\n${page.emailFooter}` : job.body;
+      const unsubscribeUrl = /Manage or unsubscribe: (\S+)/.exec(job.body)?.[1];
       result = await smtpTransport().sendMail({
-        from: process.env.SMTP_FROM ?? "SignalHub <signalhub@localhost>",
+        from: senderAddress(page?.emailFromName ?? null),
+        ...(page?.emailReplyTo ? { replyTo: page.emailReplyTo } : {}),
         to: job.contact,
         subject: job.subject,
-        text: job.body,
+        text: body,
         html: notificationHtml({
           pageName: page?.name ?? "SignalHub",
           logoUrl: page?.logoUrl ?? null,
           brandColor: page?.brandColor ?? "#0f9fab",
           subject: job.subject,
-          body: job.body,
+          body,
         }),
+        ...(unsubscribeUrl ? { list: { unsubscribe: unsubscribeUrl } } : {}),
       });
     } catch (error) {
       throw new DeliveryError(
