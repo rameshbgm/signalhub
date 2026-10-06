@@ -1,6 +1,7 @@
 "use client";
 
 import { Children, useMemo, useState, useTransition, type ReactNode } from "react";
+import { GripVertical } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DndContext,
@@ -68,10 +69,10 @@ export function ComponentOrderList({
   }
 
   return (
-    <div className="mt-5">
-      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+    <div>
+      <DndContext id={`component-order-${pageId}`} sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
         <SortableContext items={orderedIds} strategy={verticalListSortingStrategy}>
-          <div className="space-y-2" aria-busy={pending}>
+          <div className="divide-y divide-line" aria-busy={pending}>
             {orderedIds.map((id) => (
               <SortableComponent key={id} id={id} name={nameById.get(id) ?? "component"}>
                 {contentById.get(id)}
@@ -80,7 +81,7 @@ export function ComponentOrderList({
           </div>
         </SortableContext>
       </DndContext>
-      <p role="status" aria-live="polite" className="mt-2 min-h-4 text-xs text-[var(--fg-dim)]">{message}</p>
+      <p role="status" aria-live="polite" className="min-h-4 pt-2 text-xs text-ink-dim empty:hidden">{message}</p>
     </div>
   );
 }
@@ -91,19 +92,20 @@ function SortableComponent({ id, name, children }: { id: string; name: string; c
     <div
       ref={setNodeRef}
       style={{ transform: CSS.Transform.toString(transform), transition }}
-      className={`relative ${isDragging ? "z-10 opacity-70 shadow-xl" : ""}`}
+      className={`relative grid grid-cols-[auto_minmax(0,1fr)] items-start gap-1 bg-surface py-3 ${isDragging ? "z-10 rounded-control opacity-80 shadow-raised" : ""}`}
     >
+      {/* A real column, so the handle never overlaps the row content. */}
       <Button
         variant="ghost"
         size="icon"
-        className="!absolute !left-3 !top-3 !z-10 cursor-grab active:cursor-grabbing"
+        className="mt-0.5 cursor-grab text-ink-dim active:cursor-grabbing max-sm:size-11"
         aria-label={`Drag to reorder ${name}`}
         {...attributes}
         {...listeners}
       >
-        <span aria-hidden className="text-lg leading-none">⋮⋮</span>
+        <GripVertical aria-hidden size={16} />
       </Button>
-      {children}
+      <div className="min-w-0">{children}</div>
     </div>
   );
 }

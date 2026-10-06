@@ -105,8 +105,8 @@ describe("status page design", () => {
     expect(components?.type === "COMPONENT_STATUS" && components.settings.showUptime).toBe(true);
   });
 
-  it("ships nine valid theme presets including the default", () => {
-    expect(PAGE_THEME_PRESET_KEYS).toHaveLength(9);
+  it("ships twelve valid theme presets including the default", () => {
+    expect(PAGE_THEME_PRESET_KEYS).toHaveLength(12);
     expect(PAGE_THEME_PRESET_KEYS).toContain("DEFAULT");
     for (const key of PAGE_THEME_PRESET_KEYS) {
       const themed = designWithThemePreset(templateDesign("CENTERED_SUMMARY"), key);

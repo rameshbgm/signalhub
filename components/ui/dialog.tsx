@@ -2,14 +2,25 @@
 
 import { useEffect, type HTMLAttributes, type ReactNode } from "react";
 
+// Open dialogs, newest last: Escape closes only the topmost one when dialogs stack.
+const openDialogs: symbol[] = [];
+
 export function Dialog({ open, onOpenChange, children }: { open: boolean; onOpenChange: (event: unknown, data: { open: boolean }) => void; children: ReactNode }) {
   useEffect(() => {
     if (!open) return;
-    const close = (event: KeyboardEvent) => { if (event.key === "Escape") onOpenChange(event, { open: false }); };
+    const token = Symbol("dialog");
+    openDialogs.push(token);
+    const close = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && openDialogs.at(-1) === token) onOpenChange(event, { open: false });
+    };
     document.addEventListener("keydown", close);
     const previous = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    return () => { document.removeEventListener("keydown", close); document.body.style.overflow = previous; };
+    return () => {
+      document.removeEventListener("keydown", close);
+      openDialogs.splice(openDialogs.indexOf(token), 1);
+      document.body.style.overflow = previous;
+    };
   }, [onOpenChange, open]);
   if (!open) return null;
   return <div className="fixed inset-0 z-[2500] grid animate-fade place-items-center bg-ink/40 p-4 backdrop-blur-[2px]" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onOpenChange(event, { open: false }); }}>{children}</div>;

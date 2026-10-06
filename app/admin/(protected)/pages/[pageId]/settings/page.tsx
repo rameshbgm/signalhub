@@ -21,7 +21,7 @@ export default async function PageSettings({ params }: { params: Promise<{ pageI
         <CardHeader><CardTitle>Page details</CardTitle><CardDescription>Update the details visitors and your team use to identify this page.</CardDescription></CardHeader>
         <CardContent>
           <PlatformActionForm action={updatePageInfo.bind(null, pageId)} successMessage="Page settings saved" className="space-y-5">
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid max-w-3xl gap-4 sm:grid-cols-2">
               <Field label="Page name" htmlFor="page-name" required><Input id="page-name" name="name" defaultValue={page.name} required maxLength={120} /></Field>
               <Field label="Headline" htmlFor="page-headline" hint="The large title on the public page."><Input id="page-headline" name="headline" defaultValue={page.headline ?? ""} maxLength={180} placeholder="Service status" /></Field>
               <Field label="About this page" htmlFor="page-about" hint="Optional. Shown under the headline and used as the default search description." className="sm:col-span-2"><Textarea id="page-about" name="aboutText" defaultValue={page.aboutText ?? ""} maxLength={4000} rows={3} /></Field>

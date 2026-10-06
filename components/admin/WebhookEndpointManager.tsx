@@ -8,7 +8,6 @@ import { RefreshCw, Trash2, Webhook } from "lucide-react";
 import { SecretField } from "@/components/admin/SecretReveal";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -103,10 +102,10 @@ export function WebhookEndpointManager({
           <SecretField value={secret} copyLabel="Copy secret" className="mt-3" />
         </Alert>
       )}
-      <Card>
-        <CardContent className="space-y-5">
-          <div>
-            <form onSubmit={create} className="flex flex-col gap-3 sm:flex-row sm:items-end">
+      {/* Every caller already places this inside a card. */}
+      <div className="space-y-5">
+          <div className="max-w-2xl">
+            <form onSubmit={create} className="flex flex-col gap-2 sm:flex-row sm:items-end">
               <Field label="HTTPS webhook URL" htmlFor="webhook-url" className="min-w-0 flex-1">
                 <Input
                   id="webhook-url"
@@ -127,9 +126,9 @@ export function WebhookEndpointManager({
           {endpoints.length === 0 ? (
             <EmptyState icon={Webhook} hue="teal" title="No webhook endpoints yet" description="Add an HTTPS endpoint to receive signed status events." className="border-0 bg-transparent py-6" />
           ) : (
-            <ul className="space-y-2 border-t border-line pt-5">
+            <ul className="divide-y divide-line border-t border-line">
               {endpoints.map((endpoint) => (
-                <li key={endpoint.id} className="flex flex-wrap items-center justify-between gap-3 rounded-control border border-line px-3.5 py-3 text-sm">
+                <li key={endpoint.id} className="flex flex-wrap items-center justify-between gap-3 py-3 text-sm">
                   <div className="min-w-0">
                     <p className="flex flex-wrap items-center gap-2">
                       <span className="truncate font-mono text-xs font-medium text-ink">{endpoint.url}</span>
@@ -151,8 +150,7 @@ export function WebhookEndpointManager({
               ))}
             </ul>
           )}
-        </CardContent>
-      </Card>
+      </div>
     </div>
   );
 }

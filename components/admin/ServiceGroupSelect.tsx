@@ -136,7 +136,7 @@ export function ServiceGroupSelect({
                 aria-describedby={error ? `${id}-group-error` : undefined}
               />
             </div>
-            <Button type="submit" loading={pending} disabled={pending}>
+            <Button type="submit" data-button-guard="off" loading={pending} disabled={pending}>
               <Plus aria-hidden size={16} />Add group
             </Button>
           </form>
@@ -154,7 +154,7 @@ export function ServiceGroupSelect({
                       <p className="truncate text-sm font-medium text-ink">{group.name}</p>
                       <p className="text-xs text-ink-dim">{group.serviceCount} {group.serviceCount === 1 ? "service" : "services"}</p>
                     </div>
-                    <Button type="button" variant="ghost" size="sm" className={dangerGhost} disabled={pending} onClick={() => removeGroup(group)} aria-label={`Delete group ${group.name}`}>
+                    <Button type="button" data-button-guard="off" variant="ghost" size="sm" className={dangerGhost} disabled={pending} onClick={() => removeGroup(group)} aria-label={`Delete group ${group.name}`}>
                       <Trash2 aria-hidden size={14} />Delete
                     </Button>
                   </li>

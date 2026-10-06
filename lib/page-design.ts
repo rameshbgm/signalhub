@@ -27,6 +27,9 @@ export const PAGE_THEME_PRESET_KEYS = [
   "HIGH_CONTRAST",
   "WARM_PAPER",
   "SOFT_BLUE",
+  "TEAL",
+  "ROSE",
+  "INDIGO",
 ] as const;
 export type PageThemePresetKey = (typeof PAGE_THEME_PRESET_KEYS)[number];
 
@@ -40,6 +43,9 @@ export const PAGE_THEME_PRESET_LABELS: Record<PageThemePresetKey, string> = {
   HIGH_CONTRAST: "High contrast",
   WARM_PAPER: "Warm paper",
   SOFT_BLUE: "Soft blue",
+  TEAL: "Teal",
+  ROSE: "Rose",
+  INDIGO: "Indigo",
 };
 
 export const PAGE_THEME_PRESET_DESCRIPTIONS: Record<PageThemePresetKey, string> = {
@@ -52,6 +58,9 @@ export const PAGE_THEME_PRESET_DESCRIPTIONS: Record<PageThemePresetKey, string> 
   HIGH_CONTRAST: "Maximum text and control contrast with square, flat surfaces.",
   WARM_PAPER: "Soft cream surfaces and earthy accents for a human tone.",
   SOFT_BLUE: "A bright, approachable blue theme with comfortable spacing.",
+  TEAL: "Fresh teal accents on a cool, quiet surface.",
+  ROSE: "Warm rose accents with soft, rounded cards.",
+  INDIGO: "Deep indigo with crisp cards for product teams.",
 };
 
 export const PAGE_TEMPLATE_KEYS = [
@@ -744,6 +753,19 @@ export function pageThemePreset(key: PageThemePresetKey): StatusPageDesign["them
       theme.palette = { ...theme.palette, brand: "#2563eb", accent: "#0891b2", background: "#f5f7ff", surface: "#ffffff", text: "#172554", mutedText: "#63709a" };
       theme.density = "SPACIOUS";
       theme.radius = "LARGE";
+      return theme;
+    case "TEAL":
+      theme.palette = { ...theme.palette, brand: "#0f766e", accent: "#14b8a6", background: "#f0fdfa", surface: "#ffffff", text: "#134e4a", mutedText: "#4f746f" };
+      theme.radius = "MEDIUM";
+      return theme;
+    case "ROSE":
+      theme.palette = { ...theme.palette, brand: "#be123c", accent: "#f43f5e", background: "#fff1f2", surface: "#ffffff", text: "#4c0519", mutedText: "#8a5563" };
+      theme.radius = "LARGE";
+      theme.shadow = "ELEVATED";
+      return theme;
+    case "INDIGO":
+      theme.palette = { ...theme.palette, brand: "#4338ca", accent: "#6366f1", background: "#f5f5ff", surface: "#ffffff", text: "#1e1b4b", mutedText: "#5b5b8a" };
+      theme.radius = "SMALL";
       return theme;
   }
 }

@@ -203,7 +203,7 @@ export function NotificationDestinationManager({
   return (
     <div className="space-y-5">
       {selectedProvider ? (
-      <form onSubmit={create} className="space-y-5 rounded-control bg-sunken/60 p-4 sm:p-5">
+      <form onSubmit={create} className="space-y-5">
         <fieldset>
           <legend className="text-sm font-semibold text-ink">Choose a provider</legend>
           <p className="mt-1 text-xs leading-5 text-ink-dim">SignalHub sends a live verification message before saving the destination.</p>
@@ -224,11 +224,11 @@ export function NotificationDestinationManager({
                   variant="ghost"
                   className={`h-auto min-w-0 flex-col items-start justify-start whitespace-normal rounded-control border p-3 text-left transition-colors ${selected ? "border-primary bg-primary-soft" : "border-line bg-surface hover:border-line-strong"}`}
                 >
-                  <span className="flex items-center justify-between gap-2">
+                  <span className="flex w-full items-center justify-between gap-2">
                     <span className="text-sm font-semibold text-ink">{provider.label}</span>
-                    <span className="text-xs text-ink-dim">{provider.group}</span>
+                    <span className="text-xs font-normal text-ink-dim">{provider.group}</span>
                   </span>
-                  <span className="mt-1 block text-xs leading-5 text-ink-dim">{provider.description}</span>
+                  <span className="mt-1 block w-full break-words text-xs font-normal leading-5 text-ink-dim">{provider.description}</span>
                 </Button>
               );
             })}
@@ -240,7 +240,7 @@ export function NotificationDestinationManager({
             <p className="text-sm font-semibold text-ink">Configure {selectedProvider.label}</p>
             <p className="mt-1 text-xs text-ink-dim">Credentials are encrypted at rest and are never displayed again.</p>
           </div>
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid max-w-3xl gap-3 sm:grid-cols-2">
             <label className="grid gap-1.5 text-sm font-medium text-ink-soft">
               Destination name
               <Input value={name} onChange={(event) => setName(event.target.value)} placeholder={`e.g. ${selectedProvider.label} incidents`} className="font-normal" required />
@@ -280,9 +280,9 @@ export function NotificationDestinationManager({
           {message}
         </p>
       )}
-      {destinations.length > 0 ? <ul className="space-y-2">
+      {destinations.length > 0 ? <ul className="divide-y divide-line border-t border-line">
         {destinations.map((destination) => (
-          <li key={destination.id} className="flex flex-col gap-3 rounded-control border border-line px-3.5 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <li key={destination.id} className="flex flex-col gap-3 py-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
                 <p className="font-medium text-ink">{destination.name}</p>
@@ -304,7 +304,7 @@ export function NotificationDestinationManager({
             </div>
           </li>
         ))}
-      </ul> : <EmptyState icon={BellRing} hue="teal" title="No team destinations configured" description="Choose a provider above to send incident updates to your team." />}
+      </ul> : <EmptyState icon={BellRing} hue="teal" title="No team destinations configured" description="Choose a provider above to send incident updates to your team." className="border-0 border-t border-line bg-transparent py-8" />}
     </div>
   );
 }

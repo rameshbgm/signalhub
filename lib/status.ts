@@ -25,6 +25,15 @@ export const COMPONENT_STATUS_LABEL: Record<ComponentStatus, string> = {
   UNDER_MAINTENANCE: "Under Maintenance",
 };
 
+/** Badge tone for each component status in the console. */
+export const COMPONENT_STATUS_TONE: Record<ComponentStatus, "ok" | "warn" | "danger" | "info"> = {
+  OPERATIONAL: "ok",
+  DEGRADED_PERFORMANCE: "warn",
+  PARTIAL_OUTAGE: "warn",
+  MAJOR_OUTAGE: "danger",
+  UNDER_MAINTENANCE: "info",
+};
+
 export const COMPONENT_STATUS_COLOR: Record<ComponentStatus, string> = {
   OPERATIONAL: "#16a34a",
   DEGRADED_PERFORMANCE: "#eab308",

@@ -79,7 +79,7 @@ export function PageManagementShell({ page, actions, children }: { page: Managed
         />
       </div>
 
-      <nav ref={tabs} aria-label="Page management" className="w-full overflow-x-auto rounded-card border border-line bg-surface shadow-card p-1.5 [scrollbar-width:none] sm:w-fit sm:max-w-full [&::-webkit-scrollbar]:hidden">
+      <nav ref={tabs} aria-label="Page management" className="w-full overflow-x-auto border-b border-line [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         <ul className="flex min-w-max gap-1">
           {visibleSections.map((section) => {
             const href = `${base}${section.suffix}`;
@@ -91,8 +91,8 @@ export function PageManagementShell({ page, actions, children }: { page: Managed
                   href={href}
                   aria-current={active ? "page" : undefined}
                   className={cn(
-                    "inline-flex min-h-10 items-center gap-2 whitespace-nowrap rounded-control px-3.5 text-sm outline-none transition-[background-color,color,box-shadow] duration-200 ease-soft focus-visible:ring-4 focus-visible:ring-primary/25",
-                    active ? "bg-primary-soft font-semibold text-primary-ink ring-1 ring-inset ring-primary/20" : "font-medium text-ink-soft hover:bg-sunken hover:text-ink",
+                    "-mb-px inline-flex min-h-11 items-center gap-2 whitespace-nowrap border-b-2 px-3 text-sm outline-none transition-[border-color,color] duration-200 ease-soft focus-visible:rounded-chip focus-visible:ring-4 focus-visible:ring-primary/25",
+                    active ? "border-primary font-semibold text-primary-ink" : "border-transparent font-medium text-ink-soft hover:border-line-strong hover:text-ink",
                   )}
                 >
                   <Icon aria-hidden size={16} className={active ? "text-primary" : "text-ink-dim"} />

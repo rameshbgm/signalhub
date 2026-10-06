@@ -67,7 +67,7 @@ export async function PageNotificationsSection({ pageId }: { pageId: string }) {
           <CardDescription>How subscriber emails from this page are signed. The page logo and brand color are used automatically.</CardDescription>
         </CardHeader>
         <CardContent>
-          <PlatformActionForm action={updateEmailCustomization.bind(null, pageId)} successMessage="Email branding saved" className="grid gap-4 sm:grid-cols-2">
+          <PlatformActionForm action={updateEmailCustomization.bind(null, pageId)} successMessage="Email branding saved" className="grid max-w-3xl gap-4 sm:grid-cols-2">
             <Field label="Sender name" htmlFor="email-from-name" hint={`Shown as the sender, e.g. "${page?.name ?? "Acme"} Status".`}>
               <Input id="email-from-name" name="emailFromName" defaultValue={page?.emailFromName ?? ""} maxLength={80} placeholder={page?.name ?? ""} />
             </Field>
