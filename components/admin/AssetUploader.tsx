@@ -303,7 +303,7 @@ export function AssetUploader({
             <button type="button" onClick={() => setPreviewOpen(true)} aria-label={`Preview ${label.toLowerCase()}`} title="Preview image" className="group relative grid h-full w-full place-items-center outline-none focus-visible:ring-4 focus-visible:ring-inset focus-visible:ring-primary/25">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={preview} alt={`${label} preview`} className="h-full w-full object-contain p-4" />
-              <span aria-hidden="true" className="absolute right-2 top-2 grid size-7 place-items-center rounded-chip bg-surface text-ink-soft opacity-0 shadow-card transition-opacity duration-200 group-hover:opacity-100 group-focus-visible:opacity-100">
+              <span aria-hidden="true" className="absolute right-2 top-2 grid size-7 place-items-center text-ink-soft opacity-0 drop-shadow-[0_1px_1px_rgb(255_255_255)] transition-opacity duration-200 group-hover:opacity-100 group-focus-visible:opacity-100">
                 <Maximize2 size={14} />
               </span>
             </button>

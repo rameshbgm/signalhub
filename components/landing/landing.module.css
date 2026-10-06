@@ -2246,6 +2246,22 @@
 .heroProof svg { color: var(--violet); }
 .hostedCard, .signalHubCard, .capabilityCard, .deployCard, .ownershipStep, .finalCtaInner { border-radius: 12px; border-color: var(--line); box-shadow: 0 1px 2px rgba(76, 29, 149, 0.04), 0 12px 32px -16px rgba(76, 29, 149, 0.2); transition: transform 300ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 300ms ease; }
 .hostedCard:hover, .signalHubCard:hover, .capabilityCard:hover, .deployCard:hover { transform: translateY(-2px); box-shadow: 0 16px 36px -18px rgba(76, 29, 149, 0.3); }
-.iconBox, .deployIcon { border-radius: 8px; background: linear-gradient(135deg, var(--color-primary), var(--color-accent)); color: #fff; }
+
 .comparisonBadge, .capabilityTag, .deployEyebrow { border-radius: 4px; background: var(--color-primary-soft); color: var(--blue); }
 .operationsPreview .statusConsole, .opsCard, .monitorCard, .incidentCard, .deliveryCard { border-radius: 12px !important; }
+
+/* Icons stand alone: no tile, ring, or fill behind any icon. */
+.blueIcon, .violetIcon, .mintIcon, .opsOrbitIcon, .iconBox, .deployIcon, .ownershipIcon, .ctaMark, .brandMark, .consoleMark {
+  width: auto !important;
+  height: auto !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+}
+.blueIcon, .iconBox, .deployIcon, .ownershipIcon, .ctaMark { color: var(--color-primary) !important; }
+.violetIcon { color: var(--color-accent) !important; }
+.mintIcon { color: #059669 !important; }
+.brandMark span, .consoleMark i { background: var(--color-primary) !important; width: 3px !important; }
+.deliveryChannels span { width: auto !important; height: auto !important; border: 0 !important; background: none !important; box-shadow: none !important; color: var(--color-accent) !important; }

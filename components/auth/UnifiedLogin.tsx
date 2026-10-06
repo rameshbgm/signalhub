@@ -66,7 +66,7 @@ export function UnifiedLogin({ returnTo }: { returnTo: string | null }) {
     <div className="min-h-screen bg-wash text-ink lg:grid lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
       <main className="flex min-h-screen flex-col px-6 py-8 sm:px-12 lg:order-2 lg:min-h-0">
         <Link href="/" className="flex w-fit items-center gap-2.5 rounded-control text-base font-bold tracking-tight outline-none focus-visible:ring-4 focus-visible:ring-primary/25">
-          <span aria-hidden="true" className="inline-grid size-9 place-items-center rounded-[0.5rem] bg-prism text-white shadow-primary">
+          <span aria-hidden="true" className="inline-flex items-center text-primary">
             <Activity size={18} strokeWidth={2.25} />
           </span>
           SignalHub

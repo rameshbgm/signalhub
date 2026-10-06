@@ -277,8 +277,8 @@ export function SimpleAppearanceEditor({
                         <span className="flex items-center justify-between gap-2">
                           <span className="text-base font-semibold text-ink">{layout.name}</span>
                           {selected && (
-                            <span aria-hidden="true" className="grid size-5 shrink-0 place-items-center rounded-full bg-primary text-on-primary">
-                              <Check size={12} />
+                            <span aria-hidden="true" className="inline-flex shrink-0 text-primary">
+                              <Check size={16} />
                             </span>
                           )}
                         </span>

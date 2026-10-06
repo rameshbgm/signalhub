@@ -62,8 +62,8 @@ export default async function PagesListPage() {
                     style={{ background: `linear-gradient(135deg, color-mix(in srgb, ${brand} 32%, white), color-mix(in srgb, ${brand} 8%, white))` }}
                   />
                   <div className="flex flex-1 flex-col px-5 pb-5">
-                    <div className="-mt-6 flex items-end justify-between gap-3">
-                      <IconTile icon={PageIcon} hue="violet" size="lg" className="ring-4 ring-surface" />
+                    <div className="mt-4 flex items-center justify-between gap-3">
+                      <IconTile icon={PageIcon} hue="violet" size="lg" />
                       <StatusBadge tone={tone}>{state}</StatusBadge>
                     </div>
 
@@ -111,7 +111,7 @@ export default async function PagesListPage() {
 
             {canConfigure && (
               <Link href="/organization/pages/new" className="group flex min-h-72 flex-col items-center justify-center rounded-card border border-dashed border-line-strong bg-surface/50 p-6 text-center outline-none transition-[border-color,background-color] duration-200 hover:border-primary/50 hover:bg-primary-soft/50 focus-visible:ring-4 focus-visible:ring-primary/25">
-                <IconTile icon={Plus} hue="indigo" size="lg" className="transition-transform duration-200 ease-spring group-hover:scale-110" />
+                <IconTile icon={Plus} hue="indigo" size="lg" />
                 <span className="mt-4 text-sm font-semibold text-ink">Create another page</span>
                 <span className="mt-1 max-w-[15rem] text-xs leading-5 text-ink-soft">Add a new public status surface to this workspace.</span>
               </Link>

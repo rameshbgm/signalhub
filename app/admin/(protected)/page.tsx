@@ -146,7 +146,7 @@ export default async function AdminDashboard() {
       <PageHeader title="Dashboard" description={`Everything happening across ${org.name}, at a glance.`} icon={LayoutDashboard} hue="indigo" />
 
       <section aria-label="Overall health" className={cn("flex flex-wrap items-center gap-4 rounded-card border p-5", HERO_TONE[tone])}>
-        <span aria-hidden="true" className="grid size-11 place-items-center rounded-[0.625rem] bg-current/10 [&>svg]:text-current"><HeroIcon size={22} /></span>
+        <HeroIcon aria-hidden size={26} className="shrink-0" />
         <div className="min-w-0 flex-1">
           <p className="flex items-center gap-2 text-lg font-semibold tracking-tight text-ink">
             {tone === "ok" && <span aria-hidden="true" className="size-2 shrink-0 rounded-full bg-ok text-ok animate-pulse-ring" />}

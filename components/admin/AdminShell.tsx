@@ -16,8 +16,8 @@ type ShellPage = { id: string; name: string };
 
 function BrandMark({ className }: { className?: string }) {
   return (
-    <span aria-hidden="true" className={cn("inline-grid size-8 shrink-0 place-items-center rounded-[0.5rem] bg-prism text-white shadow-primary", className)}>
-      <Activity size={17} strokeWidth={2.5} />
+    <span aria-hidden="true" className={cn("inline-flex shrink-0 items-center text-primary", className)}>
+      <Activity size={22} strokeWidth={2.5} />
     </span>
   );
 }
@@ -57,7 +57,7 @@ function SidebarNav({ sections, pathname, collapsed = false, onNavigate }: { sec
                     )}
                   >
                     {active && <span aria-hidden="true" className="absolute -left-3 top-1.5 bottom-1.5 w-[3px] rounded-r-full bg-primary" />}
-                    <IconTile icon={item.icon} hue={item.hue} size="sm" className={cn("size-6 rounded-[0.3rem] transition-[filter,opacity] duration-150 [&_svg]:size-3.5", !active && "opacity-85 saturate-[0.85] group-hover:opacity-100 group-hover:saturate-100")} />
+                    <IconTile icon={item.icon} hue={item.hue} size="sm" className={cn("w-5 transition-opacity duration-150 [&_svg]:size-[17px]", !active && "opacity-80 group-hover:opacity-100")} />
                     {!collapsed && <span className="min-w-0 flex-1 truncate">{item.label}</span>}
                     {collapsed && (
                       <span role="presentation" className="pointer-events-none absolute left-full z-50 ml-3 whitespace-nowrap rounded-control bg-ink px-2 py-1 text-xs font-medium text-white opacity-0 shadow-raised transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100">
