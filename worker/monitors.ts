@@ -192,6 +192,12 @@ export async function processMonitor(monitor: MonitorRow, workerId: string) {
           componentId: monitor.componentId,
           status: monitor.downStatus as "DEGRADED_PERFORMANCE" | "PARTIAL_OUTAGE" | "MAJOR_OUTAGE",
         }],
+      }).catch(async (error: unknown) => {
+        // Undo the down transition so the next failing check retries the
+        // incident instead of leaving the monitor down with no incident.
+        await database.updateTable("monitors").set({ isDown: false })
+          .where("id", "=", monitor.id).where("leaseOwner", "=", workerId).execute();
+        throw error;
       });
       currentIncidentId = incident.id;
       await database

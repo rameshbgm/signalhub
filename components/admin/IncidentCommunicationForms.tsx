@@ -130,13 +130,15 @@ export function PostmortemComposer({
           checked={publish}
           onChange={(event) => setPublish(event.target.checked)}
           label="Publish to the public page"
+          hint={published ? (publish ? "Currently published." : "Saving will unpublish it.") : undefined}
         />
         <CheckRow
           name="notify"
-          checked={notify}
+          checked={!published && notify}
           onChange={(event) => setNotify(event.target.checked)}
-          disabled={!publish}
+          disabled={published || !publish}
           label="Notify subscribers when publishing"
+          hint={published ? "Subscribers were offered this postmortem when it was first published." : undefined}
         />
       </div>
       <div className="flex justify-end">

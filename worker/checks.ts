@@ -227,10 +227,12 @@ async function dnsCheck(monitor: MonitorRow): Promise<CheckResult> {
   }
 }
 
-function heartbeatCheck(monitor: MonitorRow): CheckResult {
+export function heartbeatCheck(monitor: Pick<MonitorRow, "lastHeartbeatAt" | "createdAt" | "intervalSec" | "heartbeatGraceSec">): CheckResult {
+  // A new monitor gets one full interval plus grace for its first heartbeat.
   const last = monitor.lastHeartbeatAt?.getTime() ?? 0;
+  const reference = last || new Date(monitor.createdAt).getTime();
   const maximumAge = (monitor.intervalSec + (monitor.heartbeatGraceSec ?? 60)) * 1000;
-  const age = Date.now() - last;
+  const age = Date.now() - reference;
   return age <= maximumAge
     ? { ok: true, latencyMs: null, statusCode: null, error: null }
     : {

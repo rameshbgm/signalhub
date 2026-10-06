@@ -9,6 +9,7 @@ import { deletePageCascade, withTransaction } from "@/lib/cascade";
 import { sanitizeCustomCss } from "@/lib/custom-css";
 import { fenceActiveOrganizationMutation } from "@/lib/organization-mutation";
 import { templateDesign } from "@/lib/page-design";
+import { isValidTimeZone } from "@/lib/page-locale";
 import { publicPagePath } from "@/lib/public-path";
 import type { DatabaseTransaction } from "@/lib/postgres/client";
 import type { PageTable } from "@/lib/postgres/schema";
@@ -260,13 +261,14 @@ export async function updatePageInfo(pageId: string, formData: FormData) {
   const page = await assertPageInOrg(pageId, session.orgId);
   const name = String(formData.get("name") ?? "").trim();
   if (!name || name.length > 120) throw new Error("Page name is required");
+  const timezone = String(formData.get("timezone") ?? "UTC").trim() || "UTC";
+  if (!isValidTimeZone(timezone)) throw new Error(`Unknown time zone "${timezone}". Use an IANA name such as Europe/Berlin.`);
   const values = {
     name,
     organizationName: String(formData.get("organizationName") ?? "").trim(),
     companyUrl: optionalUrl(formData.get("companyUrl")),
     defaultSmsCountryCode: String(formData.get("defaultSmsCountryCode") ?? "+1").trim(),
-    timezone: String(formData.get("timezone") ?? "UTC").trim() || "UTC",
-    googleAnalyticsId: optionalText(formData.get("googleAnalyticsId")),
+    timezone,
     noindex: formData.get("noindex") === "on",
     ...(formData.has("supportUrl") ? { supportUrl: optionalUrl(formData.get("supportUrl")) } : {}),
     ...(formData.has("privacyUrl") ? { privacyUrl: optionalUrl(formData.get("privacyUrl")) } : {}),
@@ -278,7 +280,6 @@ export async function updatePageInfo(pageId: string, formData: FormData) {
   });
   revalidatePath(`/organization/pages/${pageId}/settings`);
   revalidatePath(`/organization/pages/${pageId}`, "layout");
-  revalidatePath(`/organization/pages/${pageId}/your-page/page-info`);
   revalidatePath(`/${page.slug}`, "layout");
 }
 

@@ -13,7 +13,7 @@ export type EffectiveRetention = {
   [Key in keyof typeof RETENTION_BOUNDS]: number;
 };
 
-const FALLBACK_RETENTION: EffectiveRetention = {
+export const FALLBACK_RETENTION: EffectiveRetention = {
   monitorChecksDays: 90,
   analyticsDays: 395,
   notificationLogsDays: 90,

@@ -24,9 +24,11 @@ export default async function PageSettings({ params }: { params: Promise<{ pageI
               <Field label="Page name" htmlFor="page-name" required><Input id="page-name" name="name" defaultValue={page.name} required maxLength={120} /></Field>
               <Field label="Organization name" htmlFor="organization-name"><Input id="organization-name" name="organizationName" defaultValue={page.organizationName} maxLength={120} /></Field>
               <Field label="Company website" htmlFor="company-website"><Input id="company-website" name="companyUrl" defaultValue={page.companyUrl ?? ""} inputMode="url" /></Field>
-              <Field label="Timezone" htmlFor="page-timezone"><Input id="page-timezone" name="timezone" defaultValue={page.timezone} /></Field>
+              <Field label="Timezone" htmlFor="page-timezone" hint="IANA name such as Europe/Berlin. Used for public dates and maintenance windows.">
+                <Input id="page-timezone" name="timezone" defaultValue={page.timezone} list="page-timezones" required />
+                <datalist id="page-timezones">{Intl.supportedValuesOf("timeZone").map((zone) => <option key={zone} value={zone} />)}</datalist>
+              </Field>
               <Field label="Default SMS country code" htmlFor="sms-country-code"><Input id="sms-country-code" name="defaultSmsCountryCode" defaultValue={page.defaultSmsCountryCode} /></Field>
-              <Field label="Google Analytics ID" htmlFor="analytics-id"><Input id="analytics-id" name="googleAnalyticsId" defaultValue={page.googleAnalyticsId ?? ""} /></Field>
             </div>
             <label className="flex items-center gap-2 text-sm text-ink-soft"><Checkbox name="noindex" defaultChecked={page.noindex} /> Ask search engines not to index this page</label>
             <div className="flex flex-col-reverse gap-3 border-t border-line pt-5 sm:flex-row sm:items-center sm:justify-between"><p className="text-xs text-ink-dim">Changes are saved to this page only.</p><PlatformSubmitButton pendingLabel="Saving…" className="w-full sm:w-auto">Save changes</PlatformSubmitButton></div>

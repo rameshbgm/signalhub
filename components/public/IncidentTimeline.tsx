@@ -10,7 +10,17 @@ import {
 } from "@/lib/status";
 import { formatPageDate, pageDateKey } from "@/lib/page-locale";
 
-type IncidentUpdateRow = { id: string; status: string; body: string; createdAt: Date };
+type IncidentUpdateRow = { id: string; status: string; body: string; createdAt: Date; editedAt?: Date | null };
+
+/** Public timelines disclose edits so a changed update is never silent. */
+function EditedNote({ editedAt, locale, timeZone }: { editedAt?: Date | null; locale: string; timeZone: string }) {
+  if (!editedAt) return null;
+  return (
+    <span className="ml-2 text-xs italic text-[var(--fg-dim)]">
+      (edited <time dateTime={editedAt.toISOString()}>{fmt(editedAt, locale, timeZone)}</time>)
+    </span>
+  );
+}
 export type IncidentRow = {
   id: string;
   name: string;
@@ -137,9 +147,10 @@ export function IncidentCard({
                     <h3 className="text-lg font-semibold text-[var(--fg)]">{update.displayStatus}</h3>
                     <span className="text-sm text-[var(--fg-soft)]">{relativeTimestamp(update.createdAt)}</span>
                   </div>
-                  <time className="mt-1 block text-sm text-[var(--fg)]" dateTime={update.createdAt.toISOString()}>
+                  <time className="mt-1 inline-block text-sm text-[var(--fg)]" dateTime={update.createdAt.toISOString()}>
                     {exactTimestamp(update.createdAt, locale, timeZone)}
                   </time>
+                  <EditedNote editedAt={update.editedAt} locale={locale} timeZone={timeZone} />
                   <p className="mt-2 whitespace-pre-wrap text-sm leading-7 text-[var(--fg)]">{update.body}</p>
                 </div>
               </li>
@@ -152,6 +163,7 @@ export function IncidentCard({
             <div key={update.id} className="text-sm">
               <span className="font-medium text-[var(--fg)]">{update.displayStatus}</span>
               <span className="ml-2 font-mono text-xs text-[var(--fg-dim)]">{fmt(update.createdAt, locale, timeZone)}</span>
+              <EditedNote editedAt={update.editedAt} locale={locale} timeZone={timeZone} />
               <p className="mt-1 whitespace-pre-wrap leading-relaxed text-[var(--fg-soft)]">{update.body}</p>
             </div>
           ))}

@@ -8,6 +8,7 @@ import {
   OrganizationMutationBlockedError,
 } from "@/lib/organization-mutation";
 import { getPublicPageBySlug } from "@/lib/pages";
+import { FALLBACK_RETENTION } from "@/lib/retention";
 
 const schema = z.object({
   pageSlug: z.string().trim().min(1).max(200),
@@ -65,7 +66,9 @@ export async function POST(request: NextRequest) {
           pageId: currentPage.id,
           date,
           ...initial,
-          expiresAt: new Date(Date.now() + 90 * 24 * 60 * 60_000),
+          // Informational only: the retention sweep deletes rows using the
+          // organization's configured analytics window.
+          expiresAt: new Date(Date.now() + FALLBACK_RETENTION.analyticsDays * 86_400_000),
           updatedAt: now,
         })
         .onConflict((conflict) => conflict.column("id").doUpdateSet({

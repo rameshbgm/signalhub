@@ -29,7 +29,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
     description: design.seo.description || page.aboutText || `Current availability and incident history for ${page.name}.`,
     openGraph: design.seo.socialImageUrl ? { images: [design.seo.socialImageUrl] } : undefined,
     ...publicFaviconMetadata(page.faviconUrl),
-    robots: page.type === "PUBLIC" && !design.seo.noIndex ? undefined : { index: false, follow: false },
+    robots: page.type === "PUBLIC" && !page.noindex && !design.seo.noIndex ? undefined : { index: false, follow: false },
   };
 }
 

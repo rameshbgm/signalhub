@@ -188,29 +188,32 @@ export async function savePostmortem(incidentId: string, formData: FormData) {
   const notify = formData.get("notify") === "on";
   if (publish && !body) throw new Error("A postmortem body is required before publishing");
   if (publish && incident.status !== "RESOLVED") throw new Error("Resolve the incident before publishing its postmortem");
-  const publishedAt = publish ? new Date() : null;
+  let firstPublish = false;
   await withDatabaseTransaction(async (transaction) => {
     await fenceActiveOrganizationMutation(session.orgId, transaction);
     const current = await transaction.selectFrom("incidents as incident")
       .innerJoin("pages as page", "page.id", "incident.pageId")
-      .select(["incident.id", "incident.name", "incident.status", "incident.pageWide", "page.id as pageId"])
+      .select(["incident.id", "incident.name", "incident.status", "incident.pageWide", "incident.postmortemPublishedAt", "page.id as pageId"])
       .where("incident.id", "=", incident.id).where("incident.isMaintenance", "=", false)
       .where("page.orgId", "=", session.orgId).forUpdate("incident").executeTakeFirst();
     if (!current) throw new Error("Incident not found");
     if (publish && current.status !== "RESOLVED") throw new Error("Resolve the incident before publishing its postmortem");
+    firstPublish = publish && !current.postmortemPublishedAt;
     await transaction.updateTable("incidents").set({
       postmortemBody: body || null,
-      postmortemPublishedAt: publishedAt,
+      // Edits to a published postmortem keep its original publication time.
+      postmortemPublishedAt: publish ? current.postmortemPublishedAt ?? new Date() : null,
     }).where("id", "=", current.id).execute();
-    if (publish && notify) {
+    // Subscribers hear about a postmortem once, when it is first published.
+    if (firstPublish && notify) {
       const links = await transaction.selectFrom("incidentComponents").select("componentId")
         .where("incidentId", "=", current.id).execute();
       await dispatchNotifications({
         pageId: current.pageId,
         subject: `[Postmortem] ${current.name}`,
-        body: "A postmortem has been published for this incident.",
+        body,
         eventType: "postmortem.published",
-        eventId: `${incidentId}:${publishedAt!.toISOString()}`,
+        eventId: `${incidentId}:postmortem`,
         componentIds: current.pageWide ? [] : links.map((link) => link.componentId),
       }, transaction);
     }
@@ -219,7 +222,7 @@ export async function savePostmortem(incidentId: string, formData: FormData) {
     action: publish ? "PUBLISH_POSTMORTEM" : "SAVE_POSTMORTEM",
     targetType: "incident",
     targetId: incidentId,
-    metadata: { pageId: incident.pageId, notified: publish && notify },
+    metadata: { pageId: incident.pageId, notified: firstPublish && notify },
   });
   revalidatePath(`/organization/incidents/${incidentId}`);
   revalidatePath(`/${await pageSlug(incident.pageId)}`);

@@ -36,7 +36,10 @@ export async function sealAuditEntries() {
     const entries = await transaction.selectFrom("platformAuditLogs").selectAll()
       .where("entryHash", "is", null).orderBy("createdAt").orderBy("id").limit(500).forUpdate().execute();
     if (!entries.length) return 0;
-    const sinks = await transaction.selectFrom("auditSinks").select(["id"]).where("enabled", "=", true).where("orgId", "is", null).execute();
+    // Installation-wide sinks receive every entry; organization sinks receive
+    // only entries about their organization.
+    const sinks = await transaction.selectFrom("auditSinks").select(["id", "orgId"]).where("enabled", "=", true).execute();
+    let enqueued = 0;
     for (const rawEntry of entries) {
       const entry = rawEntry as unknown as AuditEntry;
       sequence += 1;
@@ -45,7 +48,8 @@ export async function sealAuditEntries() {
         .set({ previousHash, entryHash: hash, chainSequence: sequence })
         .where("id", "=", entry.id).where("entryHash", "is", null).returning("id").executeTakeFirst();
       if (!updated) throw new Error("Audit chain changed while sealing");
-      for (const sink of sinks) {
+      for (const sink of sinks.filter((candidate) => !candidate.orgId || candidate.orgId === rawEntry.organizationId)) {
+        enqueued += 1;
         await transaction.insertInto("auditDeliveryJobs").values({
           sinkId: sink.id, deduplicationKey: `${sink.id}:${entry.id}`,
           payload: { scope: "platform", entry: canonical(entry), previousHash, entryHash: hash, chainSequence: sequence },
@@ -57,7 +61,7 @@ export async function sealAuditEntries() {
     }
     await transaction.updateTable("auditChainStates").set({ latestHash: previousHash, sequence, updatedAt: new Date() })
       .where("id", "=", "platform").execute();
-    if (sinks.length) await enqueueJobSweep(transaction, JOB_TASKS.auditDelivery);
+    if (enqueued) await enqueueJobSweep(transaction, JOB_TASKS.auditDelivery);
     return entries.length;
   });
 }
