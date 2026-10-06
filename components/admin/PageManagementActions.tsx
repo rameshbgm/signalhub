@@ -40,7 +40,7 @@ export function PageManagementActions({ page }: { page: PageManagementActionPage
         action={action}
         successMessage={actionMessage}
         className="relative flex"
-        messageClassName="absolute right-0 top-full z-10 mt-2 w-max max-w-64 rounded-control bg-surface ring-1 ring-line px-3 py-1.5 font-medium shadow-raised empty:border-0 empty:p-0 empty:shadow-none"
+        messageClassName="absolute right-0 top-full z-10 mt-2 w-max max-w-64 rounded-control border border-line bg-surface px-3 py-1.5 font-medium shadow-raised empty:border-0 empty:p-0 empty:shadow-none"
       >
         <PageSubmitButton
           variant={hiding ? "outline" : "default"}

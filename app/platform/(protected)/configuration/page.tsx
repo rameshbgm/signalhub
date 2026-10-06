@@ -105,7 +105,7 @@ export default async function PlatformConfigurationPage() {
               <fieldset className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 <legend className="sr-only">Enabled notification providers</legend>
                 {DESTINATION_CHANNELS.map((channel) => (
-                  <label key={channel} className="flex min-h-12 cursor-pointer items-center gap-3 rounded-control bg-surface ring-1 ring-line px-3.5 py-3 text-sm font-medium text-ink transition-colors duration-200 hover:border-primary/40 has-[:checked]:border-primary/40 has-[:checked]:bg-primary-soft">
+                  <label key={channel} className="flex min-h-12 cursor-pointer items-center gap-3 rounded-control border border-line bg-surface px-3.5 py-3 text-sm font-medium text-ink transition-colors duration-200 hover:border-primary/40 has-[:checked]:border-primary/40 has-[:checked]:bg-primary-soft">
                     <Checkbox name="enabledDestinationChannels" value={channel} defaultChecked={enabled.has(channel)} />
                     <span>{PROVIDER_LABELS[channel]}</span>
                   </label>
@@ -144,7 +144,7 @@ export default async function PlatformConfigurationPage() {
 
 function ManagementLink({ href, icon, hue, title, detail }: { href: string; icon: LucideIcon; hue: Hue; title: string; detail: string }) {
   return (
-    <Link href={href} className="group block rounded-card bg-surface shadow-card ring-1 ring-line/80 p-5 outline-none transition-[border-color,box-shadow,transform] duration-200 ease-soft hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-raised focus-visible:ring-4 focus-visible:ring-primary/25">
+    <Link href={href} className="group block rounded-card border border-line bg-surface shadow-card p-5 outline-none transition-[border-color,box-shadow,transform] duration-200 ease-soft hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-raised focus-visible:ring-4 focus-visible:ring-primary/25">
       <IconTile icon={icon} hue={hue} />
       <h2 className="mt-4 text-base font-semibold tracking-tight text-ink">{title}</h2>
       <p className="mt-1 text-sm leading-6 text-ink-soft">{detail}</p>

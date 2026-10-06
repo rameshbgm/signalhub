@@ -1,20 +1,21 @@
-/* SignalHub "Prism" design tokens: light only.
-   Direction: airy lilac canvas, white glass surfaces, a violet → fuchsia →
-   orange brand gradient, pill controls, gradient icon orbs and springy motion.
+/* SignalHub design tokens: light only.
+   Direction: professional console. Neutral canvas, white bordered surfaces,
+   restrained radii, violet brand with a gradient accent reserved for the
+   logo and hero moments, gradient icon tiles, quick subtle motion.
    `static` keeps every token in the output so components can also read them
    through var(--token) in arbitrary values, not just through utilities. */
 @theme static {
   /* Surfaces and lines */
-  --color-canvas: #f7f5ff;
+  --color-canvas: #f8f8fb;
   --color-surface: #ffffff;
-  --color-sunken: #f1eefb;
-  --color-line: #e7e3f5;
-  --color-line-strong: #d3cdea;
+  --color-sunken: #f3f3f8;
+  --color-line: #e6e6ee;
+  --color-line-strong: #d4d4de;
 
   /* Text. ink-dim stays above 4.6:1 on white; never go lighter for readable text. */
-  --color-ink: #1a1033;
-  --color-ink-soft: #4b4466;
-  --color-ink-dim: #6b6585;
+  --color-ink: #16131f;
+  --color-ink-soft: #4a4759;
+  --color-ink-dim: #6b6880;
 
   /* Brand */
   --color-primary: #7c3aed;
@@ -47,17 +48,17 @@
   --text-2xs: 0.6875rem;
   --text-2xs--line-height: 1rem;
 
-  /* Radius: controls are pills, containers are generous. */
-  --radius-chip: 0.5rem;
-  --radius-control: 0.875rem;
-  --radius-card: 1.5rem;
-  --radius-sheet: 1.75rem;
+  /* Radius: restrained. Controls 6px, cards 10px, dialogs 14px. */
+  --radius-chip: 0.25rem;
+  --radius-control: 0.375rem;
+  --radius-card: 0.625rem;
+  --radius-sheet: 0.875rem;
 
   /* Shadows: violet-tinted and soft */
-  --shadow-card: 0 1px 2px rgb(76 29 149 / 0.04), 0 4px 16px -6px rgb(76 29 149 / 0.08);
-  --shadow-raised: 0 2px 6px rgb(76 29 149 / 0.06), 0 14px 30px -10px rgb(76 29 149 / 0.18);
+  --shadow-card: 0 1px 2px rgb(15 23 42 / 0.05);
+  --shadow-raised: 0 1px 3px rgb(15 23 42 / 0.06), 0 8px 20px -8px rgb(15 23 42 / 0.14);
   --shadow-float: 0 6px 12px rgb(76 29 149 / 0.06), 0 30px 60px -16px rgb(76 29 149 / 0.3);
-  --shadow-primary: 0 2px 4px rgb(124 58 237 / 0.25), 0 10px 24px -8px rgb(219 39 119 / 0.5);
+  --shadow-primary: 0 1px 2px rgb(76 29 149 / 0.3), inset 0 1px 0 rgb(255 255 255 / 0.12);
 
   /* Motion */
   --ease-soft: cubic-bezier(0.22, 1, 0.36, 1);
@@ -79,8 +80,8 @@
 }
 
 @keyframes sh-rise {
-  from { opacity: 0; transform: translateY(14px); filter: blur(2px); }
-  to { opacity: 1; transform: none; filter: none; }
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
 }
 
 @keyframes sh-pop {
@@ -101,6 +102,11 @@
 @keyframes sh-bar-in {
   from { opacity: 0; transform: scaleY(0.1); }
   to { opacity: 1; transform: none; }
+}
+
+@keyframes sh-drawer {
+  from { transform: translateX(-100%); }
+  to { transform: none; }
 }
 
 @keyframes sh-sheet {
@@ -160,12 +166,6 @@
 /* Aurora wash behind every signed-in and auth canvas. */
 @utility bg-wash {
   background-color: var(--color-canvas);
-  background-image:
-    radial-gradient(48rem 28rem at 0% -10%, color-mix(in srgb, var(--color-primary) 13%, transparent), transparent 70%),
-    radial-gradient(40rem 24rem at 100% -6%, color-mix(in srgb, var(--color-accent) 10%, transparent), transparent 70%),
-    radial-gradient(36rem 30rem at 60% 120%, color-mix(in srgb, #06b6d4 8%, transparent), transparent 70%);
-  background-attachment: fixed;
-  background-repeat: no-repeat;
 }
 
 /* Frosted glass panel. */

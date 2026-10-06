@@ -261,9 +261,9 @@ export default async function SubscribersPage({ searchParams }: { searchParams: 
 
 function Stat({ label, value, note, icon, hue }: { label: string; value: number; note?: string; icon: LucideIcon; hue: Hue }) {
   return (
-    <div className="rounded-card bg-surface shadow-card ring-1 ring-line/80 p-5">
+    <div className="rounded-card border border-line bg-surface shadow-card p-5">
       <IconTile icon={icon} hue={hue} />
-      <p className="mt-4 text-3xl font-extrabold tabular-nums tracking-tight text-ink">{value}</p>
+      <p className="mt-4 text-3xl font-bold tabular-nums tracking-tight text-ink">{value}</p>
       <p className="mt-0.5 text-sm text-ink-soft">{label}</p>
       {note && <p className="mt-1 text-xs text-ink-dim">{note}</p>}
     </div>

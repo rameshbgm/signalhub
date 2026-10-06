@@ -292,7 +292,7 @@ export function AssetUploader({
   const formats = kind === "FAVICON" ? "PNG, WebP or ICO." : "PNG, JPEG, WebP or AVIF.";
 
   return (
-    <div className="space-y-4 rounded-control bg-surface ring-1 ring-line p-4">
+    <div className="space-y-4 rounded-control border border-line bg-surface p-4">
       <div>
         <p className="text-sm font-semibold text-ink">{label}</p>
         <p className="mt-0.5 text-xs leading-5 text-ink-dim">{help}</p>

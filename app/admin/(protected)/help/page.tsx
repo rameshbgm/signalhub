@@ -60,14 +60,14 @@ export default async function HelpCenterPage({ searchParams }: { searchParams: P
           <section key={cat.slug} aria-label={cat.label}>
             <div className="mb-4 flex items-center gap-3">
               <IconTile icon={icon} hue={hue} size="sm" />
-              <h2 className="text-lg font-bold tracking-tight text-ink">{cat.label}</h2>
+              <h2 className="text-lg font-semibold tracking-tight text-ink">{cat.label}</h2>
             </div>
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
               {cat.articles.map((a) => (
                 <Link
                   key={a.slug}
                   href={`/organization/help/${cat.slug}/${a.slug}`}
-                  className="group flex items-start justify-between gap-3 rounded-card bg-surface shadow-card ring-1 ring-line/80 p-4 outline-none transition-[border-color,box-shadow,transform] duration-200 ease-soft hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-raised focus-visible:ring-4 focus-visible:ring-primary/25"
+                  className="group flex items-start justify-between gap-3 rounded-card border border-line bg-surface shadow-card p-4 outline-none transition-[border-color,box-shadow,transform] duration-200 ease-soft hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-raised focus-visible:ring-4 focus-visible:ring-primary/25"
                 >
                   <span className="min-w-0">
                     <span className="block text-sm font-semibold text-ink">{a.title}</span>

@@ -2,13 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Activity, ChevronDown, PanelsTopLeft, Search, X } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { IconTile } from "@/components/ui/icon-tile";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { Activity, ChevronRight, Menu, PanelLeftClose, PanelLeftOpen, PanelsTopLeft, Search, X } from "lucide-react";
 import { LogoutButton } from "@/components/admin/LogoutButton";
-import { activeNav, AdminNavList, isActivePath, visibleSections, type NavSection } from "@/components/admin/AdminNav";
+import { activeNav, isActivePath, visibleSections, type NavSection } from "@/components/admin/AdminNav";
 import { CommandPalette, type PaletteEntry } from "@/components/admin/CommandPalette";
+import { IconTile } from "@/components/ui/icon-tile";
 import { cn } from "@/lib/utils";
 import type { Capability } from "@/lib/identity";
 
@@ -17,91 +16,78 @@ type ShellPage = { id: string; name: string };
 
 function BrandMark({ className }: { className?: string }) {
   return (
-    <span aria-hidden="true" className={cn("inline-grid size-9 place-items-center rounded-[0.8rem] bg-prism text-white shadow-primary animate-gradient", className)}>
-      <Activity size={18} strokeWidth={2.5} />
+    <span aria-hidden="true" className={cn("inline-grid size-8 shrink-0 place-items-center rounded-[0.5rem] bg-prism text-white shadow-primary", className)}>
+      <Activity size={17} strokeWidth={2.5} />
     </span>
   );
 }
 
-function Avatar({ name, className }: { name: string; className?: string }) {
+function Brand({ collapsed = false }: { collapsed?: boolean }) {
   return (
-    <span aria-hidden="true" className={cn("grid size-8 shrink-0 place-items-center rounded-full bg-gradient-to-br from-fuchsia-500 to-orange-400 text-sm font-bold text-white", className)}>
-      {name.slice(0, 1).toUpperCase()}
-    </span>
+    <Link href="/organization" aria-label="SignalHub dashboard" className="flex min-w-0 items-center gap-2.5 rounded-control text-[0.9375rem] font-bold tracking-tight text-ink outline-none focus-visible:ring-[3px] focus-visible:ring-primary/30">
+      <BrandMark />
+      {!collapsed && <span className="truncate">SignalHub</span>}
+    </Link>
   );
 }
 
-/** Closes a popover on outside click or Escape. */
-function useDismiss(open: boolean, close: () => void) {
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!open) return;
-    const onDown = (event: MouseEvent) => { if (ref.current && !ref.current.contains(event.target as Node)) close(); };
-    const onKey = (event: KeyboardEvent) => { if (event.key === "Escape") close(); };
-    document.addEventListener("mousedown", onDown);
-    document.addEventListener("keydown", onKey);
-    return () => { document.removeEventListener("mousedown", onDown); document.removeEventListener("keydown", onKey); };
-  }, [open, close]);
-  return ref;
+/** Grouped section links. `collapsed` shows icons only, with the label as a hover tip. */
+function SidebarNav({ sections, pathname, collapsed = false, onNavigate }: { sections: NavSection[]; pathname: string; collapsed?: boolean; onNavigate?: () => void }) {
+  return (
+    <nav aria-label="Main" className="space-y-5">
+      {sections.map((section) => (
+        <div key={section.id}>
+          {collapsed
+            ? <div aria-hidden="true" className="mx-auto mb-2 h-px w-6 bg-line first:hidden" />
+            : <p className="mb-1.5 px-2.5 text-2xs font-semibold uppercase tracking-[0.08em] text-ink-dim">{section.label}</p>}
+          <ul className="space-y-0.5">
+            {section.items.map((item) => {
+              const active = isActivePath(pathname, item.href);
+              return (
+                <li key={item.href}>
+                  <Link
+                    href={item.href}
+                    onClick={onNavigate}
+                    aria-current={active ? "page" : undefined}
+                    aria-label={collapsed ? item.label : undefined}
+                    className={cn(
+                      "group relative flex h-9 items-center gap-2.5 rounded-control px-2 text-sm outline-none transition-colors duration-150 focus-visible:ring-[3px] focus-visible:ring-primary/30",
+                      collapsed && "justify-center px-0",
+                      active ? "bg-primary-soft font-semibold text-primary-ink" : "font-medium text-ink-soft hover:bg-sunken hover:text-ink",
+                    )}
+                  >
+                    {active && <span aria-hidden="true" className="absolute -left-3 top-1.5 bottom-1.5 w-[3px] rounded-r-full bg-primary" />}
+                    <IconTile icon={item.icon} hue={item.hue} size="sm" className={cn("size-6 rounded-[0.3rem] transition-[filter,opacity] duration-150 [&_svg]:size-3.5", !active && "opacity-85 saturate-[0.85] group-hover:opacity-100 group-hover:saturate-100")} />
+                    {!collapsed && <span className="min-w-0 flex-1 truncate">{item.label}</span>}
+                    {collapsed && (
+                      <span role="presentation" className="pointer-events-none absolute left-full z-50 ml-3 whitespace-nowrap rounded-control bg-ink px-2 py-1 text-xs font-medium text-white opacity-0 shadow-raised transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100">
+                        {item.label}
+                      </span>
+                    )}
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      ))}
+    </nav>
+  );
 }
 
-function UserMenu({ user }: { user: ShellUser }) {
-  const [open, setOpen] = useState(false);
-  const ref = useDismiss(open, () => setOpen(false));
+function UserFooter({ user, collapsed = false }: { user: ShellUser; collapsed?: boolean }) {
   return (
-    <div ref={ref} className="relative">
-      <button
-        type="button"
-        aria-label="Account menu"
-        aria-expanded={open}
-        onClick={() => setOpen((value) => !value)}
-        className="grid place-items-center rounded-full outline-none ring-2 ring-transparent transition-all duration-200 hover:ring-accent/30 focus-visible:ring-4 focus-visible:ring-primary/25"
-      >
-        <Avatar name={user.name} className="size-9" />
-      </button>
-      {open && (
-        <div className="absolute right-0 top-full z-50 mt-2 w-64 origin-top-right animate-drop rounded-card bg-surface p-2 shadow-float ring-1 ring-line">
-          <div className="flex items-center gap-3 rounded-control bg-gradient-to-r from-primary-soft to-transparent p-3">
-            <Avatar name={user.name} className="size-10" />
-            <div className="min-w-0">
-              <p className="truncate text-sm font-bold text-ink">{user.name}</p>
-              <p className="truncate text-xs text-ink-dim">{user.email}</p>
-            </div>
-          </div>
-          <div className="mt-1"><LogoutButton /></div>
+    <div className={cn("flex items-center gap-2.5 border-t border-line p-3", collapsed && "flex-col")}>
+      <span aria-hidden="true" title={collapsed ? `${user.name} · ${user.email}` : undefined} className="grid size-8 shrink-0 place-items-center rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 text-xs font-bold text-white">
+        {user.name.slice(0, 1).toUpperCase()}
+      </span>
+      {!collapsed && (
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-semibold text-ink">{user.name}</p>
+          <p className="truncate text-xs text-ink-dim">{user.email}</p>
         </div>
       )}
-    </div>
-  );
-}
-
-function SectionMenu({ section, active, pathname }: { section: NavSection; active: boolean; pathname: string }) {
-  const [open, setOpen] = useState(false);
-  const ref = useDismiss(open, () => setOpen(false));
-  const Icon = section.icon;
-  const single = section.items.length === 1;
-  const trigger = cn(
-    "group relative flex h-9 items-center gap-1.5 whitespace-nowrap rounded-full px-3 text-sm font-semibold outline-none transition-all duration-200 ease-soft focus-visible:ring-4 focus-visible:ring-primary/25",
-    active ? "bg-ink text-white shadow-raised" : "text-ink-soft hover:bg-surface hover:text-ink hover:shadow-card",
-  );
-  const icon = <span data-hue={section.hue} className={cn("transition-transform duration-300 ease-spring group-hover:scale-125", active ? "text-[var(--hue-from)]" : "text-[var(--hue-to)]")}><Icon aria-hidden size={16} /></span>;
-
-  if (single) {
-    const item = section.items[0];
-    return <Link href={item.href} aria-current={isActivePath(pathname, item.href) ? "page" : undefined} className={trigger}>{icon}{section.label}</Link>;
-  }
-  return (
-    <div ref={ref} className="relative">
-      <button type="button" aria-expanded={open} aria-haspopup="true" onClick={() => setOpen((value) => !value)} className={trigger}>
-        {icon}
-        {section.label}
-        <ChevronDown aria-hidden size={14} className={cn("transition-transform duration-200", open && "rotate-180")} />
-      </button>
-      {open && (
-        <div className="absolute left-0 top-full z-50 mt-2 w-72 origin-top-left animate-drop rounded-card bg-surface p-2 shadow-float ring-1 ring-line">
-          <AdminNavList section={section} pathname={pathname} onNavigate={() => setOpen(false)} />
-        </div>
-      )}
+      <LogoutButton compact />
     </div>
   );
 }
@@ -123,11 +109,11 @@ export function AdminShell({
   const focusedFlow = pathname === "/organization/pages/new" || /^\/organization\/pages\/[^/]+\/setup\//.test(pathname);
   const sections = useMemo(() => visibleSections(capabilities), [capabilities]);
   const current = activeNav(sections, pathname);
-  const activeSection: NavSection | undefined = current?.section ?? sections[0];
 
-  const [sheet, setSheet] = useState<{ path: string; id: string } | null>(null);
+  const [collapsed, setCollapsed] = useState(false);
+  const [drawerPath, setDrawerPath] = useState<string | null>(null);
+  const drawerOpen = drawerPath === pathname;
   const [paletteOpen, setPaletteOpen] = useState(false);
-  const sheetSection = sheet && sheet.path === pathname ? sections.find((section) => section.id === sheet.id) : undefined;
 
   const entries = useMemo<PaletteEntry[]>(() => [
     ...sections.flatMap((section) => section.items.map((item) => ({ href: item.href, label: item.label, group: section.label, icon: item.icon, hue: item.hue }))),
@@ -146,133 +132,97 @@ export function AdminShell({
   }, []);
 
   useEffect(() => {
-    if (!sheetSection) return;
-    const onKey = (event: KeyboardEvent) => { if (event.key === "Escape") setSheet(null); };
+    if (!drawerOpen) return;
+    const onKey = (event: KeyboardEvent) => { if (event.key === "Escape") setDrawerPath(null); };
     const previous = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     document.addEventListener("keydown", onKey);
     return () => { document.body.style.overflow = previous; document.removeEventListener("keydown", onKey); };
-  }, [sheetSection]);
+  }, [drawerOpen]);
 
-  const skipLink = <a href="#main" className="sr-only z-[4000] rounded-full bg-surface px-4 py-2 text-sm font-semibold text-primary-ink shadow-float focus:not-sr-only focus:fixed focus:left-3 focus:top-3">Skip to content</a>;
-  const brand = (
-    <Link href="/organization" className="flex shrink-0 items-center gap-2.5 rounded-control text-[0.95rem] font-extrabold tracking-tight outline-none focus-visible:ring-4 focus-visible:ring-primary/25">
-      <BrandMark /> <span>Signal<span className="text-prism">Hub</span></span>
-    </Link>
-  );
+  const skipLink = <a href="#main" className="sr-only z-[4000] rounded-control bg-surface px-3 py-2 text-sm font-semibold text-primary-ink shadow-raised focus:not-sr-only focus:fixed focus:left-3 focus:top-3">Skip to content</a>;
 
   if (focusedFlow) {
     return (
-      <div className="min-h-screen bg-wash text-ink">
+      <div className="min-h-screen bg-canvas text-ink">
         {skipLink}
-        <div className="flex h-16 items-center px-4 sm:px-8">{brand}</div>
-        <main id="main" className="animate-rise">{children}</main>
+        <div className="flex h-14 items-center border-b border-line bg-surface px-4 sm:px-6"><Brand /></div>
+        <main id="main">{children}</main>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-wash text-ink">
+    <div className="min-h-screen bg-canvas text-ink lg:flex">
       {skipLink}
 
-      {/* Top bar */}
-      <header className="sticky top-0 z-40 px-3 pt-3 sm:px-5">
-        <div className="glass mx-auto flex h-14 max-w-[92rem] items-center gap-3 rounded-full py-2 pl-3 pr-2 shadow-raised ring-1 ring-white/70 sm:pl-4">
-          {brand}
-          <nav aria-label="Sections" className="ml-2 hidden min-w-0 items-center gap-0.5 lg:flex">
-            {sections.map((section) => (
-              <SectionMenu key={section.id} section={section} active={activeSection?.id === section.id} pathname={pathname} />
-            ))}
-          </nav>
-          <div className="ml-auto flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setPaletteOpen(true)}
-              aria-label="Jump to a screen or page"
-              className="flex h-9 items-center gap-2 rounded-full bg-sunken px-3 text-sm text-ink-dim outline-none transition-all duration-200 hover:bg-primary-soft hover:text-primary-ink focus-visible:ring-4 focus-visible:ring-primary/25 2xl:w-56"
-            >
-              <Search aria-hidden size={15} />
-              <span className="hidden flex-1 text-left 2xl:inline">Search…</span>
-              <kbd className="hidden rounded-md bg-surface px-1.5 py-0.5 font-mono text-2xs font-semibold text-ink-soft shadow-card 2xl:inline">⌘K</kbd>
-            </button>
-            <div className="hidden max-w-52 sm:block">{orgSwitcher}</div>
-            <UserMenu user={user} />
-          </div>
+      {/* Sidebar */}
+      <aside
+        aria-label="Sidebar"
+        className={cn(
+          "sticky top-0 hidden h-screen shrink-0 flex-col border-r border-line bg-surface transition-[width] duration-200 ease-soft lg:flex",
+          collapsed ? "w-[4.25rem]" : "w-64",
+        )}
+      >
+        <div className={cn("flex h-14 shrink-0 items-center border-b border-line px-4", collapsed && "justify-center px-0")}>
+          <Brand collapsed={collapsed} />
         </div>
-      </header>
-
-      {/* In-section tabs */}
-      {activeSection && activeSection.items.length > 1 && (
-        <div className="mx-auto hidden max-w-[92rem] px-5 pt-5 lg:block lg:px-10">
-          <nav aria-label={`${activeSection.label} screens`} className="flex flex-wrap gap-1.5">
-            {activeSection.items.map((item) => {
-              const active = isActivePath(pathname, item.href);
-              const Icon = item.icon;
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  aria-current={active ? "page" : undefined}
-                  data-hue={item.hue}
-                  className={cn(
-                    "group flex h-8 items-center gap-1.5 rounded-full px-3 text-xs font-semibold outline-none transition-all duration-200 ease-soft focus-visible:ring-4 focus-visible:ring-primary/25",
-                    active ? "bg-gradient-to-r from-[var(--hue-from)] to-[var(--hue-to)] text-white shadow-[0_6px_16px_-8px_var(--hue-to)]" : "bg-surface/70 text-ink-soft ring-1 ring-line hover:-translate-y-px hover:text-[var(--hue-fg)] hover:ring-[var(--hue-from)]",
-                  )}
-                >
-                  <Icon aria-hidden size={14} className="transition-transform duration-300 ease-spring group-hover:scale-125" />
-                  {item.label}
-                </Link>
-              );
-            })}
-          </nav>
+        {!collapsed && <div className="border-b border-line p-3">{orgSwitcher}</div>}
+        <div className="min-h-0 flex-1 overflow-y-auto px-3 py-4 [scrollbar-width:thin]">
+          <SidebarNav sections={sections} pathname={pathname} collapsed={collapsed} />
         </div>
-      )}
+        <UserFooter user={user} collapsed={collapsed} />
+      </aside>
 
-      <main id="main" className="mx-auto w-full max-w-[92rem] px-4 pb-32 pt-6 sm:px-6 lg:px-10 lg:pb-14 lg:pt-7">
-        <div key={pathname} className="animate-rise">{children}</div>
-      </main>
+      <div className="min-w-0 flex-1">
+        {/* Header */}
+        <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-line bg-surface/85 px-4 backdrop-blur-md sm:px-6">
+          <button type="button" aria-label="Open menu" onClick={() => setDrawerPath(pathname)} className="grid size-9 place-items-center rounded-control text-ink-soft outline-none hover:bg-sunken focus-visible:ring-[3px] focus-visible:ring-primary/30 lg:hidden">
+            <Menu aria-hidden size={18} />
+          </button>
+          <button type="button" aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"} aria-pressed={collapsed} onClick={() => setCollapsed((value) => !value)} className="hidden size-8 place-items-center rounded-control text-ink-dim outline-none hover:bg-sunken hover:text-ink focus-visible:ring-[3px] focus-visible:ring-primary/30 lg:grid">
+            {collapsed ? <PanelLeftOpen aria-hidden size={17} /> : <PanelLeftClose aria-hidden size={17} />}
+          </button>
+          <div className="lg:hidden"><Brand /></div>
+          <p aria-label="Current location" className="hidden min-w-0 items-center gap-1.5 text-sm lg:flex">
+            {current ? (
+              <>
+                <span className="text-ink-dim">{current.section.label}</span>
+                <ChevronRight aria-hidden size={14} className="shrink-0 text-ink-dim/70" />
+                <span className="truncate font-semibold text-ink">{current.item.label}</span>
+              </>
+            ) : <span className="font-semibold text-ink">SignalHub</span>}
+          </p>
+          <button
+            type="button"
+            onClick={() => setPaletteOpen(true)}
+            aria-label="Search or jump to a screen"
+            className="ml-auto flex h-9 items-center gap-2 rounded-control border border-line bg-canvas px-2.5 text-sm text-ink-dim outline-none transition-colors duration-150 hover:border-line-strong hover:text-ink-soft focus-visible:ring-[3px] focus-visible:ring-primary/30 sm:w-72"
+          >
+            <Search aria-hidden size={15} />
+            <span className="hidden flex-1 text-left sm:inline">Search…</span>
+            <kbd className="hidden rounded-chip border border-line bg-surface px-1.5 font-mono text-2xs text-ink-soft sm:inline">⌘K</kbd>
+          </button>
+        </header>
 
-      {/* Mobile dock */}
-      <nav aria-label="Sections" className="fixed inset-x-3 bottom-3 z-30 pb-[env(safe-area-inset-bottom)] lg:hidden">
-        <ul className="glass mx-auto flex max-w-xl items-stretch justify-around rounded-[1.75rem] p-1.5 shadow-float ring-1 ring-white/70">
-          {sections.map((section) => {
-            const active = activeSection?.id === section.id;
-            const Icon = section.icon;
-            return (
-              <li key={section.id} className="min-w-0 flex-1" data-hue={section.hue}>
-                <button
-                  type="button"
-                  aria-haspopup="dialog"
-                  aria-current={active ? "true" : undefined}
-                  onClick={() => setSheet({ path: pathname, id: section.id })}
-                  className={cn("flex h-14 w-full flex-col items-center justify-center gap-0.5 rounded-[1.4rem] outline-none transition-all duration-200 focus-visible:ring-4 focus-visible:ring-inset focus-visible:ring-primary/25", active ? "bg-gradient-to-br from-[var(--hue-from)] to-[var(--hue-to)] text-white shadow-[0_8px_18px_-8px_var(--hue-to)]" : "text-ink-dim")}
-                >
-                  <Icon aria-hidden size={20} />
-                  <span className="max-w-full truncate text-2xs font-semibold">{section.tabLabel ?? section.label}</span>
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-      </nav>
+        <main id="main" className="mx-auto w-full max-w-[84rem] px-4 pb-16 pt-6 sm:px-6 lg:px-8 lg:pt-8">
+          <div key={pathname} className="animate-rise">{children}</div>
+        </main>
+      </div>
 
-      {/* Mobile sheet */}
-      {sheetSection && (
-        <div className="fixed inset-0 z-50 flex animate-fade items-end bg-ink/30 backdrop-blur-md lg:hidden" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setSheet(null); }}>
-          <div role="dialog" aria-modal="true" aria-label={`${sheetSection.label} menu`} className="max-h-[85vh] w-full animate-sheet overflow-y-auto rounded-t-sheet bg-surface pb-[env(safe-area-inset-bottom)] shadow-float">
-            <div className="mx-auto mt-2.5 h-1.5 w-10 rounded-full bg-line-strong" />
-            <div className="flex items-center justify-between px-5 pb-2 pt-3">
-              <div className="flex items-center gap-3">
-                <IconTile icon={sheetSection.icon} hue={sheetSection.hue} />
-                <h2 className="text-lg font-extrabold tracking-tight">{sheetSection.label}</h2>
-              </div>
-              <Button type="button" variant="ghost" size="icon" aria-label="Close menu" onClick={() => setSheet(null)}><X aria-hidden size={18} /></Button>
+      {/* Mobile drawer */}
+      {drawerOpen && (
+        <div className="fixed inset-0 z-50 animate-fade bg-ink/40 lg:hidden" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setDrawerPath(null); }}>
+          <div role="dialog" aria-modal="true" aria-label="Menu" className="flex h-full w-[min(18rem,86vw)] animate-[sh-drawer_220ms_var(--ease-soft)_both] flex-col border-r border-line bg-surface shadow-float">
+            <div className="flex h-14 shrink-0 items-center justify-between border-b border-line px-4">
+              <Brand />
+              <button type="button" aria-label="Close menu" onClick={() => setDrawerPath(null)} className="grid size-9 place-items-center rounded-control text-ink-soft outline-none hover:bg-sunken focus-visible:ring-[3px] focus-visible:ring-primary/30"><X aria-hidden size={18} /></button>
             </div>
-            <div className="px-4 pb-2 sm:hidden">{orgSwitcher}</div>
-            <div className="px-3 py-3">
-              <AdminNavList section={sheetSection} pathname={pathname} onNavigate={() => setSheet(null)} />
+            <div className="border-b border-line p-3">{orgSwitcher}</div>
+            <div className="min-h-0 flex-1 overflow-y-auto px-3 py-4">
+              <SidebarNav sections={sections} pathname={pathname} onNavigate={() => setDrawerPath(null)} />
             </div>
-            <div className="border-t border-line p-3"><LogoutButton /></div>
+            <UserFooter user={user} />
           </div>
         </div>
       )}

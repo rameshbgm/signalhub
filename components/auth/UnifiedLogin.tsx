@@ -65,30 +65,30 @@ export function UnifiedLogin({ returnTo }: { returnTo: string | null }) {
   return (
     <div className="min-h-screen bg-wash text-ink lg:grid lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
       <main className="flex min-h-screen flex-col px-6 py-8 sm:px-12 lg:order-2 lg:min-h-0">
-        <Link href="/" className="flex w-fit items-center gap-2.5 rounded-control text-base font-extrabold tracking-tight outline-none focus-visible:ring-4 focus-visible:ring-primary/25">
-          <span aria-hidden="true" className="inline-grid size-9 place-items-center rounded-[0.8rem] bg-prism text-white shadow-primary">
+        <Link href="/" className="flex w-fit items-center gap-2.5 rounded-control text-base font-bold tracking-tight outline-none focus-visible:ring-4 focus-visible:ring-primary/25">
+          <span aria-hidden="true" className="inline-grid size-9 place-items-center rounded-[0.5rem] bg-prism text-white shadow-primary">
             <Activity size={18} strokeWidth={2.25} />
           </span>
           SignalHub
         </Link>
 
         <div className="m-auto w-full max-w-sm animate-rise py-12">
-          <h1 className="text-4xl font-extrabold tracking-[-0.035em]">Welcome <span className="text-prism">back</span></h1>
+          <h1 className="text-3xl font-bold tracking-[-0.025em]">Sign in</h1>
           <p className="mt-2 text-sm leading-6 text-ink-soft">Use your SignalHub User ID to continue.</p>
 
           <form onSubmit={submit} className="mt-8 space-y-4">
             <div className="space-y-1.5">
               <Label htmlFor="login-username">User ID</Label>
-              <Input id="login-username" suppressHydrationWarning value={username} onChange={(event) => setUsername(event.target.value)} autoComplete="username" placeholder="User ID" disabled={mfaRequired} required className="h-12 px-4" />
+              <Input id="login-username" suppressHydrationWarning value={username} onChange={(event) => setUsername(event.target.value)} autoComplete="username" placeholder="User ID" disabled={mfaRequired} required className="h-10" />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="login-password">Password</Label>
-              <Input id="login-password" suppressHydrationWarning value={password} onChange={(event) => setPassword(event.target.value)} type="password" autoComplete="current-password" placeholder="Password" disabled={mfaRequired} required className="h-12 px-4" />
+              <Input id="login-password" suppressHydrationWarning value={password} onChange={(event) => setPassword(event.target.value)} type="password" autoComplete="current-password" placeholder="Password" disabled={mfaRequired} required className="h-10" />
             </div>
             {mfaRequired && (
               <div className="space-y-1.5">
                 <Label htmlFor="login-code">Authenticator code</Label>
-                <Input id="login-code" suppressHydrationWarning value={code} onChange={(event) => setCode(event.target.value.replace(/\D/g, "").slice(0, 6))} inputMode="numeric" autoComplete="one-time-code" placeholder="6-digit authenticator code" required className="h-12 px-4" />
+                <Input id="login-code" suppressHydrationWarning value={code} onChange={(event) => setCode(event.target.value.replace(/\D/g, "").slice(0, 6))} inputMode="numeric" autoComplete="one-time-code" placeholder="6-digit authenticator code" required className="h-10" />
               </div>
             )}
             {error && <Alert tone="danger">{error}</Alert>}
@@ -105,12 +105,12 @@ export function UnifiedLogin({ returnTo }: { returnTo: string | null }) {
         </div>
       </main>
 
-      <aside aria-hidden="true" className="relative m-3 hidden animate-gradient overflow-hidden rounded-[2rem] bg-prism lg:order-1 lg:block">
+      <aside aria-hidden="true" className="relative m-3 hidden overflow-hidden rounded-card bg-prism lg:order-1 lg:block">
         <div className="absolute -right-24 -top-24 size-96 animate-float rounded-full bg-white/15 blur-3xl" />
         <div className="absolute -bottom-32 -left-16 size-[28rem] animate-float rounded-full bg-amber-200/25 blur-3xl [animation-delay:-3s]" />
         <div className="relative flex h-full flex-col justify-center gap-10 px-14 py-16 xl:px-20">
           <div className="max-w-md text-white">
-            <p className="text-4xl font-extrabold leading-[1.05] tracking-[-0.035em] xl:text-5xl">Know first.<br />Tell everyone.</p>
+            <p className="text-4xl font-bold leading-[1.08] tracking-[-0.03em]">Know first.<br />Tell everyone.</p>
             <p className="mt-4 text-base leading-7 text-white/80">Status pages, incidents, and subscriber updates on infrastructure you own.</p>
           </div>
           <PreviewCard />
@@ -131,7 +131,7 @@ const PREVIEW_ROWS = [
 /** A miniature public status page. The bars draw in once on load, then it stays still. */
 function PreviewCard() {
   return (
-    <div className="w-full max-w-md -rotate-1 rounded-sheet bg-white/90 p-5 shadow-float ring-1 ring-white/60 backdrop-blur transition-transform duration-500 ease-spring hover:rotate-0">
+    <div className="w-full max-w-md rounded-card bg-white/95 p-5 shadow-float">
       <div className="flex items-center gap-3 rounded-card bg-ok-bg px-4 py-3 text-ok-fg">
         <span className="size-2.5 rounded-full bg-ok animate-pulse-ring" />
         <span className="text-sm font-semibold">All systems operational</span>

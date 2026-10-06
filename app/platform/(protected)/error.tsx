@@ -18,7 +18,7 @@ export default function PlatformError({
       <CardContent className="flex flex-col gap-4 p-6 sm:flex-row sm:items-start">
         <IconTile icon={AlertTriangle} hue="rose" size="lg" />
         <div className="min-w-0">
-          <h1 className="text-xl font-bold tracking-tight text-ink">
+          <h1 className="text-xl font-semibold tracking-tight text-ink">
             The platform action could not be completed
           </h1>
           <p className="mt-1.5 text-sm leading-6 text-ink-soft">

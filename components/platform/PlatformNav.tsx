@@ -31,8 +31,8 @@ export function PlatformNav() {
   }, [pathname]);
 
   return (
-    <nav aria-label="Platform administration" className="-mx-1 overflow-x-auto px-1 py-1 [scrollbar-width:none]">
-      <ul className="flex w-max min-w-full gap-1.5">
+    <nav aria-label="Platform administration" className="overflow-x-auto border-b border-line [scrollbar-width:none]">
+      <ul className="flex w-max min-w-full gap-1">
         {TABS.map(({ href, label, icon: Icon, hue }) => {
           const active = isActive(pathname, href);
           return (
@@ -42,11 +42,11 @@ export function PlatformNav() {
                 href={href}
                 aria-current={active ? "page" : undefined}
                 className={cn(
-                  "group inline-flex min-h-10 items-center gap-2 whitespace-nowrap rounded-full px-4 text-sm font-semibold outline-none transition-all duration-200 ease-soft focus-visible:ring-4 focus-visible:ring-primary/25",
-                  active ? "bg-gradient-to-r from-[var(--hue-from)] to-[var(--hue-to)] text-white shadow-[0_8px_18px_-8px_var(--hue-to)]" : "bg-surface text-ink-soft shadow-card ring-1 ring-line hover:-translate-y-px hover:text-[var(--hue-fg)]",
+                  "-mb-px inline-flex h-10 items-center gap-2 whitespace-nowrap border-b-2 px-3 text-sm font-medium outline-none transition-colors duration-150 focus-visible:ring-[3px] focus-visible:ring-inset focus-visible:ring-primary/30",
+                  active ? "border-primary text-ink" : "border-transparent text-ink-soft hover:border-line-strong hover:text-ink",
                 )}
               >
-                <Icon aria-hidden size={16} className="transition-transform duration-300 ease-spring group-hover:scale-125" />
+                <Icon aria-hidden size={16} className={active ? "text-[var(--hue-fg)]" : "text-ink-dim"} />
                 {label}
               </Link>
             </li>

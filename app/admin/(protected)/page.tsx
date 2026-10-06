@@ -145,15 +145,14 @@ export default async function AdminDashboard() {
     <div className="space-y-8">
       <PageHeader title="Dashboard" description={`Everything happening across ${org.name}, at a glance.`} icon={LayoutDashboard} hue="indigo" />
 
-      <section aria-label="Overall health" className={cn("relative flex flex-wrap items-center gap-5 overflow-hidden rounded-sheet p-6 sm:p-8", HERO_TONE[tone])}>
-        <span aria-hidden="true" className="pointer-events-none absolute -right-16 -top-20 size-72 animate-float rounded-full bg-white/20 blur-2xl" />
-        <span aria-hidden="true" className="relative grid size-16 animate-pop place-items-center rounded-[1.4rem] bg-white/20 text-white ring-1 ring-white/40 backdrop-blur"><HeroIcon size={30} /></span>
-        <div className="relative min-w-0 flex-1 text-white">
-          <p className="flex items-center gap-2.5 text-2xl font-extrabold tracking-tight sm:text-3xl">
-            {tone === "ok" && <span aria-hidden="true" className="size-3 shrink-0 rounded-full bg-white text-white animate-pulse-ring" />}
+      <section aria-label="Overall health" className={cn("flex flex-wrap items-center gap-4 rounded-card border p-5", HERO_TONE[tone])}>
+        <span aria-hidden="true" className="grid size-11 place-items-center rounded-[0.625rem] bg-current/10 [&>svg]:text-current"><HeroIcon size={22} /></span>
+        <div className="min-w-0 flex-1">
+          <p className="flex items-center gap-2 text-lg font-semibold tracking-tight text-ink">
+            {tone === "ok" && <span aria-hidden="true" className="size-2 shrink-0 rounded-full bg-ok text-ok animate-pulse-ring" />}
             {healthBanner?.label ?? "Health data unavailable"}
           </p>
-          <p className="mt-1 text-sm text-white/85">
+          <p className="mt-0.5 text-sm text-ink-soft">
             {pages.length === 0
               ? "Create a page to start tracking the health of your services."
               : `Tracking ${plural(pages.length, "page")}, ${plural(componentDocs.length, "component")}, and ${plural(monitorDocs.length, "active monitor")}.`}
@@ -170,8 +169,8 @@ export default async function AdminDashboard() {
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
-          <CardHeader className="h-16 flex-row items-center justify-between py-0">
-            <h2 className="text-lg font-bold tracking-tight">Open incidents</h2>
+          <CardHeader className="h-14 flex-row items-center justify-between py-0">
+            <h2 className="text-[0.9375rem] font-semibold tracking-tight">Open incidents</h2>
             {openIncidents.length > 0 && <StatusBadge tone="warn">{openIncidents.length} open</StatusBadge>}
           </CardHeader>
           <CardContent>
@@ -181,7 +180,7 @@ export default async function AdminDashboard() {
               <ul className="space-y-2">
                 {openIncidents.map((inc) => (
                   <li key={inc.id}>
-                    <Link href={`/organization/incidents/${inc.id}`} className="group flex items-center justify-between gap-3 rounded-control bg-sunken/60 px-3.5 py-3 text-sm outline-none transition-all duration-200 ease-soft hover:translate-x-1 hover:bg-primary-soft focus-visible:ring-4 focus-visible:ring-primary/25">
+                    <Link href={`/organization/incidents/${inc.id}`} className="group flex items-center justify-between gap-3 rounded-control border border-line px-3.5 py-2.5 text-sm outline-none transition-colors duration-150 hover:bg-sunken/60 focus-visible:ring-4 focus-visible:ring-primary/25">
                       <span className="min-w-0 truncate font-medium text-ink">{inc.name}</span>
                       <StatusBadge tone="warn">{titleCase(inc.status)}</StatusBadge>
                     </Link>
@@ -193,8 +192,8 @@ export default async function AdminDashboard() {
         </Card>
 
         <Card>
-          <CardHeader className="h-16 flex-row items-center justify-between py-0">
-            <h2 className="text-lg font-bold tracking-tight">Your pages</h2>
+          <CardHeader className="h-14 flex-row items-center justify-between py-0">
+            <h2 className="text-[0.9375rem] font-semibold tracking-tight">Your pages</h2>
             {canConfigurePages && <Link href="/organization/pages/new" className={buttonVariants({ variant: "soft", size: "sm" })}><Plus aria-hidden size={14} />New page</Link>}
           </CardHeader>
           <CardContent>
@@ -241,11 +240,11 @@ function healthTone(status: ComponentStatus | null): HealthTone {
 }
 
 const HERO_TONE: Record<HealthTone, string> = {
-  ok: "bg-gradient-to-br from-emerald-500 via-teal-500 to-cyan-500 shadow-[0_24px_50px_-24px_rgb(16_185_129/0.8)]",
-  warn: "bg-gradient-to-br from-amber-500 via-orange-500 to-rose-500 shadow-[0_24px_50px_-24px_rgb(249_115_22/0.8)]",
-  danger: "bg-gradient-to-br from-rose-500 via-red-500 to-orange-500 shadow-[0_24px_50px_-24px_rgb(239_68_68/0.8)]",
-  info: "bg-gradient-to-br from-sky-500 via-blue-500 to-indigo-500 shadow-[0_24px_50px_-24px_rgb(59_130_246/0.8)]",
-  neutral: "bg-prism shadow-primary",
+  ok: "border-ok/25 bg-gradient-to-r from-ok-bg/60 to-surface text-ok-fg",
+  warn: "border-warn/35 bg-gradient-to-r from-warn-bg/60 to-surface text-warn-fg",
+  danger: "border-danger/25 bg-gradient-to-r from-danger-bg/60 to-surface text-danger-fg",
+  info: "border-info/25 bg-gradient-to-r from-info-bg/60 to-surface text-info-fg",
+  neutral: "border-line bg-surface text-ink-soft",
 };
 
 
@@ -270,13 +269,14 @@ function titleCase(value: string) {
 function StatTile({ label, value, icon, hue, href }: { label: string; value: number; icon: LucideIcon; hue: Hue; href?: string }) {
   const content = (
     <>
-      <span aria-hidden="true" className="pointer-events-none absolute -right-8 -top-8 size-28 rounded-full bg-[var(--hue-bg)] transition-transform duration-500 ease-spring group-hover:scale-150" />
-      <IconTile icon={icon} hue={hue} className="relative transition-transform duration-300 ease-spring group-hover:rotate-[-8deg] group-hover:scale-110" />
-      <p className="relative mt-4 text-3xl font-extrabold tabular-nums tracking-tight text-ink">{value}</p>
-      <p className="relative mt-0.5 text-sm font-medium text-ink-soft">{label}</p>
-    </>
+      <div className="flex items-center justify-between">
+        <p className="text-sm font-medium text-ink-soft">{label}</p>
+        <IconTile icon={icon} hue={hue} size="sm" />
+      </div>
+      <p className="mt-3 text-2xl font-bold tabular-nums tracking-tight text-ink">{value}</p>
+      </>
   );
-  const box = "group relative overflow-hidden rounded-card bg-surface shadow-card ring-1 ring-line/80 p-5";
+  const box = "rounded-card border border-line bg-surface p-4 shadow-card";
   if (!href) return <div data-hue={hue} className={box}>{content}</div>;
-  return <Link href={href} data-hue={hue} className={cn(box, "block outline-none transition-[box-shadow,transform] duration-300 ease-soft hover:-translate-y-1 hover:shadow-raised focus-visible:ring-4 focus-visible:ring-primary/25")}>{content}</Link>;
+  return <Link href={href} data-hue={hue} className={cn(box, "block outline-none transition-[border-color,box-shadow] duration-150 hover:border-line-strong hover:shadow-raised focus-visible:ring-4 focus-visible:ring-primary/25")}>{content}</Link>;
 }

@@ -31,12 +31,12 @@ export default async function NewPage({ searchParams }: { searchParams: Promise<
           { label: "Publish", state: "todo" },
         ]}
       />
-      <Card className="mt-6 overflow-hidden rounded-sheet shadow-raised">
+      <Card className="mt-6 overflow-hidden rounded-card shadow-raised">
         <div aria-hidden="true" className="h-1.5 bg-gradient-to-r from-primary to-accent" />
         <div className="p-6 sm:p-10">
           <header>
             <IconTile icon={PanelsTopLeft} hue="violet" size="lg" />
-            <h1 className="mt-5 text-2xl font-extrabold tracking-tight text-ink sm:text-3xl">New page</h1>
+            <h1 className="mt-5 text-2xl font-bold tracking-tight text-ink sm:text-3xl">New page</h1>
             <p className="mt-2 max-w-xl text-sm leading-6 text-ink-soft">Start with a name. You can add services, control access, and shape the public experience next.</p>
           </header>
           <div className="mt-8">
