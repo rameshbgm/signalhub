@@ -4,6 +4,7 @@ import type { DatabaseTransaction } from "@/lib/postgres/client";
 import type { WebhookEndpointTable } from "@/lib/postgres/schema";
 import { newDatabaseId } from "@/lib/database-id";
 import { encryptSecret } from "@/lib/encryption";
+import { guardedFetch } from "@/lib/guarded-fetch";
 import { hashSecret } from "@/lib/secrets";
 import { validateHttpTarget } from "@/lib/target-validation";
 import { generateWebhookSecret } from "@/lib/tokens";
@@ -12,12 +13,11 @@ export async function prepareVerifiedWebhookEndpoint(pageId: string, rawUrl: str
   const url = String(rawUrl).trim();
   await validateHttpTarget(url, { httpsOnly: true, allowPrivate: false });
   const challenge = randomBytes(24).toString("base64url");
-  const response = await fetch(url, {
+  const response = await guardedFetch(url, {
     method: "POST",
     headers: { "content-type": "application/json", "user-agent": "SignalHub-Webhook-Verifier/1.0" },
     body: JSON.stringify({ type: "signalhub.webhook.verify", challenge }),
     signal: AbortSignal.timeout(5_000),
-    redirect: "manual",
   });
   const responseBody = await response.text();
   if (responseBody.length > 10_000) throw new Error("Webhook verification response is too large");

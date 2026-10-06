@@ -2,8 +2,9 @@ import { createHmac } from "node:crypto";
 import { database, withDatabaseTransaction, type DatabaseExecutor } from "@/lib/postgres/client";
 import type { NotificationJobRow } from "@/lib/postgres/schema";
 import { decryptSecret } from "@/lib/encryption";
+import { BlockedAddressError, guardedFetch } from "@/lib/guarded-fetch";
 import { smtpTransport, verifySmtp } from "@/lib/smtp";
-import { deliverDestination, deliverSms } from "@/lib/notification-providers";
+import { deliverDestination, deliverSms, ProviderHttpError } from "@/lib/notification-providers";
 import { startLeaseHeartbeat } from "@/worker/lease-heartbeat";
 
 const NOTIFICATION_LEASE_MILLISECONDS = 30_000;
@@ -20,6 +21,20 @@ class DeliveryError extends Error {
 }
 
 export { verifySmtp };
+
+function isTransientStatus(status: number) {
+  return status === 408 || status === 429 || status >= 500;
+}
+
+/** Retries only failures that can succeed later; a 4xx or blocked address is final. */
+function providerDeliveryError(error: unknown, fallback: string) {
+  const message = error instanceof Error ? error.message : fallback;
+  if (error instanceof ProviderHttpError) {
+    return new DeliveryError(message, isTransientStatus(error.status), error.status);
+  }
+  if (error instanceof BlockedAddressError) return new DeliveryError(message, false);
+  return new DeliveryError(message, true);
+}
 
 function escapeHtml(value: string) {
   return value.replace(/[&<>"']/g, (character) => ({
@@ -52,21 +67,20 @@ ${input.logoUrl ? `<img src="${escapeHtml(input.logoUrl)}" alt="${escapeHtml(inp
 }
 
 async function postJson(url: string, body: string, headers: Record<string, string> = {}) {
-  const response = await fetch(url, {
+  const response = await guardedFetch(url, {
     method: "POST",
     headers: { "content-type": "application/json", ...headers },
     body,
     signal: AbortSignal.timeout(Number(process.env.WEBHOOK_TIMEOUT_MS ?? 10_000)),
-    redirect: "error",
   }).catch((error) => {
+    if (error instanceof BlockedAddressError) throw new DeliveryError(error.message, false);
     throw new DeliveryError(
       error instanceof Error ? `Webhook network error: ${error.message}` : "Webhook network error",
       true
     );
   });
   if (!response.ok) {
-    const transient = response.status === 408 || response.status === 429 || response.status >= 500;
-    throw new DeliveryError(`Webhook returned HTTP ${response.status}`, transient, response.status);
+    throw new DeliveryError(`Webhook returned HTTP ${response.status}`, isTransientStatus(response.status), response.status);
   }
   return response.status;
 }
@@ -102,7 +116,13 @@ async function deliver(job: NotificationJobRow) {
     if (!result.accepted?.length) throw new DeliveryError("SMTP server did not accept the recipient", true);
     return null;
   }
-  if (job.channel === "SMS") return deliverSms(job.contact, job.body);
+  if (job.channel === "SMS") {
+    try {
+      return await deliverSms(job.contact, job.body);
+    } catch (error) {
+      throw providerDeliveryError(error, "SMS delivery failed");
+    }
+  }
   if (job.destinationId) {
     const destination = await database
       .selectFrom("notificationDestinations")
@@ -119,27 +139,8 @@ async function deliver(job: NotificationJobRow) {
         eventType: job.eventType,
       });
     } catch (error) {
-      throw new DeliveryError(error instanceof Error ? error.message : "Destination delivery failed", true);
+      throw providerDeliveryError(error, "Destination delivery failed");
     }
-  }
-  if (job.channel === "SLACK") {
-    return postJson(job.contact, JSON.stringify({ text: `*${job.subject}*\n${job.body}` }));
-  }
-  if (job.channel === "MICROSOFT_TEAMS") {
-    return postJson(job.contact, JSON.stringify({
-      type: "message",
-      attachments: [{
-        contentType: "application/vnd.microsoft.card.adaptive",
-        content: {
-          type: "AdaptiveCard",
-          version: "1.4",
-          body: [
-            { type: "TextBlock", weight: "Bolder", text: job.subject },
-            { type: "TextBlock", wrap: true, text: job.body },
-          ],
-        },
-      }],
-    }));
   }
   if (job.channel === "WEBHOOK" && job.endpointId) {
     const endpoint = await database

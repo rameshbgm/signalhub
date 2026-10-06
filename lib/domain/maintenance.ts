@@ -80,7 +80,8 @@ export async function createMaintenance(
       scheduledEnd: input.scheduledEnd,
       autoTransition: input.autoTransition,
       notifySubscribers: input.notify,
-      reminderMinutesBefore: input.reminderMinutesBefore,
+      // Reminders are subscriber notifications, so they follow the notify choice.
+      reminderMinutesBefore: input.notify ? input.reminderMinutesBefore : null,
       reminderSentAt: null,
       postmortemBody: null,
       postmortemPublishedAt: null,
@@ -218,10 +219,11 @@ export async function deleteMaintenance(orgId: string, incidentId: string) {
 }
 
 export function isMaintenanceReminderDue(
-  maintenance: Pick<IncidentRow, "maintenanceStatus" | "scheduledStart" | "reminderMinutesBefore" | "reminderSentAt">,
+  maintenance: Pick<IncidentRow, "maintenanceStatus" | "scheduledStart" | "reminderMinutesBefore" | "reminderSentAt" | "notifySubscribers">,
   now = new Date()
 ) {
   if (
+    !maintenance.notifySubscribers ||
     maintenance.maintenanceStatus !== "SCHEDULED" ||
     !maintenance.scheduledStart ||
     maintenance.scheduledStart <= now ||
@@ -247,6 +249,7 @@ async function sendMaintenanceReminder(maintenance: IncidentRow, now: Date) {
         .where("incident.scheduledStart", ">", now)
         .where("incident.reminderMinutesBefore", "=", maintenance.reminderMinutesBefore)
         .where("incident.reminderSentAt", "is", null)
+        .where("incident.notifySubscribers", "=", true)
         .where("page.deletedAt", "is", null)
         .forUpdate("incident")
         .executeTakeFirst();
@@ -288,6 +291,7 @@ export async function runMaintenanceTransitions(now = new Date()) {
       .where("scheduledStart", "<=", new Date(now.getTime() + MAX_REMINDER_MINUTES * 60_000))
       .where("reminderMinutesBefore", ">=", MIN_REMINDER_MINUTES)
       .where("reminderMinutesBefore", "<=", MAX_REMINDER_MINUTES)
+      .where("notifySubscribers", "=", true)
       .where("reminderSentAt", "is", null).execute(),
     database.selectFrom("incidents").selectAll()
       .where("isMaintenance", "=", true).where("autoTransition", "=", true)

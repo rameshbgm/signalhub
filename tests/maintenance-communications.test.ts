@@ -11,6 +11,7 @@ describe("maintenance reminder eligibility", () => {
     scheduledStart: new Date("2026-07-25T05:00:00.000Z"),
     reminderMinutesBefore: 60,
     reminderSentAt: null,
+    notifySubscribers: true,
   };
 
   it("is due exactly at the configured boundary", () => {
@@ -57,6 +58,15 @@ describe("maintenance reminder eligibility", () => {
     expect(
       maintenance.isMaintenanceReminderDue(
         { ...scheduled, maintenanceStatus: "IN_PROGRESS" },
+        now
+      )
+    ).toBe(false);
+  });
+
+  it("never reminds subscribers about maintenance the operator chose not to announce", () => {
+    expect(
+      maintenance.isMaintenanceReminderDue(
+        { ...scheduled, notifySubscribers: false },
         now
       )
     ).toBe(false);

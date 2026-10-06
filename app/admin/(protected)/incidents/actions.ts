@@ -92,6 +92,10 @@ export async function editIncidentUpdate(incidentId: string, updateId: string, f
     status: String(formData.get("status") ?? ""),
     body: String(formData.get("body") ?? ""),
   });
+  const scoped = await database.selectFrom("incidents").select("pageId")
+    .where("id", "=", incidentId).executeTakeFirst();
+  if (!scoped) throw new Error("Incident not found in your organization");
+  await assertPageInOrg(scoped.pageId, session.orgId);
   const result = await withDatabaseTransaction(async (transaction) => {
     await fenceActiveOrganizationMutation(session.orgId, transaction);
     const incident = await transaction.selectFrom("incidents as incident")

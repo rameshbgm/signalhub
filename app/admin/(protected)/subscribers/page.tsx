@@ -5,6 +5,7 @@ import { Select } from "@/components/ui/select";
 import { database } from "@/lib/postgres/client";
 import { addSubscriber, importSubscribersCsv, toggleQuarantine, removeSubscriber, retryNotificationJob } from "./actions";
 import { PageSelect } from "@/components/admin/PageSelect";
+import { CheckRow } from "@/components/admin/operate-ui";
 import { HelpTip } from "@/components/HelpTip";
 import { getScopedPages, requireCapability, sessionHasCapability } from "@/lib/admin-guard";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -166,6 +167,7 @@ export default async function SubscribersPage({ searchParams }: { searchParams: 
               <Field label="Contact" htmlFor="add-contact">
                 <Input id="add-contact" name="contact" placeholder={CONTACT_PLACEHOLDER[channel]} required />
               </Field>
+              <CheckRow name="consent" required label="This person agreed to receive status updates" hint="Admin-added contacts skip email or SMS verification." />
               <div className="flex justify-end border-t border-line pt-4">
                 <Button type="submit">
                   <Plus aria-hidden size={16} />
@@ -194,6 +196,7 @@ export default async function SubscribersPage({ searchParams }: { searchParams: 
               <Field label="Email addresses" htmlFor="import-csv">
                 <Textarea id="import-csv" name="csv" rows={3} placeholder="one@example.com, two@example.com" />
               </Field>
+              <CheckRow name="consent" required label="Everyone listed agreed to receive status updates" hint="Existing subscribers are skipped, including quarantined ones." />
               <div className="flex justify-end border-t border-line pt-4">
                 <Button type="submit" variant="secondary">
                   <Upload aria-hidden size={16} />

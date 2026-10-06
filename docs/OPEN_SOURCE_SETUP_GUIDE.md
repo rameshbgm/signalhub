@@ -340,7 +340,6 @@ SESSION_SECRET=<independent-random-value>
 ENCRYPTION_KEY=<independent-random-value>
 POSTGRES_PASSWORD=<independent-database-password>
 NEXT_PUBLIC_APP_URL=https://signalhub.at
-ALLOW_PUBLIC_SIGNUP=false
 STATUS_PORT=3301
 REQUIRE_WORKER=true
 ```
@@ -419,8 +418,11 @@ TRUSTED_PROXY_HOPS=1
 
 `TRUSTED_PROXY_HOPS` must match the actual number of controlled proxy hops. Do
 not trust forwarded headers when clients can reach the application directly.
-Set `PLATFORM_ADMIN_ALLOWED_CIDRS` to restrict the platform console to approved
-administrative networks.
+Set `PLATFORM_ADMIN_ALLOWED_CIDRS` (comma-separated IPv4 CIDRs) to restrict
+installation administration under `/organization/platform` and
+`/api/platform/*` to approved administrative networks. The client address comes
+from forwarded headers, so this requires `TRUST_PROXY_HEADERS=true`; without it
+every request is rejected once the allowlist is set.
 
 Custom status domains must resolve to the same proxy. Preserve their original
 host header so SignalHub can route public pages, incident details, history, feeds,
@@ -546,7 +548,6 @@ egress controls.
 | `SESSION_SIGNING_KEYS` | JSON signing-key ring | Use stable key IDs and overlap old/new keys during rotation |
 | `ENCRYPTION_KEYS` | JSON encryption-key ring | Rotate records with `signalhubctl` before retiring old keys |
 | `NEXT_PUBLIC_APP_URL` | Canonical external origin | HTTPS URL |
-| `ALLOW_PUBLIC_SIGNUP` | Public organization creation | Keep `false` unless intentionally offering self-registration |
 
 ### Authentication and network policy
 
@@ -557,12 +558,10 @@ egress controls.
 | `ARGON2_TIME_COST` | `2` | Argon2id iterations |
 | `ARGON2_PARALLELISM` | `1` | Argon2id parallelism |
 | `TENANT_SESSION_IDLE_SECONDS` | `28800` | Tenant idle timeout |
-| `TENANT_SESSION_ABSOLUTE_SECONDS` | `604800` | Tenant absolute timeout |
-| `PLATFORM_SESSION_IDLE_SECONDS` | `3600` | Platform-admin idle timeout |
-| `PLATFORM_SESSION_ABSOLUTE_SECONDS` | `43200` | Platform-admin absolute timeout |
+| `TENANT_SESSION_ABSOLUTE_SECONDS` | `604800` | Session absolute timeout (installation administration uses the same Admin session) |
 | `TRUST_PROXY_HEADERS` | `false` | Enables proxy-derived client addresses |
 | `TRUSTED_PROXY_HOPS` | `1` | Number of controlled proxy hops |
-| `PLATFORM_ADMIN_ALLOWED_CIDRS` | empty | Optional platform-console network allowlist |
+| `PLATFORM_ADMIN_ALLOWED_CIDRS` | empty | Optional IPv4 allowlist for installation administration; needs `TRUST_PROXY_HEADERS` |
 
 ### Delivery
 
@@ -588,9 +587,12 @@ egress controls.
 | Variable | Purpose |
 | --- | --- |
 | `MONITOR_ALLOW_PRIVATE_TARGETS` | Permits monitors to reach private networks; disabled by default |
-| `MONITOR_ENABLE_ICMP` | Enables ICMP checks where container permissions permit |
+| `MONITOR_ENABLE_ICMP` | Enables ICMP checks; the worker needs raw-socket permission (Helm: `worker.enableIcmp=true` adds `NET_RAW`) |
 | `MONITOR_MAX_RESPONSE_BYTES` | Bounds downloaded monitor response data |
-| `MONITOR_HISTORY_RETENTION_DAYS` | Baseline monitor-history retention |
+| `WORKER_ID` | Stable lease-owner identity; defaults to hostname, process id, and a random suffix |
+| `WORKER_*_SWEEP_MS` | Fallback sweep intervals for monitors, notifications, exports, audit delivery, platform jobs, and maintenance |
+| `SERVICE_NAME` | Name used in logs, metrics, and PostgreSQL `application_name` |
+| `ALLOW_INSECURE_AUDIT_SINKS` | Permits plain-HTTP audit sinks; keep `false` outside isolated networks |
 | `WORKER_CONCURRENCY` | Concurrent Graphile jobs per worker process |
 | `WORKER_POLL_INTERVAL_MS` | Graphile fallback polling interval; PostgreSQL notifications normally wake jobs immediately |
 | `WORKER_HEARTBEAT_INTERVAL_MS` | SignalHub worker readiness heartbeat interval |

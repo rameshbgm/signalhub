@@ -62,6 +62,8 @@ export async function getComponentsForPage(pageId: string, visibleIds: string[] 
   };
 }
 
+const PUBLIC_INCIDENT_LIMIT = 500;
+
 export async function getIncidentsForPage(pageId: string, componentIds?: string[] | null) {
   const scopedIds = componentIds?.filter(isDatabaseId) ?? componentIds;
   let incidentQuery = database
@@ -82,7 +84,8 @@ export async function getIncidentsForPage(pageId: string, componentIds?: string[
         ]))
       : incidentQuery.where("pageWide", "=", true);
   }
-  const incidents = await incidentQuery.orderBy("createdAt", "desc").execute();
+  // ponytail: fixed cap keeps public renders bounded; paginate history if pages exceed it.
+  const incidents = await incidentQuery.orderBy("createdAt", "desc").limit(PUBLIC_INCIDENT_LIMIT).execute();
   const incidentIds = incidents.map((incident) => incident.id);
   const [updates, links] = incidentIds.length
     ? await Promise.all([
@@ -109,6 +112,8 @@ export async function getIncidentsForPage(pageId: string, componentIds?: string[
         .selectAll()
         .where("id", "in", linkedComponentIds)
         .where("pageId", "=", pageId)
+        // Public surfaces only: hidden components must never be named.
+        .where("visible", "=", true)
         .execute()
     : [];
   const componentById = new Map(components.map((component) => [component.id, component]));

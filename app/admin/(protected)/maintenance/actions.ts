@@ -9,6 +9,7 @@ import {
   deleteMaintenance as deleteMaintenanceDomain,
   transitionMaintenance,
 } from "@/lib/domain/maintenance";
+import { zonedDateTimeToUtc } from "@/lib/page-locale";
 import { MAINTENANCE_STATUSES, type MaintenanceStatus } from "@/lib/status";
 import { writeSupportMutationAudit } from "@/lib/support-audit";
 import { writeActiveTenantAudit } from "@/lib/tenant-audit";
@@ -20,13 +21,13 @@ async function pageSlug(pageId: string) {
 export async function createMaintenance(formData: FormData) {
   const pageId = String(formData.get("pageId") ?? "");
   const session = await requireCapability("incident.manage", pageId);
-  await assertPageInOrg(pageId, session.orgId);
+  const page = await assertPageInOrg(pageId, session.orgId);
   const maintenance = await createMaintenanceDomain(session.orgId, {
     pageId,
     name: String(formData.get("name") ?? ""),
     body: String(formData.get("body") ?? ""),
-    scheduledStart: new Date(String(formData.get("scheduledStart") ?? "")),
-    scheduledEnd: new Date(String(formData.get("scheduledEnd") ?? "")),
+    scheduledStart: zonedDateTimeToUtc(String(formData.get("scheduledStart") ?? ""), page.timezone),
+    scheduledEnd: zonedDateTimeToUtc(String(formData.get("scheduledEnd") ?? ""), page.timezone),
     autoTransition: formData.get("autoTransition") === "on",
     notify: formData.get("notify") === "on",
     reminderMinutesBefore:

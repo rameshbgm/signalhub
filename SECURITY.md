@@ -8,8 +8,9 @@ reports within 5 business days and coordinate a fix and disclosure timeline.
 For self-hosted deployments, rotate exposed signing/encryption keyring
 entries, API keys, SCIM tokens, webhook secrets, and SMTP/IdP credentials
 immediately. Keep PostgreSQL and the SignalHub administration interface on trusted
-networks, set `ALLOW_PUBLIC_SIGNUP=false` unless required, configure forwarded
-headers only for a known proxy hop count, and use TLS for all public traffic.
+networks, restrict installation administration with
+`PLATFORM_ADMIN_ALLOWED_CIDRS`, configure forwarded headers only for a known
+proxy hop count, and use TLS for all public traffic.
 
 Enterprise deployments should use a highly available PostgreSQL cluster, S3-compatible object
 storage, authenticated metrics, external secret management, and the restricted

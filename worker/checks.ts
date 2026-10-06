@@ -4,6 +4,7 @@ import { spawn } from "node:child_process";
 import type { MonitorRow } from "@/lib/postgres/schema";
 import { validateHttpTarget, validateNetworkHost } from "@/lib/target-validation";
 import { decryptSecret } from "@/lib/encryption";
+import { guardedFetch } from "@/lib/guarded-fetch";
 import { resolve4, resolve6, resolveCname, resolveMx, resolveNs, resolveTxt } from "node:dns/promises";
 import { isExpectedStatus } from "@/lib/monitor-validation";
 
@@ -78,12 +79,12 @@ async function httpCheck(monitor: MonitorRow, allowPrivate: boolean): Promise<Ch
     }
     let response: Response | null = null;
     for (let redirects = 0; redirects <= 3; redirects += 1) {
-      response = await fetch(url, {
+      response = await guardedFetch(url, {
         method: monitor.method,
         headers,
         body: ["GET", "HEAD"].includes(monitor.method) ? undefined : monitor.requestBody ?? undefined,
-        redirect: "manual",
         signal: AbortSignal.timeout(monitor.timeoutMs),
+        allowPrivate,
       });
       if (![301, 302, 303, 307, 308].includes(response.status)) break;
       const location = response.headers.get("location");

@@ -46,6 +46,12 @@ Provider credentials, `METRICS_TOKEN`, and `OTEL_EXPORTER_OTLP_HEADERS` may be
 kept in the same Secret. See `.env.example` for the complete supported
 configuration.
 
+For evaluation clusters you may instead set `secrets.databaseUrl`,
+`secrets.sessionSecret`, and `secrets.encryptionKey`. The chart then renders its
+own Secret as a pre-install/pre-upgrade hook so the migration Job can read it on
+the first install. Helm does not delete hook resources on `helm uninstall`;
+remove that Secret manually when tearing the release down.
+
 ## 2. Create an environment values file
 
 ```yaml
@@ -81,6 +87,19 @@ ingress:
 
 Commit non-secret values if desired. Never commit a rendered Secret or a values
 file containing credentials.
+
+Optional hardening and capability values:
+
+```yaml
+config:
+  # Comma-separated IPv4 CIDRs allowed to use installation administration.
+  platformAdminAllowedCidrs: "10.20.0.0/16"
+
+worker:
+  # ICMP monitors run `ping`; this adds only the NET_RAW capability to the
+  # worker container and sets MONITOR_ENABLE_ICMP=true.
+  enableIcmp: true
+```
 
 ## 3. Validate and install
 

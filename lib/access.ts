@@ -1,4 +1,4 @@
-import { getPageAccessSession } from "@/lib/auth";
+import { credentialVersion, getPageAccessSession } from "@/lib/auth";
 import { isPageOrganizationActive } from "@/lib/public-page";
 import { database } from "@/lib/postgres/client";
 
@@ -19,7 +19,13 @@ export async function checkPageAccess(page: { id: string; type: string; orgId: s
   const session = await getPageAccessSession(page.id);
 
   if (page.type === "PRIVATE") {
-    if (session?.pageId === page.id) return { ok: true, visibleComponentIds: null };
+    if (session?.pageId === page.id) {
+      const current = await database.selectFrom("pages").select("passwordHash")
+        .where("id", "=", page.id).executeTakeFirst();
+      if (current && session.cv === credentialVersion(current.passwordHash)) {
+        return { ok: true, visibleComponentIds: null };
+      }
+    }
     return { ok: false, reason: "password" };
   }
 
@@ -31,7 +37,7 @@ export async function checkPageAccess(page: { id: string; type: string; orgId: s
         .where("id", "=", session.userId)
         .where("pageId", "=", page.id)
         .executeTakeFirst();
-      if (!user) return { ok: false, reason: "login" };
+      if (!user || session.cv !== credentialVersion(user.passwordHash)) return { ok: false, reason: "login" };
       const group = user.groupId
         ? await database
             .selectFrom("pageAccessGroups")

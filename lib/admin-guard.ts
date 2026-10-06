@@ -1,4 +1,6 @@
+import { headers } from "next/headers";
 import { getSession } from "@/lib/auth";
+import { addressAllowed, trustedClientIp } from "@/lib/network-policy";
 import { database } from "@/lib/postgres/client";
 import {
   roleAtLeast,
@@ -162,11 +164,24 @@ export async function getScopedPages(
   return query.orderBy(options.orderBy ?? "createdAt", "asc").execute();
 }
 
+/** Parses PLATFORM_ADMIN_ALLOWED_CIDRS; empty means no network restriction. */
+export function platformAdminAllowedCidrs(value = process.env.PLATFORM_ADMIN_ALLOWED_CIDRS) {
+  return (value ?? "").split(",").map((cidr) => cidr.trim()).filter(Boolean);
+}
+
 /** Installation management is a capability of the standard Admin identity. */
 export async function requirePlatformSession() {
   const session = await requireOrgSession();
   if (session.role !== "ADMIN") {
     throw new AdminAuthError("Installation administration requires the Admin role", 403, "PLATFORM_PERMISSION_REQUIRED");
+  }
+  const allowedCidrs = platformAdminAllowedCidrs();
+  if (allowedCidrs.length && !addressAllowed(trustedClientIp(await headers()), allowedCidrs)) {
+    throw new AdminAuthError(
+      "Installation administration is not permitted from this network",
+      403,
+      "PLATFORM_NETWORK_FORBIDDEN"
+    );
   }
   return {
     ...session,

@@ -3,21 +3,22 @@ import { NextRequest, NextResponse } from "next/server";
 import { requirePlatformCapability } from "@/lib/admin-guard";
 import { database } from "@/lib/postgres/client";
 import { routeError } from "@/lib/api-response";
+import { csvField as csv } from "@/lib/csv";
 
-function csv(value: unknown) {
-  const text = typeof value === "string" ? value : JSON.stringify(value ?? "");
-  return `"${text.replaceAll('"', '""')}"`;
-}
+const EXPORT_LIMIT = 100_000;
 
 export async function GET(request: NextRequest) {
   try {
     await requirePlatformCapability("audit.read");
     const format = request.nextUrl.searchParams.get("format") === "json" ? "json" : "csv";
-    const entries = await database.selectFrom("platformAuditLogs").selectAll()
-      .orderBy("createdAt", "asc").limit(100_000).execute();
+    // Keep the newest entries when the log exceeds the cap, then restore chronological order.
+    const newest = await database.selectFrom("platformAuditLogs").selectAll()
+      .orderBy("createdAt", "desc").orderBy("id", "desc").limit(EXPORT_LIMIT + 1).execute();
+    const truncated = newest.length > EXPORT_LIMIT;
+    const entries = newest.slice(0, EXPORT_LIMIT).reverse();
     const body = format === "json"
       ? JSON.stringify({
-          manifest: { format: "signalhub-platform-audit-export", version: 1, generatedAt: new Date().toISOString() },
+          manifest: { format: "signalhub-platform-audit-export", version: 1, generatedAt: new Date().toISOString(), truncated },
           entries,
         })
       : [
@@ -41,6 +42,7 @@ export async function GET(request: NextRequest) {
         "content-type": format === "json" ? "application/json" : "text/csv; charset=utf-8",
         "content-disposition": `attachment; filename="platform-audit.${format}"`,
         "x-content-sha256": checksum,
+        "x-export-truncated": String(truncated),
         "cache-control": "no-store",
       },
     });

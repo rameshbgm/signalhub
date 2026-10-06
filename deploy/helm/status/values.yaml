@@ -34,9 +34,9 @@ config:
   logLevel: info
   tenantSessionIdleSeconds: "28800"
   tenantSessionAbsoluteSeconds: "604800"
-  platformSessionIdleSeconds: "3600"
-  platformSessionAbsoluteSeconds: "43200"
   passwordMinLength: "14"
+  # Comma-separated IPv4 CIDRs allowed to use installation administration.
+  # Requires trustProxyHeaders so the client address is known.
   platformAdminAllowedCidrs: ""
   otlpEndpoint: ""
 
@@ -66,6 +66,8 @@ web:
     limits: { cpu: "2", memory: 1Gi }
 
 worker:
+  # ICMP monitors need the NET_RAW capability on the worker container.
+  enableIcmp: false
   resources:
     requests: { cpu: 250m, memory: 384Mi }
     limits: { cpu: "2", memory: 1Gi }

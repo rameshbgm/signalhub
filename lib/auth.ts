@@ -1,4 +1,4 @@
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { hash as argonHash, verify as argonVerify } from "@node-rs/argon2";
 import { decodeProtectedHeader, SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers.js";
@@ -223,7 +223,17 @@ export function passwordNeedsRehash(hash: string) {
 
 // ---- Page-visitor access sessions (for PRIVATE / AUDIENCE pages) ----
 
-export async function createPageAccessSession(pageId: string, data: { userId?: string; email?: string }) {
+/**
+ * Short fingerprint of the credential a visitor proved. Access tokens carry
+ * it, so changing a page or audience password invalidates earlier sessions.
+ */
+export function credentialVersion(passwordHash: string | null | undefined) {
+  return passwordHash ? createHash("sha256").update(passwordHash).digest("base64url").slice(0, 22) : "";
+}
+
+export type PageAccessClaims = { pageId: string; userId?: string; email?: string; cv?: string };
+
+export async function createPageAccessSession(pageId: string, data: Omit<PageAccessClaims, "pageId">) {
   const { active } = getSessionSigningKeys();
   const token = await new SignJWT({ pageId, ...data })
     .setProtectedHeader({ alg: "HS256", kid: active.id })
@@ -240,7 +250,7 @@ export async function createPageAccessSession(pageId: string, data: { userId?: s
   });
 }
 
-export async function getPageAccessSession(pageId: string): Promise<{ pageId: string; userId?: string; email?: string } | null> {
+export async function getPageAccessSession(pageId: string): Promise<PageAccessClaims | null> {
   const store = await cookies();
   const token = store.get(`${ACCESS_COOKIE_PREFIX}${pageId}`)?.value;
   if (!token) return null;
@@ -251,7 +261,7 @@ export async function getPageAccessSession(pageId: string): Promise<{ pageId: st
     for (const candidate of candidates) {
       try {
         const { payload } = await jwtVerify(token, candidate.secret);
-        return payload as unknown as { pageId: string; userId?: string; email?: string };
+        return payload as unknown as PageAccessClaims;
       } catch {
         // Continue through rotation keys.
       }

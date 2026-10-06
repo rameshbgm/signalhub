@@ -1,7 +1,15 @@
 import type { NotificationDestinationRow } from "@/lib/postgres/schema";
 import { decryptSecret } from "@/lib/encryption";
+import { guardedFetch } from "@/lib/guarded-fetch";
 
 type Message = { subject: string; body: string; eventType: string };
+
+/** A provider answered with a non-2xx status; callers decide whether to retry. */
+export class ProviderHttpError extends Error {
+  constructor(message: string, public readonly status: number) {
+    super(message);
+  }
+}
 
 export const DESTINATION_CHANNELS = [
   "SLACK",
@@ -23,14 +31,13 @@ async function post(
   headers: Record<string, string> = {}
 ) {
   const contentType = headers["content-type"] ?? "application/json";
-  const response = await fetch(url, {
+  const response = await guardedFetch(url, {
     method: "POST",
     headers: { "content-type": contentType, ...headers },
     body: contentType === "application/json" ? JSON.stringify(body) : String(body),
     signal: AbortSignal.timeout(Number(process.env.WEBHOOK_TIMEOUT_MS ?? 10_000)),
-    redirect: "error",
   });
-  if (!response.ok) throw new Error(`Provider returned HTTP ${response.status}`);
+  if (!response.ok) throw new ProviderHttpError(`Provider returned HTTP ${response.status}`, response.status);
   return response.status;
 }
 
@@ -153,6 +160,6 @@ async function deliverTwilio(
       signal: AbortSignal.timeout(Number(process.env.WEBHOOK_TIMEOUT_MS ?? 10_000)),
     }
   );
-  if (!response.ok) throw new Error(`Messaging provider returned HTTP ${response.status}`);
+  if (!response.ok) throw new ProviderHttpError(`Messaging provider returned HTTP ${response.status}`, response.status);
   return response.status;
 }

@@ -1,14 +1,17 @@
 import { randomBytes } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { checkPageAccess } from "@/lib/access";
 import { apiError, routeError, validationError } from "@/lib/api-response";
 import { canonicalizeEmail } from "@/lib/identity";
 import { fenceActiveOrganizationMutation } from "@/lib/organization-mutation";
 import { getPublicPageBySlug } from "@/lib/pages";
-import { database, withDatabaseTransaction } from "@/lib/postgres/client";
+import { withDatabaseTransaction } from "@/lib/postgres/client";
 import { isPageOrganizationActive } from "@/lib/public-page";
 import { consumeRateLimit, RateLimitError, requestIp } from "@/lib/rate-limit";
 import { secretMatches } from "@/lib/secrets";
+
+const MAX_OTP_ATTEMPTS = 5;
 
 const schema = z.object({
   pageSlug: z.string().trim().min(1),
@@ -27,22 +30,20 @@ export async function POST(request: NextRequest) {
       : parsed.data.contact.replace(/[\s()-]/g, "");
     const page = await getPublicPageBySlug(parsed.data.pageSlug);
     if (!page || !(await isPageOrganizationActive(page.orgId))) return apiError(404, "PAGE_NOT_FOUND", "Page not found");
-    const otp = await database.selectFrom("subscriptionOtps").selectAll()
-      .where("pageId", "=", page.id).where("channel", "=", parsed.data.channel)
-      .where("contact", "=", contact).where("expiresAt", ">", new Date())
-      .orderBy("createdAt", "desc").executeTakeFirst();
-    if (!otp || otp.attempts >= 5 || !secretMatches(parsed.data.code, otp.codeHash)) {
-      if (otp) await database.updateTable("subscriptionOtps").set((expression) => ({ attempts: expression("attempts", "+", 1) }))
-        .where("id", "=", otp.id).execute();
-      return apiError(400, "INVALID_OTP", "Invalid or expired verification code");
-    }
-    await withDatabaseTransaction(async (transaction) => {
+    if (!(await checkPageAccess(page)).ok) return apiError(404, "PAGE_NOT_FOUND", "Page not found");
+    const verified = await withDatabaseTransaction(async (transaction) => {
       await fenceActiveOrganizationMutation(page.orgId, transaction);
+      // The row lock serializes concurrent guesses so the attempt limit is exact.
       const currentOtp = await transaction.selectFrom("subscriptionOtps").selectAll()
-        .where("id", "=", otp.id).where("pageId", "=", page.id)
-        .where("expiresAt", ">", new Date()).where("attempts", "<", 5).forUpdate().executeTakeFirst();
-      if (!currentOtp || !secretMatches(parsed.data.code, currentOtp.codeHash)) {
-        throw new Error("Verification state changed; request a new code");
+        .where("pageId", "=", page.id).where("channel", "=", parsed.data.channel)
+        .where("contact", "=", contact).where("expiresAt", ">", new Date())
+        .orderBy("createdAt", "desc").forUpdate().executeTakeFirst();
+      if (!currentOtp || currentOtp.attempts >= MAX_OTP_ATTEMPTS) return false;
+      if (!secretMatches(parsed.data.code, currentOtp.codeHash)) {
+        await transaction.updateTable("subscriptionOtps")
+          .set((expression) => ({ attempts: expression("attempts", "+", 1) }))
+          .where("id", "=", currentOtp.id).execute();
+        return false;
       }
       await transaction.insertInto("subscribers").values({
         pageId: page.id,
@@ -61,7 +62,9 @@ export async function POST(request: NextRequest) {
       })).execute();
       await transaction.deleteFrom("subscriptionOtps").where("pageId", "=", page.id)
         .where("channel", "=", parsed.data.channel).where("contact", "=", contact).execute();
+      return true;
     });
+    if (!verified) return apiError(400, "INVALID_OTP", "Invalid or expired verification code");
     return NextResponse.json({ ok: true });
   } catch (error) {
     if (error instanceof RateLimitError) {

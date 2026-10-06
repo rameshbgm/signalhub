@@ -21,6 +21,9 @@ const FALLBACK_RETENTION: EffectiveRetention = {
 };
 
 const PLATFORM_AUDIT_RETENTION_DAYS = 2555;
+const EXPIRED_SESSION_HISTORY_DAYS = 30;
+/** The sweep runs hourly; the guard must stay shorter than that interval. */
+export const RETENTION_RERUN_GUARD_MS = 50 * 60_000;
 
 function bounded(policy: Partial<EffectiveRetention>): EffectiveRetention {
   return Object.fromEntries(
@@ -91,6 +94,20 @@ export async function runRetentionSweep(workerId: string, now = new Date()) {
         .where("monitorId", "in", monitorIds)
         .where("checkedAt", "<", cutoff(now, policy.monitorChecksDays)).execute());
     }
+    const metrics = await database.selectFrom("metrics").select("id")
+      .where("pageId", "in", pageIds).execute();
+    if (metrics.length) {
+      // Metric history is visitor-facing analytics, so it follows that window.
+      deletes.push(database.deleteFrom("metricPoints")
+        .where("metricId", "in", metrics.map((metric) => metric.id))
+        .where("timestamp", "<", cutoff(now, policy.analyticsDays)).execute());
+    }
+    // Closed status intervals older than the incident history window no longer
+    // feed any uptime bar or incident timeline.
+    deletes.push(database.deleteFrom("componentStatusEvents")
+      .where("componentId", "in", (query) => query.selectFrom("components").select("id").where("pageId", "in", pageIds))
+      .where("endedAt", "is not", null)
+      .where("endedAt", "<", cutoff(now, policy.resolvedIncidentsDays)).execute());
     await Promise.all(deletes);
 
     const expiredIncidents = await database.selectFrom("incidents").select("id")
@@ -104,10 +121,19 @@ export async function runRetentionSweep(workerId: string, now = new Date()) {
     }
   }
 
+  // Short-lived operational rows that are never read once expired.
+  await Promise.all([
+    database.deleteFrom("rateLimits").where("expiresAt", "<", now).execute(),
+    database.deleteFrom("subscriptionOtps").where("expiresAt", "<", now).execute(),
+    database.deleteFrom("authSessions")
+      .where("absoluteExpiresAt", "<", cutoff(now, EXPIRED_SESSION_HISTORY_DAYS)).execute(),
+  ]);
   await pruneAuditBefore(cutoff(now, PLATFORM_AUDIT_RETENTION_DAYS));
   await database.updateTable("maintenanceLeases").set({
     lastCompletedAt: new Date(),
-    leaseExpiresAt: new Date(Date.now() + 60 * 60_000),
+    // Hold the lease until just before the next hourly schedule so another
+    // worker does not repeat the sweep, without making the next run skip.
+    leaseExpiresAt: new Date(now.getTime() + RETENTION_RERUN_GUARD_MS),
   }).where("id", "=", "retention").where("owner", "=", workerId).execute();
   return true;
 }

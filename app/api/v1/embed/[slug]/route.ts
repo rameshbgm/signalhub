@@ -28,17 +28,22 @@ export async function GET(
   function render(data) {
     var active = [].concat(data.active_incidents || [], data.active_maintenance || []);
     if (!active.length) return;
-    var banner = document.createElement("div");
-    banner.id = "status-embed-banner";
-    banner.setAttribute("role", "status");
-    banner.style.cssText = "position:fixed;bottom:16px;right:16px;max-width:320px;background:" + BRAND_COLOR + ";color:#fff;padding:12px 16px;font:13px system-ui,sans-serif;box-shadow:0 4px 16px rgba(0,0,0,.2);z-index:999999;cursor:pointer;";
+    var region = document.createElement("div");
+    region.id = "status-embed-banner";
+    region.setAttribute("role", "status");
+    region.style.cssText = "position:fixed;bottom:16px;right:16px;max-width:320px;z-index:999999;";
+    var link = document.createElement("a");
+    link.href = PAGE_URL;
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+    link.style.cssText = "display:block;background:" + BRAND_COLOR + ";color:#fff;padding:12px 16px;font:13px system-ui,sans-serif;box-shadow:0 4px 16px rgba(0,0,0,.2);text-decoration:none;";
     var strong = document.createElement("strong");
     text(strong, data.status.description);
-    banner.appendChild(strong);
-    banner.appendChild(document.createElement("br"));
-    text(banner, active[0].name || data.status.description);
-    banner.onclick = function () { window.open(PAGE_URL, "_blank", "noopener,noreferrer"); };
-    document.body.appendChild(banner);
+    link.appendChild(strong);
+    link.appendChild(document.createElement("br"));
+    text(link, active[0].name || data.status.description);
+    region.appendChild(link);
+    document.body.appendChild(region);
   }
   fetch(STATUS_URL, { credentials: "omit" })
     .then(function (response) { if (!response.ok) throw new Error("status"); return response.json(); })

@@ -47,7 +47,7 @@ export default async function NewMaintenancePage({ searchParams }: { searchParam
               </Field>
             </CardContent>
           </Card>
-          <MaintenanceForm action={createMaintenance} pageId={pageId} components={components} />
+          <MaintenanceForm action={createMaintenance} pageId={pageId} components={components} timeZone={pages.find((p) => p.id === pageId)?.timezone || "UTC"} />
         </>
       ) : (
         <NoPagesState description="Maintenance windows are announced on a status page. Create one before you schedule maintenance." canCreate={sessionHasCapability(session, "page.configure")} />

@@ -221,7 +221,6 @@ SESSION_SECRET=<first-random-value>
 ENCRYPTION_KEY=<second-random-value>
 POSTGRES_PASSWORD=<independent-database-password>
 NEXT_PUBLIC_APP_URL=https://signalhub.at
-ALLOW_PUBLIC_SIGNUP=false
 REQUIRE_WORKER=true
 ```
 
@@ -404,7 +403,6 @@ Create one local account per tenant and platform role:
 NODE_ENV=development \
 ALLOW_DEV_SEED=true \
 DEV_ROLE_PASSWORD='choose-a-development-password' \
-DEV_PLATFORM_TOTP_SECRET='a-base32-authenticator-secret' \
 npm run db:seed-roles
 ```
 

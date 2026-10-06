@@ -1,16 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { assertPageInOrg, requireCapability } from "@/lib/admin-guard";
 import { apiError, routeError } from "@/lib/api-response";
+import { csvField } from "@/lib/csv";
 import { database } from "@/lib/postgres/client";
-
-function spreadsheetSafe(value: unknown) {
-  const text = String(value ?? "");
-  return /^[=+\-@\t\r]/.test(text) ? `'${text}` : text;
-}
-
-function csvField(value: unknown) {
-  return `"${spreadsheetSafe(value).replace(/"/g, '""')}"`;
-}
 
 export async function GET(request: NextRequest) {
   try {

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { createPageAccessSession, verifyPassword } from "@/lib/auth";
+import { createPageAccessSession, credentialVersion, verifyPassword } from "@/lib/auth";
 import { apiError, routeError, validationError } from "@/lib/api-response";
 import { canonicalizeEmail } from "@/lib/identity";
 import { consumeRateLimit, RateLimitError, requestIp } from "@/lib/rate-limit";
@@ -35,7 +35,7 @@ export async function POST(
       if (!page.passwordHash || !(await verifyPassword(parsed.data.password, page.passwordHash))) {
         return apiError(401, "ACCESS_DENIED", "Incorrect password");
       }
-      await createPageAccessSession(page.id, {});
+      await createPageAccessSession(page.id, { cv: credentialVersion(page.passwordHash) });
       return NextResponse.json({ ok: true });
     }
     if (page.type === "AUDIENCE") {
@@ -50,7 +50,7 @@ export async function POST(
       if (!user || !(await verifyPassword(parsed.data.password, user.passwordHash))) {
         return apiError(401, "ACCESS_DENIED", "Invalid email or password");
       }
-      await createPageAccessSession(page.id, { userId: user.id, email: user.email });
+      await createPageAccessSession(page.id, { userId: user.id, email: user.email, cv: credentialVersion(user.passwordHash) });
       return NextResponse.json({ ok: true });
     }
     return apiError(400, "ACCESS_NOT_REQUIRED", "This page does not require access control");

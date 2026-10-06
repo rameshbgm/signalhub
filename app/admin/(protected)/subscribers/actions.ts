@@ -30,42 +30,23 @@ function unsubscribeToken() {
   return randomBytes(32).toString("hex");
 }
 
-export async function addSubscriber(pageId: string, formData: FormData) {
-  const session = await requireCapability("subscriber.manage", pageId);
-  await assertPageInOrg(pageId, session.orgId);
-  const channel = String(formData.get("channel") ?? "EMAIL");
-  const contact = await validatedContact(channel, String(formData.get("contact") ?? "").trim());
-  await withDatabaseTransaction(async (transaction) => {
-    await fenceActiveOrganizationMutation(session.orgId, transaction);
-    await transaction.insertInto("subscribers").values({
-      pageId,
-      channel,
-      contact,
-      componentIds: [],
-      eventTypes: [],
-      verified: true,
-      quarantined: false,
-      unsubscribeToken: unsubscribeToken(),
-    }).onConflict((conflict) => conflict.columns(["pageId", "channel", "contact"]).doUpdateSet({
-      verified: true,
-      quarantined: false,
-    })).execute();
-  });
-  revalidatePath("/organization/subscribers");
+/**
+ * Admin-added contacts skip the visitor OTP, so the operator must attest that
+ * each person agreed to receive updates.
+ */
+function requireConsentAttestation(formData: FormData) {
+  if (formData.get("consent") !== "on") {
+    throw new Error("Confirm that these contacts agreed to receive status updates");
+  }
 }
 
-export async function importSubscribersCsv(pageId: string, formData: FormData) {
-  const session = await requireCapability("subscriber.manage", pageId);
-  await assertPageInOrg(pageId, session.orgId);
-  const csv = String(formData.get("csv") ?? "");
-  const channel = String(formData.get("channel") ?? "EMAIL");
-  if (channel !== "EMAIL") throw new Error("CSV import currently supports email subscribers only");
-  const rawContacts = [...new Set(csv.split(/[\n,]/).map((value) => value.trim()).filter(Boolean))];
-  const contacts = await Promise.all(rawContacts.map((contact) => validatedContact("EMAIL", contact)));
-  if (!contacts.length) return;
-
+/**
+ * Inserts admin-attested subscribers. Existing rows are left untouched so a
+ * re-import never un-quarantines a bounced contact or alters its preferences.
+ */
+async function insertAttestedSubscribers(orgId: string, pageId: string, channel: string, contacts: string[]) {
   await withDatabaseTransaction(async (transaction) => {
-    await fenceActiveOrganizationMutation(session.orgId, transaction);
+    await fenceActiveOrganizationMutation(orgId, transaction);
     await transaction.insertInto("subscribers").values(contacts.map((contact) => ({
       pageId,
       channel,
@@ -75,11 +56,37 @@ export async function importSubscribersCsv(pageId: string, formData: FormData) {
       verified: true,
       quarantined: false,
       unsubscribeToken: unsubscribeToken(),
-    }))).onConflict((conflict) => conflict.columns(["pageId", "channel", "contact"]).doUpdateSet({
-      verified: true,
-      quarantined: false,
-    })).execute();
+    }))).onConflict((conflict) => conflict.columns(["pageId", "channel", "contact"]).doNothing()).execute();
   });
+}
+
+export async function addSubscriber(pageId: string, formData: FormData) {
+  const session = await requireCapability("subscriber.manage", pageId);
+  await assertPageInOrg(pageId, session.orgId);
+  requireConsentAttestation(formData);
+  const channel = String(formData.get("channel") ?? "EMAIL");
+  const contact = await validatedContact(channel, String(formData.get("contact") ?? "").trim());
+  await insertAttestedSubscribers(session.orgId, pageId, channel, [contact]);
+  revalidatePath("/organization/subscribers");
+}
+
+export async function importSubscribersCsv(pageId: string, formData: FormData) {
+  const session = await requireCapability("subscriber.manage", pageId);
+  await assertPageInOrg(pageId, session.orgId);
+  requireConsentAttestation(formData);
+  const csv = String(formData.get("csv") ?? "");
+  const channel = String(formData.get("channel") ?? "EMAIL");
+  if (channel !== "EMAIL") throw new Error("CSV import currently supports email subscribers only");
+  const rawContacts = [...new Set(csv.split(/[\n,]/).map((value) => value.trim()).filter(Boolean))];
+  const results = await Promise.allSettled(rawContacts.map((contact) => validatedContact("EMAIL", contact)));
+  const invalid = rawContacts.filter((_, index) => results[index].status === "rejected");
+  if (invalid.length) {
+    const sample = invalid.slice(0, 5).join(", ");
+    throw new Error(`Fix ${invalid.length} invalid address${invalid.length === 1 ? "" : "es"} and import again: ${sample}${invalid.length > 5 ? ", …" : ""}`);
+  }
+  const contacts = [...new Set(results.map((result) => (result as PromiseFulfilledResult<string>).value))];
+  if (!contacts.length) return;
+  await insertAttestedSubscribers(session.orgId, pageId, channel, contacts);
   revalidatePath("/organization/subscribers");
 }
 
