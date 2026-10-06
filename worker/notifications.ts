@@ -14,13 +14,33 @@ class DeliveryError extends Error {
   constructor(
     message: string,
     public readonly transient: boolean,
-    public readonly responseStatus: number | null = null
+    public readonly responseStatus: number | null = null,
+    /** The recipient address itself was refused; stop mailing that subscriber. */
+    public readonly recipientRejected = false
   ) {
     super(message);
   }
 }
 
 export { verifySmtp };
+
+/**
+ * SMTP 5xx replies are permanent, so retrying cannot succeed; 4xx replies and
+ * connection errors are transient and retried with backoff. A permanent reply
+ * about the recipient is a hard bounce.
+ */
+export function smtpDeliveryError(error: unknown) {
+  const message = error instanceof Error ? error.message : "";
+  const responseCode = (error as { responseCode?: unknown } | null)?.responseCode;
+  const permanent = typeof responseCode === "number" && responseCode >= 500;
+  const recipientRejected = permanent && /\b(recipient|mailbox|address|user|domain)\b/i.test(message);
+  return new DeliveryError(
+    message ? `SMTP delivery failed: ${message}` : "SMTP delivery failed",
+    !permanent,
+    permanent ? responseCode : null,
+    recipientRejected
+  );
+}
 
 function isTransientStatus(status: number) {
   return status === 408 || status === 429 || status >= 500;
@@ -122,12 +142,9 @@ async function deliver(job: NotificationJobRow) {
         ...(unsubscribeUrl ? { list: { unsubscribe: unsubscribeUrl } } : {}),
       });
     } catch (error) {
-      throw new DeliveryError(
-        error instanceof Error ? `SMTP delivery failed: ${error.message}` : "SMTP delivery failed",
-        true
-      );
+      throw smtpDeliveryError(error);
     }
-    if (!result.accepted?.length) throw new DeliveryError("SMTP server did not accept the recipient", true);
+    if (!result.accepted?.length) throw new DeliveryError("SMTP server did not accept the recipient", false, null, true);
     return null;
   }
   if (job.channel === "SMS") {
@@ -267,6 +284,7 @@ type NotificationOutcome =
       responseStatus: number | null;
       error: string;
       terminal: boolean;
+      recipientRejected: boolean;
       nextAttemptAt: Date;
       now: Date;
     };
@@ -308,6 +326,12 @@ async function commitNotificationOutcome(
       .returning("id")
       .executeTakeFirst();
     if (!updated) return false;
+    // Hard bounce: quarantine the subscriber so later events skip the address.
+    // Operators can review and release it from the subscribers screen.
+    if (outcome.status === "FAILED" && outcome.recipientRejected && job.subscriberId) {
+      await transaction.updateTable("subscribers").set({ quarantined: true })
+        .where("id", "=", job.subscriberId).where("pageId", "=", job.pageId).execute();
+    }
     await transaction.insertInto("notificationLogs").values({
       pageId: job.pageId,
       channel: job.channel,
@@ -352,6 +376,7 @@ export async function processNotificationJob(job: NotificationJobRow, workerId: 
       error: deliveryError.message.slice(0, 1_000),
       attempt,
       terminal,
+      recipientRejected: deliveryError.recipientRejected,
       nextAttemptAt: terminal
         ? new Date("9999-12-31T23:59:59.999Z")
         : new Date(now.getTime() + backoffMs + jitterMs),
