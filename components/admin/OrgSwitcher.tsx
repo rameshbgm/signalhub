@@ -90,7 +90,6 @@ export function OrgSwitcher({
 
       {open && (
         <div role="menu" className="absolute inset-x-0 top-full z-50 mt-1.5 flex max-h-[min(26rem,calc(100dvh-9rem))] animate-drop flex-col rounded-card border border-line bg-surface p-1.5 shadow-float">
-          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
           {organizations.length > 1 && (
             <>
               <p className="px-2.5 py-1 text-2xs font-bold uppercase tracking-[0.08em] text-ink-dim">Organizations</p>
@@ -111,6 +110,7 @@ export function OrgSwitcher({
             </>
           )}
           <p className="px-2.5 py-1 text-2xs font-bold uppercase tracking-[0.08em] text-ink-dim">Your pages</p>
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
           {canConfigurePages &&
             pages.map((p) => (
               <Link
