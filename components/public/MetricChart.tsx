@@ -132,15 +132,24 @@ export function MetricChart({
     grid: <CartesianGrid strokeDasharray="3 3" stroke="var(--line)" vertical={false} />,
   };
   const format = (value: unknown) => `${formatMetricValue(Number(Array.isArray(value) ? value[0] : value ?? 0), precision)}${suffix}`;
+  // One custom tooltip for every view: the metric name is already the card title, and recharts'
+  // default content repeated a line per series (scatter has one for each axis).
+  const valueLabel = suffix.trim().toLowerCase() === "ms" ? "Response time" : "Value";
   const tooltip = (
     <Tooltip
-      formatter={(value) => {
-        if (Array.isArray(value)) return [`${format(value[0])} – ${format(value[1])}`, "Range"];
-        return [format(value), name];
+      content={({ active, payload }) => {
+        const row = active ? (payload?.[0]?.payload as { full?: string; value?: number; average?: number; min?: number; max?: number } | undefined) : undefined;
+        if (!row) return null;
+        const lines: [string, string][] = row.average !== undefined && row.min !== undefined && row.max !== undefined
+          ? [["Average", format(row.average)], ["Range", `${format(row.min)} – ${format(row.max)}`]]
+          : [[valueLabel, format(row.value)]];
+        return (
+          <div className="border border-[var(--line-bright)] bg-[var(--surface-raised)] px-3 py-2 text-xs text-[var(--fg)]">
+            {row.full && <div className="mb-1 text-[var(--fg-soft)]">{row.full}</div>}
+            {lines.map(([label, value]) => <div key={label}>{label}: <span className="font-semibold tabular-nums">{value}</span></div>)}
+          </div>
+        );
       }}
-      labelFormatter={(label, payload) => String(payload?.[0]?.payload?.full ?? label)}
-      contentStyle={{ borderRadius: 0, border: "1px solid var(--line-bright)", background: "var(--surface-raised)", fontSize: 12, color: "var(--fg)" }}
-      labelStyle={{ color: "var(--fg-soft)" }}
     />
   );
 
