@@ -1,308 +1,300 @@
 "use client";
 
-import { useCallback, useMemo, useSyncExternalStore, type ReactElement } from "react";
+import { useCallback, useMemo, useSyncExternalStore } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import {
-  Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, ComposedChart, Line, LineChart, PolarAngleAxis,
-  RadialBar, RadialBarChart, ReferenceLine, ResponsiveContainer, Scatter, ScatterChart, Tooltip, XAxis, YAxis,
-} from "recharts";
-import { ChartArea, ChartCandlestick, ChartColumn, ChartLine, ChartNoAxesCombined, ChartScatter, Gauge, Grid3x3, type LucideIcon } from "lucide-react";
 import { formatMetricValue, metricDecimals } from "@/lib/status";
 import { formatPageDate } from "@/lib/page-locale";
+import { SERIES_RANGES } from "@/lib/metric-ranges";
+import type { MetricInsights } from "@/lib/metric-series";
+import type { MetricLens, MetricRange, MetricView } from "@/lib/page-design";
+import { COMPARABLE_VIEWS, TrendChart } from "@/components/public/metric/TrendChart";
+import { DistributionChart, PercentileChart, ResponsesPanel, UptimePanel } from "@/components/public/metric/InsightCharts";
+import { CHART_HEIGHT, LENS_LABELS, RANGE_LABELS, VIEWS, type TrendRow } from "@/components/public/metric/shared";
 
-// Each view has its own icon color so the buttons are told apart at a glance; the hues read on light and dark pages.
-const VIEWS = [
-  { id: "line", label: "Line", icon: ChartLine, tone: "#3b82f6" },
-  { id: "area", label: "Area", icon: ChartArea, tone: "#06b6d4" },
-  { id: "bar", label: "Bars", icon: ChartColumn, tone: "#f59e0b" },
-  { id: "step", label: "Step", icon: ChartNoAxesCombined, tone: "#10b981" },
-  { id: "scatter", label: "Scatter", icon: ChartScatter, tone: "#ec4899" },
-  { id: "bands", label: "Min / avg / max", icon: ChartCandlestick, tone: "#8b5cf6" },
-  { id: "gauge", label: "Gauge", icon: Gauge, tone: "#ef4444" },
-  { id: "heatmap", label: "Heatmap", icon: Grid3x3, tone: "#f97316" },
-] as const satisfies readonly { id: string; label: string; icon: LucideIcon; tone: string }[];
+export type MetricChartOptions = {
+  ranges: MetricRange[];
+  defaultRange: MetricRange;
+  lenses: MetricLens[];
+  chartViews: MetricView[];
+  showStats: boolean;
+};
 
-type ViewId = (typeof VIEWS)[number]["id"];
+type Prefs = { range: MetricRange; lens: MetricLens; view: MetricView; compare: boolean };
 
-const CHART_HEIGHT = 160;
-const ANIMATION_MS = 700;
-// Few, wide buckets so the band view summarises the series instead of tracing the line.
-const BAND_BUCKETS = 8;
-// Scatter marks samples above the series average with this color so outliers stand out.
-const OUTLIER_COLOR = "#f59e0b";
-
-/** The remembered view lives in localStorage; useSyncExternalStore keeps server HTML on "line" and avoids an effect. */
-function useStoredView(storageKey: string): [ViewId, (view: ViewId) => void] {
+/**
+ * A visitor's choices for one chart live in localStorage. useSyncExternalStore keeps the server HTML on the
+ * defaults (no hydration mismatch, no effect) and anything the page owner has since disabled falls back to them.
+ */
+function usePrefs(storageKey: string, defaults: Prefs, allowed: { ranges: MetricRange[]; lenses: MetricLens[]; views: MetricView[] }): [Prefs, (patch: Partial<Prefs>) => void] {
   const subscribe = useCallback((notify: () => void) => {
     const listener = (event: StorageEvent) => { if (event.key === storageKey) notify(); };
     window.addEventListener("storage", listener);
-    window.addEventListener("signalhub:metric-view", notify);
+    window.addEventListener("signalhub:metric-prefs", notify);
     return () => {
       window.removeEventListener("storage", listener);
-      window.removeEventListener("signalhub:metric-view", notify);
+      window.removeEventListener("signalhub:metric-prefs", notify);
     };
   }, [storageKey]);
-  const read = useCallback((): ViewId => {
-    try {
-      const stored = window.localStorage.getItem(storageKey);
-      return VIEWS.some((view) => view.id === stored) ? (stored as ViewId) : "line";
-    } catch {
-      return "line";
-    }
-  }, [storageKey]);
-  const view = useSyncExternalStore(subscribe, read, () => "line" as ViewId);
-  const write = useCallback((next: ViewId) => {
-    try { window.localStorage.setItem(storageKey, next); } catch { /* storage blocked: the view still changes for this tab via the event */ }
-    window.dispatchEvent(new Event("signalhub:metric-view"));
-  }, [storageKey]);
-  return [view, write];
+  const raw = useSyncExternalStore(
+    subscribe,
+    () => { try { return window.localStorage.getItem(storageKey) ?? ""; } catch { return ""; } },
+    () => "",
+  );
+  const prefs = useMemo<Prefs>(() => {
+    let stored: Partial<Prefs> = {};
+    try { stored = raw ? (JSON.parse(raw) as Partial<Prefs>) : {}; } catch { /* corrupt value: use defaults */ }
+    return {
+      range: allowed.ranges.includes(stored.range as MetricRange) ? (stored.range as MetricRange) : defaults.range,
+      lens: allowed.lenses.includes(stored.lens as MetricLens) ? (stored.lens as MetricLens) : defaults.lens,
+      view: allowed.views.includes(stored.view as MetricView) ? (stored.view as MetricView) : defaults.view,
+      compare: stored.compare === true,
+    };
+  }, [raw, defaults, allowed]);
+  const update = useCallback((patch: Partial<Prefs>) => {
+    try { window.localStorage.setItem(storageKey, JSON.stringify({ ...prefs, ...patch })); } catch { /* storage blocked: choices last until reload */ }
+    window.dispatchEvent(new Event("signalhub:metric-prefs"));
+  }, [storageKey, prefs]);
+  return [prefs, update];
+}
+
+function percentChange(current: number, previous: number | undefined) {
+  if (previous === undefined || previous === 0) return null;
+  return ((current - previous) / Math.abs(previous)) * 100;
 }
 
 export function MetricChart({
   id,
   name,
   suffix,
-  points,
   color,
   decimals,
+  insights,
+  options,
   locale = "en",
   timeZone = "UTC",
 }: {
   id: string;
   name: string;
   suffix: string;
-  points: { timestamp: string; value: number }[];
   color: string;
   decimals: number;
+  insights: MetricInsights;
+  options: MetricChartOptions;
   locale?: string;
   timeZone?: string;
 }) {
   const precision = metricDecimals(decimals);
-  const reduceMotion = Boolean(useReducedMotion());
-  const [view, setView] = useStoredView(`signalhub:metric-view:${id}`);
-  const animate = !reduceMotion;
-  const animation = { isAnimationActive: animate, animationDuration: ANIMATION_MS, animationEasing: "ease-out" as const };
+  const animate = !useReducedMotion();
+  const hasChecks = Boolean(insights["24h"]?.checks);
+  const lenses = useMemo(() => {
+    const available = options.lenses.filter((lens) => (lens === "uptime" || lens === "responses" ? hasChecks : true));
+    return available.length ? available : (["trend"] as MetricLens[]);
+  }, [options.lenses, hasChecks]);
+  const ranges = options.ranges;
+  const views = useMemo(() => VIEWS.filter((view) => options.chartViews.includes(view.id)), [options.chartViews]);
+  const defaults = useMemo<Prefs>(() => ({
+    range: ranges.includes(options.defaultRange) ? options.defaultRange : ranges[0],
+    lens: lenses[0],
+    view: options.chartViews.includes("line") ? "line" : options.chartViews[0],
+    compare: false,
+  }), [ranges, lenses, options.defaultRange, options.chartViews]);
+  const allowed = useMemo(() => ({ ranges, lenses, views: options.chartViews }), [ranges, lenses, options.chartViews]);
+  const [prefs, setPrefs] = usePrefs(`signalhub:metric:${id}`, defaults, allowed);
 
-  const data = useMemo(() => points.map((point, index) => ({
-    index,
-    t: formatPageDate(point.timestamp, { language: locale, timeZone, month: "short", day: "numeric" }),
-    full: formatPageDate(point.timestamp, { language: locale, timeZone, month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }),
-    value: Number(formatMetricValue(point.value, precision)),
-  })), [points, locale, timeZone, precision]);
+  const insight = insights[prefs.range];
+  const format = (value: number) => `${formatMetricValue(value, precision)}${suffix}`;
+  const formatAxis = (value: number) => formatMetricValue(value, precision);
+  const formatDate = (iso: string) => formatPageDate(iso, { language: locale, timeZone, month: "short", day: "numeric", ...(prefs.range === "24h" ? { hour: "numeric", minute: "2-digit" } : {}) });
 
-  const stats = useMemo(() => {
-    const values = data.map((point) => point.value);
-    return {
-      latest: values.at(-1) ?? 0,
-      peak: values.length ? Math.max(...values) : 0,
-      low: values.length ? Math.min(...values) : 0,
-      average: values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0,
-    };
-  }, [data]);
+  const rows = useMemo<TrendRow[]>(() => {
+    const windowMs = SERIES_RANGES[prefs.range].windowMs;
+    const previous = new Map(insight.previous.buckets.map((bucket) => [Date.parse(bucket.t), bucket.avg]));
+    const round = (value: number) => Number(formatMetricValue(value, precision));
+    const shortOptions = prefs.range === "24h" ? { hour: "numeric", minute: "2-digit" } as const : { month: "short", day: "numeric" } as const;
+    return insight.buckets.map((bucket, index) => {
+      const earlier = previous.get(Date.parse(bucket.t) - windowMs);
+      return {
+        index,
+        t: formatPageDate(bucket.t, { language: locale, timeZone, ...shortOptions }),
+        full: formatPageDate(bucket.t, { language: locale, timeZone, month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }),
+        value: round(bucket.avg),
+        min: round(bucket.min),
+        max: round(bucket.max),
+        p50: round(bucket.p50),
+        p95: round(bucket.p95),
+        p99: round(bucket.p99),
+        prev: earlier === undefined ? undefined : round(earlier),
+      };
+    });
+  }, [insight, prefs.range, locale, timeZone, precision]);
 
-  const bands = useMemo(() => {
-    const size = Math.max(1, Math.ceil(data.length / BAND_BUCKETS));
-    const buckets = [];
-    for (let start = 0; start < data.length; start += size) {
-      const slice = data.slice(start, start + size);
-      const values = slice.map((point) => point.value);
-      buckets.push({
-        t: slice[0].t,
-        full: slice[0].full,
-        min: Math.min(...values),
-        max: Math.max(...values),
-        range: [Math.min(...values), Math.max(...values)] as [number, number],
-        average: Number((values.reduce((sum, value) => sum + value, 0) / values.length).toFixed(precision)),
-      });
-    }
-    return buckets;
-  }, [data, precision]);
+  const summary = insight.summary;
+  const lowerIsBetter = suffix.trim().toLowerCase() === "ms";
+  const stats = summary ? [
+    { label: "Latest", value: summary.latest, delta: null },
+    { label: "Average", value: summary.avg, delta: percentChange(summary.avg, insight.previous.summary?.avg) },
+    { label: "Min", value: summary.min, delta: null },
+    { label: "Max", value: summary.max, delta: null },
+    { label: "p95", value: summary.p95, delta: percentChange(summary.p95, insight.previous.summary?.p95) },
+  ] : [];
 
-  const axisProps = {
-    xAxis: <XAxis dataKey="t" tick={{ fontSize: 10, fill: "var(--fg-dim)" }} minTickGap={30} axisLine={{ stroke: "var(--line)" }} tickLine={false} />,
-    yAxis: (
-      <YAxis
-        tick={{ fontSize: 10, fill: "var(--fg-dim)" }}
-        tickFormatter={(value: number) => formatMetricValue(value, precision)}
-        width={56}
-        axisLine={false}
-        tickLine={false}
-      />
-    ),
-    grid: <CartesianGrid strokeDasharray="3 3" stroke="var(--line)" vertical={false} />,
-  };
-  const format = (value: unknown) => `${formatMetricValue(Number(Array.isArray(value) ? value[0] : value ?? 0), precision)}${suffix}`;
-  // One custom tooltip for every view: the metric name is already the card title, and recharts'
-  // default content repeated a line per series (scatter has one for each axis).
-  const valueLabel = suffix.trim().toLowerCase() === "ms" ? "Response time" : "Value";
-  const tooltip = (
-    <Tooltip
-      content={({ active, payload }) => {
-        const row = active ? (payload?.[0]?.payload as { full?: string; value?: number; average?: number; min?: number; max?: number } | undefined) : undefined;
-        if (!row) return null;
-        const lines: [string, string][] = row.average !== undefined && row.min !== undefined && row.max !== undefined
-          ? [["Average", format(row.average)], ["Range", `${format(row.min)} – ${format(row.max)}`]]
-          : [[valueLabel, format(row.value)]];
-        return (
-          <div className="border border-[var(--line-bright)] bg-[var(--surface-raised)] px-3 py-2 text-xs text-[var(--fg)]">
-            {row.full && <div className="mb-1 text-[var(--fg-soft)]">{row.full}</div>}
-            {lines.map(([label, value]) => <div key={label}>{label}: <span className="font-semibold tabular-nums">{value}</span></div>)}
-          </div>
-        );
-      }}
-    />
-  );
+  const canCompare = prefs.lens === "trend" && COMPARABLE_VIEWS.includes(prefs.view) && insight.previous.buckets.length > 0;
+  const noData = !insight.buckets.length && (prefs.lens === "trend" || prefs.lens === "percentiles" || prefs.lens === "distribution");
+  const transition = { duration: animate ? 0.25 : 0 };
 
-  let chart: ReactElement;
-  if (view === "area") {
-    chart = (
-      <AreaChart data={data}>
-        {axisProps.grid}{axisProps.xAxis}{axisProps.yAxis}{tooltip}
-        <Area type="monotone" dataKey="value" stroke={color} strokeWidth={1.5} fill={color} fillOpacity={0.35} dot={false} {...animation} />
-      </AreaChart>
-    );
-  } else if (view === "bar") {
-    chart = (
-      <BarChart data={data}>
-        {axisProps.grid}{axisProps.xAxis}{axisProps.yAxis}{tooltip}
-        <Bar dataKey="value" fill={color} radius={[3, 3, 0, 0]} maxBarSize={14} {...animation} />
-      </BarChart>
-    );
-  } else if (view === "step") {
-    chart = (
-      <LineChart data={data}>
-        {axisProps.grid}{axisProps.xAxis}{axisProps.yAxis}{tooltip}
-        <Line type="stepAfter" dataKey="value" stroke={color} dot={false} strokeWidth={2} {...animation} />
-      </LineChart>
-    );
-  } else if (view === "scatter") {
-    chart = (
-      <ScatterChart>
-        {axisProps.grid}
-        <XAxis
-          type="number"
-          dataKey="index"
-          domain={["dataMin", "dataMax"]}
-          tickFormatter={(index: number) => data[index]?.t ?? ""}
-          tick={{ fontSize: 10, fill: "var(--fg-dim)" }}
-          minTickGap={30}
-          axisLine={{ stroke: "var(--line)" }}
-          tickLine={false}
-        />
-        {axisProps.yAxis}
-        {tooltip}
-        <Scatter data={data} dataKey="value" fill={color} fillOpacity={0.85} {...animation}>
-          {data.map((point) => <Cell key={point.index} fill={point.value > stats.average ? OUTLIER_COLOR : color} />)}
-        </Scatter>
-      </ScatterChart>
-    );
-  } else if (view === "bands") {
-    chart = (
-      <ComposedChart data={bands}>
-        {axisProps.grid}{axisProps.xAxis}{axisProps.yAxis}{tooltip}
-        <Area type="monotone" dataKey="range" stroke="none" fill={color} fillOpacity={0.3} name="Range" {...animation} />
-        <Line type="monotone" dataKey="max" stroke={color} strokeOpacity={0.5} strokeDasharray="3 3" dot={false} strokeWidth={1} name="Max" {...animation} />
-        <Line type="monotone" dataKey="min" stroke={color} strokeOpacity={0.5} strokeDasharray="3 3" dot={false} strokeWidth={1} name="Min" {...animation} />
-        <Line type="monotone" dataKey="average" stroke={color} dot={{ r: 3, fill: color }} strokeWidth={2} name="Average" {...animation} />
-      </ComposedChart>
-    );
-  } else if (view === "gauge") {
-    chart = (
-      <RadialBarChart data={[{ name, value: stats.latest }]} cx="50%" cy="85%" innerRadius="115%" outerRadius="165%" startAngle={180} endAngle={0} barSize={16}>
-        <PolarAngleAxis type="number" domain={[0, stats.peak || 1]} tick={false} />
-        <RadialBar dataKey="value" cornerRadius={8} fill={color} background={{ fill: "var(--line)" }} {...animation} />
-      </RadialBarChart>
-    );
+  let body;
+  if (noData) {
+    body = <div className="grid h-full place-items-center text-xs text-[var(--fg-dim)]">No data in this range yet.</div>;
+  } else if (prefs.lens === "percentiles") {
+    body = <PercentileChart rows={rows} color={color} animate={animate} format={format} formatAxis={formatAxis} />;
+  } else if (prefs.lens === "distribution") {
+    body = <DistributionChart bins={insight.histogram} color={color} animate={animate} format={format} formatAxis={formatAxis} />;
+  } else if (prefs.lens === "uptime") {
+    body = <UptimePanel insight={insight} range={prefs.range} animate={animate} formatDate={formatDate} />;
+  } else if (prefs.lens === "responses") {
+    body = <ResponsesPanel insight={insight} animate={animate} />;
   } else {
-    chart = (
-      <LineChart data={data}>
-        {axisProps.grid}{axisProps.xAxis}{axisProps.yAxis}{tooltip}
-        <ReferenceLine y={stats.average} stroke="var(--fg-dim)" strokeDasharray="4 4" label={{ value: `avg ${format(stats.average)}`, position: "insideBottomRight", fontSize: 10, fill: "var(--fg-dim)" }} />
-        <Line type="monotone" dataKey="value" stroke={color} dot={false} strokeWidth={2} {...animation} />
-      </LineChart>
+    body = (
+      <TrendChart
+        view={prefs.view}
+        rows={rows}
+        color={color}
+        precision={precision}
+        suffix={suffix}
+        animate={animate}
+        compare={prefs.compare && canCompare}
+        summary={summary ? { latest: summary.latest, avg: summary.avg, max: summary.max } : null}
+        format={format}
+        formatAxis={formatAxis}
+      />
     );
   }
 
-  const span = stats.peak - stats.low || 1;
-  const transition = { duration: animate ? 0.25 : 0 };
-
   return (
     <div className="public-metric bg-[var(--surface)] border border-[var(--line)] p-5">
-      <h4 className="text-sm font-mono font-semibold mb-3 text-[var(--fg)]">
-        {name} <span className="text-[var(--fg-dim)] font-normal">({suffix || "value"})</span>
-      </h4>
+      <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
+        <h4 className="text-sm font-mono font-semibold text-[var(--fg)]">
+          {name} <span className="text-[var(--fg-dim)] font-normal">({suffix || "value"})</span>
+        </h4>
+        {ranges.length > 1 && (
+          <div role="radiogroup" aria-label={`${name} time range`} className="flex gap-0.5">
+            {ranges.map((range) => {
+              const active = prefs.range === range;
+              return (
+                <button
+                  key={range}
+                  type="button"
+                  role="radio"
+                  aria-checked={active}
+                  onClick={() => setPrefs({ range })}
+                  className="relative px-2 py-1 text-xs font-medium tabular-nums transition-colors hover:text-[var(--fg)]"
+                  style={{ color: active ? color : "var(--fg-dim)" }}
+                >
+                  {active && <motion.span layoutId={`metric-range-${id}`} className="absolute inset-0" style={{ background: `color-mix(in srgb, ${color} 14%, transparent)`, border: `1px solid color-mix(in srgb, ${color} 40%, transparent)` }} transition={animate ? { type: "spring", stiffness: 500, damping: 36 } : { duration: 0 }} />}
+                  <span className="relative">{RANGE_LABELS[range]}</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {options.showStats && stats.length > 0 && (
+        <dl className="mb-3 grid grid-cols-3 gap-x-3 gap-y-2 sm:grid-cols-5">
+          {stats.map((stat) => {
+            const worse = stat.delta !== null && lowerIsBetter && stat.delta > 0;
+            const better = stat.delta !== null && lowerIsBetter && stat.delta < 0;
+            return (
+              <div key={stat.label} className="min-w-0">
+                <dt className="text-[10px] uppercase tracking-wide text-[var(--fg-dim)]">{stat.label}</dt>
+                <dd className="text-sm font-semibold tabular-nums text-[var(--fg)]">
+                  {format(stat.value)}
+                  {stat.delta !== null && Math.abs(stat.delta) >= 0.1 && (
+                    <span className="ml-1 text-[10px] font-medium" style={{ color: worse ? "#d97706" : better ? "#059669" : "var(--fg-dim)" }} title="Compared with the previous period">
+                      {stat.delta > 0 ? "▲" : "▼"} {Math.abs(stat.delta).toFixed(Math.abs(stat.delta) < 10 ? 1 : 0)}%
+                    </span>
+                  )}
+                </dd>
+              </div>
+            );
+          })}
+        </dl>
+      )}
+
+      {lenses.length > 1 && (
+        <div role="tablist" aria-label={`${name} information`} className="mb-3 flex flex-wrap gap-x-4 gap-y-1 border-b border-[var(--line)]">
+          {lenses.map((lens) => {
+            const active = prefs.lens === lens;
+            return (
+              <button
+                key={lens}
+                type="button"
+                role="tab"
+                aria-selected={active}
+                onClick={() => setPrefs({ lens })}
+                className="relative pb-1.5 text-xs font-medium transition-colors hover:text-[var(--fg)]"
+                style={{ color: active ? color : "var(--fg-dim)" }}
+              >
+                {LENS_LABELS[lens]}
+                {active && <motion.span layoutId={`metric-lens-${id}`} className="absolute inset-x-0 -bottom-px h-0.5" style={{ background: color }} transition={animate ? { type: "spring", stiffness: 500, damping: 36 } : { duration: 0 }} />}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       <div className="relative" style={{ height: CHART_HEIGHT }}>
         <AnimatePresence mode="wait" initial={false}>
           <motion.div
-            key={view}
+            key={`${prefs.lens}-${prefs.range}-${prefs.lens === "trend" ? prefs.view : ""}`}
             className="absolute inset-0"
             initial={animate ? { opacity: 0, y: 8 } : false}
             animate={{ opacity: 1, y: 0 }}
             exit={animate ? { opacity: 0, y: -8 } : { opacity: 0 }}
             transition={transition}
           >
-            {view === "heatmap" ? (
-              <div className="flex h-full flex-col justify-center gap-3">
-                <div className="grid gap-[3px]" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(14px, 1fr))" }} role="img" aria-label={`${name} samples, darker is higher`}>
-                  {data.map((point, index) => (
-                    <motion.span
-                      key={point.index}
-                      title={`${point.full} · ${format(point.value)}`}
-                      className="block h-4 rounded-[3px]"
-                      style={{ background: `color-mix(in srgb, ${color} ${Math.round(12 + ((point.value - stats.low) / span) * 88)}%, transparent)` }}
-                      initial={animate ? { opacity: 0, scale: 0.4 } : false}
-                      animate={{ opacity: 1, scale: 1 }}
-                      transition={{ delay: animate ? Math.min(index * 0.012, 0.6) : 0, duration: animate ? 0.3 : 0 }}
-                    />
-                  ))}
-                </div>
-                <div className="flex items-center justify-between text-[10px] text-[var(--fg-dim)]">
-                  <span>{format(stats.low)}</span>
-                  <span className="h-1.5 w-24 rounded-full" style={{ background: `linear-gradient(90deg, color-mix(in srgb, ${color} 12%, transparent), ${color})` }} aria-hidden />
-                  <span>{format(stats.peak)}</span>
-                </div>
-              </div>
-            ) : (
-              <div className="relative h-full">
-                <ResponsiveContainer width="100%" height="100%">{chart}</ResponsiveContainer>
-                {view === "gauge" && (
-                  <div className="pointer-events-none absolute inset-x-0 bottom-0 text-center">
-                    <div className="text-2xl font-semibold tabular-nums text-[var(--fg)]">{format(stats.latest)}</div>
-                    <div className="text-[10px] text-[var(--fg-dim)]">latest · avg {format(stats.average)} · peak {format(stats.peak)}</div>
-                  </div>
-                )}
-              </div>
-            )}
+            {body}
           </motion.div>
         </AnimatePresence>
       </div>
-      <div role="radiogroup" aria-label={`${name} chart view`} className="mt-3 flex flex-wrap items-center justify-center gap-1">
-        {VIEWS.map(({ id: viewId, label, icon: Icon, tone }) => {
-          const active = view === viewId;
-          return (
-            <button
-              key={viewId}
-              type="button"
-              role="radio"
-              aria-checked={active}
-              aria-label={label}
-              title={label}
-              onClick={() => setView(viewId)}
-              className="relative grid size-8 place-items-center border border-transparent transition-opacity hover:opacity-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1"
-              style={{ color: tone, opacity: active ? 1 : 0.7 }}
-            >
-              {active && (
-                <motion.span
-                  layoutId={`metric-view-pill-${id}`}
-                  className="absolute inset-0"
-                  style={{ background: `color-mix(in srgb, ${tone} 16%, transparent)`, border: `1px solid color-mix(in srgb, ${tone} 45%, transparent)` }}
-                  transition={animate ? { type: "spring", stiffness: 500, damping: 36 } : { duration: 0 }}
-                />
-              )}
-              <Icon aria-hidden size={15} className="relative" />
-            </button>
-          );
-        })}
+
+      <div className="mt-3 flex min-h-8 flex-wrap items-center justify-center gap-x-4 gap-y-1">
+        {prefs.lens === "trend" && views.length > 1 && (
+          <div role="radiogroup" aria-label={`${name} chart style`} className="flex flex-wrap items-center justify-center gap-1">
+            {views.map(({ id: viewId, label, icon: Icon, tone }) => {
+              const active = prefs.view === viewId;
+              return (
+                <button
+                  key={viewId}
+                  type="button"
+                  role="radio"
+                  aria-checked={active}
+                  aria-label={label}
+                  title={label}
+                  onClick={() => setPrefs({ view: viewId })}
+                  className="relative grid size-8 place-items-center border border-transparent transition-opacity hover:opacity-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1"
+                  style={{ color: tone, opacity: active ? 1 : 0.7 }}
+                >
+                  {active && (
+                    <motion.span
+                      layoutId={`metric-view-pill-${id}`}
+                      className="absolute inset-0"
+                      style={{ background: `color-mix(in srgb, ${tone} 16%, transparent)`, border: `1px solid color-mix(in srgb, ${tone} 45%, transparent)` }}
+                      transition={animate ? { type: "spring", stiffness: 500, damping: 36 } : { duration: 0 }}
+                    />
+                  )}
+                  <Icon aria-hidden size={15} className="relative" />
+                </button>
+              );
+            })}
+          </div>
+        )}
+        {canCompare && (
+          <label className="flex cursor-pointer items-center gap-1.5 text-xs text-[var(--fg-dim)]">
+            <input type="checkbox" checked={prefs.compare} onChange={(event) => setPrefs({ compare: event.target.checked })} className="size-3.5 cursor-pointer" style={{ accentColor: color }} />
+            Compare to previous period
+          </label>
+        )}
       </div>
     </div>
   );

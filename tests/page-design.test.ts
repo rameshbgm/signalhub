@@ -256,4 +256,24 @@ describe("status page design", () => {
     const design = templateDesign("CENTERED_SUMMARY");
     expect(design.surfaces.hub.full.some((block) => block.type === "ANNOUNCEMENTS")).toBe(true);
   });
+
+  it("fills metric chart options for designs saved before they existed", () => {
+    const design = templateDesign("CENTERED_SUMMARY");
+    // Simulate a stored design whose METRICS block only has the original settings.
+    const stored = structuredClone(design) as unknown as { surfaces: { status: Record<string, { type: string; settings: Record<string, unknown> }[]> } };
+    for (const region of ["full", "primary", "sidebar"]) {
+      for (const block of stored.surfaces.status[region]) {
+        if (block.type === "METRICS") block.settings = { heading: "System metrics", columns: 2 };
+      }
+    }
+    const parsed = statusPageDesignSchema.parse(stored);
+    const metrics = allSurfaceBlocks(parsed, "status").find((block) => block.type === "METRICS");
+    expect(metrics?.type === "METRICS" && metrics.settings).toMatchObject({
+      ranges: ["24h", "7d", "30d", "90d"],
+      defaultRange: "24h",
+      showStats: true,
+    });
+    expect(metrics?.type === "METRICS" && metrics.settings.lenses).toHaveLength(5);
+    expect(metrics?.type === "METRICS" && metrics.settings.chartViews).toHaveLength(8);
+  });
 });

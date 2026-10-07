@@ -4,15 +4,9 @@ import { classifyFailure, type FailureKind } from "@/lib/failure-kind";
 
 export { classifyFailure, type FailureKind };
 
-/** Visitor-selectable windows. Bucket widths give roughly 90-100 points per chart. */
-export const SERIES_RANGES = {
-  "24h": { windowMs: 86_400_000, bucketSec: 900, cellSec: 3_600 },
-  "7d": { windowMs: 7 * 86_400_000, bucketSec: 7_200, cellSec: 86_400 },
-  "30d": { windowMs: 30 * 86_400_000, bucketSec: 28_800, cellSec: 86_400 },
-  "90d": { windowMs: 90 * 86_400_000, bucketSec: 86_400, cellSec: 86_400 },
-} as const;
-export type SeriesRangeId = keyof typeof SERIES_RANGES;
-export const SERIES_RANGE_IDS = Object.keys(SERIES_RANGES) as SeriesRangeId[];
+import { SERIES_RANGES, SERIES_RANGE_IDS, type SeriesRangeId } from "@/lib/metric-ranges";
+
+export { SERIES_RANGES, SERIES_RANGE_IDS, type SeriesRangeId };
 
 const HISTOGRAM_BINS = 8;
 const CACHE_TTL_MS = 60_000;
@@ -24,6 +18,9 @@ export type RangeSummary = { latest: number; avg: number; min: number; max: numb
 export type HistogramBin = { from: number; to: number | null; count: number };
 export type UptimeCell = { t: string; total: number; ok: number };
 export type RangeInsight = {
+  /** ISO window bounds, so the client can lay out empty slots (calendar days with no checks). */
+  start: string;
+  end: string;
   buckets: SeriesBucket[];
   summary: RangeSummary | null;
   previous: { summary: RangeSummary | null; buckets: { t: string; avg: number }[] };
@@ -131,7 +128,7 @@ async function loadChecks(metricIds: string[], range: SeriesRangeId, now: Date) 
 }
 
 /** Folds the loaded rows of one range into a per-metric RangeInsight. */
-function assemble(metricId: string, loaded: Awaited<ReturnType<typeof loadRange>>, checks: Awaited<ReturnType<typeof loadChecks>>, linked: boolean): RangeInsight {
+function assemble(metricId: string, loaded: Awaited<ReturnType<typeof loadRange>>, checks: Awaited<ReturnType<typeof loadChecks>>, linked: boolean, end: Date): RangeInsight {
   const own = loaded.buckets.filter((row) => row.metricId === metricId);
   const current = own.filter((row) => row.period === "current");
   const previous = own.filter((row) => row.period === "previous");
@@ -175,6 +172,8 @@ function assemble(metricId: string, loaded: Awaited<ReturnType<typeof loadRange>
   }
 
   return {
+    start: loaded.start.toISOString(),
+    end: end.toISOString(),
     buckets: current.map((row) => ({ t: row.t.toISOString(), avg: row.avg, min: row.min, max: row.max, p50: row.p50, p95: row.p95, p99: row.p99, count: Number(row.count) })),
     summary: summaryOf(summaries.find((row) => row.period === "current")),
     previous: {
@@ -210,7 +209,7 @@ export async function getMetricInsights(metricIds: string[], now = new Date()): 
       loadRange(metricIds, range, now),
       linkedIds.length ? loadChecks(linkedIds, range, now) : Promise.resolve({ cells: [], groups: [] }),
     ]);
-    for (const id of metricIds) result.get(id)![range] = assemble(id, loaded, checks, linked.has(id));
+    for (const id of metricIds) result.get(id)![range] = assemble(id, loaded, checks, linked.has(id), now);
   }));
 
   if (cache.size >= CACHE_MAX_ENTRIES) cache.clear();

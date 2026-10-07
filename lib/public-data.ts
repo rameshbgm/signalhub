@@ -1,4 +1,3 @@
-import { sql } from "kysely";
 import { database } from "@/lib/postgres/client";
 import { isDatabaseId } from "@/lib/database-id";
 import { overallBanner, type ComponentStatus } from "@/lib/status";
@@ -165,10 +164,10 @@ export async function isIncidentVisibleToScope(
   return Boolean(link);
 }
 
+/** Visible metrics for a page. Chart data is loaded separately by getMetricInsights (lib/metric-series.ts). */
 export async function getMetricsForPage(
   pageId: string,
-  visibleComponentIds: string[] | null,
-  pointLimit = 200
+  visibleComponentIds: string[] | null
 ) {
   const scopedIds = visibleComponentIds?.filter(isDatabaseId) ?? null;
   if (scopedIds !== null && scopedIds.length === 0) return [];
@@ -180,37 +179,7 @@ export async function getMetricsForPage(
   if (scopedIds !== null) {
     metricQuery = metricQuery.where("componentId", "in", scopedIds);
   }
-  const metrics = await metricQuery.execute();
-  const metricIds = metrics.map((metric) => metric.id);
-  const rankedPoints = metricIds.length
-    ? database
-        .selectFrom("metricPoints")
-        .selectAll()
-        .select(
-          sql<number>`row_number() over (partition by metric_id order by timestamp desc)`.as("pointRank")
-        )
-        .where("metricId", "in", metricIds)
-        .as("rankedPoints")
-    : null;
-  const points = rankedPoints
-    ? await database
-        .selectFrom(rankedPoints)
-        .select(["id", "metricId", "timestamp", "value"])
-        .where("pointRank", "<=", Math.max(1, pointLimit))
-        .orderBy("metricId", "asc")
-        .orderBy("timestamp", "asc")
-        .execute()
-    : [];
-  const pointsByMetric = new Map<string, typeof points>();
-  for (const point of points) {
-    const existing = pointsByMetric.get(point.metricId) ?? [];
-    existing.push(point);
-    pointsByMetric.set(point.metricId, existing);
-  }
-  return metrics.map((metric) => ({
-    ...metric,
-    points: pointsByMetric.get(metric.id) ?? [],
-  }));
+  return metricQuery.execute();
 }
 
 export function splitActiveAndPast(incidents: Awaited<ReturnType<typeof getIncidentsForPage>>) {

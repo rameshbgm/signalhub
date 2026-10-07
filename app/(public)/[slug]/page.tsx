@@ -7,6 +7,7 @@ import { ComponentList } from "@/components/public/ComponentList";
 import { SubscribeModal } from "@/components/public/SubscribeModal";
 import { IncidentCard, PastIncidentsByDay } from "@/components/public/IncidentTimeline";
 import { MetricChart } from "@/components/public/MetricChart";
+import { getMetricInsights } from "@/lib/metric-series";
 import Link from "next/link";
 import { scopeCustomCss } from "@/lib/custom-css";
 import { publicPagePath } from "@/lib/public-path";
@@ -57,6 +58,7 @@ export default async function PublicStatusPage({ params }: { params: Promise<{ s
   const upcomingMaintenance = incidents.filter((i) => i.isMaintenance && i.maintenanceStatus === "SCHEDULED");
 
   const metrics = await getMetricsForPage(page.id, access.visibleComponentIds);
+  const metricInsights = await getMetricInsights(metrics.map((metric) => metric.id));
   const now = new Date();
   const announcementDocs = await getActivePageAnnouncements(page.id, "STATUS", now);
   const announcements = announcementDocs.map((announcement) => ({
@@ -140,7 +142,8 @@ export default async function PublicStatusPage({ params }: { params: Promise<{ s
                   locale={page.language}
                   timeZone={page.timezone}
                   color={design.theme.palette.brand}
-                  points={metric.points.map((point) => ({ timestamp: point.timestamp.toISOString(), value: point.value }))}
+                  insights={metricInsights.get(metric.id)!}
+                  options={block.settings}
                 />
               ))}
             </div>

@@ -4,13 +4,15 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Check, ChevronLeft, Eye, ImageIcon, LayoutTemplate, Link2, Palette, Send } from "lucide-react";
+import { ChartLine, Check, ChevronLeft, Eye, ImageIcon, LayoutTemplate, Link2, Palette, Send } from "lucide-react";
 import { Alert } from "@/components/ui/alert";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field } from "@/components/ui/field";
 import { IconTile } from "@/components/ui/icon-tile";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import { PageHeader } from "@/components/ui/page-header";
 import { Textarea } from "@/components/ui/textarea";
 import { StatusBadge, type StatusTone } from "@/components/ui/status-badge";
@@ -23,10 +25,16 @@ import {
   PAGE_THEME_PRESET_LABELS,
   applyPageTemplateLayout,
   contrastRatio,
+  METRIC_LENSES,
+  METRIC_RANGES,
+  METRIC_VIEWS,
   designWithThemePreset,
+  metricBlockSettings,
   pageThemePreset,
   sameStatusPageDesign,
   statusPageDesignSchema,
+  withMetricBlockSettings,
+  type MetricBlockSettings,
   type PageTemplateKey,
   type PageThemePresetKey,
   type StatusPageDesign,
@@ -50,6 +58,44 @@ type AppearancePage = {
   coverImageCropWidth: number | null;
   coverImageCropHeight: number | null;
 };
+
+const METRIC_RANGE_LABELS: Record<(typeof METRIC_RANGES)[number], string> = { "24h": "24 hours", "7d": "7 days", "30d": "30 days", "90d": "90 days" };
+const METRIC_LENS_LABELS: Record<(typeof METRIC_LENSES)[number], string> = {
+  trend: "Trend", percentiles: "Percentiles (p50 / p95 / p99)", distribution: "Distribution", uptime: "Uptime & calendar", responses: "Status codes & errors",
+};
+const METRIC_VIEW_LABELS: Record<(typeof METRIC_VIEWS)[number], string> = {
+  line: "Line", area: "Area", bar: "Bars", step: "Step", scatter: "Scatter", bands: "Min / avg / max", gauge: "Gauge", heatmap: "Heatmap",
+};
+
+/** A group of checkboxes that always keeps at least one option selected. */
+function OptionGroup<T extends string>({ legend, options, labels, selected, onChange }: {
+  legend: string;
+  options: readonly T[];
+  labels: Record<T, string>;
+  selected: readonly T[];
+  onChange: (next: T[]) => void;
+}) {
+  return (
+    <fieldset className="space-y-2">
+      <legend className="text-sm font-medium text-ink">{legend}</legend>
+      <div className="flex flex-wrap gap-x-5 gap-y-2">
+        {options.map((option) => {
+          const checked = selected.includes(option);
+          return (
+            <label key={option} className="flex items-center gap-2 text-sm text-ink-soft">
+              <Checkbox
+                checked={checked}
+                disabled={checked && selected.length === 1}
+                onChange={() => onChange(options.filter((candidate) => (candidate === option ? !checked : selected.includes(candidate))))}
+              />
+              {labels[option]}
+            </label>
+          );
+        })}
+      </div>
+    </fieldset>
+  );
+}
 
 const SIMPLE_LAYOUTS: Array<{
   key: PageTemplateKey;
@@ -156,6 +202,15 @@ export function SimpleAppearanceEditor({
 
   function selectPreset(key: PageThemePresetKey) {
     commit(designWithThemePreset(design, key));
+  }
+
+  const metricSettings = metricBlockSettings(design);
+
+  function updateMetrics(patch: Partial<MetricBlockSettings>) {
+    const next = { ...metricSettings!, ...patch };
+    // The default range must stay one of the enabled ranges.
+    if (!next.ranges.includes(next.defaultRange)) next.defaultRange = next.ranges[0];
+    commit(withMetricBlockSettings(design, next));
   }
 
   function updatePresentation(patch: Partial<StatusPageDesign["presentation"]>) {
@@ -317,6 +372,36 @@ export function SimpleAppearanceEditor({
             </CardContent>
           </Card>
         </section>
+
+        {metricSettings && (
+          <section aria-labelledby="metrics-heading">
+            <Card>
+              <CardHeader>
+                <div className="flex items-center gap-3.5">
+                  <IconTile icon={ChartLine} hue="sky" />
+                  <div className="min-w-0">
+                    <CardTitle id="metrics-heading">Metric charts</CardTitle>
+                    <CardDescription>Choose what visitors can switch between on each metric chart. Everything is on by default.</CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-5">
+                <OptionGroup legend="Time ranges" options={METRIC_RANGES} labels={METRIC_RANGE_LABELS} selected={metricSettings.ranges} onChange={(ranges) => updateMetrics({ ranges })} />
+                <Field label="Default range" htmlFor="metric-default-range" className="max-w-xs">
+                  <Select id="metric-default-range" value={metricSettings.defaultRange} onChange={(event) => updateMetrics({ defaultRange: event.target.value as MetricBlockSettings["defaultRange"] })}>
+                    {metricSettings.ranges.map((range) => <option key={range} value={range}>{METRIC_RANGE_LABELS[range]}</option>)}
+                  </Select>
+                </Field>
+                <OptionGroup legend="Information" options={METRIC_LENSES} labels={METRIC_LENS_LABELS} selected={metricSettings.lenses} onChange={(lenses) => updateMetrics({ lenses })} />
+                <OptionGroup legend="Chart styles" options={METRIC_VIEWS} labels={METRIC_VIEW_LABELS} selected={metricSettings.chartViews} onChange={(chartViews) => updateMetrics({ chartViews })} />
+                <label className="flex items-center gap-2 text-sm text-ink-soft">
+                  <Checkbox checked={metricSettings.showStats} onChange={(event) => updateMetrics({ showStats: event.target.checked })} />
+                  Show the summary strip (latest, average, min, max, p95)
+                </label>
+              </CardContent>
+            </Card>
+          </section>
+        )}
 
         <section aria-labelledby="style-heading">
           <Card>
