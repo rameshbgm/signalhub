@@ -146,6 +146,7 @@ export async function createIncident(orgId: string, rawInput: CreateIncidentInpu
         body: input.body,
         eventType: "incident.created",
         eventId: update.id,
+        correlationId: incident.id,
         componentIds: input.components.map((component) => component.componentId),
       }, transaction);
     }
@@ -209,6 +210,7 @@ export async function addIncidentUpdate(
         body: input.body,
         eventType: input.status === "RESOLVED" ? "incident.resolved" : "incident.updated",
         eventId: update.id,
+        correlationId: incident.id,
         componentIds: links.map((link) => link.componentId),
       }, transaction);
     }

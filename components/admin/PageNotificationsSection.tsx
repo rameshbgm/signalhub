@@ -17,12 +17,13 @@ import { IconTile } from "@/components/ui/icon-tile";
 import { StatusBadge } from "@/components/ui/status-badge";
 
 export async function PageNotificationsSection({ pageId }: { pageId: string }) {
-  const [page, endpointDocs, destinations, capabilities, enabledChannels] = await Promise.all([
+  const [page, endpointDocs, destinations, capabilities, enabledChannels, components] = await Promise.all([
     database.selectFrom("pages").select(["name", "emailFromName", "emailReplyTo", "emailFooter"]).where("id", "=", pageId).executeTakeFirst(),
     database.selectFrom("webhookEndpoints").selectAll().where("pageId", "=", pageId).execute(),
     database.selectFrom("notificationDestinations").selectAll().where("pageId", "=", pageId).orderBy("createdAt").execute(),
     subscriptionCapabilities(),
     enabledDestinationChannels(),
+    database.selectFrom("components").select(["id", "name"]).where("pageId", "=", pageId).orderBy("name", "asc").execute(),
   ]);
   const endpoints = endpointDocs;
 
@@ -93,6 +94,7 @@ export async function PageNotificationsSection({ pageId }: { pageId: string }) {
           <NotificationDestinationManager
             pageId={pageId}
             enabledChannels={enabledChannels}
+            components={components}
             initial={destinations.map((destination) => ({
               id: destination.id,
               name: destination.name,
@@ -101,6 +103,8 @@ export async function PageNotificationsSection({ pageId }: { pageId: string }) {
               verifiedAt: destination.verifiedAt?.toISOString() ?? null,
               lastTestOk: destination.lastTestOk,
               lastError: destination.lastError,
+              eventTypes: destination.eventTypes,
+              componentIds: destination.componentIds,
             }))}
           />
         </CardContent>

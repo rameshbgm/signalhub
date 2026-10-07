@@ -8,91 +8,19 @@ import { Input } from "@/components/ui/input";
 import { Alert } from "@/components/ui/alert";
 import { EmptyState } from "@/components/ui/empty-state";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Select } from "@/components/ui/select";
+import {
+  defaultConfig,
+  DESTINATION_CHANNELS,
+  DESTINATION_EVENT_TYPES,
+  DESTINATION_PROVIDERS,
+  fieldVisible,
+  type DestinationChannel,
+} from "@/lib/destination-catalog";
 import { BellRing } from "lucide-react";
 
-const CHANNELS = [
-  {
-    value: "SLACK",
-    label: "Slack",
-    group: "Chat",
-    description: "Send updates through a Slack incoming webhook.",
-    fields: [{ key: "url", label: "Incoming webhook URL", required: true }],
-  },
-  {
-    value: "MICROSOFT_TEAMS",
-    label: "Microsoft Teams",
-    group: "Chat",
-    description: "Post an Adaptive Card through a Teams workflow webhook.",
-    fields: [{ key: "url", label: "Workflow webhook URL", required: true }],
-  },
-  {
-    value: "DISCORD",
-    label: "Discord",
-    group: "Chat",
-    description: "Publish incident updates to a Discord channel webhook.",
-    fields: [{ key: "url", label: "Incoming webhook URL", required: true }],
-  },
-  {
-    value: "GOOGLE_CHAT",
-    label: "Google Chat",
-    group: "Chat",
-    description: "Post updates to a Google Chat space webhook.",
-    fields: [{ key: "url", label: "Incoming webhook URL", required: true }],
-  },
-  {
-    value: "TELEGRAM",
-    label: "Telegram",
-    group: "Messaging",
-    description: "Send updates with a Telegram bot to a chat or channel.",
-    fields: [
-      { key: "botToken", label: "Bot token", required: true, sensitive: true },
-      { key: "chatId", label: "Chat ID", required: true },
-    ],
-  },
-  {
-    value: "WHATSAPP",
-    label: "WhatsApp",
-    group: "Messaging",
-    description: "Deliver updates through a Twilio WhatsApp sender.",
-    fields: [
-      { key: "accountSid", label: "Twilio account SID", required: true, sensitive: true },
-      { key: "authToken", label: "Twilio auth token", required: true, sensitive: true },
-      { key: "from", label: "From number", required: true },
-      { key: "to", label: "To number", required: true },
-    ],
-  },
-  {
-    value: "PAGERDUTY",
-    label: "PagerDuty",
-    group: "On-call",
-    description: "Trigger or resolve incidents through Events API v2.",
-    fields: [
-      { key: "routingKey", label: "Events routing key", required: true, sensitive: true },
-      { key: "severity", label: "Severity (defaults to warning)", required: false },
-    ],
-  },
-  {
-    value: "OPSGENIE",
-    label: "Opsgenie",
-    group: "On-call",
-    description: "Create alerts with the US or EU Opsgenie Alerts API.",
-    fields: [
-      { key: "apiKey", label: "API key", required: true, sensitive: true },
-      { key: "region", label: "Region (us or eu)", required: false },
-    ],
-  },
-  {
-    value: "NTFY",
-    label: "Ntfy",
-    group: "Push",
-    description: "Publish to ntfy.sh or your own ntfy server.",
-    fields: [
-      { key: "serverUrl", label: "Server URL (defaults to ntfy.sh)", required: false },
-      { key: "topic", label: "Topic", required: true },
-      { key: "token", label: "Access token (optional)", required: false, sensitive: true },
-    ],
-  },
-] as const;
+const CHANNELS = DESTINATION_CHANNELS.map((value) => ({ value, ...DESTINATION_PROVIDERS[value] }));
 
 type Destination = {
   id: string;
@@ -102,26 +30,32 @@ type Destination = {
   verifiedAt: string | null;
   lastTestOk: boolean | null;
   lastError: string | null;
+  eventTypes: string[];
+  componentIds: string[] | null;
 };
 
 export function NotificationDestinationManager({
   pageId,
   initial,
   enabledChannels,
+  components = [],
 }: {
   pageId: string;
   initial: Destination[];
   enabledChannels?: readonly string[];
+  components?: Array<{ id: string; name: string }>;
 }) {
   const availableProviders = CHANNELS.filter(
     (provider) => !enabledChannels || enabledChannels.includes(provider.value)
   );
   const [destinations, setDestinations] = useState(initial);
-  const [channel, setChannel] = useState<(typeof CHANNELS)[number]["value"]>(
+  const [channel, setChannel] = useState<DestinationChannel>(
     availableProviders[0]?.value ?? "SLACK"
   );
   const [name, setName] = useState("");
-  const [config, setConfig] = useState<Record<string, string>>({});
+  const [config, setConfig] = useState<Record<string, string>>(() => defaultConfig(availableProviders[0]?.value ?? "SLACK"));
+  const [eventTypes, setEventTypes] = useState<string[]>([]);
+  const [componentIds, setComponentIds] = useState<string[]>([]);
   const [message, setMessage] = useState<string | null>(null);
   const [messageIsError, setMessageIsError] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -143,7 +77,7 @@ export function NotificationDestinationManager({
       const response = await fetchWithTimeout("/api/admin/notification-destinations", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ pageId, name, channel, config, dryRun }),
+        body: JSON.stringify({ pageId, name, channel, config, dryRun, eventTypes, componentIds }),
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
@@ -155,9 +89,11 @@ export function NotificationDestinationManager({
         setMessage(`Test message delivered to ${selectedProvider?.label ?? "the destination"}. Nothing was saved yet.`);
         return;
       }
-      setDestinations((items) => [...items, { ...data.destination, lastTestOk: true, lastError: null }]);
+      setDestinations((items) => [...items, { ...data.destination, lastTestOk: true, lastError: null, eventTypes, componentIds: componentIds.length ? componentIds : null }]);
       setName("");
-      setConfig({});
+      setConfig(defaultConfig(channel));
+      setEventTypes([]);
+      setComponentIds([]);
       setMessage("Destination verified and enabled.");
     } catch {
       setMessageIsError(true);
@@ -224,7 +160,7 @@ export function NotificationDestinationManager({
                   aria-pressed={selected}
                   onClick={() => {
                     setChannel(provider.value);
-                    setConfig({});
+                    setConfig(defaultConfig(provider.value));
                     setMessage(null);
                   }}
                   variant="ghost"
@@ -251,22 +187,72 @@ export function NotificationDestinationManager({
               Destination name
               <Input value={name} onChange={(event) => setName(event.target.value)} placeholder={`e.g. ${selectedProvider.label} incidents`} className="font-normal" required />
             </label>
-            {selectedProvider.fields.map((field) => (
-              <label key={field.key} className="grid gap-1.5 text-sm font-medium text-ink-soft">
-                {field.label}
-                <Input
-                  type={"sensitive" in field && field.sensitive ? "password" : "text"}
-                  value={config[field.key] ?? ""}
-                  onChange={(event) => setConfig({ ...config, [field.key]: event.target.value })}
-                  placeholder={field.label}
-                  className="font-normal"
-                  required={field.required}
-                  autoComplete="off"
-                />
-              </label>
+            {selectedProvider.fields.filter((field) => fieldVisible(field, config)).map((field) => (
+              <div key={field.key} className="grid content-start gap-1.5 text-sm font-medium text-ink-soft">
+                <label htmlFor={`destination-${field.key}`}>{field.label}</label>
+                {field.kind === "select" ? (
+                  <Select
+                    id={`destination-${field.key}`}
+                    value={config[field.key] ?? field.defaultValue ?? ""}
+                    onChange={(event) => setConfig({ ...config, [field.key]: event.target.value })}
+                    className="w-full font-normal"
+                  >
+                    {field.options?.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                  </Select>
+                ) : (
+                  <Input
+                    id={`destination-${field.key}`}
+                    type={field.kind === "secret" ? "password" : field.kind === "url" ? "url" : "text"}
+                    value={config[field.key] ?? ""}
+                    onChange={(event) => setConfig({ ...config, [field.key]: event.target.value })}
+                    placeholder={field.placeholder ?? field.label}
+                    className="font-normal"
+                    required={field.required}
+                    autoComplete="off"
+                  />
+                )}
+                {field.hint && <p className="text-xs font-normal leading-5 text-ink-dim">{field.hint}</p>}
+              </div>
             ))}
           </div>
         </div>
+        <details className="group rounded-control border border-line p-3">
+          <summary className="cursor-pointer text-sm font-semibold text-ink">
+            Filters <span className="font-normal text-ink-dim">({eventTypes.length ? `${eventTypes.length} events` : "all events"}, {componentIds.length ? `${componentIds.length} components` : "all components"})</span>
+          </summary>
+          <div className="mt-3 grid gap-4 md:grid-cols-2">
+            <fieldset>
+              <legend className="text-xs font-semibold uppercase tracking-wide text-ink-dim">Events</legend>
+              <p className="mt-1 text-xs text-ink-dim">Leave all unchecked to receive every event.</p>
+              <div className="mt-2 grid gap-1.5">
+                {DESTINATION_EVENT_TYPES.map((event) => (
+                  <label key={event.value} className="flex items-center gap-2 text-sm text-ink">
+                    <Checkbox
+                      checked={eventTypes.includes(event.value)}
+                      onChange={(change) => setEventTypes((current) => change.target.checked ? [...current, event.value] : current.filter((value) => value !== event.value))}
+                    />
+                    {event.label}
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+            <fieldset>
+              <legend className="text-xs font-semibold uppercase tracking-wide text-ink-dim">Components</legend>
+              <p className="mt-1 text-xs text-ink-dim">Only events affecting these components. Page-wide events are always sent.</p>
+              <div className="mt-2 grid gap-1.5">
+                {components.length ? components.map((component) => (
+                  <label key={component.id} className="flex items-center gap-2 text-sm text-ink">
+                    <Checkbox
+                      checked={componentIds.includes(component.id)}
+                      onChange={(change) => setComponentIds((current) => change.target.checked ? [...current, component.id] : current.filter((value) => value !== component.id))}
+                    />
+                    {component.name}
+                  </label>
+                )) : <p className="text-sm text-ink-dim">This page has no components.</p>}
+              </div>
+            </fieldset>
+          </div>
+        </details>
         <div className="flex flex-col-reverse justify-end gap-2 border-t border-line pt-4 sm:flex-row">
           <Button type="submit" name="intent" value="test" variant="secondary" disabled={loading || Boolean(pendingAction)} className="w-full sm:w-auto">
             Send test
@@ -298,6 +284,10 @@ export function NotificationDestinationManager({
                 <StatusBadge tone={destination.active && destination.verifiedAt ? "ok" : destination.active ? "warn" : "neutral"}>{destination.active && destination.verifiedAt ? "Verified" : destination.active ? "Unverified" : "Paused"}</StatusBadge>
               </div>
               <p className="mt-1 text-xs text-ink-dim">{CHANNELS.find((provider) => provider.value === destination.channel)?.label ?? destination.channel.replaceAll("_", " ")}</p>
+              <p className="mt-0.5 text-xs text-ink-dim">
+                {destination.eventTypes.length ? `${destination.eventTypes.length} event types` : "All events"}
+                {destination.componentIds?.length ? ` · ${destination.componentIds.length} components` : ""}
+              </p>
               {destination.lastError && <p className="mt-1 text-xs text-danger-fg">{destination.lastError}</p>}
             </div>
             <div className="flex flex-wrap gap-2">

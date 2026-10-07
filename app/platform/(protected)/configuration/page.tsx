@@ -7,7 +7,7 @@ import { requirePlatformPageCapability } from "@/lib/platform-page-guard";
 import { hasPlatformCapability } from "@/lib/platform-policy";
 import { subscriptionCapabilities } from "@/lib/notification-capabilities";
 import { enabledDestinationChannels } from "@/lib/platform-configuration";
-import { DESTINATION_CHANNELS } from "@/lib/notification-providers";
+import { DESTINATION_CHANNELS, DESTINATION_PROVIDERS } from "@/lib/destination-catalog";
 import { updatePlatformConfiguration } from "./actions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -20,17 +20,6 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { Textarea } from "@/components/ui/textarea";
 import { PlatformHealth } from "@/components/platform/PlatformStat";
 
-const PROVIDER_LABELS: Record<(typeof DESTINATION_CHANNELS)[number], string> = {
-  SLACK: "Slack",
-  MICROSOFT_TEAMS: "Microsoft Teams",
-  DISCORD: "Discord",
-  TELEGRAM: "Telegram",
-  WHATSAPP: "WhatsApp",
-  GOOGLE_CHAT: "Google Chat",
-  PAGERDUTY: "PagerDuty",
-  OPSGENIE: "Opsgenie",
-  NTFY: "Ntfy",
-};
 
 export default async function PlatformConfigurationPage() {
   const actor = await requirePlatformPageCapability("configuration.read");
@@ -110,7 +99,7 @@ export default async function PlatformConfigurationPage() {
                 {DESTINATION_CHANNELS.map((channel) => (
                   <label key={channel} className="flex min-h-12 cursor-pointer items-center gap-3 rounded-control border border-line bg-surface px-3.5 py-3 text-sm font-medium text-ink transition-colors duration-200 hover:border-primary/40 has-[:checked]:border-primary/40 has-[:checked]:bg-primary-soft">
                     <Checkbox name="enabledDestinationChannels" value={channel} defaultChecked={enabled.has(channel)} />
-                    <span>{PROVIDER_LABELS[channel]}</span>
+                    <span>{DESTINATION_PROVIDERS[channel].label}</span>
                   </label>
                 ))}
               </fieldset>
@@ -128,7 +117,7 @@ export default async function PlatformConfigurationPage() {
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {DESTINATION_CHANNELS.map((channel) => (
                 <div key={channel} className="flex items-center justify-between gap-3 rounded-control border border-line px-3.5 py-3 text-sm">
-                  <span className="font-medium text-ink">{PROVIDER_LABELS[channel]}</span>
+                  <span className="font-medium text-ink">{DESTINATION_PROVIDERS[channel].label}</span>
                   <StatusBadge tone={enabled.has(channel) ? "ok" : "neutral"}>{enabled.has(channel) ? "Enabled" : "Disabled"}</StatusBadge>
                 </div>
               ))}

@@ -25,11 +25,12 @@ export default async function NotificationsPage({
   const pages = await getScopedPages(session, org.id, { orderBy: "name" });
   const page = pages.find((item) => item.id === requested) ?? pages[0];
   if (!page) return <div className="space-y-8"><PageHeader title="Notifications and destinations" icon={BellRing} hue="teal" description="Configure subscriber delivery and team integrations for your status pages." /><EmptyState icon={BellRing} hue="teal" title="Create a status page first" description="Notifications and destinations belong to a status page." /></div>;
-  const [destinations, endpoints, capabilities, enabledChannels] = await Promise.all([
+  const [destinations, endpoints, capabilities, enabledChannels, components] = await Promise.all([
     database.selectFrom("notificationDestinations").selectAll().where("pageId", "=", page.id).orderBy("createdAt", "asc").execute(),
     database.selectFrom("webhookEndpoints").selectAll().where("pageId", "=", page.id).orderBy("createdAt", "asc").execute(),
     subscriptionCapabilities(),
     enabledDestinationChannels(),
+    database.selectFrom("components").select(["id", "name"]).where("pageId", "=", page.id).orderBy("name", "asc").execute(),
   ]);
   return (
     <div className="space-y-8">
@@ -55,6 +56,7 @@ export default async function NotificationsPage({
         <CardContent><NotificationDestinationManager
           pageId={page.id}
           enabledChannels={enabledChannels}
+          components={components}
           initial={destinations.map((destination) => ({
             id: destination.id,
             name: destination.name,
@@ -63,6 +65,8 @@ export default async function NotificationsPage({
             verifiedAt: destination.verifiedAt?.toISOString() ?? null,
             lastTestOk: destination.lastTestOk,
             lastError: destination.lastError,
+            eventTypes: destination.eventTypes,
+            componentIds: destination.componentIds,
           }))}
         /></CardContent>
       </Card>

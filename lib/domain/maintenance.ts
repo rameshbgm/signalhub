@@ -114,6 +114,7 @@ export async function createMaintenance(
         body: input.body,
         eventType: "maintenance.scheduled",
         eventId: update.id,
+        correlationId: incident.id,
         componentIds: input.componentIds,
       }, transaction);
     }
@@ -183,6 +184,7 @@ export async function transitionMaintenance(input: {
           body: input.body,
           eventType: `maintenance.${input.status.toLowerCase()}`,
           eventId: update.id,
+          correlationId: incident.id,
           componentIds: links.map((link) => link.componentId),
         }, transaction);
       }
@@ -272,6 +274,7 @@ async function sendMaintenanceReminder(maintenance: IncidentRow, now: Date) {
         ].filter(Boolean).join("\n\n"),
         eventType: "maintenance.reminder",
         eventId: `${current.id}:reminder`,
+        correlationId: current.id,
         componentIds: links.map((link) => link.componentId),
       }, transaction);
       return true;

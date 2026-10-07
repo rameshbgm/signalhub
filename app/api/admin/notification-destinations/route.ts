@@ -6,9 +6,12 @@ import { newDatabaseId, isDatabaseId } from "@/lib/database-id";
 import { encryptSecret } from "@/lib/encryption";
 import {
   DESTINATION_CHANNELS,
-  deliverDestination,
+  DESTINATION_EVENT_TYPES,
+  DESTINATION_PROVIDERS,
+  normalizeDestinationConfig,
   type DestinationChannel,
-} from "@/lib/notification-providers";
+} from "@/lib/destination-catalog";
+import { deliverDestination } from "@/lib/notification-providers";
 import { fenceActiveOrganizationMutation } from "@/lib/organization-mutation";
 import { enabledDestinationChannels } from "@/lib/platform-configuration";
 import { database, withDatabaseTransaction } from "@/lib/postgres/client";
@@ -22,39 +25,25 @@ const schema = z.object({
   config: z.record(z.string(), z.string()),
   /** Send the verification message without storing the destination. */
   dryRun: z.boolean().optional(),
+  /** Limit the destination to these events / components; empty means all. */
+  eventTypes: z.array(z.enum(DESTINATION_EVENT_TYPES.map((event) => event.value) as [string, ...string[]])).max(20).default([]),
+  componentIds: z.array(z.string()).max(200).default([]),
 });
 
-const URL_CHANNELS = new Set<DestinationChannel>([
-  "SLACK",
-  "MICROSOFT_TEAMS",
-  "DISCORD",
-  "GOOGLE_CHAT",
-]);
+// Headers a custom destination may not override: they would break or redirect the request.
+const RESERVED_HEADERS = new Set(["host", "content-type", "content-length", "transfer-encoding", "connection", "cookie"]);
 
-async function validateConfig(channel: DestinationChannel, config: Record<string, string>) {
-  if (URL_CHANNELS.has(channel)) {
-    config.url = (await validateHttpTarget(config.url ?? "", { httpsOnly: true, allowPrivate: false })).toString();
+async function validateConfig(channel: DestinationChannel, input: Record<string, string>) {
+  const config = normalizeDestinationConfig(channel, input);
+  for (const field of DESTINATION_PROVIDERS[channel].fields) {
+    if (field.kind === "url" && config[field.key]) {
+      config[field.key] = (await validateHttpTarget(config[field.key], { httpsOnly: true, allowPrivate: false })).toString();
+    }
   }
-  if (channel === "NTFY" && config.serverUrl) {
-    config.serverUrl = (await validateHttpTarget(config.serverUrl, { httpsOnly: true, allowPrivate: false })).toString();
+  if (config.headerName && (!/^[A-Za-z0-9-]{1,64}$/.test(config.headerName) || RESERVED_HEADERS.has(config.headerName.toLowerCase()))) {
+    throw new Error("Header name must be letters, digits and dashes, and not a reserved header");
   }
-  const requiredByChannel: Record<DestinationChannel, string[]> = {
-    SLACK: ["url"],
-    MICROSOFT_TEAMS: ["url"],
-    DISCORD: ["url"],
-    GOOGLE_CHAT: ["url"],
-    TELEGRAM: ["botToken", "chatId"],
-    WHATSAPP: ["accountSid", "authToken", "from", "to"],
-    PAGERDUTY: ["routingKey"],
-    OPSGENIE: ["apiKey"],
-    NTFY: ["topic"],
-  };
-  for (const field of requiredByChannel[channel]) {
-    if (!config[field]?.trim()) throw new Error(`${field} is required`);
-  }
-  return Object.fromEntries(
-    Object.entries(config).filter(([, value]) => value.trim()).map(([key, value]) => [key, value.trim()])
-  );
+  return config;
 }
 
 export async function POST(request: NextRequest) {
@@ -75,7 +64,18 @@ export async function POST(request: NextRequest) {
       .executeTakeFirst();
     if (!page) return apiError(404, "PAGE_NOT_FOUND", "Page not found");
 
-    const config = await validateConfig(parsed.data.channel, parsed.data.config);
+    let config: Record<string, string>;
+    try {
+      config = await validateConfig(parsed.data.channel, parsed.data.config);
+    } catch (error) {
+      return apiError(400, "INVALID_CONFIG", error instanceof Error ? error.message.slice(0, 300) : "Invalid configuration");
+    }
+    const componentIds = [...new Set(parsed.data.componentIds)];
+    if (componentIds.length) {
+      const owned = await database.selectFrom("components").select("id")
+        .where("pageId", "=", page.id).where("id", "in", componentIds.filter(isDatabaseId)).execute();
+      if (owned.length !== componentIds.length) return apiError(400, "INVALID_COMPONENTS", "Choose components from this page");
+    }
     const now = new Date();
     const destination: NotificationDestinationRow = {
       id: newDatabaseId(),
@@ -88,8 +88,8 @@ export async function POST(request: NextRequest) {
       lastTestedAt: now,
       lastTestOk: true,
       lastError: null,
-      eventTypes: [],
-      componentIds: null,
+      eventTypes: [...new Set(parsed.data.eventTypes)],
+      componentIds: componentIds.length ? componentIds : null,
       createdAt: now,
     };
     try {

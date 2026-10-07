@@ -214,6 +214,7 @@ export async function savePostmortem(incidentId: string, formData: FormData) {
         body,
         eventType: "postmortem.published",
         eventId: `${incidentId}:postmortem`,
+        correlationId: current.id,
         componentIds: current.pageWide ? [] : links.map((link) => link.componentId),
       }, transaction);
     }

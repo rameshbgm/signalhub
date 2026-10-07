@@ -19,6 +19,8 @@ export type NotifyEvent = {
   eventType: string;
   componentIds?: string[];
   eventId?: string;
+  /** The incident, maintenance or monitor this event is about; on-call providers resolve alerts by it. */
+  correlationId?: string;
 };
 
 function deduplicationKey(event: NotifyEvent, target: string) {
@@ -55,6 +57,7 @@ function notificationPayload(event: NotifyEvent, sourcePage?: SourcePageLabel) {
     subject: event.subject,
     body: event.body,
     componentIds: event.componentIds ?? [],
+    ...(event.correlationId ? { correlationId: event.correlationId } : {}),
     ...(sourcePage
       ? { sourcePage: { id: sourcePage.id, name: sourcePage.name, slug: sourcePage.slug } }
       : {}),

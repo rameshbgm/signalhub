@@ -197,10 +197,12 @@ async function deliver(job: NotificationJobRow) {
       .executeTakeFirst();
     if (!destination) throw new DeliveryError("Notification destination is no longer active", false);
     try {
+      const payload = job.payload && typeof job.payload === "object" ? job.payload as { correlationId?: unknown } : {};
       return await deliverDestination(destination, {
         subject: job.subject,
         body: job.body,
         eventType: job.eventType,
+        correlationId: typeof payload.correlationId === "string" ? payload.correlationId : undefined,
       });
     } catch (error) {
       throw providerDeliveryError(error, "Destination delivery failed");

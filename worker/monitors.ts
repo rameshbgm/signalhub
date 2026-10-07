@@ -213,6 +213,7 @@ export async function processMonitor(monitor: MonitorRow, workerId: string) {
         body: result.error ?? "The monitor crossed its failure threshold",
         eventType: "monitor.down",
         eventId: `${monitor.id}:${now.toISOString()}:down`,
+        correlationId: `monitor:${monitor.id}`,
         componentIds: monitor.componentId ? [monitor.componentId] : [],
       });
     }
@@ -244,6 +245,7 @@ export async function processMonitor(monitor: MonitorRow, workerId: string) {
           body: recoveryBody,
           eventType: "monitor.recovered",
           eventId: `${monitor.id}:${now.toISOString()}:up`,
+        correlationId: `monitor:${monitor.id}`,
           componentIds: monitor.componentId ? [monitor.componentId] : [],
         });
       }
@@ -254,6 +256,7 @@ export async function processMonitor(monitor: MonitorRow, workerId: string) {
         body: `${monitor.name} recovered after ${consecutiveOks} successful checks.`,
         eventType: "monitor.recovered",
         eventId: `${monitor.id}:${now.toISOString()}:up`,
+        correlationId: `monitor:${monitor.id}`,
         componentIds: monitor.componentId ? [monitor.componentId] : [],
       });
     }
