@@ -7,7 +7,7 @@ import { database } from "@/lib/postgres/client";
 import { requirePlatformPageCapability } from "@/lib/platform-page-guard";
 import { hasPlatformCapability } from "@/lib/platform-policy";
 import { subscriptionCapabilities } from "@/lib/notification-capabilities";
-import { enabledDestinationChannels } from "@/lib/platform-configuration";
+import { enabledDestinationChannels, parseDestinationConnections } from "@/lib/platform-configuration";
 import { IconTile, type Hue } from "@/components/ui/icon-tile";
 import { PageHeader } from "@/components/ui/page-header";
 import { PlatformHealth } from "@/components/platform/PlatformStat";
@@ -21,7 +21,8 @@ export default async function PlatformConfigurationPage() {
     subscriptionCapabilities(),
     database.selectFrom("platformConfiguration").selectAll().where("id", "=", "global").executeTakeFirst(),
   ]);
-  const enabled = new Set(enabledChannels);
+  const defaults = sanitizeDestinationDefaults(stored?.destinationDefaults);
+  const connections = parseDestinationConnections(stored?.destinationConnectionsCiphertext);
   const appUrlConfigured = Boolean(process.env.NEXT_PUBLIC_APP_URL);
   const storageDriver = (process.env.ASSET_STORAGE_DRIVER ?? "local").toLowerCase();
   const telemetryConfigured = Boolean(process.env.OTEL_EXPORTER_OTLP_ENDPOINT);
@@ -73,7 +74,10 @@ export default async function PlatformConfigurationPage() {
         />
       </section>
 
-      <DestinationProvidersCard canManage={canManage} enabled={enabled} defaults={sanitizeDestinationDefaults(stored?.destinationDefaults)} />
+      <DestinationProvidersCard
+        canManage={canManage}
+        added={enabledChannels.map((channel) => ({ channel, defaults: defaults[channel] ?? {}, shared: Boolean(connections[channel]) }))}
+      />
 
       <DeliveryProvidersCard
         canManage={canManage}

@@ -537,6 +537,8 @@ export interface PlatformConfigurationTable {
   smsSecretCiphertext: string | null;
   smsFrom: string | null;
   destinationDefaults: Generated<Record<string, Record<string, string>>>;
+  /** Encrypted JSON: shared provider connections keyed by channel. */
+  destinationConnectionsCiphertext: string | null;
 }
 
 export interface MaintenanceLeaseTable {

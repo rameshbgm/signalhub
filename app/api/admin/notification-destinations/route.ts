@@ -4,19 +4,13 @@ import { assertPageInOrg, requireCapability } from "@/lib/admin-guard";
 import { apiError, routeError, validationError } from "@/lib/api-response";
 import { newDatabaseId, isDatabaseId } from "@/lib/database-id";
 import { encryptSecret } from "@/lib/encryption";
-import {
-  DESTINATION_CHANNELS,
-  DESTINATION_EVENT_TYPES,
-  DESTINATION_PROVIDERS,
-  normalizeDestinationConfig,
-  type DestinationChannel,
-} from "@/lib/destination-catalog";
+import { DESTINATION_CHANNELS, DESTINATION_EVENT_TYPES, PLATFORM_CONNECTION_KEY } from "@/lib/destination-catalog";
+import { validateDestinationConfig } from "@/lib/destination-validation";
 import { deliverDestination } from "@/lib/notification-providers";
 import { fenceActiveOrganizationMutation } from "@/lib/organization-mutation";
-import { destinationDefaults, enabledDestinationChannels } from "@/lib/platform-configuration";
+import { destinationConnections, destinationDefaults, enabledDestinationChannels } from "@/lib/platform-configuration";
 import { database, withDatabaseTransaction } from "@/lib/postgres/client";
 import type { NotificationDestinationRow } from "@/lib/postgres/schema";
-import { validateHttpTarget } from "@/lib/target-validation";
 
 const schema = z.object({
   pageId: z.string(),
@@ -25,26 +19,12 @@ const schema = z.object({
   config: z.record(z.string(), z.string()),
   /** Send the verification message without storing the destination. */
   dryRun: z.boolean().optional(),
+  /** Send through the platform administrator's shared connection instead of own credentials. */
+  usePlatformConnection: z.boolean().optional(),
   /** Limit the destination to these events / components; empty means all. */
   eventTypes: z.array(z.enum(DESTINATION_EVENT_TYPES.map((event) => event.value) as [string, ...string[]])).max(20).default([]),
   componentIds: z.array(z.string()).max(200).default([]),
 });
-
-// Headers a custom destination may not override: they would break or redirect the request.
-const RESERVED_HEADERS = new Set(["host", "content-type", "content-length", "transfer-encoding", "connection", "cookie"]);
-
-async function validateConfig(channel: DestinationChannel, input: Record<string, string>) {
-  const config = normalizeDestinationConfig(channel, input, await destinationDefaults());
-  for (const field of DESTINATION_PROVIDERS[channel].fields) {
-    if (field.kind === "url" && config[field.key]) {
-      config[field.key] = (await validateHttpTarget(config[field.key], { httpsOnly: true, allowPrivate: false })).toString();
-    }
-  }
-  if (config.headerName && (!/^[A-Za-z0-9-]{1,64}$/.test(config.headerName) || RESERVED_HEADERS.has(config.headerName.toLowerCase()))) {
-    throw new Error("Header name must be letters, digits and dashes, and not a reserved header");
-  }
-  return config;
-}
 
 export async function POST(request: NextRequest) {
   try {
@@ -66,7 +46,13 @@ export async function POST(request: NextRequest) {
 
     let config: Record<string, string>;
     try {
-      config = await validateConfig(parsed.data.channel, parsed.data.config);
+      if (parsed.data.usePlatformConnection) {
+        if (!(await destinationConnections())[parsed.data.channel]) throw new Error("This provider has no platform connection");
+        // Only a marker is stored; the credentials stay with the platform and are resolved at send time.
+        config = { [PLATFORM_CONNECTION_KEY]: "true" };
+      } else {
+        config = await validateDestinationConfig(parsed.data.channel, parsed.data.config, await destinationDefaults());
+      }
     } catch (error) {
       return apiError(400, "INVALID_CONFIG", error instanceof Error ? error.message.slice(0, 300) : "Invalid configuration");
     }

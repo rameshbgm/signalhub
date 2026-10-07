@@ -10,12 +10,15 @@ import {
   type ProviderColumns,
 } from "@/lib/delivery-config";
 import { SMS_PROVIDER_IDS, SMS_PROVIDERS } from "@/lib/delivery-providers";
-import { DESTINATION_PROVIDERS, sanitizeDestinationDefaults, type DestinationDefaults } from "@/lib/destination-catalog";
+import { defaultable, DESTINATION_PROVIDERS, sanitizeDestinationDefaults, type DestinationDefaults } from "@/lib/destination-catalog";
+import { validateDestinationConfig } from "@/lib/destination-validation";
+import { parseDestinationConnections, type DestinationConnections } from "@/lib/platform-configuration";
 import { validateHttpTarget } from "@/lib/target-validation";
 import { decryptSecret, encryptSecret } from "@/lib/encryption";
 import type { SmsProvider } from "@/lib/postgres/schema";
 import {
   DESTINATION_CHANNELS,
+  deliverConfig,
   deliverSms,
   verifySmsCredentials,
   type DestinationChannel,
@@ -199,30 +202,85 @@ export async function sendTestSms(formData: FormData) {
  * fields are named `default:<CHANNEL>:<field>`; values equal to the built-in
  * default are not stored.
  */
-/** One form: which team destination providers are enabled, and the starting values for each. */
-export async function updatePlatformConfiguration(formData: FormData) {
+/**
+ * Adds or updates one team destination provider. Defaults pre-fill organization forms; credentials, when
+ * given, become a shared connection that is test-delivered before it is saved.
+ */
+export async function saveDestinationProvider(formData: FormData) {
   const actor = await requirePlatformCapability("configuration.manage");
-  const reason = changeReason(formData);
-  const raw: Record<string, Record<string, string>> = {};
+  const channel = z.enum(DESTINATION_CHANNELS).parse(formData.get("channel"));
+  const provider = DESTINATION_PROVIDERS[channel];
+  const input: Record<string, string> = {};
   for (const [name, value] of formData.entries()) {
-    const [prefix, channel, key] = name.split(":");
-    if (prefix !== "default" || !channel || !key || typeof value !== "string") continue;
-    (raw[channel] ??= {})[key] = value;
+    if (name.startsWith("field:") && typeof value === "string" && value.trim()) input[name.slice("field:".length)] = value.trim();
   }
-  const submitted = new Set(formData.getAll("enabledDestinationChannels").map(String));
-  const enabledDestinationChannels = DESTINATION_CHANNELS.filter((channel) => submitted.has(channel)) satisfies DestinationChannel[];
-  const defaults: DestinationDefaults = sanitizeDestinationDefaults(raw);
-  for (const [channel, values] of Object.entries(defaults) as Array<[keyof typeof DESTINATION_PROVIDERS, Record<string, string>]>) {
-    for (const field of DESTINATION_PROVIDERS[channel].fields) {
-      const value = values[field.key];
-      if (value === undefined) continue;
-      if (value === field.defaultValue) delete values[field.key];
-      else if (field.kind === "url") {
-        values[field.key] = (await validateHttpTarget(value, { httpsOnly: true, allowPrivate: false })).toString();
-      }
+  const row = await database.selectFrom("platformConfiguration")
+    .select(["enabledDestinationChannels", "destinationDefaults", "destinationConnectionsCiphertext"])
+    .where("id", "=", "global").executeTakeFirst();
+  const connections = parseDestinationConnections(row?.destinationConnectionsCiphertext);
+  const stored = connections[channel];
+
+  const channelDefaults: Record<string, string> = {};
+  for (const field of provider.fields.filter(defaultable)) {
+    const value = input[field.key];
+    if (!value || value === field.defaultValue) continue;
+    channelDefaults[field.key] = field.kind === "url"
+      ? (await validateHttpTarget(value, { httpsOnly: true, allowPrivate: false })).toString()
+      : value;
+  }
+  const defaults: DestinationDefaults = sanitizeDestinationDefaults({ ...row?.destinationDefaults, [channel]: channelDefaults });
+
+  const credentials = provider.fields.filter((field) => !defaultable(field));
+  let connection: Record<string, string> | undefined;
+  if (credentials.some((field) => input[field.key]) || stored) {
+    // Blank secrets keep the stored ones, but only while every other value is unchanged:
+    // otherwise pointing a URL elsewhere would send the old token there.
+    const merged = { ...stored, ...input };
+    const reusedSecret = provider.fields.some((field) => field.kind === "secret" && !input[field.key] && stored?.[field.key]);
+    const targetChanged = provider.fields.some((field) => field.kind !== "secret" && stored && (merged[field.key] ?? "") !== (stored[field.key] ?? ""));
+    if (reusedSecret && targetChanged) throw new Error("Re-enter the secrets when changing the other connection settings");
+    connection = await validateDestinationConfig(channel, merged);
+    try {
+      await deliverConfig(channel, connection, {
+        subject: "SignalHub connection test",
+        body: `${provider.label} is connected for every organization on this installation.`,
+        eventType: "destination.test",
+      });
+    } catch (error) {
+      throw new Error(`${provider.label} test failed: ${error instanceof Error ? error.message.slice(0, 300) : "unknown error"}`);
     }
-    if (!Object.keys(values).length) delete defaults[channel];
   }
-  const values = { enabledDestinationChannels, destinationDefaults: defaults };
-  await saveProviders(actor, reason, "PLATFORM_CONFIGURATION_UPDATED", values, values);
+  if (testOnly(formData)) {
+    if (!connection) throw new Error("Enter the connection credentials to test them");
+    return `Test message delivered through ${provider.label}. Nothing was saved.`;
+  }
+
+  if (connection) connections[channel] = connection;
+  const enabled = new Set([...(row?.enabledDestinationChannels ?? []), channel]);
+  const added = !row?.enabledDestinationChannels.includes(channel);
+  await saveProviders(actor, `${added ? "Added" : "Updated"} ${provider.label} in platform configuration`, added ? "DESTINATION_PROVIDER_ADDED" : "DESTINATION_PROVIDER_UPDATED", {
+    enabledDestinationChannels: DESTINATION_CHANNELS.filter((candidate) => enabled.has(candidate)),
+    destinationDefaults: defaults,
+    destinationConnectionsCiphertext: encryptConnections(connections),
+  }, { channel, defaults: defaults[channel] ?? {}, sharedConnection: Boolean(connection), secretsChanged: credentials.some((field) => field.kind === "secret" && input[field.key]) });
 }
+
+/** Organizations can no longer add it; their existing destinations keep their own credentials, platform-connected ones stop. */
+export async function removeDestinationProvider(channel: DestinationChannel) {
+  const actor = await requirePlatformCapability("configuration.manage");
+  const row = await database.selectFrom("platformConfiguration")
+    .select(["enabledDestinationChannels", "destinationDefaults", "destinationConnectionsCiphertext"])
+    .where("id", "=", "global").executeTakeFirst();
+  const connections = parseDestinationConnections(row?.destinationConnectionsCiphertext);
+  delete connections[channel];
+  const defaults = sanitizeDestinationDefaults(row?.destinationDefaults);
+  delete defaults[channel];
+  await saveProviders(actor, `Removed ${DESTINATION_PROVIDERS[channel].label} from platform configuration`, "DESTINATION_PROVIDER_REMOVED", {
+    enabledDestinationChannels: (row?.enabledDestinationChannels ?? []).filter((candidate) => candidate !== channel),
+    destinationDefaults: defaults,
+    destinationConnectionsCiphertext: encryptConnections(connections),
+  }, { channel });
+}
+
+const encryptConnections = (connections: DestinationConnections) =>
+  Object.keys(connections).length ? encryptSecret(JSON.stringify(connections)) : null;

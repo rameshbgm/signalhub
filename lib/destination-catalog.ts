@@ -12,13 +12,19 @@ export const DESTINATION_CHANNELS = [
   "ROCKET_CHAT",
   "WEBEX",
   "ZULIP",
+  "MATRIX",
+  "LARK",
+  "DINGTALK",
+  "WECOM",
   "TELEGRAM",
   "WHATSAPP",
+  "SIGNAL",
   "PAGERDUTY",
   "OPSGENIE",
   "SPLUNK_ON_CALL",
   "NTFY",
   "PUSHOVER",
+  "PUSHBULLET",
   "GOTIFY",
   "HTTP",
 ] as const;
@@ -144,6 +150,42 @@ export const DESTINATION_PROVIDERS: Record<DestinationChannel, DestinationProvid
       { key: "topic", label: "Topic", defaultValue: "Status updates" },
     ],
   },
+  MATRIX: {
+    label: "Matrix",
+    group: "Chat",
+    description: "Post to a Matrix room (Element and others) with a bot account.",
+    fields: [
+      { key: "homeserverUrl", label: "Homeserver URL", kind: "url", required: true, placeholder: "https://matrix.org", platformDefault: true },
+      { key: "accessToken", label: "Access token", kind: "secret", required: true },
+      { key: "roomId", label: "Room ID", required: true, placeholder: "!abc123:matrix.org", hint: "Invite the bot user to the room first." },
+    ],
+  },
+  LARK: {
+    label: "Lark (Feishu)",
+    group: "Chat",
+    description: "Post to a Lark or Feishu group with a custom bot webhook.",
+    fields: [
+      { key: "url", label: "Bot webhook URL", kind: "url", required: true, placeholder: "https://open.larksuite.com/open-apis/bot/v2/hook/…" },
+      { key: "secret", label: "Signing secret (optional)", kind: "secret", hint: "Only when the bot has signature verification turned on." },
+    ],
+  },
+  DINGTALK: {
+    label: "DingTalk",
+    group: "Chat",
+    description: "Post to a DingTalk group with a custom robot webhook.",
+    fields: [
+      { key: "url", label: "Robot webhook URL", kind: "url", required: true, placeholder: "https://oapi.dingtalk.com/robot/send?access_token=…" },
+      { key: "secret", label: "Signing secret (optional)", kind: "secret", placeholder: "SEC…", hint: "Only when the robot uses the signature security setting." },
+    ],
+  },
+  WECOM: {
+    label: "WeCom (WeChat Work)",
+    group: "Chat",
+    description: "Post to a WeCom group with a group robot webhook.",
+    fields: [
+      { key: "url", label: "Robot webhook URL", kind: "url", required: true, placeholder: "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=…" },
+    ],
+  },
   TELEGRAM: {
     label: "Telegram",
     group: "Messaging",
@@ -163,6 +205,16 @@ export const DESTINATION_PROVIDERS: Record<DestinationChannel, DestinationProvid
       { key: "authToken", label: "Twilio auth token", kind: "secret", required: true },
       { key: "from", label: "From number", required: true, placeholder: "+15551234567" },
       { key: "to", label: "To number", required: true, placeholder: "+15557654321" },
+    ],
+  },
+  SIGNAL: {
+    label: "Signal",
+    group: "Messaging",
+    description: "Send through your own signal-cli REST API server.",
+    fields: [
+      { key: "serverUrl", label: "signal-cli REST API URL", kind: "url", required: true, placeholder: "https://signal.example.com", platformDefault: true },
+      { key: "number", label: "Sender number", required: true, placeholder: "+15551234567", hint: "The number registered with signal-cli." },
+      { key: "recipients", label: "Recipients", required: true, placeholder: "+15557654321, group.abc…", hint: "Phone numbers or group IDs, separated by commas." },
     ],
   },
   PAGERDUTY: {
@@ -240,6 +292,15 @@ export const DESTINATION_PROVIDERS: Record<DestinationChannel, DestinationProvid
       { key: "priority", label: "Priority", kind: "select", defaultValue: "normal", options: PRIORITY_3 },
     ],
   },
+  PUSHBULLET: {
+    label: "Pushbullet",
+    group: "Push",
+    description: "Push notes to your devices or a Pushbullet channel.",
+    fields: [
+      { key: "accessToken", label: "Access token", kind: "secret", required: true },
+      { key: "channelTag", label: "Channel tag (optional)", hint: "Leave blank to push to your own devices." },
+    ],
+  },
   GOTIFY: {
     label: "Gotify",
     group: "Push",
@@ -270,6 +331,19 @@ export const DESTINATION_PROVIDERS: Record<DestinationChannel, DestinationProvid
     ],
   },
 };
+
+/** Custom HTTP first, on its own, then every other provider A to Z: the order of the provider picker. */
+export function providerPickerGroups() {
+  const sorted = DESTINATION_CHANNELS.filter((channel) => channel !== "HTTP")
+    .sort((a, b) => DESTINATION_PROVIDERS[a].label.localeCompare(DESTINATION_PROVIDERS[b].label));
+  return [
+    { label: "Custom", channels: ["HTTP"] as DestinationChannel[] },
+    { label: "Providers", channels: sorted },
+  ];
+}
+
+/** Stored in an organization destination instead of credentials: send through the platform's shared connection. */
+export const PLATFORM_CONNECTION_KEY = "platformConnection";
 
 /** Events a destination can be limited to; an empty selection means all of them. */
 export const DESTINATION_EVENT_TYPES = [

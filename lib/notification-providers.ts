@@ -1,9 +1,10 @@
-import { randomUUID } from "node:crypto";
+import { createHmac, randomUUID } from "node:crypto";
 import type { NotificationDestinationRow } from "@/lib/postgres/schema";
 import { getDeliveryConfig, type SmsConfig } from "@/lib/delivery-config";
-import { alertAction, defaultConfig, type DestinationChannel } from "@/lib/destination-catalog";
+import { alertAction, defaultConfig, DESTINATION_PROVIDERS, PLATFORM_CONNECTION_KEY, type DestinationChannel } from "@/lib/destination-catalog";
 import { decryptSecret } from "@/lib/encryption";
 import { guardedFetch } from "@/lib/guarded-fetch";
+import { destinationConnections } from "@/lib/platform-configuration";
 
 export { DESTINATION_CHANNELS, type DestinationChannel } from "@/lib/destination-catalog";
 
@@ -22,9 +23,9 @@ export class ProviderHttpError extends Error {
   }
 }
 
-async function send(url: string, body: string, headers: Record<string, string>) {
+async function send(url: string, body: string, headers: Record<string, string>, method = "POST") {
   const response = await guardedFetch(url, {
-    method: "POST",
+    method,
     headers,
     body,
     signal: AbortSignal.timeout(Number(process.env.WEBHOOK_TIMEOUT_MS ?? 10_000)),
@@ -41,14 +42,45 @@ async function postForm(url: string, fields: Record<string, string>, headers: Re
   return send(url, new URLSearchParams(fields).toString(), { "content-type": "application/x-www-form-urlencoded", ...headers });
 }
 
+/** Chat webhooks (Lark, DingTalk, WeCom) answer HTTP 200 even when they reject the message; the JSON code is the real result. */
+async function postChecked(url: string, body: unknown, codeField: "code" | "errcode") {
+  const response = await send(url, JSON.stringify(body), { "content-type": "application/json" });
+  const result = await response.json().catch(() => ({})) as Record<string, unknown>;
+  if (result[codeField] !== undefined && result[codeField] !== 0) {
+    throw new Error(`Provider rejected the message: ${String(result.msg ?? result.errmsg ?? result[codeField])}`);
+  }
+  return response.status;
+}
+
+/** DingTalk robot signature: HMAC-SHA256 of "timestamp\nsecret", keyed by the secret, in the query string. */
+export function dingTalkSignedUrl(url: string, secret: string, now = Date.now()) {
+  const sign = createHmac("sha256", secret).update(`${now}\n${secret}`).digest("base64");
+  const signed = new URL(url);
+  signed.searchParams.set("timestamp", String(now));
+  signed.searchParams.set("sign", sign);
+  return signed.toString();
+}
+
+/** Lark bot signature: HMAC-SHA256 of an empty message, keyed by "timestamp\nsecret". */
+export function larkSignature(secret: string, seconds = Math.floor(Date.now() / 1_000)) {
+  return { timestamp: String(seconds), sign: createHmac("sha256", `${seconds}\n${secret}`).update("").digest("base64") };
+}
+
 const basicAuth = (user: string, password: string) => `Basic ${Buffer.from(`${user}:${password}`).toString("base64")}`;
 const trimSlash = (url: string) => url.replace(/\/+$/, "");
 
-function config(destination: NotificationDestinationRow) {
+async function config(destination: NotificationDestinationRow) {
+  const channel = destination.channel as DestinationChannel;
   const parsed: unknown = JSON.parse(decryptSecret(destination.configCiphertext));
   if (!parsed || typeof parsed !== "object") throw new Error("Destination configuration is invalid");
+  // Resolved at send time, so a platform credential rotation reaches every organization at once.
+  if ((parsed as Record<string, string>)[PLATFORM_CONNECTION_KEY] === "true") {
+    const shared = (await destinationConnections())[channel];
+    if (!shared) throw new Error(`The platform connection for ${DESTINATION_PROVIDERS[channel].label} was removed`);
+    return { ...defaultConfig(channel), ...shared };
+  }
   // Destinations saved before a field existed fall back to its default (e.g. Slack "auth" = webhook).
-  return { ...defaultConfig(destination.channel as DestinationChannel), ...(parsed as Record<string, string>) };
+  return { ...defaultConfig(channel), ...(parsed as Record<string, string>) };
 }
 
 function required(value: string | undefined, label: string) {
@@ -61,7 +93,11 @@ const SKIPPED = 204;
 
 export async function deliverDestination(destination: NotificationDestinationRow, message: Message) {
   const channel = destination.channel as DestinationChannel;
-  const values = config(destination);
+  return deliverConfig(channel, await config(destination), message);
+}
+
+/** Sends to a provider with already-resolved settings; the platform's "Test connection" uses it directly. */
+export async function deliverConfig(channel: DestinationChannel, values: Record<string, string>, message: Message) {
   // A connection test on an on-call provider opens an alert and closes it again, leaving nothing behind.
   if (message.eventType === "destination.test" && ON_CALL.has(channel)) {
     const correlationId = `signalhub-test-${randomUUID()}`;
@@ -135,6 +171,31 @@ async function deliverToProvider(channel: DestinationChannel, values: Record<str
         { type: "stream", to: required(values.stream, "Stream"), topic: values.topic || "Status updates", content: `**${message.subject}**\n${message.body}` },
         { authorization: basicAuth(required(values.botEmail, "Bot email"), required(values.apiKey, "API key")) }
       )).status;
+    case "MATRIX":
+      return (await send(
+        `${trimSlash(required(values.homeserverUrl, "Homeserver URL"))}/_matrix/client/v3/rooms/${encodeURIComponent(required(values.roomId, "Room ID"))}/send/m.room.message/${randomUUID()}`,
+        JSON.stringify({ msgtype: "m.text", body: text }),
+        { "content-type": "application/json", authorization: `Bearer ${required(values.accessToken, "Access token")}` },
+        "PUT"
+      )).status;
+    case "LARK":
+      return postChecked(required(values.url, "Webhook URL"), {
+        ...(values.secret ? larkSignature(values.secret) : {}),
+        msg_type: "text",
+        content: { text },
+      }, "code");
+    case "DINGTALK": {
+      const url = required(values.url, "Webhook URL");
+      return postChecked(values.secret ? dingTalkSignedUrl(url, values.secret) : url, { msgtype: "text", text: { content: text } }, "errcode");
+    }
+    case "WECOM":
+      return postChecked(required(values.url, "Webhook URL"), { msgtype: "text", text: { content: text } }, "errcode");
+    case "SIGNAL":
+      return post(`${trimSlash(required(values.serverUrl, "Server URL"))}/v2/send`, {
+        message: text,
+        number: required(values.number, "Sender number"),
+        recipients: required(values.recipients, "Recipients").split(",").map((recipient) => recipient.trim()).filter(Boolean),
+      });
     case "TELEGRAM":
       return post(`https://api.telegram.org/bot${required(values.botToken, "Bot token")}/sendMessage`, {
         chat_id: required(values.chatId, "Chat ID"),
@@ -214,6 +275,13 @@ async function deliverToProvider(channel: DestinationChannel, values: Record<str
       });
       return response.status;
     }
+    case "PUSHBULLET":
+      return post("https://api.pushbullet.com/v2/pushes", {
+        type: "note",
+        title: message.subject,
+        body: message.body,
+        ...(values.channelTag ? { channel_tag: values.channelTag } : {}),
+      }, { "access-token": required(values.accessToken, "Access token") });
     case "GOTIFY":
       return post(
         `${trimSlash(required(values.serverUrl, "Server URL"))}/message`,

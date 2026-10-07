@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { alertAction, defaultConfig, DESTINATION_CHANNELS, DESTINATION_PROVIDERS, normalizeDestinationConfig, sanitizeDestinationDefaults } from "@/lib/destination-catalog";
+import { alertAction, defaultConfig, DESTINATION_CHANNELS, DESTINATION_PROVIDERS, normalizeDestinationConfig, providerPickerGroups, sanitizeDestinationDefaults } from "@/lib/destination-catalog";
 
 describe("destination catalog", () => {
   it("keeps only the fields of the chosen auth mode", () => {
@@ -27,6 +27,14 @@ describe("destination catalog", () => {
         expect(controller?.defaultValue, `${channel}.${field.key}`).toBeDefined();
       }
     }
+  });
+
+  it("lists Custom HTTP first on its own, then every other provider A to Z", () => {
+    const [custom, rest] = providerPickerGroups();
+    expect(custom.channels).toEqual(["HTTP"]);
+    const labels = rest.channels.map((channel) => DESTINATION_PROVIDERS[channel].label);
+    expect(labels).toEqual([...labels].sort((a, b) => a.localeCompare(b)));
+    expect(rest.channels.length).toBe(DESTINATION_CHANNELS.length - 1);
   });
 
   it("pages on-call only for alerting events", () => {

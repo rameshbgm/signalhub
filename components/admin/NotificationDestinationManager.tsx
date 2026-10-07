@@ -41,6 +41,7 @@ export function NotificationDestinationManager({
   enabledChannels,
   components = [],
   defaults = {},
+  sharedChannels = [],
 }: {
   pageId: string;
   initial: Destination[];
@@ -48,6 +49,8 @@ export function NotificationDestinationManager({
   components?: Array<{ id: string; name: string }>;
   /** Installation-wide defaults set by the platform administrator. */
   defaults?: DestinationDefaults;
+  /** Providers the platform administrator connected once for every organization; credentials never reach the browser. */
+  sharedChannels?: readonly string[];
 }) {
   const availableProviders = CHANNELS.filter(
     (provider) => !enabledChannels || enabledChannels.includes(provider.value)
@@ -58,6 +61,7 @@ export function NotificationDestinationManager({
   );
   const [name, setName] = useState("");
   const [config, setConfig] = useState<Record<string, string>>(() => defaultConfig(availableProviders[0]?.value ?? "SLACK", defaults));
+  const [ownCredentials, setOwnCredentials] = useState(false);
   const [eventTypes, setEventTypes] = useState<string[]>([]);
   const [componentIds, setComponentIds] = useState<string[]>([]);
   const [message, setMessage] = useState<string | null>(null);
@@ -67,6 +71,7 @@ export function NotificationDestinationManager({
   const selectedProvider =
     availableProviders.find((provider) => provider.value === channel) ??
     availableProviders[0];
+  const usePlatformConnection = sharedChannels.includes(channel) && !ownCredentials;
 
   async function create(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -81,7 +86,7 @@ export function NotificationDestinationManager({
       const response = await fetchWithTimeout("/api/admin/notification-destinations", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ pageId, name, channel, config, dryRun, eventTypes, componentIds }),
+        body: JSON.stringify({ pageId, name, channel, config, dryRun, usePlatformConnection, eventTypes, componentIds }),
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
@@ -165,6 +170,7 @@ export function NotificationDestinationManager({
                   onClick={() => {
                     setChannel(provider.value);
                     setConfig(defaultConfig(provider.value, defaults));
+                    setOwnCredentials(false);
                     setMessage(null);
                   }}
                   variant="ghost"
@@ -191,7 +197,16 @@ export function NotificationDestinationManager({
               Destination name
               <Input value={name} onChange={(event) => setName(event.target.value)} placeholder={`e.g. ${selectedProvider.label} incidents`} className="font-normal" required />
             </label>
-            {selectedProvider.fields.filter((field) => fieldVisible(field, config)).map((field) => (
+            {sharedChannels.includes(channel) && (
+              <label className="flex items-start gap-2.5 rounded-control border border-line bg-sunken/50 p-3 text-sm text-ink sm:col-span-2">
+                <Checkbox checked={!ownCredentials} onChange={(change) => setOwnCredentials(!change.target.checked)} className="mt-0.5" />
+                <span>
+                  <span className="font-medium">Use the platform connection</span>
+                  <span className="mt-0.5 block text-xs leading-5 text-ink-dim">Your platform administrator connected {selectedProvider.label} for every organization. Untick to connect your own account instead.</span>
+                </span>
+              </label>
+            )}
+            {!usePlatformConnection && selectedProvider.fields.filter((field) => fieldVisible(field, config)).map((field) => (
               <div key={field.key} className="grid content-start gap-1.5 text-sm font-medium text-ink-soft">
                 <label htmlFor={`destination-${field.key}`}>{field.label}</label>
                 {field.kind === "select" ? (

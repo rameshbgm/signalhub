@@ -1,7 +1,6 @@
 import { decryptSecret, encryptSecret } from "@/lib/encryption";
 import { log } from "@/lib/logger";
 import { writePlatformAudit } from "@/lib/platform-policy";
-import { DESTINATION_CHANNELS } from "@/lib/notification-providers";
 import type { Updateable } from "kysely";
 import { database, type DatabaseExecutor } from "@/lib/postgres/client";
 import type { PlatformConfigurationTable, SmsProvider } from "@/lib/postgres/schema";
@@ -126,17 +125,14 @@ export async function importLegacyDeliveryEnvironment(executor: DatabaseExecutor
   return imported;
 }
 
-/**
- * Writes the singleton row. A missing row means "every destination provider
- * enabled", so a first insert must keep that default instead of the column's '{}'.
- */
+/** Writes the singleton row. */
 export async function upsertPlatformConfiguration(
   executor: DatabaseExecutor,
   values: ProviderColumns & { updatedBy: string | null }
 ) {
   const changes = { ...values, updatedAt: new Date() };
   await executor.insertInto("platformConfiguration")
-    .values({ id: "global", enabledDestinationChannels: [...DESTINATION_CHANNELS], ...changes })
+    .values({ id: "global", ...changes })
     .onConflict((conflict) => conflict.column("id").doUpdateSet(changes))
     .execute();
 }
