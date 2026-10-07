@@ -6,7 +6,7 @@ import { ChevronLeft, ChevronRight, History, Pencil, Plus, RefreshCw, X } from "
 import { HeartbeatTokenManager } from "@/components/admin/HeartbeatTokenManager";
 import { MonitorForm, type MonitorFormValues } from "@/components/admin/MonitorForm";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogActions, DialogSurface, DialogTitle } from "@/components/ui/dialog";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { fetchWithTimeout } from "@/lib/client-fetch";
@@ -82,12 +82,44 @@ const PAGE_SIZE = 25;
 
 type HistoryPage = { checks: MonitorCheck[]; nextCursor: MonitorCheckCursor | null };
 
+/** Details of one check in a centered modal; rows with no value (no status code, no error) are left out. */
+function CheckDetail({ name, check, onClose }: { name: string; check: MonitorCheck; onClose: () => void }) {
+  const rows = ([
+    ["Checked", new Date(check.checkedAt).toLocaleString(undefined, { dateStyle: "full", timeStyle: "medium" })],
+    ["Latency", check.latencyMs === null ? null : `${check.latencyMs} ms`],
+    ["HTTP status", check.statusCode],
+    ["Error", check.error],
+    ["Check ID", check.id],
+  ] as [string, string | number | null][]).filter(([, value]) => value !== null && value !== "");
+  return createPortal(
+    <Dialog open onOpenChange={(_event, data) => { if (!data.open) onClose(); }}>
+      <DialogSurface>
+        <div className="flex items-center justify-between gap-3 pr-0">
+          <DialogTitle>{name} check</DialogTitle>
+          <StatusBadge tone={check.ok ? "ok" : "danger"}>{check.ok ? "Up" : "Down"}</StatusBadge>
+        </div>
+        <dl className="mt-4 space-y-3 text-sm">
+          {rows.map(([label, value]) => (
+            <div key={label}>
+              <dt className="text-xs text-ink-dim">{label}</dt>
+              <dd className="mt-0.5 break-words tabular-nums text-ink">{value}</dd>
+            </div>
+          ))}
+        </dl>
+        <DialogActions><Button type="button" variant="secondary" onClick={onClose}>Close</Button></DialogActions>
+      </DialogSurface>
+    </Dialog>,
+    document.body,
+  );
+}
+
 /** Check history, paged on the server by keyset cursor; visited pages are cached so Newer is instant. */
-function CheckHistory({ monitorId, firstPage }: { monitorId: string; firstPage: HistoryPage }) {
+function CheckHistory({ monitorId, name, firstPage }: { monitorId: string; name: string; firstPage: HistoryPage }) {
   const [pages, setPages] = useState<HistoryPage[]>([firstPage]);
   const [index, setIndex] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [selected, setSelected] = useState<MonitorCheck | null>(null);
 
   const load = useCallback(async (cursor: MonitorCheckCursor | null, target: number) => {
     setLoading(true);
@@ -129,7 +161,7 @@ function CheckHistory({ monitorId, firstPage }: { monitorId: string; firstPage: 
           </TableHeader>
           <TableBody className={loading ? "opacity-60" : undefined}>
             {page?.checks.map((check) => (
-              <TableRow key={check.id}>
+              <TableRow key={check.id} tabIndex={0} className="cursor-pointer" onClick={() => setSelected(check)} onKeyDown={(event) => { if (event.key === "Enter") setSelected(check); }}>
                 <TableCell className="whitespace-nowrap px-4 py-2.5 tabular-nums">{new Date(check.checkedAt).toLocaleString()}</TableCell>
                 <TableCell className="px-4 py-2.5"><StatusBadge tone={check.ok ? "ok" : "danger"}>{check.ok ? "Up" : "Down"}</StatusBadge></TableCell>
                 <TableCell className="px-4 py-2.5 tabular-nums">{check.latencyMs === null ? "—" : `${check.latencyMs} ms`}</TableCell>
@@ -152,6 +184,7 @@ function CheckHistory({ monitorId, firstPage }: { monitorId: string; firstPage: 
           <ChevronRight aria-hidden size={14} />
         </Button>
       </div>
+      {selected && <CheckDetail name={name} check={selected} onClose={() => setSelected(null)} />}
     </div>
   );
 }
@@ -171,7 +204,7 @@ export function MonitorHistoryDrawer({ monitorId, name, latest }: { monitorId: s
       </Button>
       {open && (
         <Drawer title={`${name} history`} subtitle={`Newest first, ${PAGE_SIZE} checks per page.`} onClose={() => setOpen(false)}>
-          <CheckHistory monitorId={monitorId} firstPage={firstPage} />
+          <CheckHistory monitorId={monitorId} name={name} firstPage={firstPage} />
         </Drawer>
       )}
     </>
