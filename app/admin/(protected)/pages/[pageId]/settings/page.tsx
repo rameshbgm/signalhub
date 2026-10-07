@@ -1,4 +1,7 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
+import { Alert } from "@/components/ui/alert";
+import { database } from "@/lib/postgres/client";
 import { PlatformActionForm } from "@/components/platform/PlatformActionForm";
 import { PlatformSubmitButton } from "@/components/platform/PlatformSubmitButton";
 import { assertPageInOrg, requireCapability } from "@/lib/admin-guard";
@@ -14,6 +17,10 @@ export default async function PageSettings({ params }: { params: Promise<{ pageI
   const session = await requireCapability("page.configure", pageId);
   const page = await assertPageInOrg(pageId, session.orgId);
   if (!page) notFound();
+  const hubChildren = page.isHub
+    ? Number((await database.selectFrom("pages").select((eb) => eb.fn.countAll<string>().as("count"))
+      .where("hubParentId", "=", pageId).where("deletedAt", "is", null).executeTakeFirstOrThrow()).count)
+    : 0;
 
   return (
     <div className="space-y-8">
@@ -41,10 +48,14 @@ export default async function PageSettings({ params }: { params: Promise<{ pageI
 
       <Card id="delete-page" className="scroll-mt-24 border-danger/30">
         <CardHeader><CardTitle className="text-danger-fg">Delete page</CardTitle><CardDescription id="delete-page-warning">Permanently deletes this page, its services, incidents, subscriber records, metrics, monitors, and uploaded assets. This cannot be undone.</CardDescription></CardHeader>
-        <CardContent><PlatformActionForm action={deletePage.bind(null, pageId)} successMessage="Page deleted" className="flex max-w-lg flex-col gap-3">
+        <CardContent>{hubChildren > 0 ? (
+          <Alert tone="warn">
+            This hub still has {hubChildren} page{hubChildren === 1 ? "" : "s"}. Remove or delete them first from the <Link href="/organization/pages" className="font-semibold underline">pages list</Link>, then delete the hub.
+          </Alert>
+        ) : <PlatformActionForm action={deletePage.bind(null, pageId)} successMessage="Page deleted" className="flex max-w-lg flex-col gap-3">
           <Field label={<>Type <code className="font-mono text-ink">{page.name}</code> to confirm</>} htmlFor="delete-page-confirmation"><Input id="delete-page-confirmation" name="confirmation" autoComplete="off" required aria-describedby="delete-page-warning" /></Field>
           <PlatformSubmitButton pendingLabel="Deleting permanently…" confirmMessage={`Permanently delete ${page.name} and all of its data? This cannot be undone.`} variant="destructive" className="w-fit">Delete permanently</PlatformSubmitButton>
-        </PlatformActionForm></CardContent>
+        </PlatformActionForm>}</CardContent>
       </Card>
     </div>
   );

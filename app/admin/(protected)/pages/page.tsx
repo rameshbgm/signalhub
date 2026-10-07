@@ -1,13 +1,14 @@
 import Link from "next/link";
-import { ArrowUpRight, Globe, Layers3, LayoutGrid, Lock, PanelsTopLeft, Pencil, Plus, Rocket, Trash2, Users } from "lucide-react";
+import { ArrowUpRight, Layers3, LayoutGrid, PanelsTopLeft, Pencil, Plus, Rocket, Trash2 } from "lucide-react";
 import { requireSession } from "@/lib/require-session";
 import { getScopedPages, sessionHasCapability } from "@/lib/admin-guard";
 import { formatPageDate } from "@/lib/page-locale";
 import { groupPageEvents, isOpenEvent } from "@/lib/page-events";
 import { database } from "@/lib/postgres/client";
 import { publicPagePath } from "@/lib/public-path";
+import { PageGroup, type PageRow } from "@/components/admin/page-group";
+import { bulkPageAction } from "./actions";
 import { buttonVariants } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { IconTile } from "@/components/ui/icon-tile";
 import { PageHeader } from "@/components/ui/page-header";
@@ -30,7 +31,7 @@ export default async function PagesListPage() {
   const publishedCount = pages.filter((page) => page.setupCompletedAt !== null && page.publicVisible).length;
   const draftCount = pages.filter((page) => page.setupCompletedAt === null).length;
   const hiddenCount = pages.length - publishedCount - draftCount;
-  // Open incidents and pending maintenance, so each card can say whether its page needs attention.
+  // Open incidents and pending maintenance, so each row can say whether its page needs attention.
   const statusPageIds = pages.filter((page) => !page.isHub).map((page) => page.id);
   const openEvents = sessionHasCapability(session, "incident.update") && statusPageIds.length
     ? await database.selectFrom("incidents")
@@ -40,9 +41,10 @@ export default async function PagesListPage() {
       .execute()
     : null;
   const eventsByPage = new Map(statusPageIds.map((id) => [id, groupPageEvents(openEvents?.filter((event) => event.pageId === id) ?? [])]));
+  const activeCount = (page: ScopedPage) => eventsByPage.get(page.id)?.active.length ?? 0;
 
   // Pages needing attention first: live events, then unfinished setup. Sort is stable, so creation order holds within a rank.
-  const urgency = (page: ScopedPage) => (eventsByPage.get(page.id)?.active.length ? 0 : page.setupCompletedAt === null ? 1 : 2);
+  const urgency = (page: ScopedPage) => (activeCount(page) ? 0 : page.setupCompletedAt === null ? 1 : 2);
   const byUrgency = (a: ScopedPage, b: ScopedPage) => urgency(a) - urgency(b);
   const hubs = pages.filter((page) => page.isHub).sort(byUrgency);
   const hubIds = new Set(hubs.map((hub) => hub.id));
@@ -50,67 +52,78 @@ export default async function PagesListPage() {
   // A scoped member may see a child page without its hub; it then lists as standalone instead of vanishing.
   const standalone = pages.filter((page) => !page.isHub && !(page.hubParentId && hubIds.has(page.hubParentId))).sort(byUrgency);
 
-  const primaryAction = (page: ScopedPage) => (
-    !page.setupCompletedAt && canConfigure ? (
-      <Link href={`/organization/pages/${page.id}`} className="inline-flex items-center gap-1.5 rounded-chip text-sm font-semibold text-warn-fg outline-none hover:underline focus-visible:ring-4 focus-visible:ring-primary/25">
-        <Rocket aria-hidden="true" size={16} />
-        Continue setup
-      </Link>
-    ) : page.publicVisible && page.setupCompletedAt ? (
-      <a href={publicPagePath(page)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-chip text-sm font-semibold text-primary-ink outline-none hover:underline focus-visible:ring-4 focus-visible:ring-primary/25">
-        View live page
-        <ArrowUpRight aria-hidden="true" size={16} />
-      </a>
-    ) : <span className="text-xs text-ink-dim">Not visible to visitors</span>
-  );
-
-  const pageActions = (page: ScopedPage) => canConfigure && (
-    <div className="flex shrink-0 items-center">
-      <Link href={`/organization/pages/${page.id}`} aria-label={`Edit ${page.name}`} title="Edit page" className={iconAction()}><Pencil aria-hidden size={16} /></Link>
-      {page.isHub && <Link href={`/organization/pages/new?hubParentId=${page.id}`} aria-label="Create status page in this hub" title="Add page to hub" className={iconAction()}><Plus aria-hidden size={16} /></Link>}
-      <Link href={`/organization/pages/${page.id}/settings#delete-page`} aria-label={`Delete ${page.name}`} title="Delete page" className={iconAction("hover:bg-danger-bg hover:text-danger-fg [&_svg]:!text-ink-dim hover:[&_svg]:!text-danger-fg")}><Trash2 aria-hidden size={16} /></Link>
-    </div>
-  );
-
-  const pageCard = (page: ScopedPage) => {
+  const toRow = (page: ScopedPage): PageRow => {
     const { state, tone } = pageState(page);
-    const AccessIcon = page.type === "PUBLIC" ? Globe : page.type === "PRIVATE" ? Lock : Users;
-    const accessLabel = page.type === "PUBLIC" ? "Public" : page.type === "PRIVATE" ? "Private" : "Audience";
     const events = openEvents ? eventsByPage.get(page.id) : undefined;
     const next = events?.upcoming[0]?.scheduledStart;
-
-    return (
-      <Card key={page.id} className="group flex flex-col overflow-hidden transition-[box-shadow,transform,border-color] duration-200 ease-soft hover:-translate-y-0.5 hover:border-line-strong hover:shadow-raised">
-        <div aria-hidden="true" className="h-1" style={{ background: page.brandColor || "var(--color-primary)" }} />
-        <div className="flex flex-1 flex-col p-5">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <h3 className="truncate text-base font-semibold tracking-tight text-ink" title={page.name}>{page.name}</h3>
-              <p className="mt-0.5 truncate font-mono text-xs text-ink-dim" title={`/${page.slug}`}>/{page.slug}</p>
-            </div>
-            <StatusBadge tone={tone}>{state}</StatusBadge>
-          </div>
-
-          <div className="mb-4 mt-3 flex flex-wrap items-center gap-2 text-sm">
-            <span className="inline-flex items-center gap-1.5 font-medium text-ink-soft"><AccessIcon aria-hidden size={14} className="shrink-0 text-ink-dim" />{accessLabel}</span>
-            {events && (events.active.length > 0 || next) && (
-              <Link href={`/organization/events?pageId=${page.id}`} className="inline-flex rounded-chip outline-none focus-visible:ring-4 focus-visible:ring-primary/25">
-                {events.active.length ? <StatusBadge tone="warn" live>{events.active.length} active event{events.active.length === 1 ? "" : "s"}</StatusBadge>
-                  : <StatusBadge tone="info">Maintenance {formatPageDate(next!, { language: page.language, timeZone: page.timezone, month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</StatusBadge>}
-              </Link>
-            )}
-          </div>
-
-          <div className="mt-auto flex items-center justify-between gap-3 border-t border-line pt-3">
-            <div className="min-w-0">{primaryAction(page)}</div>
-            {pageActions(page)}
-          </div>
-        </div>
-      </Card>
-    );
+    return {
+      id: page.id,
+      name: page.name,
+      slug: page.slug,
+      brand: page.brandColor || "var(--color-primary)",
+      state,
+      tone,
+      type: page.type,
+      event: events?.active.length ? { label: `${events.active.length} active event${events.active.length === 1 ? "" : "s"}`, tone: "warn", live: true }
+        : next ? { label: `Maintenance ${formatPageDate(next, { language: page.language, timeZone: page.timezone, month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}`, tone: "info", live: false }
+        : null,
+      liveHref: page.publicVisible && page.setupCompletedAt ? publicPagePath(page) : null,
+      setupHref: page.setupCompletedAt ? null : `/organization/pages/${page.id}`,
+    };
   };
 
-  const grid = "grid gap-4 sm:grid-cols-2 xl:grid-cols-3";
+  const hubHeader = (hub: ScopedPage, children: ScopedPage[]) => {
+    const { state, tone } = pageState(hub);
+    const active = children.reduce((sum, child) => sum + activeCount(child), 0);
+    const drafts = children.filter((child) => child.setupCompletedAt === null).length;
+    return (
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+        <IconTile icon={Layers3} hue="violet" />
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="truncate text-base font-semibold tracking-tight text-ink" title={hub.name}>{hub.name}</h2>
+            <StatusBadge tone={tone}>{state}</StatusBadge>
+          </div>
+          <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-ink-dim">
+            <span className="font-mono">/{hub.slug}</span>
+            <span>Hub · {children.length} page{children.length === 1 ? "" : "s"}</span>
+            {active > 0 && <span className="font-semibold text-warn-fg">{active} active event{active === 1 ? "" : "s"}</span>}
+            {drafts > 0 && <span>{drafts} draft</span>}
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          {!hub.setupCompletedAt && canConfigure ? (
+            <Link href={`/organization/pages/${hub.id}`} className="inline-flex items-center gap-1.5 rounded-chip text-sm font-semibold text-warn-fg outline-none hover:underline focus-visible:ring-4 focus-visible:ring-primary/25">
+              <Rocket aria-hidden="true" size={16} />
+              Continue setup
+            </Link>
+          ) : hub.publicVisible && hub.setupCompletedAt ? (
+            <a href={publicPagePath(hub)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-chip text-sm font-semibold text-primary-ink outline-none hover:underline focus-visible:ring-4 focus-visible:ring-primary/25">
+              View live page
+              <ArrowUpRight aria-hidden="true" size={16} />
+            </a>
+          ) : null}
+          {canConfigure && (
+            <div className="flex shrink-0 items-center">
+              <Link href={`/organization/pages/${hub.id}`} aria-label={`Edit ${hub.name}`} title="Edit page" className={iconAction()}><Pencil aria-hidden size={16} /></Link>
+              <Link href={`/organization/pages/new?hubParentId=${hub.id}`} aria-label="Create status page in this hub" title="Add page to hub" className={iconAction()}><Plus aria-hidden size={16} /></Link>
+              {children.length ? (
+                <span
+                  role="img"
+                  tabIndex={0}
+                  title={`Delete or remove its ${children.length} page${children.length === 1 ? "" : "s"} first`}
+                  aria-label={`Can't delete ${hub.name}: delete or remove its ${children.length} page${children.length === 1 ? "" : "s"} first`}
+                  className={iconAction("cursor-not-allowed opacity-40 hover:bg-transparent")}
+                ><Trash2 aria-hidden size={16} /></span>
+              ) : (
+                <Link href={`/organization/pages/${hub.id}/settings#delete-page`} aria-label={`Delete ${hub.name}`} title="Delete page" className={iconAction("hover:bg-danger-bg hover:text-danger-fg [&_svg]:!text-ink-dim hover:[&_svg]:!text-danger-fg")}><Trash2 aria-hidden size={16} /></Link>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className="space-y-8">
@@ -128,7 +141,7 @@ export default async function PagesListPage() {
       />
 
       {pages.length ? (
-        <div className="space-y-8">
+        <div className="space-y-4">
           <div className="flex flex-wrap items-center gap-2" aria-label="Page status summary">
             <StatusBadge tone="ok">{publishedCount} published</StatusBadge>
             <StatusBadge tone="warn">{draftCount} draft</StatusBadge>
@@ -136,46 +149,45 @@ export default async function PagesListPage() {
           </div>
 
           {hubs.map((hub) => {
-            const { state, tone } = pageState(hub);
             const children = childrenOf(hub.id);
             return (
-              <section key={hub.id} aria-label={`${hub.name} hub`} className="space-y-4">
-                <Card className="flex flex-wrap items-center gap-x-4 gap-y-3 px-5 py-4">
-                  <IconTile icon={Layers3} hue="violet" size="lg" />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h2 className="truncate text-lg font-semibold tracking-tight text-ink" title={hub.name}>{hub.name}</h2>
-                      <StatusBadge tone={tone}>{state}</StatusBadge>
-                    </div>
-                    <p className="mt-0.5 truncate text-xs text-ink-dim">
-                      <span className="font-mono">/{hub.slug}</span> · Hub · {children.length} page{children.length === 1 ? "" : "s"}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    {primaryAction(hub)}
-                    {pageActions(hub)}
-                  </div>
-                </Card>
-
-                <div className={cn(grid, "ml-3 border-l-2 border-line pl-4 sm:ml-6 sm:pl-6")}>
-                  {children.map(pageCard)}
-                  {!children.length && (canConfigure ? (
-                    <Link href={`/organization/pages/new?hubParentId=${hub.id}`} className="flex min-h-36 flex-col items-center justify-center rounded-card border border-dashed border-line-strong bg-surface/50 p-6 text-center outline-none transition-[border-color,background-color] duration-200 hover:border-primary/50 hover:bg-primary-soft/50 focus-visible:ring-4 focus-visible:ring-primary/25">
-                      <IconTile icon={Plus} hue="indigo" />
-                      <span className="mt-3 text-sm font-semibold text-ink">Add page to hub</span>
-                      <span className="mt-1 max-w-[15rem] text-xs leading-5 text-ink-soft">Status pages added here appear on {hub.name}.</span>
-                    </Link>
-                  ) : <p className="py-4 text-sm text-ink-dim">No pages in this hub yet.</p>)}
-                </div>
-              </section>
+              <PageGroup
+                key={hub.id}
+                label={`${hub.name} hub`}
+                header={hubHeader(hub, children)}
+                rows={children.map(toRow)}
+                hubId={hub.id}
+                action={bulkPageAction.bind(null, hub.id)}
+                // Collapsed unless something inside needs attention, so many hubs stay scannable.
+                defaultOpen={!children.length || children.some((child) => activeCount(child) > 0)}
+                canConfigure={canConfigure}
+                empty={canConfigure ? (
+                  <Link href={`/organization/pages/new?hubParentId=${hub.id}`} className="flex items-center justify-center gap-2 rounded-card border border-dashed border-line-strong p-4 text-sm font-semibold text-ink-soft outline-none transition-colors hover:border-primary/50 hover:bg-primary-soft/50 hover:text-primary-ink focus-visible:ring-4 focus-visible:ring-primary/25">
+                    <Plus aria-hidden size={16} />Add page to hub
+                  </Link>
+                ) : <p className="text-sm text-ink-dim">No pages in this hub yet.</p>}
+              />
             );
           })}
 
           {standalone.length > 0 && (
-            <section aria-label="Standalone pages" className="space-y-4">
-              {hubs.length > 0 && <h2 className="flex items-center gap-2 text-sm font-semibold text-ink-soft"><LayoutGrid aria-hidden size={16} className="text-ink-dim" />Standalone pages</h2>}
-              <div className={grid}>{standalone.map(pageCard)}</div>
-            </section>
+            <PageGroup
+              label="Standalone pages"
+              header={
+                <div className="flex items-center gap-3">
+                  <IconTile icon={LayoutGrid} hue="indigo" />
+                  <div>
+                    <h2 className="text-base font-semibold tracking-tight text-ink">{hubs.length ? "Standalone pages" : "Status pages"}</h2>
+                    <p className="text-xs text-ink-dim">{standalone.length} page{standalone.length === 1 ? "" : "s"}{hubs.length ? " not in any hub" : ""}</p>
+                  </div>
+                </div>
+              }
+              rows={standalone.map(toRow)}
+              hubId={null}
+              action={bulkPageAction.bind(null, null)}
+              defaultOpen
+              canConfigure={canConfigure}
+            />
           )}
         </div>
       ) : (

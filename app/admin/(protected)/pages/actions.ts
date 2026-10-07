@@ -10,7 +10,7 @@ import { fenceActiveOrganizationMutation } from "@/lib/organization-mutation";
 import { templateDesign } from "@/lib/page-design";
 import { isValidTimeZone } from "@/lib/page-locale";
 import { publicPagePath } from "@/lib/public-path";
-import type { DatabaseTransaction } from "@/lib/postgres/client";
+import { database, type DatabaseTransaction } from "@/lib/postgres/client";
 import type { PageTable } from "@/lib/postgres/schema";
 import { recordTenantAudit } from "@/lib/tenant-audit";
 import { generateAutomationToken } from "@/lib/tokens";
@@ -292,12 +292,88 @@ export async function updateEmailCustomization(pageId: string, formData: FormDat
   revalidatePath(`/organization/pages/${pageId}/notifications`);
 }
 
+// ponytail: checked outside the delete transaction; a page attached in that gap falls back to standalone via the FK's ON DELETE SET NULL, not lost.
+async function assertHubEmpty(hubId: string) {
+  const { count } = await database.selectFrom("pages").select((eb) => eb.fn.countAll<string>().as("count"))
+    .where("hubParentId", "=", hubId).where("deletedAt", "is", null).executeTakeFirstOrThrow();
+  const children = Number(count);
+  if (children > 0) throw new Error(`Remove or delete this hub's ${children} page${children === 1 ? "" : "s"} before deleting it`);
+}
+
+const BULK_INTENTS = ["publish", "hide", "remove", "delete"] as const;
+
+/** Bulk action over pages from the pages list; hubId scopes "remove" to one hub's children. */
+export async function bulkPageAction(hubId: string | null, formData: FormData) {
+  const intent = String(formData.get("intent") ?? "") as (typeof BULK_INTENTS)[number];
+  if (!BULK_INTENTS.includes(intent)) throw new Error("Choose a bulk action");
+  const pageIds = [...new Set(formData.getAll("pageId").map(String).filter(Boolean))];
+  if (!pageIds.length) throw new Error("Select at least one page");
+  if (pageIds.length > 100) throw new Error("Select 100 pages or fewer");
+  let session = await requireCapability("page.configure", hubId ?? undefined);
+  for (const id of pageIds) session = await requireCapability("page.configure", id);
+  const label = `${pageIds.length} page${pageIds.length === 1 ? "" : "s"}`;
+  const publicPaths = new Set<string>();
+  let message: string;
+
+  if (intent === "delete") {
+    if (String(formData.get("confirmation") ?? "").trim().toLowerCase() !== `delete ${label}`) {
+      throw new Error(`Type "delete ${label}" to confirm`);
+    }
+    let deleted = 0;
+    try {
+      for (const id of pageIds) {
+        const page = await assertPageInOrg(id, session.orgId);
+        if (page.isHub) await assertHubEmpty(id);
+        await deletePageCascade(id, session.orgId, { afterDelete: (transaction) => audit(transaction, session, "DELETE_PAGE", id) });
+        publicPaths.add(publicPagePath(page));
+        deleted += 1;
+      }
+    } catch (error) {
+      revalidatePath("/organization/pages");
+      throw new Error(`Deleted ${deleted} of ${pageIds.length}: ${error instanceof Error ? error.message : "unexpected error"}`);
+    }
+    message = `Deleted ${label}`;
+  } else {
+    message = await withTransaction(async (transaction) => {
+      await fenceActiveOrganizationMutation(session.orgId, transaction);
+      let query = transaction.updateTable("pages")
+        .where("id", "in", pageIds).where("orgId", "=", session.orgId).where("deletedAt", "is", null);
+      if (intent === "remove") {
+        if (!hubId) throw new Error("Only hub pages can be removed from a hub");
+        query = query.where("hubParentId", "=", hubId).where("isHub", "=", false);
+      }
+      if (intent === "publish") query = query.where("setupCompletedAt", "is not", null);
+      const changed = await query
+        .set(intent === "remove" ? { hubParentId: null } : { publicVisible: intent === "publish" })
+        .returning(["id", "slug", "isHub"]).execute();
+      const action = intent === "remove" ? "DETACH_PAGE_FROM_HUB" : intent === "publish" ? "SHOW_PAGE" : "HIDE_PAGE";
+      for (const page of changed) {
+        await audit(transaction, session, action, page.id, intent === "remove" ? { hubId } : null);
+        publicPaths.add(publicPagePath(page));
+      }
+      const verb = intent === "remove" ? "Removed" : intent === "publish" ? "Published" : "Hid";
+      const skipped = pageIds.length - changed.length;
+      return `${verb} ${changed.length} page${changed.length === 1 ? "" : "s"}${skipped ? `, skipped ${skipped} ${intent === "publish" ? "still in setup" : "unchanged"}` : ""}`;
+    });
+  }
+
+  if (hubId) {
+    const hub = await database.selectFrom("pages").select(["slug", "isHub"]).where("id", "=", hubId).executeTakeFirst();
+    if (hub) publicPaths.add(publicPagePath(hub));
+    revalidatePath(`/organization/pages/${hubId}`);
+  }
+  for (const path of publicPaths) revalidatePath(path, "layout");
+  revalidatePath("/organization/pages");
+  return message;
+}
+
 export async function deletePage(pageId: string, formData: FormData) {
   const session = await requireCapability("page.configure", pageId);
   const page = await assertPageInOrg(pageId, session.orgId);
   if (String(formData.get("confirmation") ?? "").trim() !== page.name) {
     throw new Error("Type the exact page name to permanently delete it");
   }
+  if (page.isHub) await assertHubEmpty(pageId);
   await deletePageCascade(pageId, session.orgId, {
     afterDelete: async (transaction) => {
       await audit(transaction, session, "DELETE_PAGE", pageId);

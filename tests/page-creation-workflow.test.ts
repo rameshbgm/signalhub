@@ -14,6 +14,13 @@ describe("unified page creation workflow", () => {
     expect(pageList).toContain("Create status page in this hub");
   });
 
+  it("refuses to delete a hub that still has pages, including through bulk delete", () => {
+    const actions = source("app/admin/(protected)/pages/actions.ts");
+    expect(actions).toContain("before deleting it");
+    expect(actions.match(/if \(page\.isHub\) await assertHubEmpty\(/g)).toHaveLength(2);
+    expect(actions).toContain('.where("setupCompletedAt", "is not", null)');
+  });
+
   it("creates hidden drafts and only publishes through setup completion", () => {
     const actions = source("app/admin/(protected)/pages/actions.ts");
     expect(actions).toContain("setupCompletedAt: null");
