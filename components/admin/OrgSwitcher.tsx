@@ -93,6 +93,7 @@ export function OrgSwitcher({
           {organizations.length > 1 && (
             <>
               <p className="px-2.5 py-1 text-2xs font-bold uppercase tracking-[0.08em] text-ink-dim">Organizations</p>
+              <div className="max-h-[7.5rem] overflow-y-auto overscroll-contain">
               {organizations.map((organization) => (
                 <button
                   key={organization.id}
@@ -106,6 +107,7 @@ export function OrgSwitcher({
                   <span className="shrink-0 text-xs text-ink-dim">{organization.role.toLowerCase()}</span>
                 </button>
               ))}
+              </div>
               <div className="my-1 h-px bg-line" />
             </>
           )}
