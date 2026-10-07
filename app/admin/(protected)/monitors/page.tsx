@@ -1,10 +1,8 @@
 import { PageSubmitButton } from "@/components/admin/PageSubmitButton";
-import { PlatformActionForm } from "@/components/platform/PlatformActionForm";
 import type { ReactNode } from "react";
 import { AlertTriangle, ChevronDown, History, Info, Link2, MonitorDot, Pause, Pencil, Play, Plus, RefreshCw, Trash2, type LucideIcon } from "lucide-react";
 import { requireSession } from "@/lib/require-session";
 import { sql } from "kysely";
-import { Select } from "@/components/ui/select";
 import { database } from "@/lib/postgres/client";
 import { createMonitor, toggleMonitorEnabled, deleteMonitor, runMonitorNow, updateMonitor } from "./actions";
 import { MonitorForm } from "@/components/admin/MonitorForm";
@@ -17,12 +15,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Field } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { INPUT_LIMITS, MONITOR_TAGS_HINT, MONITOR_TAGS_PATTERN } from "@/lib/input-limits";
 import { ActionRow, InlineActionForm } from "@/components/InlineActionForm";
 
 function relativeTime(date: Date | null): string {
@@ -249,41 +244,7 @@ export default async function MonitorsPage({ searchParams }: { searchParams: Pro
 
                   {canManage && (
                     <Disclosure icon={Pencil} title="Edit monitor">
-                      <PlatformActionForm successMessage="Monitor saved" action={updateMonitor.bind(null, m.id)} className="grid gap-4 p-4 sm:grid-cols-2">
-                        <Field label="Monitor name" htmlFor={`monitor-name-${m.id}`} required>
-                          <Input id={`monitor-name-${m.id}`} name="name" maxLength={INPUT_LIMITS.title} defaultValue={m.name} required />
-                        </Field>
-                        <Field label="Monitor target" htmlFor={`monitor-target-${m.id}`} required>
-                          <Input id={`monitor-target-${m.id}`} name="target" maxLength={INPUT_LIMITS.url} defaultValue={m.target} className="font-mono" required />
-                        </Field>
-                        <Field label="Linked component" htmlFor={`monitor-component-${m.id}`}>
-                          <Select id={`monitor-component-${m.id}`} name="componentId" defaultValue={m.componentId ?? ""}>
-                            <option value="">No linked component</option>
-                            {components.map((component) => <option key={component.id} value={component.id}>{component.name}</option>)}
-                          </Select>
-                        </Field>
-                        <Field label="Group" htmlFor={`monitor-group-${m.id}`}>
-                          <Input id={`monitor-group-${m.id}`} name="groupName" maxLength={INPUT_LIMITS.monitorGroup} defaultValue={m.groupName ?? ""} placeholder="Group" />
-                        </Field>
-                        <Field label="Interval seconds" htmlFor={`monitor-interval-${m.id}`} hint="How often the monitor polls, from 10 seconds to 24 hours.">
-                          <Input id={`monitor-interval-${m.id}`} name="intervalSec" type="number" min={10} max={86400} defaultValue={m.intervalSec} />
-                        </Field>
-                        <Field label="Timeout milliseconds" htmlFor={`monitor-timeout-${m.id}`}>
-                          <Input id={`monitor-timeout-${m.id}`} name="timeoutMs" type="number" min={100} max={60000} defaultValue={m.timeoutMs} />
-                        </Field>
-                        <Field label="Failure threshold" htmlFor={`monitor-fail-${m.id}`} hint="Consecutive failed checks before the monitor is marked down.">
-                          <Input id={`monitor-fail-${m.id}`} name="failThreshold" type="number" min={1} max={20} defaultValue={m.failThreshold} />
-                        </Field>
-                        <Field label="Recovery threshold" htmlFor={`monitor-recover-${m.id}`} hint="Consecutive successful checks before it is marked recovered.">
-                          <Input id={`monitor-recover-${m.id}`} name="recoverThreshold" type="number" min={1} max={20} defaultValue={m.recoverThreshold} />
-                        </Field>
-                        <Field label="Tags" htmlFor={`monitor-tags-${m.id}`} className="sm:col-span-2">
-                          <Input id={`monitor-tags-${m.id}`} name="tags" maxLength={INPUT_LIMITS.monitorTags * (INPUT_LIMITS.monitorTag + 2)} pattern={MONITOR_TAGS_PATTERN} title={MONITOR_TAGS_HINT} defaultValue={m.tags?.join(", ") ?? ""} placeholder="Tags, comma separated" />
-                        </Field>
-                        <div className="flex justify-end sm:col-span-2">
-                          <Button type="submit">Save monitor</Button>
-                        </div>
-                      </PlatformActionForm>
+                      <div className="p-4"><MonitorForm action={updateMonitor.bind(null, m.id)} components={components.map((c) => ({ id: c.id, name: c.name }))} monitor={m} /></div>
                     </Disclosure>
                   )}
 

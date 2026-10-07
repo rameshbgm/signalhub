@@ -2,14 +2,12 @@
 
 import { revalidatePath } from "next/cache";
 import { assertPageInOrg, requireCapability } from "@/lib/admin-guard";
-import { isDatabaseId } from "@/lib/database-id";
-import { INPUT_LIMITS, MONITOR_TAGS_HINT } from "@/lib/input-limits";
+import { encryptSecret } from "@/lib/encryption";
 import { deleteMonitorCascade } from "@/lib/cascade";
-import { createMonitor as createMonitorDomain, type MonitorInput } from "@/lib/domain/monitors";
+import { createMonitor as createMonitorDomain, prepareMonitorInput, type MonitorInput } from "@/lib/domain/monitors";
 import { fenceActiveOrganizationMutation } from "@/lib/organization-mutation";
 import { database, withDatabaseTransaction } from "@/lib/postgres/client";
 import { writeSupportMutationAudit } from "@/lib/support-audit";
-import { validateHttpTarget, validateNetworkHost } from "@/lib/target-validation";
 import { enqueueJobSweep, JOB_TASKS } from "@/lib/jobs";
 
 function string(formData: FormData, key: string, fallback = "") {
@@ -21,12 +19,10 @@ function optionalString(formData: FormData, key: string) {
   return value || null;
 }
 
-export async function createMonitor(pageId: string, formData: FormData) {
-  const session = await requireCapability("monitor.manage", pageId);
-  await assertPageInOrg(pageId, session.orgId);
+function monitorInputFromForm(formData: FormData): MonitorInput {
   const legacyType = string(formData, "type", "HTTP");
   const type = legacyType === "SSL" ? "TLS" : legacyType === "PING" ? "ICMP" : legacyType;
-  const rawInput: MonitorInput = {
+  return {
     name: string(formData, "name"),
     type: type as MonitorInput["type"],
     componentId: optionalString(formData, "componentId"),
@@ -59,6 +55,12 @@ export async function createMonitor(pageId: string, formData: FormData) {
     dnsRecordType: optionalString(formData, "dnsRecordType") as MonitorInput["dnsRecordType"],
     dnsExpectedValue: optionalString(formData, "dnsExpectedValue"),
   };
+}
+
+export async function createMonitor(pageId: string, formData: FormData) {
+  const session = await requireCapability("monitor.manage", pageId);
+  await assertPageInOrg(pageId, session.orgId);
+  const rawInput = monitorInputFromForm(formData);
   const monitor = await createMonitorDomain(session.orgId, pageId, rawInput);
   await writeSupportMutationAudit(session, {
     action: "CREATE_MONITOR",
@@ -138,40 +140,39 @@ export async function updateMonitor(monitorId: string, formData: FormData) {
   const monitor = await monitorContext(monitorId);
   const session = await requireCapability("monitor.manage", monitor.pageId);
   await assertPageInOrg(monitor.pageId, session.orgId);
-  const name = string(formData, "name").trim();
-  const target = string(formData, "target").trim();
-  const componentId = optionalString(formData, "componentId");
-  const intervalSec = Number(formData.get("intervalSec"));
-  const timeoutMs = Number(formData.get("timeoutMs"));
-  const failThreshold = Number(formData.get("failThreshold"));
-  const recoverThreshold = Number(formData.get("recoverThreshold"));
-  const groupName = optionalString(formData, "groupName");
-  const tags = [...new Set(string(formData, "tags").split(",").map((tag) => tag.trim()).filter(Boolean))];
-  if (!name || name.length > INPUT_LIMITS.title) throw new Error(`Monitor name is required and must be ${INPUT_LIMITS.title} characters or fewer`);
-  if (!target || target.length > INPUT_LIMITS.url) throw new Error(`Monitor target is required and must be ${INPUT_LIMITS.url} characters or fewer`);
-  if (!Number.isInteger(intervalSec) || intervalSec < 10 || intervalSec > 86_400) throw new Error("Interval must be between 10 and 86400 seconds");
-  if (!Number.isInteger(timeoutMs) || timeoutMs < 100 || timeoutMs > 60_000) throw new Error("Timeout must be between 100 and 60000 milliseconds");
-  if (![failThreshold, recoverThreshold].every((value) => Number.isInteger(value) && value >= 1 && value <= 20)) throw new Error("Thresholds must be between 1 and 20");
-  if (tags.length > INPUT_LIMITS.monitorTags || tags.some((tag) => tag.length > INPUT_LIMITS.monitorTag)) throw new Error(MONITOR_TAGS_HINT);
-  if (groupName && groupName.length > INPUT_LIMITS.monitorGroup) throw new Error(`Group names must be ${INPUT_LIMITS.monitorGroup} characters or fewer`);
-  if (componentId && !isDatabaseId(componentId)) throw new Error("Component not found on this page");
-  if (componentId) {
-    const component = await database.selectFrom("components").select("id")
-      .where("id", "=", componentId).where("pageId", "=", monitor.pageId).executeTakeFirst();
-    if (!component) throw new Error("Component not found on this page");
-  }
-  const allowPrivate = process.env.MONITOR_ALLOW_PRIVATE_TARGETS === "true";
-  if (["HTTP", "KEYWORD"].includes(monitor.type)) {
-    await validateHttpTarget(target, { allowPrivate });
-  } else if (monitor.type !== "HEARTBEAT") {
-    const hostname = monitor.type === "TLS" && target.includes("://") ? new URL(target).hostname : target;
-    await validateNetworkHost(hostname, allowPrivate);
-  }
+  // The monitor type is fixed after creation; everything else is validated like a new monitor.
+  formData.set("type", monitor.type);
+  const input = await prepareMonitorInput(monitorInputFromForm(formData));
   await withDatabaseTransaction(async (transaction) => {
     await fenceActiveOrganizationMutation(session.orgId, transaction);
+    if (input.componentId) {
+      const component = await transaction.selectFrom("components").select("id")
+        .where("id", "=", input.componentId).where("pageId", "=", monitor.pageId).executeTakeFirst();
+      if (!component) throw new Error("Component not found on this page");
+    }
+    let metricId = monitor.metricId;
+    if (input.actionRecordMetric && !metricId) {
+      metricId = (await transaction.insertInto("metrics").values({
+        pageId: monitor.pageId, componentId: input.componentId, name: `${input.name} response time`,
+        suffix: "ms", description: `Automatically recorded by monitor "${input.name}"`, visible: true, decimals: 0,
+      }).returning("id").executeTakeFirstOrThrow()).id;
+    }
+    // A blank secret keeps the stored one unless auth was switched off.
+    const authSecret = input.authType === "NONE" ? null
+      : input.authSecret ? encryptSecret(input.authSecret) : monitor.authSecret;
     const changed = await transaction.updateTable("monitors").set({
-      name, target, componentId, intervalSec, timeoutMs, failThreshold, recoverThreshold,
-      groupName, tags, runRequestedAt: new Date(), leaseOwner: null, leaseExpiresAt: null,
+      name: input.name, target: input.type === "HEARTBEAT" ? monitor.target : input.target, port: input.port,
+      componentId: input.componentId, method: input.method, requestBody: input.requestBody,
+      requestHeaders: input.requestHeaders, expectedStatusRange: input.expectedStatusRange,
+      keywordMatch: input.keywordMatch, keywordAbsent: input.keywordAbsent, sslWarnDays: input.sslWarnDays,
+      authType: input.authType, authUsername: input.authUsername, authSecret, authHeaderName: input.authHeaderName,
+      verifyTls: input.verifyTls, intervalSec: input.intervalSec, timeoutMs: input.timeoutMs,
+      failThreshold: input.failThreshold, recoverThreshold: input.recoverThreshold, downStatus: input.downStatus,
+      actionFlipStatus: input.actionFlipStatus, actionRecordMetric: input.actionRecordMetric,
+      actionAutoIncident: input.actionAutoIncident, actionNotify: input.actionNotify, metricId,
+      tags: input.tags ?? [], groupName: input.groupName ?? null, heartbeatGraceSec: input.heartbeatGraceSec ?? 60,
+      dnsRecordType: input.dnsRecordType ?? null, dnsExpectedValue: input.dnsExpectedValue ?? null,
+      runRequestedAt: new Date(), leaseOwner: null, leaseExpiresAt: null,
     }).where("id", "=", monitor.id).where("pageId", "=", monitor.pageId)
       .returning("id").executeTakeFirst();
     if (!changed) throw new Error("Monitor state changed; reload and retry");

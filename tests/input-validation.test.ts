@@ -99,9 +99,9 @@ describe("monitor tags pattern", () => {
     expect(matches(Array(INPUT_LIMITS.monitorTags + 1).fill("t").join(", "))).toBe(false);
   });
 
-  it("is used by both monitor forms", () => {
+  it("is used by the shared create and edit monitor form", () => {
     expect(source("components/admin/MonitorForm.tsx")).toContain("pattern={MONITOR_TAGS_PATTERN}");
-    expect(source("app/admin/(protected)/monitors/page.tsx")).toContain("pattern={MONITOR_TAGS_PATTERN}");
+    expect(source("app/admin/(protected)/monitors/page.tsx")).toContain("monitor={m}");
   });
 });
 
