@@ -1,11 +1,11 @@
 "use client";
 
 import { fetchWithTimeout } from "@/lib/client-fetch";
+import { useToast } from "@/components/ui/toast";
 
 import { useId, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { useRouter } from "next/navigation";
-import { CheckCircle2, ImageIcon, Loader2, Maximize2, Trash2, Upload, X } from "lucide-react";
-import { Alert } from "@/components/ui/alert";
+import { ImageIcon, Loader2, Maximize2, Trash2, Upload, X } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { Field } from "@/components/ui/field";
@@ -79,6 +79,7 @@ export function AssetUploader({
   const [preview, setPreview] = useState(currentUrl ?? "");
   const [message, setMessage] = useState<string | null>(null);
   const [messageIsError, setMessageIsError] = useState(false);
+  useToast(messageIsError ? "danger" : "ok", message);
   const [loading, setLoading] = useState(false);
   const [savingFraming, setSavingFraming] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -487,14 +488,6 @@ export function AssetUploader({
         )}
       </div>
       <p className="text-xs leading-5 text-ink-dim">{formats}</p>
-      {message && (messageIsError
-        ? <Alert tone="danger">{message}</Alert>
-        : (
-          <p role="status" className="flex items-center gap-1.5 text-xs text-ink-soft">
-            <CheckCircle2 aria-hidden="true" size={14} className="shrink-0 text-ok" />
-            {message}
-          </p>
-        ))}
       <Dialog open={previewOpen && Boolean(preview)} onOpenChange={(_event, data) => setPreviewOpen(data.open)}>
         <div role="dialog" aria-modal="true" aria-label={`${label} preview`} className="relative max-h-full max-w-5xl animate-pop overflow-auto rounded-sheet border border-line bg-surface p-3 shadow-float">
           <Button type="button" variant="secondary" size="icon" onClick={() => setPreviewOpen(false)} aria-label="Close image preview" title="Close preview" className="absolute right-5 top-5 z-10">

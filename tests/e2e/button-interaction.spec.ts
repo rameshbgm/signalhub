@@ -53,7 +53,7 @@ test.describe("button interaction guard", () => {
     await expect(button).toHaveAttribute("aria-busy", "true");
     await expect.poll(() => page.evaluate(() => (window as typeof window & { guardSubmitCount?: number }).guardSubmitCount)).toBe(1);
 
-    await expect(page.getByRole("status")).toContainText("Save settings timed out. Please try again.");
+    await expect(page.getByRole("alert")).toContainText("Save settings timed out. Please try again.");
     await expect(button).not.toHaveAttribute("data-button-guard-locked", "true");
 
     await button.click();

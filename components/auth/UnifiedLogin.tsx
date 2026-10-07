@@ -1,6 +1,7 @@
 "use client";
 
 import { fetchWithTimeout } from "@/lib/client-fetch";
+import { useToast } from "@/components/ui/toast";
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -8,7 +9,6 @@ import { useRouter } from "next/navigation";
 import { QuickLogin } from "@/components/landing/QuickLogin";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Activity } from "lucide-react";
-import { Alert } from "@/components/ui/alert";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
@@ -20,6 +20,7 @@ export function UnifiedLogin({ returnTo }: { returnTo: string | null }) {
   const [mfaRequired, setMfaRequired] = useState(false);
   const [connections, setConnections] = useState<Array<{ name: string; startUrl: string }>>([]);
   const [error, setError] = useState<string | null>(null);
+  useToast("danger", error);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -91,7 +92,6 @@ export function UnifiedLogin({ returnTo }: { returnTo: string | null }) {
                 <Input id="login-code" suppressHydrationWarning value={code} onChange={(event) => setCode(event.target.value.replace(/\D/g, "").slice(0, 6))} inputMode="numeric" autoComplete="one-time-code" placeholder="6-digit authenticator code" required className="h-10" />
               </div>
             )}
-            {error && <Alert tone="danger">{error}</Alert>}
             <Button type="submit" loading={loading} size="lg" className="w-full">{mfaRequired ? "Verify and sign in" : "Sign in"}</Button>
           </form>
 

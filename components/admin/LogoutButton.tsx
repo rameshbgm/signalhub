@@ -1,6 +1,7 @@
 "use client";
 
 import { fetchWithTimeout } from "@/lib/client-fetch";
+import { useToast } from "@/components/ui/toast";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -17,6 +18,7 @@ export function LogoutButton({
   const router = useRouter();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  useToast("danger", error);
 
   async function logout() {
     if (pending) return;
@@ -54,11 +56,6 @@ export function LogoutButton({
         >
           <LogOut aria-hidden size={16} />
         </Button>
-        {error && (
-          <span role="alert" className="absolute right-0 top-full z-30 mt-1 w-56 rounded-control border border-danger/30 bg-danger-bg p-2 text-xs text-danger-fg">
-            {error}
-          </span>
-        )}
       </span>
     );
   }
@@ -75,7 +72,6 @@ export function LogoutButton({
         <span>{pending ? "Signing out…" : "Sign out"}</span>
         <LogOut aria-hidden size={16} />
       </Button>
-      {error && <p role="alert" className="px-3 pt-1 text-xs text-danger-fg">{error}</p>}
     </div>
   );
 }

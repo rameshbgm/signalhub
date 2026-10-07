@@ -1,6 +1,7 @@
 "use client";
 
 import { fetchWithTimeout } from "@/lib/client-fetch";
+import { useToast } from "@/components/ui/toast";
 
 import { useEffect, useRef, useState, type CSSProperties, type FormEvent } from "react";
 import { createPortal } from "react-dom";
@@ -211,6 +212,8 @@ function ContactTab({
   const [code, setCode] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  useToast("danger", message);
+  useToast("info", message ? null : notice);
   const [loading, setLoading] = useState(false);
   const [lastResponse, setLastResponse] = useState<{ alreadySubscribed?: boolean; scoped?: boolean }>({});
   const isEmail = channel === "EMAIL";
@@ -290,8 +293,6 @@ function ContactTab({
           placeholder="123456"
           className={`${inputClass} mb-2 text-center font-mono text-lg tracking-[0.4em]`}
         />
-        {message && <p role="alert" className="mb-2 text-xs text-[var(--red)]">{message}</p>}
-        {notice && !message && <p role="status" className="mb-2 text-xs text-[var(--fg-soft)]">{notice}</p>}
         <Button type="submit" loading={loading} disabled={!/^\d{6}$/.test(code)} className="w-full py-2.5 font-medium text-white" style={{ backgroundColor: brandColor }}>{loading ? "Verifying…" : "Verify & subscribe"}</Button>
         <div className="mt-3 flex items-center justify-between gap-3 text-xs">
           <button type="button" className="text-[var(--fg-soft)] underline-offset-4 hover:underline" onClick={() => { setStage("form"); setMessage(null); setNotice(null); }}>
@@ -318,7 +319,6 @@ function ContactTab({
         style={{ "--tw-ring-color": brandColor } as CSSProperties}
       />
       <ComponentPicker components={components} selected={selected} onChange={setSelected} />
-      {message && <p role="alert" className="mb-2 text-xs text-[var(--red)]">{message}</p>}
       <Button type="submit" loading={loading} disabled={!trimmedContact} className="w-full py-2.5 font-medium text-white" style={{ backgroundColor: brandColor }}>{loading ? "Sending…" : "Send verification code"}</Button>
     </form>
   );

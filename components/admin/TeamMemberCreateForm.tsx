@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
+import { useToast } from "@/components/ui/toast";
 import { UserPlus } from "lucide-react";
 import { Select } from "@/components/ui/select";
 import {
@@ -8,7 +9,6 @@ import {
   type TeamMemberCreateState,
 } from "@/app/admin/(protected)/team/actions";
 import { MEMBERSHIP_ROLES } from "@/lib/identity";
-import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -29,6 +29,8 @@ export function TeamMemberCreateForm({
   pages: PageOption[];
 }) {
   const [state, action, pending] = useActionState(createMember, INITIAL_STATE);
+  useToast("danger", state.error, state);
+  useToast("ok", state.ok ? `${state.memberName ?? "User"} is active and can sign in now.` : null, state);
 
   return (
     <Card>
@@ -110,12 +112,6 @@ export function TeamMemberCreateForm({
               )}
             </div>
           </fieldset>
-          {state.error && <Alert tone="danger" className="sm:col-span-2">{state.error}</Alert>}
-          {state.ok && (
-            <Alert tone="ok" className="sm:col-span-2">
-              {state.memberName ?? "User"} is active and can sign in now.
-            </Alert>
-          )}
           <div className="flex justify-end border-t border-line pt-4 sm:col-span-2">
             <Button type="submit" loading={pending} className="w-full sm:w-auto">
               <UserPlus aria-hidden size={16} />

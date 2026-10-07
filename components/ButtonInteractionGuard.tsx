@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
+import { toast } from "@/components/ui/toast";
 
 export const BUTTON_INTERACTION_LOCK_MS = 450;
 export const BUTTON_ACTION_TIMEOUT_MS = 15_000;
@@ -59,8 +60,6 @@ function restoreAttribute(element: HTMLElement, name: string, value: string | nu
 }
 
 export function ButtonInteractionGuard({ children }: { children: ReactNode }) {
-  const [timeoutMessage, setTimeoutMessage] = useState("");
-  const messageTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const locks = new Map<HTMLButtonElement, ButtonLock>();
@@ -90,9 +89,7 @@ export function ButtonInteractionGuard({ children }: { children: ReactNode }) {
       // forever when their operation never settles. Locks only start on enabled
       // buttons, so returning this property to false restores the initial state.
       lock.button.disabled = false;
-      setTimeoutMessage(`${buttonText(lock.button)} timed out. Please try again.`);
-      if (messageTimer.current) clearTimeout(messageTimer.current);
-      messageTimer.current = setTimeout(() => setTimeoutMessage(""), 6_000);
+      toast(`${buttonText(lock.button)} timed out. Please try again.`, "danger");
     };
 
     const lockButton = (button: HTMLButtonElement, form: HTMLFormElement | null) => {
@@ -247,16 +244,8 @@ export function ButtonInteractionGuard({ children }: { children: ReactNode }) {
       document.removeEventListener("signalhub:button-action-complete", onActionComplete, true);
       observer.disconnect();
       for (const lock of locks.values()) clearTimeout(lock.timer);
-      if (messageTimer.current) clearTimeout(messageTimer.current);
     };
   }, []);
 
-  return (
-    <>
-      {children}
-      <div aria-atomic="true" aria-live="assertive" role="status" className="button-timeout-message">
-        {timeoutMessage}
-      </div>
-    </>
-  );
+  return <>{children}</>;
 }

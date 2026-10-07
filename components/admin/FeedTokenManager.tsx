@@ -1,6 +1,7 @@
 "use client";
 
 import { fetchWithTimeout } from "@/lib/client-fetch";
+import { useToast } from "@/components/ui/toast";
 
 import { useState } from "react";
 import { useConfirm } from "@/components/ui/confirm-dialog";
@@ -42,6 +43,7 @@ export function FeedTokenManager({
   const [pending, setPending] = useState(false);
   const [secret, setSecret] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  useToast("danger", error);
   const [confirm, confirmDialog] = useConfirm();
 
   async function create(event: React.FormEvent) {
@@ -138,7 +140,6 @@ export function FeedTokenManager({
         )}
         <div className="flex justify-end"><Button type="submit" loading={pending}>{pending ? "Creating…" : "Create signed feed token"}</Button></div>
       </form>
-      {error && <Alert tone="danger">{error}</Alert>}
       {secret && (
         <Alert tone="warn" title="Copy these feed URLs now. The token will not be shown again.">
           {(["rss", "atom"] as const).map((format) => (

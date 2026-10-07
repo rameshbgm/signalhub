@@ -1,10 +1,10 @@
 "use client";
 
 import { fetchWithTimeout } from "@/lib/client-fetch";
+import { useToast } from "@/components/ui/toast";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -22,6 +22,7 @@ export function InviteAcceptanceForm({
   const [password, setPassword] = useState("");
   const [confirmation, setConfirmation] = useState("");
   const [error, setError] = useState<string | null>(null);
+  useToast("danger", error);
   const [pending, setPending] = useState(false);
 
   async function submit(event: React.FormEvent) {
@@ -83,7 +84,6 @@ export function InviteAcceptanceForm({
           />
         </Field>
       )}
-      {error && <Alert tone="danger">{error}</Alert>}
       <Button type="submit" loading={pending} size="lg" className="w-full">
         {pending ? "Accepting…" : "Accept invitation"}
       </Button>

@@ -174,23 +174,6 @@ button[data-button-busy="saving"]::after {
   animation: button-busy-spin 700ms linear infinite;
 }
 
-.button-timeout-message {
-  position: fixed;
-  z-index: 3000;
-  right: 1rem;
-  bottom: 1rem;
-  max-width: min(24rem, calc(100vw - 2rem));
-  border: 1px solid color-mix(in srgb, var(--red) 45%, var(--line));
-  background: var(--surface-raised);
-  color: var(--fg);
-  box-shadow: 0 14px 35px rgba(15, 23, 42, 0.2);
-  font-size: 0.875rem;
-}
-
-.button-timeout-message:not(:empty) {
-  padding: 0.75rem 1rem;
-}
-
 @keyframes button-busy-spin {
   to {
     transform: translate(-50%, -50%) rotate(360deg);

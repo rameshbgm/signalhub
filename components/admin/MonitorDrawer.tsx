@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useToast } from "@/components/ui/toast";
 import { createPortal } from "react-dom";
 import { ArrowDownUp, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Filter, History, Pencil, Plus, RefreshCw, X } from "lucide-react";
 import { HeartbeatTokenManager } from "@/components/admin/HeartbeatTokenManager";
@@ -123,6 +124,7 @@ function CheckHistory({ monitorId, name, firstPage }: { monitorId: string; name:
   const [page, setPage] = useState<HistoryPage>(firstPage);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  useToast("danger", error);
   const [selected, setSelected] = useState<MonitorCheck | null>(null);
   const [filter, setFilter] = useState<HistoryFilter>(DEFAULT_FILTER);
 
@@ -184,7 +186,6 @@ function CheckHistory({ monitorId, name, firstPage }: { monitorId: string; name:
         </Button>
       </div>
       <p className="text-xs text-ink-dim" aria-live="polite">{loading ? "Loading…" : `${page.total} checks`}</p>
-      {error && <p role="alert" className="rounded-control bg-danger-bg px-3 py-2 text-xs text-danger-fg">{error}</p>}
       <div>
         <Table aria-busy={loading}>
           <TableHeader>

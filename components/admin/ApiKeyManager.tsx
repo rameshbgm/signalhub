@@ -1,6 +1,7 @@
 "use client";
 
 import { fetchWithTimeout } from "@/lib/client-fetch";
+import { useToast } from "@/components/ui/toast";
 
 import { useState } from "react";
 import { useConfirm } from "@/components/ui/confirm-dialog";
@@ -28,6 +29,7 @@ export function ApiKeyCreator({ pages }: { pages: Array<{ id: string; name: stri
   const [name, setName] = useState("");
   const [secret, setSecret] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  useToast("danger", error);
   const [pending, setPending] = useState(false);
   const [scopes, setScopes] = useState<string[]>(["status.read"]);
   const [pageIds, setPageIds] = useState<string[]>([]);
@@ -144,7 +146,6 @@ export function ApiKeyCreator({ pages }: { pages: Array<{ id: string; name: stri
         </div>
         <div className="flex justify-end"><Button type="submit" loading={pending} disabled={scopes.length === 0}>{pending ? "Generating…" : "Generate key"}</Button></div>
       </form>
-      {error && <Alert tone="danger">{error}</Alert>}
       {secret && <Alert tone="warn" title="Copy this key now. It will not be shown again."><SecretField value={secret} copyLabel="Copy key" className="mt-2" /></Alert>}
     </div>
   );
@@ -155,6 +156,7 @@ export function ApiKeyActions({ id }: { id: string }) {
   const [pending, setPending] = useState(false);
   const [secret, setSecret] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  useToast("danger", error);
   const [confirm, confirmDialog] = useConfirm();
 
   async function mutate(kind: "rotate" | "revoke") {
@@ -198,7 +200,6 @@ export function ApiKeyActions({ id }: { id: string }) {
       <Button type="button" variant="destructive" size="sm" disabled={pending} onClick={() => void mutate("revoke")}>
         Revoke
       </Button>
-      {error && <span role="alert" className="basis-full text-xs text-danger-fg">{error}</span>}
       {confirmDialog}
     </div>
   );

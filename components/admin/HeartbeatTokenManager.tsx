@@ -1,6 +1,7 @@
 "use client";
 
 import { fetchWithTimeout } from "@/lib/client-fetch";
+import { useToast } from "@/components/ui/toast";
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -10,6 +11,7 @@ import { SecretField } from "@/components/admin/SecretReveal";
 export function HeartbeatTokenManager({ monitorId }: { monitorId: string }) {
   const [url, setUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  useToast("danger", error);
   const [pending, setPending] = useState(false);
 
   async function rotate() {
@@ -48,7 +50,6 @@ export function HeartbeatTokenManager({ monitorId }: { monitorId: string }) {
           {pending ? "Creating heartbeat URL…" : "Create or rotate heartbeat URL"}
         </Button>
       )}
-      {error && <p role="alert" className="mt-1 text-danger-fg">{error}</p>}
     </div>
   );
 }

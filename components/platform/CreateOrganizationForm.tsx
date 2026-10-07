@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
+import { useToast } from "@/components/ui/toast";
 import { Plus } from "lucide-react";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -16,6 +17,7 @@ const INITIAL_STATE: CreateOrganizationState = { ok: false };
 
 export function CreateOrganizationForm() {
   const [state, action, pending] = useActionState(createOrganization, INITIAL_STATE);
+  useToast("danger", state.error, state);
 
   if (state.ok) {
     return (
@@ -55,11 +57,6 @@ export function CreateOrganizationForm() {
           placeholder="Customer request or internal ticket"
         />
       </Field>
-      {state.error && (
-        <Alert tone="danger" className="sm:col-span-2">
-          {state.error}
-        </Alert>
-      )}
       <div className="flex justify-end sm:col-span-2">
         <Button
           type="submit"

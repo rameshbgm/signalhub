@@ -1,17 +1,18 @@
 "use client";
 
 import { fetchWithTimeout } from "@/lib/client-fetch";
+import { useToast } from "@/components/ui/toast";
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { ArrowRight } from "lucide-react";
-import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 
 export function SwitchOrganizationButton({ organizationId }: { organizationId: string }) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  useToast("danger", error);
 
   async function switchOrganization() {
     setPending(true);
@@ -45,7 +46,6 @@ export function SwitchOrganizationButton({ organizationId }: { organizationId: s
         {pending ? "Opening…" : "Open organization"}
         {!pending && <ArrowRight aria-hidden size={14} />}
       </Button>
-      {error && <Alert tone="danger" className="mt-2">{error}</Alert>}
     </div>
   );
 }

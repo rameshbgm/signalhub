@@ -1,6 +1,7 @@
 "use client";
 
 import { fetchWithTimeout } from "@/lib/client-fetch";
+import { useToast } from "@/components/ui/toast";
 
 import { useState } from "react";
 import { useConfirm } from "@/components/ui/confirm-dialog";
@@ -33,7 +34,9 @@ export function WebhookEndpointManager({
   const [pending, setPending] = useState<string | null>(null);
   const [secret, setSecret] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  useToast("danger", error);
   const [notice, setNotice] = useState<string | null>(null);
+  useToast("ok", notice);
   const [confirm, confirmDialog] = useConfirm();
 
   async function create(event: React.FormEvent) {
@@ -117,8 +120,6 @@ export function WebhookEndpointManager({
 
   return (
     <div className="space-y-4">
-      {error && <Alert tone="danger">{error}</Alert>}
-      {notice && <Alert tone="ok" role="status">{notice}</Alert>}
       {secret && (
         <Alert tone="warn" role="status" title="Copy this signing secret now. It will not be shown again.">
           <SecretField value={secret} copyLabel="Copy secret" className="mt-3" />

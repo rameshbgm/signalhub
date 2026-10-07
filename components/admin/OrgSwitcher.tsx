@@ -1,6 +1,7 @@
 "use client";
 
 import { fetchWithTimeout } from "@/lib/client-fetch";
+import { useToast } from "@/components/ui/toast";
 
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
@@ -23,6 +24,7 @@ export function OrgSwitcher({
   const [open, setOpen] = useState(false);
   const [switching, setSwitching] = useState(false);
   const [switchError, setSwitchError] = useState<string | null>(null);
+  useToast("danger", switchError);
   const ref = useRef<HTMLDivElement>(null);
   const router = useRouter();
 
@@ -106,11 +108,6 @@ export function OrgSwitcher({
               ))}
               <div className="my-1 h-px bg-line" />
             </>
-          )}
-          {switchError && (
-            <p role="alert" className="px-2.5 py-1.5 text-xs text-danger-fg">
-              {switchError}
-            </p>
           )}
           <p className="px-2.5 py-1 text-2xs font-bold uppercase tracking-[0.08em] text-ink-dim">Your pages</p>
           {canConfigurePages &&

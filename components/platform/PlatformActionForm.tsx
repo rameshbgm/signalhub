@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useActionState, useEffect, useRef, type ComponentPropsWithoutRef, type ReactNode } from "react";
 import { runPlatformActionWithFeedback } from "@/app/platform/(protected)/action-feedback";
-import { Alert } from "@/components/ui/alert";
+import { toast } from "@/components/ui/toast";
 import { cn } from "@/lib/utils";
 
 type PlatformAction = (formData: FormData) => void | string | Promise<void | string>;
@@ -29,26 +29,25 @@ export function PlatformActionForm({
   action,
   children,
   successMessage,
-  messageClassName = "",
+  messageClassName: _messageClassName, // ponytail: feedback is a toast now, prop kept so callers need no change
   onSuccess,
   ...formProps
 }: PlatformActionFormProps) {
   const formClassName = formProps.className ?? "";
-  const [state, formAction, pending] = useActionState(
+  const [state, formAction] = useActionState(
     runPlatformActionWithFeedback.bind(null, action, successMessage),
     INITIAL_STATE
   );
-  const feedback = pending ? INITIAL_STATE : state;
 
   const router = useRouter();
   const refreshed = useRef<ActionFeedbackState>(INITIAL_STATE);
   // revalidatePath targets internal routes, which a proxy-rewritten public URL can miss, so refresh explicitly (once per result).
   useEffect(() => {
-    if (state.status !== "success") return;
-    if (refreshed.current !== state) {
-      refreshed.current = state;
-      router.refresh();
-    }
+    if (state.status === "idle" || refreshed.current === state) return;
+    refreshed.current = state;
+    toast(state.message, state.status === "error" ? "danger" : "ok");
+    if (state.status === "error") return;
+    router.refresh();
     onSuccess?.();
   }, [onSuccess, router, state]);
 
@@ -59,18 +58,6 @@ export function PlatformActionForm({
       className={cn(formClassName, formClassName.includes("flex") && "flex-wrap")}
     >
       {children}
-      <div
-        aria-atomic="true"
-        aria-live={feedback.status === "error" ? "assertive" : "polite"}
-        role={feedback.status === "error" ? "alert" : "status"}
-        className={cn("w-full basis-full", messageClassName)}
-      >
-        {feedback.status !== "idle" && (
-          <Alert tone={feedback.status === "error" ? "danger" : "ok"} role={undefined}>
-            {feedback.message}
-          </Alert>
-        )}
-      </div>
     </form>
   );
 }

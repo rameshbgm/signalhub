@@ -1,6 +1,7 @@
 "use client";
 
 import { fetchWithTimeout } from "@/lib/client-fetch";
+import { useToast } from "@/components/ui/toast";
 
 import { useEffect, useState } from "react";
 import { useConfirm } from "@/components/ui/confirm-dialog";
@@ -38,6 +39,7 @@ export function SecurityManager({ enrollmentRequired }: { enrollmentRequired: bo
   const [recoveryCodes, setRecoveryCodes] = useState<string[]>([]);
   const [sessions, setSessions] = useState<Session[]>([]);
   const [error, setError] = useState<string | null>(null);
+  useToast("danger", error);
   const [pendingAction, setPendingAction] = useState<string | null>(null);
   const [confirm, confirmDialog] = useConfirm();
 
@@ -197,7 +199,6 @@ export function SecurityManager({ enrollmentRequired }: { enrollmentRequired: bo
           )}
         </CardContent>
       </Card>
-      {error && <Alert tone="danger">{error}</Alert>}
       {confirmDialog}
     </div>
   );

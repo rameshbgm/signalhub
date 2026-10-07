@@ -1,6 +1,7 @@
 "use client";
 
 import { fetchWithTimeout } from "@/lib/client-fetch";
+import { useToast } from "@/components/ui/toast";
 
 import { useState } from "react";
 import { useConfirm } from "@/components/ui/confirm-dialog";
@@ -13,6 +14,7 @@ export function ScimTokenManager({ connectionId }: { connectionId: string }) {
   const [secret, setSecret] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  useToast("danger", error);
   const [confirm, confirmDialog] = useConfirm();
 
   async function rotate() {
@@ -54,7 +56,6 @@ export function ScimTokenManager({ connectionId }: { connectionId: string }) {
           <CopyButton value={secret} label="Copy token" errorClassName="text-xs text-danger-fg" className="mt-2" />
         </Alert>
       )}
-      {error && <Alert tone="danger">{error}</Alert>}
       {confirmDialog}
     </div>
   );

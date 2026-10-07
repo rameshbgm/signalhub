@@ -1,11 +1,11 @@
 "use client";
 
 import { fetchWithTimeout } from "@/lib/client-fetch";
+import { useToast } from "@/components/ui/toast";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { AuthShell } from "@/components/admin/AuthShell";
-import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -17,6 +17,7 @@ export default function ChangeTemporaryPasswordPage() {
   const [newPassword, setNewPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [error, setError] = useState<string | null>(null);
+  useToast("danger", error);
   const [loading, setLoading] = useState(false);
 
   async function submit(event: React.FormEvent) {
@@ -102,7 +103,6 @@ export default function ChangeTemporaryPasswordPage() {
             required
           />
         </Field>
-        {error && <Alert tone="danger">{error}</Alert>}
         <Button type="submit" loading={loading} size="lg" className="w-full">
           {loading ? "Saving…" : "Save account and continue"}
         </Button>

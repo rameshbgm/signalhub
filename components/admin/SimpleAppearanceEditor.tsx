@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useToast } from "@/components/ui/toast";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -198,6 +199,7 @@ export function SimpleAppearanceEditor({
 
   const saveFailed = saveState === "ERROR" || saveState === "CONFLICT";
   const saveTone: StatusTone = saveFailed ? "danger" : saveState === "SAVED" ? "neutral" : "info";
+  useToast(saveFailed ? "danger" : "ok", message);
 
   const actionControls = (
     <div className="flex shrink-0 items-center gap-2">
@@ -261,9 +263,6 @@ export function SimpleAppearanceEditor({
             </div>
           )}
 
-          {message && (saveFailed
-            ? <Alert tone="danger">{message}</Alert>
-            : <p role="status" className="text-sm text-ink-soft">{message}</p>)}
         </div>
 
         <section aria-labelledby="layout-heading">

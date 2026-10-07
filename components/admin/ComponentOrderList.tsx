@@ -1,6 +1,7 @@
 "use client";
 
 import { Children, useMemo, useState, useTransition, type ReactNode } from "react";
+import { toast } from "@/components/ui/toast";
 import { GripVertical } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -40,7 +41,6 @@ export function ComponentOrderList({
   );
   const nameById = useMemo(() => new Map(components.map((component) => [component.id, component.name])), [components]);
   const [orderedIds, setOrderedIds] = useState(components.map((component) => component.id));
-  const [message, setMessage] = useState("");
   const [pending, startTransition] = useTransition();
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
@@ -56,14 +56,13 @@ export function ComponentOrderList({
     if (oldIndex < 0 || newIndex < 0) return;
     const next = arrayMove(previous, oldIndex, newIndex);
     setOrderedIds(next);
-    setMessage("");
     startTransition(async () => {
       try {
         await reorderComponentOrder(pageId, next);
-        setMessage("Component order saved");
+        toast("Component order saved", "ok");
       } catch (error) {
         setOrderedIds(previous);
-        setMessage(error instanceof Error ? error.message : "Could not save component order");
+        toast(error instanceof Error ? error.message : "Could not save component order", "danger");
       }
     });
   }
@@ -81,7 +80,6 @@ export function ComponentOrderList({
           </div>
         </SortableContext>
       </DndContext>
-      <p role="status" aria-live="polite" className="min-h-4 pt-2 text-xs text-ink-dim empty:hidden">{message}</p>
     </div>
   );
 }

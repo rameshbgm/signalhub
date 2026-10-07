@@ -1,6 +1,7 @@
 "use client";
 
 import { fetchWithTimeout } from "@/lib/client-fetch";
+import { useToast } from "@/components/ui/toast";
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -20,6 +21,7 @@ export function QuickLogin() {
   const [accounts, setAccounts] = useState<QuickAccount[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  useToast("danger", error);
 
   useEffect(() => {
     fetchWithTimeout("/api/auth/dev-login", { cache: "no-store" })
@@ -90,7 +92,6 @@ export function QuickLogin() {
           </Button>
         ))}
       </div>
-      {error && <p role="alert" className="mt-2 text-xs text-danger-fg">{error}</p>}
     </section>
   );
 }
