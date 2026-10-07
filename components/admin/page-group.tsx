@@ -47,13 +47,13 @@ function BulkButton({ intent, children, variant = "ghost", disabled = false, lab
   return <Button type="submit" name="intent" value={intent} size="icon" variant={variant} className={cn("size-8", className)} disabled={disabled || pending} aria-label={label} title={label}>{children}</Button>;
 }
 
-/** Single-page action; submits through the same bulk server action with just this page. Feedback floats so rows keep their height. With `confirm`, asks in a dialog first. */
+/** Single-page action; submits through the same bulk server action with just this page. Feedback floats beside the icon (a card above clips anything below the row) and fades after 3s. With `confirm`, asks in a dialog first. */
 function RowAction({ action, pageId, intent, label, done, className, confirm, children }: { action: (formData: FormData) => Promise<string>; pageId: string; intent: string; label: string; done: string; className?: string; confirm?: { title: string; body: string }; children: ReactNode }) {
   const [asking, setAsking] = useState(false);
   const formId = useId();
   const close = useCallback(() => setAsking(false), []);
   return (
-    <PlatformActionForm id={formId} action={action} successMessage={done} className="relative flex" messageClassName="absolute right-0 top-full z-10 mt-1 w-max max-w-64 empty:hidden">
+    <PlatformActionForm id={formId} action={action} successMessage={done} className="relative flex" messageClassName="pointer-events-none absolute right-full top-1/2 z-10 mr-2 w-max max-w-64 -translate-y-1/2 animate-[sh-flash_3s_ease-out_forwards] empty:hidden">
       <input type="hidden" name="pageId" value={pageId} />
       {confirm ? (
         <>
