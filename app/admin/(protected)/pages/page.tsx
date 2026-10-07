@@ -7,7 +7,8 @@ import { groupPageEvents, isOpenEvent } from "@/lib/page-events";
 import { database } from "@/lib/postgres/client";
 import { publicPagePath } from "@/lib/public-path";
 import { PageGroup, type PageRow } from "@/components/admin/page-group";
-import { attachChildPage, bulkPageAction } from "./actions";
+import { attachChildPage, bulkPageAction, deletePage } from "./actions";
+import { DeletePageButton } from "@/components/admin/DeletePageButton";
 import { buttonVariants } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { IconTile } from "@/components/ui/icon-tile";
@@ -118,7 +119,7 @@ export default async function PagesListPage() {
                   className={iconAction("cursor-not-allowed opacity-40 hover:bg-transparent")}
                 ><Trash2 aria-hidden size={16} /></span>
               ) : (
-                <Link href={`/organization/pages/${hub.id}/settings#delete-page`} aria-label={`Delete ${hub.name}`} title="Delete page" className={iconAction("hover:bg-danger-bg hover:text-danger-fg [&_svg]:!text-ink-dim hover:[&_svg]:!text-danger-fg")}><Trash2 aria-hidden size={16} /></Link>
+                <DeletePageButton name={hub.name} action={deletePage.bind(null, hub.id)} className={iconAction("size-9 hover:bg-danger-bg hover:text-danger-fg [&_svg]:!text-ink-dim hover:[&_svg]:!text-danger-fg")} />
               )}
             </div>
           )}
