@@ -17,6 +17,7 @@ const TABS: Array<{ href: string; label: string; icon: LucideIcon; hue: Hue }> =
   { href: "/organization/platform/identity", label: "Identity", icon: KeyRound, hue: "indigo" },
   // Tenant-scoped, so these live outside /platform.
   { href: "/organization/security", label: "Security", icon: ShieldCheck, hue: "rose" },
+  { href: "/organization/api-keys", label: "API Keys", icon: KeyRound, hue: "teal" },
   { href: "/organization/team", label: "Users & Roles", icon: UserCog, hue: "indigo" },
 ];
 

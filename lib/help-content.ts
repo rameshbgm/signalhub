@@ -86,8 +86,8 @@ export const HELP_CATEGORIES: HelpCategory[] = [
           {
             heading: "Navigation",
             paragraphs: [
-              "The sidebar groups screens into Workspace (Dashboard, Pages), Operate (Events, Monitors, Metrics), Audience (Subscribers, Destinations, Analytics), Tools (SignalHub Embed, API Keys, Help Center), and Platform. Items you are not permitted to use are hidden.",
-              "Press Ctrl+K (Cmd+K on macOS) to open the command palette. Type to jump to a screen or a page; use the arrow keys and Enter, and Escape to close.",
+              "The sidebar groups screens into Workspace (Dashboard, Pages), Operate (Events, Monitors, Metrics), Audience (Subscribers, Destinations, Analytics, SignalHub Embed), and Platform administration. API Keys sit in Platform administration next to Security. Items you are not permitted to use are hidden.",
+              "The Help center is the question-mark button beside the search box at the top of every screen. Press Ctrl+K (Cmd+K on macOS) to open the command palette. Type to jump to a screen or a page; use the arrow keys and Enter, and Escape to close.",
               "If your account belongs to more than one organization, the organization switcher in the shell changes the active organization.",
             ],
           },
@@ -287,7 +287,7 @@ export const HELP_CATEGORIES: HelpCategory[] = [
           },
           {
             heading: "Feeds and embeds on protected pages",
-            paragraphs: ["RSS, Atom, the badge, and the embed script need a revocable feed token on non-public pages. Create tokens under API Keys."],
+            paragraphs: ["RSS, Atom, the badge, and the embed script need a revocable feed token on non-public pages. Create tokens under Platform administration, API Keys."],
           },
         ],
       },
@@ -870,7 +870,7 @@ export const HELP_CATEGORIES: HelpCategory[] = [
           {
             heading: "Screens",
             paragraphs: [
-              "Platform administration has tabs for Overview, Organizations, Users, Operations, Audit, Configuration, and Identity, plus links to Security and Users and roles. Overview shows live counts straight from the installation database.",
+              "Platform administration has tabs for Overview, Organizations, Users, Operations, Audit, Configuration, and Identity, plus links to Security, API Keys, and Users and roles. Overview shows live counts straight from the installation database.",
               "Operations lists platform jobs, dead-letter deliveries that exhausted their retries, worker heartbeats, platform retention defaults, and a migration-state warning when the schema needs attention. Only safe, idempotent retries are offered.",
             ],
           },

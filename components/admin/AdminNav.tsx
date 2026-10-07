@@ -2,17 +2,14 @@
 
 import {
   BellRing,
-  BookOpen,
   ChartNoAxesCombined,
   Code2,
   Gauge,
-  KeyRound,
   Landmark,
   LayoutDashboard,
   MonitorDot,
   PanelsTopLeft,
   Siren,
-  Sparkles,
   UsersRound,
   type LucideIcon,
 } from "lucide-react";
@@ -66,17 +63,7 @@ export const NAV_SECTIONS: NavSection[] = [
       { href: "/organization/subscribers", label: "Subscribers", icon: UsersRound, hue: "emerald", capability: "subscriber.manage" },
       { href: "/organization/notifications", label: "Destinations", icon: BellRing, hue: "teal", capability: "integration.manage" },
       { href: "/organization/analytics", label: "Analytics", icon: ChartNoAxesCombined, hue: "violet", capability: "analytics.view" },
-    ],
-  },
-  {
-    id: "tools",
-    label: "Tools",
-    icon: Sparkles,
-    hue: "teal",
-    items: [
       { href: "/organization/embed", label: "SignalHub Embed", icon: Code2, hue: "teal", capability: "integration.manage" },
-      { href: "/organization/api-keys", label: "API Keys", icon: KeyRound, hue: "teal", capability: "integration.manage" },
-      { href: "/organization/help", label: "Help Center", icon: BookOpen, hue: "slate" },
     ],
   },
   {

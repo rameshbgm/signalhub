@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { Activity, ChevronRight, Menu, PanelLeftClose, PanelLeftOpen, PanelsTopLeft, Search, ShieldCheck, Siren, Wrench, X } from "lucide-react";
+import { Activity, BookOpen, ChevronRight, CircleHelp, KeyRound, Menu, PanelLeftClose, PanelLeftOpen, PanelsTopLeft, Search, ShieldCheck, Siren, Wrench, X } from "lucide-react";
 import { LogoutButton } from "@/components/admin/LogoutButton";
 import { activeNav, isActivePath, visibleSections, type NavSection } from "@/components/admin/AdminNav";
 import { CommandPalette, type PaletteEntry } from "@/components/admin/CommandPalette";
@@ -121,6 +121,8 @@ export function AdminShell({
 
   const entries = useMemo<PaletteEntry[]>(() => [
     ...sections.flatMap((section) => section.items.map((item) => ({ href: item.href, label: item.label, group: section.label, icon: item.icon, hue: item.hue }))),
+    { href: "/organization/help", label: "Help Center", group: "Help", icon: BookOpen, hue: "slate" as const },
+    ...(capabilities.includes("integration.manage") ? [{ href: "/organization/api-keys", label: "API Keys", group: "Platform", icon: KeyRound, hue: "teal" as const }] : []),
     ...(capabilities.includes("incident.manage") ? [
       { href: "/organization/incidents/new", label: "Report incident", group: "Action", icon: Siren, hue: "amber" as const },
       { href: "/organization/maintenance/new", label: "Schedule maintenance", group: "Action", icon: Wrench, hue: "amber" as const },
@@ -211,6 +213,14 @@ export function AdminShell({
             <span className="hidden flex-1 text-left sm:inline">Search…</span>
             <kbd className="hidden rounded-chip border border-line bg-surface px-1.5 font-mono text-2xs text-ink-soft sm:inline">⌘K</kbd>
           </button>
+          <Link
+            href="/organization/help"
+            aria-label="Help center"
+            title="Help center"
+            className="grid size-9 shrink-0 place-items-center rounded-control border border-line bg-canvas text-ink-soft outline-none transition-colors duration-150 hover:border-line-strong hover:text-ink focus-visible:ring-[3px] focus-visible:ring-primary/30"
+          >
+            <CircleHelp aria-hidden size={17} />
+          </Link>
         </header>
 
         <main id="main" className="mx-auto w-full max-w-[84rem] px-4 pb-16 pt-6 sm:px-6 lg:px-8 lg:pt-8">

@@ -89,7 +89,8 @@ export function OrgSwitcher({
       </button>
 
       {open && (
-        <div role="menu" className="absolute inset-x-0 top-full z-50 mt-1.5 animate-drop rounded-card border border-line bg-surface p-1.5 shadow-float">
+        <div role="menu" className="absolute inset-x-0 top-full z-50 mt-1.5 flex max-h-[min(26rem,calc(100dvh-9rem))] animate-drop flex-col rounded-card border border-line bg-surface p-1.5 shadow-float">
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
           {organizations.length > 1 && (
             <>
               <p className="px-2.5 py-1 text-2xs font-bold uppercase tracking-[0.08em] text-ink-dim">Organizations</p>
@@ -127,7 +128,8 @@ export function OrgSwitcher({
             </p>
           )}
           {pages.length === 0 && <p className="px-2.5 py-1.5 text-xs text-ink-dim">No pages yet.</p>}
-          <div className="mt-1 border-t border-line pt-1">
+          </div>
+          <div className="mt-1 shrink-0 border-t border-line pt-1">
             <Link
               href="/organization/pages"
               onClick={() => setOpen(false)}

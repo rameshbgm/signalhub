@@ -1,4 +1,5 @@
 import { requireSession } from "@/lib/require-session";
+import { PlatformNav } from "@/components/platform/PlatformNav";
 import { database } from "@/lib/postgres/client";
 import { PageSelect } from "@/components/admin/PageSelect";
 import { ApiKeyActions, ApiKeyCreator } from "@/components/admin/ApiKeyManager";
@@ -36,6 +37,7 @@ export default async function ApiKeysPage({ searchParams }: { searchParams: Prom
 
   return (
     <div className="space-y-8">
+      {session.role === "ADMIN" && <PlatformNav />}
       <PageHeader title="API keys and webhooks" icon={KeyRound} hue="teal" description="Manage programmatic access, signed webhooks, and protected feeds." />
       <Card>
         <CardHeader>
