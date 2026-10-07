@@ -21,7 +21,7 @@ export async function updateOrgSettings(formData: FormData) {
       .where("id", "=", session.orgId).returning("id").executeTakeFirst();
     if (!changed) throw new Error("Organization not found");
   });
-  revalidatePath("/organization/settings");
+  revalidatePath("/organization/platform/orgs");
 }
 
 export async function updateOrgRetention(formData: FormData) {
@@ -52,7 +52,7 @@ export async function updateOrgRetention(formData: FormData) {
       updatedAt: new Date(),
     })).execute();
   });
-  revalidatePath("/organization/settings");
+  revalidatePath("/organization/platform/orgs");
 }
 
 export async function requestOrgExport() {
@@ -82,5 +82,5 @@ export async function requestOrgExport() {
     }).execute();
     await enqueueJobSweep(transaction, JOB_TASKS.exports);
   });
-  revalidatePath("/organization/settings");
+  revalidatePath("/organization/platform/orgs");
 }

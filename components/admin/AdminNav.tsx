@@ -101,8 +101,8 @@ export function visibleSections(capabilities: Capability[]): NavSection[] {
 export function isActivePath(pathname: string, href: string) {
   // Incident and maintenance screens belong to the Events inbox.
   pathname = pathname.replace(/^\/organization\/(incidents|maintenance)(?=\/|$)/, "/organization/events");
-  // Organization settings, Security and Users & Roles are tabs inside Platform administration.
-  pathname = pathname.replace(/^\/organization\/(settings|security|team)(?=\/|$)/, "/organization/platform/$1");
+  // Security and Users & Roles are tabs inside Platform administration.
+  pathname = pathname.replace(/^\/organization\/(security|team)(?=\/|$)/, "/organization/platform/$1");
   return href === "/organization" ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);
 }
 

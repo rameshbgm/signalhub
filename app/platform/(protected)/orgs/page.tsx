@@ -21,6 +21,7 @@ import { organizationStatus } from "@/lib/organization-state";
 import { PlatformActionForm } from "@/components/platform/PlatformActionForm";
 import { PlatformSubmitButton } from "@/components/platform/PlatformSubmitButton";
 import { organizationPurgeCanBeCancelled } from "@/lib/platform-job-policy";
+import { OrganizationSettingsSection } from "@/components/platform/OrganizationSettingsSection";
 import { SwitchOrganizationButton } from "@/components/platform/SwitchOrganizationButton";
 import { Alert } from "@/components/ui/alert";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -95,7 +96,7 @@ export default async function PlatformOrgsPage({
     <div className="space-y-8">
       <PageHeader
         title="Organizations"
-        description="Provision, open, freeze, and queue tenant purges with durable audit records."
+        description="Provision, open, freeze, and queue tenant purges, and manage the settings of the organization you are signed in to."
         icon={Building2}
         hue="violet"
         actions={canCreate && (
@@ -153,6 +154,8 @@ export default async function PlatformOrgsPage({
           detail="Monitor targets on private networks"
         />
       </section>
+
+      <OrganizationSettingsSection />
 
       {canCreate && (
         <Card id="provision-organization" className="scroll-mt-6">

@@ -5,8 +5,7 @@ import { redirect } from "next/navigation";
 
 export default async function InstallationAdminLayout({ children }: { children: React.ReactNode }) {
   const session = await requireOrgSession();
-  // Org owners without the platform role still have the Organization settings tab.
-  if (session.role !== "ADMIN") redirect("/organization/settings");
+  if (session.role !== "ADMIN") redirect("/organization");
   return (
     <AdminLayout>
       <div className="space-y-6">
