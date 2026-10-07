@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { CalendarClock, ChevronRight, History, Plus, Siren, TriangleAlert, Wrench } from "lucide-react";
+import { sql } from "kysely";
+import { CalendarClock, ChevronLeft, ChevronRight, History, Plus, Siren, TriangleAlert, Wrench } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,49 +9,45 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { incidentStatusTone, maintenanceStatusTone } from "@/components/admin/operate-ui";
 import { formatPageDate } from "@/lib/page-locale";
-import { eventHref, groupPageEvents } from "@/lib/page-events";
+import { EVENT_KINDS, eventHref, eventsHref, groupPageEvents, isOpenEvent, type EventKind } from "@/lib/page-events";
 import { database } from "@/lib/postgres/client";
 import { IMPACT_LABEL, INCIDENT_STATUS_LABEL, MAINTENANCE_STATUS_LABEL, type Impact, type IncidentStatus, type MaintenanceStatus } from "@/lib/status";
 
-export const EVENT_KINDS = [
-  { key: "all", label: "All" },
-  { key: "incidents", label: "Incidents" },
-  { key: "maintenance", label: "Maintenance" },
-] as const;
-export type EventKind = (typeof EVENT_KINDS)[number]["key"];
+const HISTORY_PAGE_SIZE = 50;
+const COLUMNS = ["id", "pageId", "name", "status", "impact", "isMaintenance", "maintenanceStatus", "scheduledStart", "scheduledEnd", "createdAt", "resolvedAt"] as const;
 
-export function parseEventKind(value: string | undefined): EventKind {
-  return EVENT_KINDS.find((kind) => kind.key === value)?.key ?? "all";
-}
-
-/**
- * Active, upcoming and past incidents and maintenance for one or more pages.
- * Both the Events inbox and a page's Events tab render this, so they stay the same view.
- */
-export async function EventsList({ pageIds, pageNameById, kindHref, kind, canManage, newEventPageId, locale }: {
+/** Active, upcoming and paged past incidents and maintenance for the given pages. */
+export async function EventsList({ pageIds, filteredPageId, pageNameById, kind, historyPage, canManage, locale }: {
   pageIds: string[];
+  filteredPageId?: string;
   /** Set when the list spans several pages, so each row names its page. */
   pageNameById?: Record<string, string>;
-  kindHref: (kind: EventKind) => string;
   kind: EventKind;
+  historyPage: number;
   canManage: boolean;
-  /** Preselects the page in the create forms. */
-  newEventPageId?: string;
   locale?: { language?: string | null; timeZone?: string | null };
 }) {
-  // ponytail: newest 200 events; add paging when history outgrows it.
-  const events = pageIds.length
-    ? await database.selectFrom("incidents")
-      .select(["id", "pageId", "name", "status", "impact", "isMaintenance", "maintenanceStatus", "scheduledStart", "scheduledEnd", "createdAt", "resolvedAt"])
-      .where("pageId", "in", pageIds)
-      .$if(kind !== "all", (query) => query.where("isMaintenance", "=", kind === "maintenance"))
-      .orderBy("createdAt", "desc").limit(200).execute()
-    : [];
-  const { active, upcoming, history } = groupPageEvents(events);
+  const ofKind = (event: { isMaintenance: boolean }) => kind === "all" || event.isMaintenance === (kind === "maintenance");
+  const [openEvents, historyRows] = pageIds.length
+    ? await Promise.all([
+      // Open events stay few, so they load in full; the filter applies after, so we can say what it hides.
+      database.selectFrom("incidents").select(COLUMNS).where("pageId", "in", pageIds).where(isOpenEvent).execute(),
+      database.selectFrom("incidents").select(COLUMNS).where("pageId", "in", pageIds).where((eb) => eb.not(isOpenEvent(eb)))
+        .$if(kind !== "all", (query) => query.where("isMaintenance", "=", kind === "maintenance"))
+        // Same order as groupPageEvents: maintenance by its window, incidents by when they opened.
+        .orderBy(sql`coalesce(case when ${sql.ref("isMaintenance")} then ${sql.ref("scheduledStart")} end, ${sql.ref("createdAt")})`, "desc")
+        .orderBy("id")
+        .limit(HISTORY_PAGE_SIZE + 1).offset((historyPage - 1) * HISTORY_PAGE_SIZE).execute(),
+    ])
+    : [[], []];
+  const { active, upcoming } = groupPageEvents(openEvents.filter(ofKind));
+  const hidden = openEvents.filter((event) => !ofKind(event));
+  const history = historyRows.slice(0, HISTORY_PAGE_SIZE);
+  const hasOlder = historyRows.length > HISTORY_PAGE_SIZE;
 
   const date = (value: Date) => formatPageDate(value, { ...locale, month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
   const pagePrefix = (pageId: string) => (pageNameById ? `${pageNameById[pageId] ?? "Unknown page"} · ` : "");
-  const row = (event: (typeof events)[number]) => {
+  const row = (event: (typeof openEvents)[number]) => {
     if (!event.isMaintenance) {
       return (
         <EventRow key={event.id} href={eventHref(event)} icon={TriangleAlert} title={event.name}
@@ -69,7 +66,7 @@ export async function EventsList({ pageIds, pageNameById, kindHref, kind, canMan
     );
   };
 
-  const query = newEventPageId ? `?pageId=${newEventPageId}` : "";
+  const query = filteredPageId ? `?pageId=${filteredPageId}` : "";
   const createActions = canManage && (
     <div className="flex flex-wrap gap-2">
       <Link href={`/organization/incidents/new${query}`} className={buttonVariants({ size: "sm" })}>
@@ -89,7 +86,7 @@ export async function EventsList({ pageIds, pageNameById, kindHref, kind, canMan
         {EVENT_KINDS.map((option) => (
           <Link
             key={option.key}
-            href={kindHref(option.key)}
+            href={eventsHref({ pageId: filteredPageId, kind: option.key })}
             aria-current={kind === option.key ? "page" : undefined}
             className={buttonVariants({ variant: kind === option.key ? "secondary" : "ghost", size: "sm" })}
           >
@@ -101,7 +98,17 @@ export async function EventsList({ pageIds, pageNameById, kindHref, kind, canMan
     </div>
   );
 
-  if (events.length === 0) {
+  // A filter must never hide something that is happening right now or coming up.
+  const hiddenNotice = hidden.length > 0 && (
+    <p className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-card border border-warn/30 bg-warn-bg px-4 py-3 text-sm text-warn-fg">
+      <span>
+        {hidden.length} open {kind === "incidents" ? `maintenance window${hidden.length === 1 ? "" : "s"}` : `incident${hidden.length === 1 ? "" : "s"}`} hidden by this filter.
+      </span>
+      <Link href={eventsHref({ pageId: filteredPageId })} className="rounded-chip font-semibold underline outline-none focus-visible:ring-4 focus-visible:ring-primary/25">Show all</Link>
+    </p>
+  );
+
+  if (!openEvents.length && !history.length && historyPage === 1) {
     return (
       <div className="space-y-6">
         {kind !== "all" && toolbar}
@@ -120,40 +127,56 @@ export async function EventsList({ pageIds, pageNameById, kindHref, kind, canMan
   return (
     <div className="space-y-6">
       {toolbar}
+      {hiddenNotice}
+
+      {historyPage === 1 && (
+        <>
+          <Card>
+            <CardHeader className="flex-row items-center justify-between gap-3">
+              <div className="min-w-0">
+                <CardTitle>Active now</CardTitle>
+                <CardDescription>Open incidents and maintenance in progress. Visitors can see these.</CardDescription>
+              </div>
+              {active.length > 0 && <StatusBadge tone="warn">{active.length} active</StatusBadge>}
+            </CardHeader>
+            <CardContent className="py-2">
+              {active.length ? <ul className="divide-y divide-line">{active.map(row)}</ul> : <p className="py-3 text-sm text-ink-dim">Nothing is happening right now.</p>}
+            </CardContent>
+          </Card>
+
+          {upcoming.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Upcoming</CardTitle>
+                <CardDescription>Scheduled maintenance, soonest first.</CardDescription>
+              </CardHeader>
+              <CardContent className="py-2">
+                <ul className="divide-y divide-line">{upcoming.map(row)}</ul>
+              </CardContent>
+            </Card>
+          )}
+        </>
+      )}
 
       <Card>
         <CardHeader className="flex-row items-center justify-between gap-3">
           <div className="min-w-0">
-            <CardTitle>Active now</CardTitle>
-            <CardDescription>Open incidents and maintenance in progress. Visitors can see these.</CardDescription>
+            <CardTitle className="flex items-center gap-2"><History aria-hidden size={16} className="text-ink-dim" />History</CardTitle>
+            <CardDescription>Resolved incidents and completed maintenance, newest first.</CardDescription>
           </div>
-          {active.length > 0 && <StatusBadge tone="warn">{active.length} active</StatusBadge>}
-        </CardHeader>
-        <CardContent className="py-2">
-          {active.length ? <ul className="divide-y divide-line">{active.map(row)}</ul> : <p className="py-3 text-sm text-ink-dim">Nothing is happening right now.</p>}
-        </CardContent>
-      </Card>
-
-      {upcoming.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Upcoming</CardTitle>
-            <CardDescription>Scheduled maintenance, soonest first.</CardDescription>
-          </CardHeader>
-          <CardContent className="py-2">
-            <ul className="divide-y divide-line">{upcoming.map(row)}</ul>
-          </CardContent>
-        </Card>
-      )}
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2"><History aria-hidden size={16} className="text-ink-dim" />History</CardTitle>
-          <CardDescription>Resolved incidents and completed maintenance, newest first.</CardDescription>
+          {historyPage > 1 && <Badge>Page {historyPage}</Badge>}
         </CardHeader>
         <CardContent className="py-2">
           {history.length ? <ul className="divide-y divide-line">{history.map(row)}</ul> : <p className="py-3 text-sm text-ink-dim">Nothing here yet.</p>}
         </CardContent>
+        {(historyPage > 1 || hasOlder) && (
+          <nav aria-label="History pages" className="flex items-center justify-between gap-3 border-t border-line px-5 py-3">
+            {historyPage > 1
+              ? <Link href={eventsHref({ pageId: filteredPageId, kind, historyPage: historyPage - 1 })} className={buttonVariants({ variant: "ghost", size: "sm" })}><ChevronLeft aria-hidden size={14} />Newer</Link>
+              : <span />}
+            {hasOlder && <Link href={eventsHref({ pageId: filteredPageId, kind, historyPage: historyPage + 1 })} className={buttonVariants({ variant: "ghost", size: "sm" })}>Older<ChevronRight aria-hidden size={14} /></Link>}
+          </nav>
+        )}
       </Card>
     </div>
   );

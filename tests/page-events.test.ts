@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { isActivePath } from "@/components/admin/AdminNav";
-import { eventHref, groupPageEvents } from "@/lib/page-events";
+import { eventHref, eventsHref, groupPageEvents } from "@/lib/page-events";
 
 const at = (day: number) => new Date(Date.UTC(2026, 9, day));
 const incident = (id: string, status: string, day: number) => ({ id, isMaintenance: false, status, maintenanceStatus: null, scheduledStart: null, createdAt: at(day) });
@@ -23,9 +23,8 @@ describe("groupPageEvents", () => {
     expect(history.map((e) => e.id)).toEqual(["done", "resolved"]);
   });
 
-  it("links each kind to its own section", () => {
-    expect(eventHref({ id: "a", isMaintenance: false })).toBe("/organization/incidents/a");
-    expect(eventHref({ id: "b", isMaintenance: true })).toBe("/organization/maintenance/b");
+  it("links both kinds to the Events detail route", () => {
+    expect(eventHref({ id: "a" })).toBe("/organization/events/a");
   });
 });
 
@@ -35,5 +34,13 @@ describe("isActivePath", () => {
     expect(isActivePath("/organization/maintenance/new", "/organization/events")).toBe(true);
     expect(isActivePath("/organization/maintenance-windows", "/organization/events")).toBe(false);
     expect(isActivePath("/organization/pages/x/events", "/organization/events")).toBe(false);
+  });
+});
+
+describe("eventsHref", () => {
+  it("keeps only the filters that narrow the inbox", () => {
+    expect(eventsHref({})).toBe("/organization/events");
+    expect(eventsHref({ kind: "all", historyPage: 1 })).toBe("/organization/events");
+    expect(eventsHref({ pageId: "p", kind: "maintenance", historyPage: 3 })).toBe("/organization/events?pageId=p&show=maintenance&history=3");
   });
 });

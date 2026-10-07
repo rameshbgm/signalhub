@@ -1,6 +1,6 @@
 import { PageSubmitButton } from "@/components/admin/PageSubmitButton";
 import Link from "next/link";
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import { ArrowLeft, ChevronRight, Trash2, Wrench, Siren } from "lucide-react";
 import { requireSession } from "@/lib/require-session";
 import { database } from "@/lib/postgres/client";
@@ -20,15 +20,14 @@ import {
 import { assertPageInOrg } from "@/lib/admin-guard";
 import { sessionHasCapability } from "@/lib/admin-guard";
 import { IncidentTimelineEditor } from "@/components/admin/IncidentTimelineEditor";
-import { eventHref, groupPageEvents } from "@/lib/page-events";
+import { eventHref, groupPageEvents, isOpenEvent } from "@/lib/page-events";
 import { TimelineItem, TimelineList, componentTone, incidentStatusTone, maintenanceStatusTone, updateStatusLabel, updateStatusTone } from "@/components/admin/operate-ui";
 
-/** Detail screen for an incident or maintenance window, served from both sections' routes. */
-export async function EventDetail({ incidentId, kind }: { incidentId: string; kind: "incident" | "maintenance" }) {
+/** Detail screen for an incident or maintenance window at /organization/events/{id}. */
+export async function EventDetail({ incidentId }: { incidentId: string }) {
   const { session, org } = await requireSession();
   const incidentRow = await database.selectFrom("incidents").selectAll().where("id", "=", incidentId).executeTakeFirst();
   if (!incidentRow) notFound();
-  if (incidentRow.isMaintenance !== (kind === "maintenance")) redirect(eventHref(incidentRow));
   const pageRow = await database.selectFrom("pages").selectAll().where("id", "=", incidentRow.pageId).executeTakeFirst();
   if (!pageRow || pageRow.orgId !== org.id) notFound();
   await assertPageInOrg(pageRow.id, org.id);
@@ -41,9 +40,8 @@ export async function EventDetail({ incidentId, kind }: { incidentId: string; ki
   const [updates, links, pageEvents] = await Promise.all([
     database.selectFrom("incidentUpdates").selectAll().where("incidentId", "=", incidentRow.id).orderBy("createdAt").execute(),
     database.selectFrom("incidentComponents").selectAll().where("incidentId", "=", incidentRow.id).execute(),
-    // ponytail: open events sit among the page's newest 50; widen if a page keeps more open at once.
     database.selectFrom("incidents").select(["id", "name", "isMaintenance", "status", "maintenanceStatus", "scheduledStart", "createdAt"])
-      .where("pageId", "=", pageRow.id).where("id", "!=", incidentRow.id).orderBy("createdAt", "desc").limit(50).execute(),
+      .where("pageId", "=", pageRow.id).where("id", "!=", incidentRow.id).where(isOpenEvent).execute(),
   ]);
   const { active: otherActive, upcoming: otherUpcoming } = groupPageEvents(pageEvents);
   const related = [...otherActive, ...otherUpcoming];

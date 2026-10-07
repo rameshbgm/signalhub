@@ -1,5 +1,6 @@
-import { EventDetail } from "@/components/admin/EventDetail";
+import { redirect } from "next/navigation";
 
-export default async function MaintenanceDetailPage({ params }: { params: Promise<{ incidentId: string }> }) {
-  return <EventDetail incidentId={(await params).incidentId} kind="maintenance" />;
+/** Detail screens moved to /organization/events/{id}; old links keep working. */
+export default async function LegacyEventDetail({ params }: { params: Promise<{ incidentId: string }> }) {
+  redirect(`/organization/events/${encodeURIComponent((await params).incidentId)}`);
 }

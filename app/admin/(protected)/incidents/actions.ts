@@ -55,7 +55,7 @@ export async function createIncident(formData: FormData) {
   });
   revalidatePath("/organization/events");
   revalidatePath(`/${await pageSlug(pageId)}`);
-  redirect(`/organization/incidents/${incident.id}`);
+  redirect(`/organization/events/${incident.id}`);
 }
 
 export async function postIncidentUpdate(incidentId: string, formData: FormData) {
@@ -82,7 +82,7 @@ export async function postIncidentUpdate(incidentId: string, formData: FormData)
     metadata: { pageId: incident.pageId },
     tenantAuditExists: true,
   });
-  revalidatePath(`/organization/incidents/${incidentId}`);
+  revalidatePath(`/organization/events/${incidentId}`);
   revalidatePath(`/${await pageSlug(incident.pageId)}`);
 }
 
@@ -142,7 +142,7 @@ export async function editIncidentUpdate(incidentId: string, updateId: string, f
     metadata: { incidentId, pageId: result.pageId },
     tenantAuditExists: true,
   });
-  revalidatePath(`/organization/incidents/${incidentId}`);
+  revalidatePath(`/organization/events/${incidentId}`);
   revalidatePath(`/${result.slug}`, "layout");
   if (result.hubParentId) {
     const hub = await database.selectFrom("pages").select("slug")
@@ -224,6 +224,6 @@ export async function savePostmortem(incidentId: string, formData: FormData) {
     targetId: incidentId,
     metadata: { pageId: incident.pageId, notified: firstPublish && notify },
   });
-  revalidatePath(`/organization/incidents/${incidentId}`);
+  revalidatePath(`/organization/events/${incidentId}`);
   revalidatePath(`/${await pageSlug(incident.pageId)}`);
 }

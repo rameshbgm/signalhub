@@ -3,7 +3,7 @@ import { ArrowUpRight, Globe, Layers3, LayoutGrid, Lock, PanelsTopLeft, Pencil, 
 import { requireSession } from "@/lib/require-session";
 import { getScopedPages, sessionHasCapability } from "@/lib/admin-guard";
 import { formatPageDate } from "@/lib/page-locale";
-import { groupPageEvents } from "@/lib/page-events";
+import { groupPageEvents, isOpenEvent } from "@/lib/page-events";
 import { database } from "@/lib/postgres/client";
 import { publicPagePath } from "@/lib/public-path";
 import { buttonVariants } from "@/components/ui/button";
@@ -29,10 +29,7 @@ export default async function PagesListPage() {
     ? await database.selectFrom("incidents")
       .select(["id", "pageId", "isMaintenance", "status", "maintenanceStatus", "scheduledStart", "createdAt"])
       .where("pageId", "in", statusPageIds)
-      .where((eb) => eb.or([
-        eb.and([eb("isMaintenance", "=", false), eb("status", "!=", "RESOLVED")]),
-        eb.and([eb("isMaintenance", "=", true), eb.or([eb("maintenanceStatus", "is", null), eb("maintenanceStatus", "in", ["SCHEDULED", "IN_PROGRESS", "VERIFYING"])])]),
-      ]))
+      .where(isOpenEvent)
       .execute()
     : null;
 

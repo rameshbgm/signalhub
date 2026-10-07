@@ -185,7 +185,7 @@ export default async function AdminDashboard() {
               <ul className="space-y-2">
                 {openIncidents.map((inc) => (
                   <li key={inc.id}>
-                    <Link href={`/organization/incidents/${inc.id}`} className="group flex items-center justify-between gap-3 rounded-control border border-line px-3.5 py-2.5 text-sm outline-none transition-colors duration-150 hover:bg-sunken/60 focus-visible:ring-4 focus-visible:ring-primary/25">
+                    <Link href={`/organization/events/${inc.id}`} className="group flex items-center justify-between gap-3 rounded-control border border-line px-3.5 py-2.5 text-sm outline-none transition-colors duration-150 hover:bg-sunken/60 focus-visible:ring-4 focus-visible:ring-primary/25">
                       <span className="min-w-0 truncate font-medium text-ink">{inc.name}</span>
                       <StatusBadge tone="warn">{titleCase(inc.status)}</StatusBadge>
                     </Link>
