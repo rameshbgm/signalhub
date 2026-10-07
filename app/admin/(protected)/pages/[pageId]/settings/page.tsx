@@ -39,7 +39,7 @@ export default async function PageSettings({ params }: { params: Promise<{ pageI
         </CardContent>
       </Card>
 
-      <Card className="border-danger/30">
+      <Card id="delete-page" className="scroll-mt-24 border-danger/30">
         <CardHeader><CardTitle className="text-danger-fg">Delete page</CardTitle><CardDescription id="delete-page-warning">Permanently deletes this page, its services, incidents, subscriber records, metrics, monitors, and uploaded assets. This cannot be undone.</CardDescription></CardHeader>
         <CardContent><PlatformActionForm action={deletePage.bind(null, pageId)} successMessage="Page deleted" className="flex max-w-lg flex-col gap-3">
           <Field label={<>Type <code className="font-mono text-ink">{page.name}</code> to confirm</>} htmlFor="delete-page-confirmation"><Input id="delete-page-confirmation" name="confirmation" autoComplete="off" required aria-describedby="delete-page-warning" /></Field>
