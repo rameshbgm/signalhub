@@ -3,6 +3,7 @@
 import { fetchWithTimeout } from "@/lib/client-fetch";
 
 import { useState } from "react";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -154,13 +155,14 @@ export function ApiKeyActions({ id }: { id: string }) {
   const [pending, setPending] = useState(false);
   const [secret, setSecret] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [confirm, confirmDialog] = useConfirm();
 
   async function mutate(kind: "rotate" | "revoke") {
     if (pending) return;
     const message = kind === "rotate"
       ? "Rotate this key? Existing integrations will stop working immediately."
       : "Revoke this key? This cannot be undone.";
-    if (!window.confirm(message)) return;
+    if (!(await confirm(message, { confirmLabel: kind === "rotate" ? "Rotate key" : "Revoke key" }))) return;
     setPending(true);
     setError(null);
 
@@ -197,6 +199,7 @@ export function ApiKeyActions({ id }: { id: string }) {
         Revoke
       </Button>
       {error && <span role="alert" className="basis-full text-xs text-danger-fg">{error}</span>}
+      {confirmDialog}
     </div>
   );
 }

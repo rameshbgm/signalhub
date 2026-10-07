@@ -3,6 +3,7 @@
 import { fetchWithTimeout } from "@/lib/client-fetch";
 
 import { useState } from "react";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import { useRouter } from "next/navigation";
 import { RefreshCw, Send, Trash2, Webhook } from "lucide-react";
 import { SecretField } from "@/components/admin/SecretReveal";
@@ -33,6 +34,7 @@ export function WebhookEndpointManager({
   const [secret, setSecret] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [confirm, confirmDialog] = useConfirm();
 
   async function create(event: React.FormEvent) {
     event.preventDefault();
@@ -81,10 +83,11 @@ export function WebhookEndpointManager({
 
   async function mutate(id: string, action: "rotate" | "delete") {
     if (pending) return;
-    const confirmed = window.confirm(
+    const confirmed = await confirm(
       action === "rotate"
         ? "Rotate this signing secret? The previous secret stops working immediately."
-        : "Delete this webhook endpoint and stop all future deliveries?"
+        : "Delete this webhook endpoint and stop all future deliveries?",
+      { confirmLabel: action === "rotate" ? "Rotate secret" : "Delete endpoint" }
     );
     if (!confirmed) return;
     setPending(id);
@@ -174,6 +177,7 @@ export function WebhookEndpointManager({
             </ul>
           )}
       </div>
+      {confirmDialog}
     </div>
   );
 }

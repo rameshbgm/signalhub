@@ -3,6 +3,7 @@
 import { fetchWithTimeout } from "@/lib/client-fetch";
 
 import { useState } from "react";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import { RotateCw } from "lucide-react";
 import { CopyButton } from "@/components/CopyButton";
 import { Alert } from "@/components/ui/alert";
@@ -12,9 +13,10 @@ export function ScimTokenManager({ connectionId }: { connectionId: string }) {
   const [secret, setSecret] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [confirm, confirmDialog] = useConfirm();
 
   async function rotate() {
-    if (!window.confirm("Rotate the SCIM token? The previous token will stop working immediately.")) return;
+    if (!(await confirm("Rotate the SCIM token? The previous token will stop working immediately.", { confirmLabel: "Rotate token" }))) return;
     setPending(true);
     setError(null);
     try {
@@ -53,6 +55,7 @@ export function ScimTokenManager({ connectionId }: { connectionId: string }) {
         </Alert>
       )}
       {error && <Alert tone="danger">{error}</Alert>}
+      {confirmDialog}
     </div>
   );
 }

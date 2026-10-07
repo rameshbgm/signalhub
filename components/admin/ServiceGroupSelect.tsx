@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition, type FormEvent } from "react";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { FolderTree, Plus, Trash2, X } from "lucide-react";
@@ -40,6 +41,7 @@ export function ServiceGroupSelect({
   const [error, setError] = useState<string | null>(null);
   const [added, setAdded] = useState<ServiceGroupOption[]>([]);
   const [removed, setRemoved] = useState<string[]>([]);
+  const [confirm, confirmDialog] = useConfirm();
   const [pending, startTransition] = useTransition();
 
   // Show server data plus this popup's own changes until the refresh lands.
@@ -76,11 +78,11 @@ export function ServiceGroupSelect({
     });
   }
 
-  function removeGroup(group: ServiceGroupOption) {
+  async function removeGroup(group: ServiceGroupOption) {
     const consequence = group.serviceCount
       ? ` Its ${group.serviceCount} ${group.serviceCount === 1 ? "service becomes" : "services become"} ungrouped.`
       : "";
-    if (!window.confirm(`Delete the group "${group.name}"?${consequence}`)) return;
+    if (!(await confirm(`Delete the group "${group.name}"?${consequence}`, { confirmLabel: "Delete group" }))) return;
     setError(null);
     startTransition(async () => {
       try {
@@ -169,6 +171,7 @@ export function ServiceGroupSelect({
           </div>
         </DialogSurface>
       </Dialog>, document.body)}
+      {confirmDialog}
     </>
   );
 }

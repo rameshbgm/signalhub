@@ -83,7 +83,9 @@ export function DestinationProvidersCard({ added, canManage }: { added: AddedPro
                         <Pencil aria-hidden size={14} />
                         Edit
                       </Button>
-                      <PlatformActionForm action={removeDestinationProvider.bind(null, entry.channel)} successMessage={`${provider.label} removed`}>
+                      {/* The channel travels as a field: a server action bound in the browser cannot be sent back to the server. */}
+                      <PlatformActionForm action={removeDestinationProvider} successMessage={`${provider.label} removed`}>
+                        <input type="hidden" name="channel" value={entry.channel} />
                         <PlatformSubmitButton
                           variant="ghost"
                           size="sm"

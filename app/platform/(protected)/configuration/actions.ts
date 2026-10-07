@@ -21,7 +21,6 @@ import {
   deliverConfig,
   deliverSms,
   verifySmsCredentials,
-  type DestinationChannel,
 } from "@/lib/notification-providers";
 import { writePlatformAudit } from "@/lib/platform-policy";
 import { database, withDatabaseTransaction } from "@/lib/postgres/client";
@@ -266,8 +265,9 @@ export async function saveDestinationProvider(formData: FormData) {
 }
 
 /** Organizations can no longer add it; their existing destinations keep their own credentials, platform-connected ones stop. */
-export async function removeDestinationProvider(channel: DestinationChannel) {
+export async function removeDestinationProvider(formData: FormData) {
   const actor = await requirePlatformCapability("configuration.manage");
+  const channel = z.enum(DESTINATION_CHANNELS).parse(formData.get("channel"));
   const row = await database.selectFrom("platformConfiguration")
     .select(["enabledDestinationChannels", "destinationDefaults", "destinationConnectionsCiphertext"])
     .where("id", "=", "global").executeTakeFirst();

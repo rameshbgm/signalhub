@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 import { useFormStatus } from "react-dom";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import { Button, type ButtonVariant, type ButtonSize } from "@/components/ui/button";
 
 /** Like PlatformSubmitButton (pending label, optional confirm prompt) but with a Button variant. */
@@ -25,7 +26,9 @@ export function PageSubmitButton({
   title?: string;
 }) {
   const { pending } = useFormStatus();
+  const [confirm, confirmDialog] = useConfirm();
   return (
+    <>
     <Button
       type="submit"
       variant={variant}
@@ -34,11 +37,17 @@ export function PageSubmitButton({
       loading={pending}
       title={title}
       className={className}
-      onClick={(event) => {
-        if (confirmMessage && !window.confirm(confirmMessage)) event.preventDefault();
+      onClick={async (event) => {
+        if (!confirmMessage) return;
+        // Hold the submit, ask in-app, then submit with this button so its name/value still reach the action.
+        event.preventDefault();
+        const button = event.currentTarget;
+        if (await confirm(confirmMessage)) button.form?.requestSubmit(button);
       }}
     >
       {pending ? pendingLabel : children}
     </Button>
+    {confirmDialog}
+    </>
   );
 }

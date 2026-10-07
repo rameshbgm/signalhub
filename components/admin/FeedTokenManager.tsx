@@ -3,6 +3,7 @@
 import { fetchWithTimeout } from "@/lib/client-fetch";
 
 import { useState } from "react";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -41,6 +42,7 @@ export function FeedTokenManager({
   const [pending, setPending] = useState(false);
   const [secret, setSecret] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [confirm, confirmDialog] = useConfirm();
 
   async function create(event: React.FormEvent) {
     event.preventDefault();
@@ -78,7 +80,7 @@ export function FeedTokenManager({
   }
 
   async function revoke(id: string) {
-    if (pending || !window.confirm("Revoke this feed token? Existing feed readers will lose access immediately.")) return;
+    if (pending || !(await confirm("Revoke this feed token? Existing feed readers will lose access immediately.", { confirmLabel: "Revoke token" }))) return;
     setPending(true);
     setError(null);
 
@@ -159,6 +161,7 @@ export function FeedTokenManager({
           </li>
         ))}
       </ul> : <EmptyState icon={Rss} hue="teal" title="No active feed tokens" description="Create a token above to grant access to protected feeds." />}
+      {confirmDialog}
     </div>
   );
 }

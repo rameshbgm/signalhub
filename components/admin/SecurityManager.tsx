@@ -3,6 +3,7 @@
 import { fetchWithTimeout } from "@/lib/client-fetch";
 
 import { useEffect, useState } from "react";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import { CopyButton } from "@/components/CopyButton";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -38,6 +39,7 @@ export function SecurityManager({ enrollmentRequired }: { enrollmentRequired: bo
   const [sessions, setSessions] = useState<Session[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [pendingAction, setPendingAction] = useState<string | null>(null);
+  const [confirm, confirmDialog] = useConfirm();
 
   async function refresh() {
     const [mfaResponse, sessionResponse] = await Promise.all([
@@ -87,7 +89,7 @@ export function SecurityManager({ enrollmentRequired }: { enrollmentRequired: bo
   }
 
   async function revoke(id: string) {
-    if (pendingAction || !window.confirm("Revoke this session immediately?")) return;
+    if (pendingAction || !(await confirm("Revoke this session immediately? That device is signed out.", { confirmLabel: "Revoke session" }))) return;
     setPendingAction(`revoke:${id}`);
     setError(null);
     try {
@@ -196,6 +198,7 @@ export function SecurityManager({ enrollmentRequired }: { enrollmentRequired: bo
         </CardContent>
       </Card>
       {error && <Alert tone="danger">{error}</Alert>}
+      {confirmDialog}
     </div>
   );
 }
