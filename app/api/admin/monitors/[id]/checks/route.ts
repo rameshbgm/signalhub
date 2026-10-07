@@ -5,7 +5,7 @@ import { isDatabaseId } from "@/lib/database-id";
 import { listMonitorChecks } from "@/lib/monitor-checks";
 import { database } from "@/lib/postgres/client";
 
-/** One keyset page of a monitor's check history: ?beforeAt=<ISO>&beforeId=<uuid>. */
+/** One keyset page of a monitor's check history: ?beforeAt=<ISO>&beforeId=<uuid>&result=up|down&order=asc|desc. */
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
@@ -28,7 +28,12 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       }
       before = { checkedAt: beforeAt, id: beforeId };
     }
-    return NextResponse.json(await listMonitorChecks(monitor.id, before));
+    const result = url.searchParams.get("result");
+    const order = url.searchParams.get("order");
+    return NextResponse.json(await listMonitorChecks(monitor.id, before, undefined, {
+      result: result === "up" || result === "down" ? result : undefined,
+      order: order === "asc" ? "asc" : "desc",
+    }));
   } catch (error) {
     return routeError(error, { route: "GET /api/admin/monitors/:id/checks" });
   }

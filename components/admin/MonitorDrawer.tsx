@@ -2,11 +2,12 @@
 
 import { useCallback, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { ChevronLeft, ChevronRight, History, Pencil, Plus, RefreshCw, X } from "lucide-react";
+import { ArrowDownUp, ChevronLeft, ChevronRight, ChevronsLeft, Filter, History, Pencil, Plus, RefreshCw, X } from "lucide-react";
 import { HeartbeatTokenManager } from "@/components/admin/HeartbeatTokenManager";
 import { MonitorForm, type MonitorFormValues } from "@/components/admin/MonitorForm";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogActions, DialogSurface, DialogTitle } from "@/components/ui/dialog";
+import { Select } from "@/components/ui/select";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { fetchWithTimeout } from "@/lib/client-fetch";
@@ -113,20 +114,26 @@ function CheckDetail({ name, check, onClose }: { name: string; check: MonitorChe
   );
 }
 
-/** Check history, paged on the server by keyset cursor; visited pages are cached so Newer is instant. */
+type HistoryFilter = { result: "all" | "up" | "down"; order: "desc" | "asc" };
+const DEFAULT_FILTER: HistoryFilter = { result: "all", order: "desc" };
+
+/** Check history, paged on the server by keyset cursor; filter and sort run in SQL. Visited pages are cached so Previous is instant. */
 function CheckHistory({ monitorId, name, firstPage }: { monitorId: string; name: string; firstPage: HistoryPage }) {
   const [pages, setPages] = useState<HistoryPage[]>([firstPage]);
   const [index, setIndex] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<MonitorCheck | null>(null);
+  const [filter, setFilter] = useState<HistoryFilter>(DEFAULT_FILTER);
 
-  const load = useCallback(async (cursor: MonitorCheckCursor | null, target: number) => {
+  const load = useCallback(async (cursor: MonitorCheckCursor | null, target: number, active: HistoryFilter) => {
     setLoading(true);
     setError(null);
     try {
-      const query = cursor ? `?${new URLSearchParams({ beforeAt: cursor.checkedAt, beforeId: cursor.id })}` : "";
-      const response = await fetchWithTimeout(`/api/admin/monitors/${monitorId}/checks${query}`);
+      const params = new URLSearchParams({ order: active.order });
+      if (active.result !== "all") params.set("result", active.result);
+      if (cursor) { params.set("beforeAt", cursor.checkedAt); params.set("beforeId", cursor.id); }
+      const response = await fetchWithTimeout(`/api/admin/monitors/${monitorId}/checks?${params}`);
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error?.message ?? "Could not load check history");
       setPages((current) => [...current.slice(0, target), data as HistoryPage]);
@@ -139,20 +146,35 @@ function CheckHistory({ monitorId, name, firstPage }: { monitorId: string; name:
   }, [monitorId]);
 
   const page = pages[index];
-  const older = () => (pages[index + 1] ? setIndex(index + 1) : page?.nextCursor && load(page.nextCursor, index + 1));
-  const refresh = () => void load(null, 0);
+  const next = () => (pages[index + 1] ? setIndex(index + 1) : page?.nextCursor && load(page.nextCursor, index + 1, filter));
+  const apply = (change: Partial<HistoryFilter>) => {
+    const active = { ...filter, ...change };
+    setFilter(active);
+    void load(null, 0, active);
+  };
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-xs text-ink-dim" aria-live="polite">
-          {page ? `Page ${index + 1} · ${page.checks.length} checks` : loading ? "Loading…" : ""}
-        </p>
-        <Button type="button" variant="ghost" size="sm" onClick={refresh} disabled={loading}>
-          <RefreshCw aria-hidden size={14} />
+      <div className="flex flex-wrap items-center gap-2">
+        <Filter aria-hidden size={14} className="text-info-fg" />
+        <Select aria-label="Filter by result" value={filter.result} onChange={(event) => apply({ result: event.target.value as HistoryFilter["result"] })}>
+          <option value="all">All results</option>
+          <option value="up">Up only</option>
+          <option value="down">Down only</option>
+        </Select>
+        <ArrowDownUp aria-hidden size={14} className="ml-1 text-warn-fg" />
+        <Select aria-label="Sort order" value={filter.order} onChange={(event) => apply({ order: event.target.value as HistoryFilter["order"] })}>
+          <option value="desc">Newest first</option>
+          <option value="asc">Oldest first</option>
+        </Select>
+        <Button type="button" variant="ghost" size="sm" className="ml-auto" onClick={() => apply(DEFAULT_FILTER)} disabled={loading}>
+          <RefreshCw aria-hidden size={14} className="text-primary-ink" />
           Latest
         </Button>
       </div>
+      <p className="text-xs text-ink-dim" aria-live="polite">
+        {page ? `Page ${index + 1} · ${page.checks.length} checks` : loading ? "Loading…" : ""}
+      </p>
       {error && <p role="alert" className="rounded-control bg-danger-bg px-3 py-2 text-xs text-danger-fg">{error}</p>}
       <div>
         <Table aria-busy={loading}>
@@ -169,19 +191,23 @@ function CheckHistory({ monitorId, name, firstPage }: { monitorId: string; name:
               </TableRow>
             ))}
             {page && page.checks.length === 0 && (
-              <TableRow><TableCell colSpan={4} className="px-4 py-6 text-center text-ink-dim">No checks have run yet.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={4} className="px-4 py-6 text-center text-ink-dim">No checks match.</TableCell></TableRow>
             )}
           </TableBody>
         </Table>
       </div>
       <div className="flex items-center justify-between gap-2">
-        <Button type="button" variant="secondary" size="sm" onClick={() => setIndex(index - 1)} disabled={loading || index === 0}>
-          <ChevronLeft aria-hidden size={14} />
-          Newer
+        <Button type="button" variant="secondary" size="sm" onClick={() => setIndex(0)} disabled={loading || index === 0} aria-label="First page" title="First page">
+          <ChevronsLeft aria-hidden size={14} className="text-primary-ink" />
         </Button>
-        <Button type="button" variant="secondary" size="sm" onClick={older} disabled={loading || !page || (!page.nextCursor && !pages[index + 1])}>
-          Older
-          <ChevronRight aria-hidden size={14} />
+        <Button type="button" variant="secondary" size="sm" onClick={() => setIndex(index - 1)} disabled={loading || index === 0}>
+          <ChevronLeft aria-hidden size={14} className="text-primary-ink" />
+          Previous
+        </Button>
+        <span className="text-xs tabular-nums text-ink-soft">Page {index + 1}</span>
+        <Button type="button" variant="secondary" size="sm" onClick={next} disabled={loading || !page || (!page.nextCursor && !pages[index + 1])}>
+          Next
+          <ChevronRight aria-hidden size={14} className="text-primary-ink" />
         </Button>
       </div>
       {selected && <CheckDetail name={name} check={selected} onClose={() => setSelected(null)} />}

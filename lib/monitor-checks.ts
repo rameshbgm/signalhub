@@ -56,14 +56,22 @@ export async function latestChecksByMonitor(monitorIds: string[], limit: number)
 }
 
 /**
- * One page of a monitor's check history, newest first, using keyset
+ * One page of a monitor's check history, newest first (or oldest first with order "asc"), optionally only up or down checks, using keyset
  * pagination so deep pages cost the same as the first one.
  */
-export async function listMonitorChecks(monitorId: string, before: MonitorCheckCursor | null, limit = MONITOR_CHECK_PAGE_SIZE) {
+export type MonitorCheckFilter = { result?: "up" | "down"; order?: "asc" | "desc" };
+
+export async function listMonitorChecks(monitorId: string, before: MonitorCheckCursor | null, limit = MONITOR_CHECK_PAGE_SIZE, { result, order = "desc" }: MonitorCheckFilter = {}) {
   let query = database.selectFrom("monitorChecks")
     .select(["id", "checkedAt", "ok", "statusCode", "latencyMs", "error"])
     .where("monitorId", "=", monitorId);
-  if (before) {
+  if (result) query = query.where("ok", "=", result === "up");
+  if (before && order === "asc") {
+    const checkedAt = new Date(before.checkedAt);
+    query = query
+      .where("checkedAt", ">=", checkedAt)
+      .where(sql<boolean>`(checked_at, id) > (${checkedAt}, ${before.id}::uuid)`);
+  } else if (before) {
     const checkedAt = new Date(before.checkedAt);
     query = query
       // The plain bound lets the planner prune newer partitions; the row
@@ -72,7 +80,7 @@ export async function listMonitorChecks(monitorId: string, before: MonitorCheckC
       .where(sql<boolean>`(checked_at, id) < (${checkedAt}, ${before.id}::uuid)`);
   }
   // One extra row tells whether an older page exists without a count(*).
-  const rows = await query.orderBy("checkedAt", "desc").orderBy("id", "desc").limit(limit + 1).execute();
+  const rows = await query.orderBy("checkedAt", order).orderBy("id", order).limit(limit + 1).execute();
   const checks = rows.slice(0, limit).map(view);
   const last = checks.at(-1);
   return {
