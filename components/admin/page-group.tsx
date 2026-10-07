@@ -1,5 +1,6 @@
 "use client";
 
+import { CopyPhrase } from "@/components/ui/copy-phrase";
 import { useCallback, useId, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { createPortal, useFormStatus } from "react-dom";
@@ -215,7 +216,7 @@ export function PageGroup({ header, rows, hubId, action, defaultOpen, canConfigu
               <p className="text-sm leading-6 text-ink-soft">Deletes each page with its services, incidents, subscribers, metrics, monitors and assets. This cannot be undone.</p>
               <ul className="max-h-40 list-disc overflow-y-auto pl-5 text-sm text-ink">{chosen.map((row) => <li key={row.id}>{row.name}</li>)}</ul>
               <label className="block space-y-1.5 text-sm text-ink-soft">
-                <span>Type <code className="font-mono text-ink">{bulkDeletePhrase(chosen.length)}</code> to confirm</span>
+                <span>Type <CopyPhrase text={bulkDeletePhrase(chosen.length)} /> to confirm</span>
                 <Input name="confirmation" autoComplete="off" required autoFocus value={confirmation} onChange={(event) => setConfirmation(event.target.value)} />
               </label>
               <DialogActions>

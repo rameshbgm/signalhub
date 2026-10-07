@@ -1,3 +1,4 @@
+import { CopyPhrase } from "@/components/ui/copy-phrase";
 import Link from "next/link";
 import { Building2, ClipboardCheck, Cpu, Database, Inbox, KeyRound, Mail, Network, Plus, Search, Trash2 } from "lucide-react";
 import { database, verifyDatabaseConnection } from "@/lib/postgres/client";
@@ -332,7 +333,7 @@ export default async function PlatformOrgsPage({
                                     placeholder="Purge reason / ticket"
                                   />
                                 </Field>
-                                <Field label={<>Type <span className="font-mono">{organization.slug}</span> to confirm</>} htmlFor={`purge-confirm-${id}`}>
+                                <Field label={<>Type <CopyPhrase text={organization.slug} /> to confirm</>} htmlFor={`purge-confirm-${id}`}>
                                   <Input
                                     id={`purge-confirm-${id}`}
                                     name="confirmation"

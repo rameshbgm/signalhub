@@ -1,3 +1,4 @@
+import { CopyPhrase } from "@/components/ui/copy-phrase";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Alert } from "@/components/ui/alert";
@@ -54,7 +55,7 @@ export default async function PageSettings({ params }: { params: Promise<{ pageI
             This hub still has {hubChildren} page{hubChildren === 1 ? "" : "s"}. Remove or delete them first from the <Link href="/organization/pages" className="font-semibold underline">pages list</Link>, then delete the hub.
           </Alert>
         ) : <PlatformActionForm action={deletePage.bind(null, pageId)} successMessage="Page deleted" className="flex max-w-lg flex-col gap-3">
-          <Field label={<>Type <code className="font-mono text-ink">{page.name}</code> to confirm</>} htmlFor="delete-page-confirmation"><Input id="delete-page-confirmation" name="confirmation" autoComplete="off" required aria-describedby="delete-page-warning" /></Field>
+          <Field label={<>Type <CopyPhrase text={page.name} /> to confirm</>} htmlFor="delete-page-confirmation"><Input id="delete-page-confirmation" name="confirmation" autoComplete="off" required aria-describedby="delete-page-warning" /></Field>
           <PlatformSubmitButton pendingLabel="Deleting permanently…" confirmMessage={`Permanently delete ${page.name} and all of its data? This cannot be undone.`} variant="destructive" className="w-fit">Delete permanently</PlatformSubmitButton>
         </PlatformActionForm>}</CardContent>
       </Card>
