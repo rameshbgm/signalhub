@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
+import { ChevronDown } from "lucide-react";
 import { PlatformActionForm } from "@/components/platform/PlatformActionForm";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
@@ -14,12 +15,25 @@ import { INPUT_LIMITS, MONITOR_TAGS_HINT, MONITOR_TAGS_PATTERN } from "@/lib/inp
 
 const MONITOR_TYPES = ["HTTP", "KEYWORD", "TCP", "TLS", "ICMP", "DNS", "HEARTBEAT"] as const;
 
-function Section({ title, children }: { title: string; children: ReactNode }) {
+/** Monitor fields the form edits. Picked explicitly so stored secrets never reach the browser. */
+export type MonitorFormValues = Pick<MonitorRow,
+  | "id" | "name" | "type" | "target" | "port" | "componentId" | "method" | "expectedStatusRange" | "timeoutMs"
+  | "requestHeaders" | "requestBody" | "keywordMatch" | "keywordAbsent" | "sslWarnDays" | "dnsRecordType"
+  | "dnsExpectedValue" | "heartbeatGraceSec" | "verifyTls" | "authType" | "authUsername" | "authHeaderName"
+  | "intervalSec" | "failThreshold" | "recoverThreshold" | "downStatus" | "groupName" | "tags"
+  | "actionFlipStatus" | "actionRecordMetric" | "actionAutoIncident" | "actionNotify"
+> & { hasAuthSecret: boolean };
+
+/** Collapsed-by-default group of advanced fields. Closed sections still submit their inputs. */
+function Section({ title, open, children }: { title: string; open?: boolean; children: ReactNode }) {
   return (
-    <fieldset className="space-y-4 rounded-card border border-line p-4">
-      <legend className="px-1.5 text-sm font-semibold text-ink">{title}</legend>
-      {children}
-    </fieldset>
+    <details className="group rounded-card border border-line" open={open}>
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-2 rounded-card px-4 py-3 text-sm font-semibold text-ink outline-none hover:bg-sunken focus-visible:ring-4 focus-visible:ring-primary/25 [&::-webkit-details-marker]:hidden">
+        {title}
+        <ChevronDown aria-hidden size={16} className="text-primary transition-transform duration-200 ease-soft group-open:rotate-180" />
+      </summary>
+      <div className="space-y-4 border-t border-line p-4">{children}</div>
+    </details>
   );
 }
 
@@ -27,11 +41,13 @@ export function MonitorForm({
   action,
   components,
   monitor,
+  onSuccess,
 }: {
   action: (formData: FormData) => void;
   components: { id: string; name: string }[];
   /** When set, the form edits this monitor: its type is fixed and fields start from its values. */
-  monitor?: MonitorRow;
+  monitor?: MonitorFormValues;
+  onSuccess?: () => void;
 }) {
   const [type, setType] = useState<(typeof MONITOR_TYPES)[number]>((monitor?.type as (typeof MONITOR_TYPES)[number]) ?? "HTTP");
   const [authType, setAuthType] = useState(monitor?.authType ?? "NONE");
@@ -41,7 +57,7 @@ export function MonitorForm({
   const idp = monitor ? `${monitor.id}-` : "";
 
   return (
-    <PlatformActionForm action={action} successMessage={editing ? "Monitor saved" : "Monitor added"} className="space-y-5 text-sm">
+    <PlatformActionForm action={action} successMessage={editing ? "Monitor saved" : "Monitor added"} onSuccess={onSuccess} className="space-y-4 text-sm">
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Monitor name" htmlFor={`${idp}monitor-name`} required>
           <Input id={`${idp}monitor-name`} name="name" defaultValue={monitor?.name} maxLength={INPUT_LIMITS.title} placeholder="Monitor name" required />
@@ -86,10 +102,19 @@ export function MonitorForm({
             ))}
           </Select>
         </Field>
+        <Field label="Interval (seconds)" htmlFor={`${idp}monitor-interval`} hint="How often the monitor polls the target.">
+          <Input id={`${idp}monitor-interval`} name="intervalSec" type="number" min={10} max={86400} defaultValue={monitor?.intervalSec ?? 300} placeholder="Interval (sec)" />
+        </Field>
+        <Field label="Monitor group" htmlFor={`${idp}monitor-group`}>
+          <Input id={`${idp}monitor-group`} name="groupName" defaultValue={monitor?.groupName ?? ""} maxLength={INPUT_LIMITS.monitorGroup} placeholder="Monitor group (optional)" />
+        </Field>
+        <Field label="Tags" htmlFor={`${idp}monitor-tags`}>
+          <Input id={`${idp}monitor-tags`} name="tags" defaultValue={monitor?.tags?.join(", ") ?? ""} maxLength={INPUT_LIMITS.monitorTags * (INPUT_LIMITS.monitorTag + 2)} pattern={MONITOR_TAGS_PATTERN} title={MONITOR_TAGS_HINT} placeholder="Tags, comma separated" />
+        </Field>
       </div>
 
       {isHttpLike && (
-        <Section title="HTTP request">
+        <Section title="HTTP request" open={type === "KEYWORD"}>
           <div className="grid gap-4 sm:grid-cols-3">
             <Field label="HTTP method" htmlFor={`${idp}monitor-method`}>
               <Select id={`${idp}monitor-method`} aria-label="HTTP method" name="method" defaultValue={monitor?.method ?? "GET"}>
@@ -172,13 +197,13 @@ export function MonitorForm({
                 <Input id={`${idp}monitor-auth-user`} name="authUsername" defaultValue={monitor?.authUsername ?? ""} maxLength={INPUT_LIMITS.monitorAuthUsername} placeholder="Username" />
               </Field>
               <Field label="Password" htmlFor={`${idp}monitor-auth-secret`}>
-                <Input id={`${idp}monitor-auth-secret`} name="authSecret" maxLength={INPUT_LIMITS.monitorAuthSecret} type="password" placeholder={editing && monitor?.authSecret ? "Leave blank to keep current" : "Password"} />
+                <Input id={`${idp}monitor-auth-secret`} name="authSecret" maxLength={INPUT_LIMITS.monitorAuthSecret} type="password" placeholder={editing && monitor?.hasAuthSecret ? "Leave blank to keep current" : "Password"} />
               </Field>
             </div>
           )}
           {authType === "BEARER" && (
             <Field label="Bearer token" htmlFor={`${idp}monitor-auth-secret`}>
-              <Input id={`${idp}monitor-auth-secret`} name="authSecret" maxLength={INPUT_LIMITS.monitorAuthSecret} type="password" placeholder={editing && monitor?.authSecret ? "Leave blank to keep current" : "Bearer token"} />
+              <Input id={`${idp}monitor-auth-secret`} name="authSecret" maxLength={INPUT_LIMITS.monitorAuthSecret} type="password" placeholder={editing && monitor?.hasAuthSecret ? "Leave blank to keep current" : "Bearer token"} />
             </Field>
           )}
           {authType === "HEADER" && (
@@ -187,18 +212,15 @@ export function MonitorForm({
                 <Input id={`${idp}monitor-auth-header`} name="authHeaderName" defaultValue={monitor?.authHeaderName ?? ""} maxLength={INPUT_LIMITS.monitorAuthHeaderName} placeholder="Header name (e.g. X-Api-Key)" />
               </Field>
               <Field label="Header value" htmlFor={`${idp}monitor-auth-secret`}>
-                <Input id={`${idp}monitor-auth-secret`} name="authSecret" maxLength={INPUT_LIMITS.monitorAuthSecret} type="password" placeholder={editing && monitor?.authSecret ? "Leave blank to keep current" : "Header value"} />
+                <Input id={`${idp}monitor-auth-secret`} name="authSecret" maxLength={INPUT_LIMITS.monitorAuthSecret} type="password" placeholder={editing && monitor?.hasAuthSecret ? "Leave blank to keep current" : "Header value"} />
               </Field>
             </div>
           )}
         </Section>
       )}
 
-      <Section title="Scheduling and thresholds">
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <Field label="Interval (seconds)" htmlFor={`${idp}monitor-interval`} hint="How often the monitor polls the target.">
-            <Input id={`${idp}monitor-interval`} name="intervalSec" type="number" defaultValue={monitor?.intervalSec ?? 300} placeholder="Interval (sec)" />
-          </Field>
+      <Section title="Thresholds and failure status">
+        <div className="grid gap-4 sm:grid-cols-3">
           {!isHttpLike && (
             <Field label="Timeout (ms)" htmlFor={`${idp}monitor-timeout`}>
               <Input id={`${idp}monitor-timeout`} name="timeoutMs" type="number" defaultValue={monitor?.timeoutMs ?? 10000} placeholder="Timeout (ms)" />
@@ -222,15 +244,6 @@ export function MonitorForm({
         </Field>
       </Section>
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Monitor group" htmlFor={`${idp}monitor-group`}>
-          <Input id={`${idp}monitor-group`} name="groupName" defaultValue={monitor?.groupName ?? ""} maxLength={INPUT_LIMITS.monitorGroup} placeholder="Monitor group (optional)" />
-        </Field>
-        <Field label="Tags" htmlFor={`${idp}monitor-tags`}>
-          <Input id={`${idp}monitor-tags`} name="tags" defaultValue={monitor?.tags?.join(", ") ?? ""} maxLength={INPUT_LIMITS.monitorTags * (INPUT_LIMITS.monitorTag + 2)} pattern={MONITOR_TAGS_PATTERN} title={MONITOR_TAGS_HINT} placeholder="Tags, comma separated" />
-        </Field>
-      </div>
-
       <Section title="Automated actions">
         <div className="grid gap-3 sm:grid-cols-2">
           <CheckRow name="actionFlipStatus" defaultChecked={monitor?.actionFlipStatus ?? true} label="Flip component status" />
@@ -240,7 +253,7 @@ export function MonitorForm({
         </div>
       </Section>
 
-      <div className="flex justify-end">
+      <div className="sticky bottom-0 -mx-1 flex justify-end border-t border-line bg-surface px-1 pt-3">
         <Button type="submit">{editing ? "Save monitor" : "Add monitor"}</Button>
       </div>
     </PlatformActionForm>

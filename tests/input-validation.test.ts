@@ -101,7 +101,11 @@ describe("monitor tags pattern", () => {
 
   it("is used by the shared create and edit monitor form", () => {
     expect(source("components/admin/MonitorForm.tsx")).toContain("pattern={MONITOR_TAGS_PATTERN}");
-    expect(source("app/admin/(protected)/monitors/page.tsx")).toContain("monitor={m}");
+    expect(source("components/admin/MonitorDrawer.tsx")).toContain("<MonitorForm");
+    // Edit values are picked field by field so stored secrets never reach the client.
+    const monitorsPage = source("app/admin/(protected)/monitors/page.tsx");
+    expect(monitorsPage).toContain("hasAuthSecret: Boolean(m.authSecret)");
+    expect(monitorsPage).not.toMatch(/authSecret: m\.authSecret|heartbeatTokenHash: m\./);
   });
 });
 
