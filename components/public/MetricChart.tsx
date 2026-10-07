@@ -10,16 +10,17 @@ import { ChartArea, ChartCandlestick, ChartColumn, ChartLine, ChartNoAxesCombine
 import { formatMetricValue, metricDecimals } from "@/lib/status";
 import { formatPageDate } from "@/lib/page-locale";
 
+// Each view has its own icon color so the buttons are told apart at a glance; the hues read on light and dark pages.
 const VIEWS = [
-  { id: "line", label: "Line", icon: ChartLine },
-  { id: "area", label: "Area", icon: ChartArea },
-  { id: "bar", label: "Bars", icon: ChartColumn },
-  { id: "step", label: "Step", icon: ChartNoAxesCombined },
-  { id: "scatter", label: "Scatter", icon: ChartScatter },
-  { id: "bands", label: "Min / avg / max", icon: ChartCandlestick },
-  { id: "gauge", label: "Gauge", icon: Gauge },
-  { id: "heatmap", label: "Heatmap", icon: Grid3x3 },
-] as const satisfies readonly { id: string; label: string; icon: LucideIcon }[];
+  { id: "line", label: "Line", icon: ChartLine, tone: "#3b82f6" },
+  { id: "area", label: "Area", icon: ChartArea, tone: "#06b6d4" },
+  { id: "bar", label: "Bars", icon: ChartColumn, tone: "#f59e0b" },
+  { id: "step", label: "Step", icon: ChartNoAxesCombined, tone: "#10b981" },
+  { id: "scatter", label: "Scatter", icon: ChartScatter, tone: "#ec4899" },
+  { id: "bands", label: "Min / avg / max", icon: ChartCandlestick, tone: "#8b5cf6" },
+  { id: "gauge", label: "Gauge", icon: Gauge, tone: "#ef4444" },
+  { id: "heatmap", label: "Heatmap", icon: Grid3x3, tone: "#f97316" },
+] as const satisfies readonly { id: string; label: string; icon: LucideIcon; tone: string }[];
 
 type ViewId = (typeof VIEWS)[number]["id"];
 
@@ -255,7 +256,7 @@ export function MetricChart({
         </AnimatePresence>
       </div>
       <div role="radiogroup" aria-label={`${name} chart view`} className="mt-3 flex flex-wrap items-center justify-center gap-1">
-        {VIEWS.map(({ id: viewId, label, icon: Icon }) => {
+        {VIEWS.map(({ id: viewId, label, icon: Icon, tone }) => {
           const active = view === viewId;
           return (
             <button
@@ -266,14 +267,14 @@ export function MetricChart({
               aria-label={label}
               title={label}
               onClick={() => setView(viewId)}
-              className="relative grid size-8 place-items-center border border-transparent text-[var(--fg-dim)] transition-colors hover:text-[var(--fg)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1"
-              style={{ color: active ? color : undefined }}
+              className="relative grid size-8 place-items-center border border-transparent transition-opacity hover:opacity-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1"
+              style={{ color: tone, opacity: active ? 1 : 0.7 }}
             >
               {active && (
                 <motion.span
                   layoutId={`metric-view-pill-${id}`}
                   className="absolute inset-0"
-                  style={{ background: `color-mix(in srgb, ${color} 14%, transparent)`, border: `1px solid color-mix(in srgb, ${color} 40%, transparent)` }}
+                  style={{ background: `color-mix(in srgb, ${tone} 16%, transparent)`, border: `1px solid color-mix(in srgb, ${tone} 45%, transparent)` }}
                   transition={animate ? { type: "spring", stiffness: 500, damping: 36 } : { duration: 0 }}
                 />
               )}
