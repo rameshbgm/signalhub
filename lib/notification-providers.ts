@@ -242,7 +242,29 @@ async function deliverToProvider(channel: DestinationChannel, values: Record<str
 export async function deliverSms(to: string, body: string, config?: SmsConfig) {
   const sms = config ?? (await getDeliveryConfig()).sms;
   if (!sms) throw new Error("SMS delivery is not configured");
-  return deliverTwilio(sms.accountSid, sms.authToken, sms.fromNumber, to, body);
+  const accountId = () => required(sms.accountId ?? undefined, "Account ID");
+  switch (sms.provider) {
+    case "TWILIO":
+      return deliverTwilio(accountId(), sms.secret, sms.fromNumber, to, body);
+    case "VONAGE": {
+      // Vonage answers 200 even when a message is rejected; the per-message status is the result.
+      const response = await postForm("https://rest.nexmo.com/sms/json", {
+        api_key: accountId(), api_secret: sms.secret, from: sms.fromNumber.replace(/^\+/, ""), to: to.replace(/^\+/, ""), text: body,
+      });
+      const result = await response.json().catch(() => ({})) as { messages?: Array<{ status?: string; "error-text"?: string }> };
+      const first = result.messages?.[0];
+      if (first?.status !== "0") throw new Error(`Vonage rejected the message: ${first?.["error-text"] ?? "unknown error"}`);
+      return response.status;
+    }
+    case "PLIVO":
+      return post(
+        `https://api.plivo.com/v1/Account/${encodeURIComponent(accountId())}/Message/`,
+        { src: sms.fromNumber, dst: to, text: body },
+        { authorization: basicAuth(accountId(), sms.secret) }
+      );
+    case "TELNYX":
+      return post("https://api.telnyx.com/v2/messages", { from: sms.fromNumber, to, text: body }, { authorization: `Bearer ${sms.secret}` });
+  }
 }
 
 async function deliverTwilio(
@@ -269,15 +291,19 @@ async function deliverTwilio(
   return response.status;
 }
 
-/** Confirms a Twilio account SID and auth token pair without sending a message. */
-export async function verifyTwilioCredentials(accountSid: string, authToken: string) {
-  const response = await fetch(
-    `https://api.twilio.com/2010-04-01/Accounts/${encodeURIComponent(accountSid)}.json`,
-    {
-      headers: { authorization: `Basic ${Buffer.from(`${accountSid}:${authToken}`).toString("base64")}` },
-      signal: AbortSignal.timeout(Number(process.env.WEBHOOK_TIMEOUT_MS ?? 10_000)),
-    }
-  );
-  if (response.status === 401 || response.status === 404) throw new Error("Twilio rejected the account SID or auth token");
-  if (!response.ok) throw new Error(`Twilio returned HTTP ${response.status}`);
+/** Confirms SMS credentials with a read-only account call, without sending a message. */
+export async function verifySmsCredentials(sms: Pick<SmsConfig, "provider" | "accountId" | "secret">) {
+  const id = encodeURIComponent(sms.accountId ?? "");
+  const request: { url: string; headers: Record<string, string> } = {
+    TWILIO: { url: `https://api.twilio.com/2010-04-01/Accounts/${id}.json`, headers: { authorization: basicAuth(sms.accountId ?? "", sms.secret) } },
+    VONAGE: { url: `https://rest.nexmo.com/account/get-balance?${new URLSearchParams({ api_key: sms.accountId ?? "", api_secret: sms.secret })}`, headers: {} },
+    PLIVO: { url: `https://api.plivo.com/v1/Account/${id}/`, headers: { authorization: basicAuth(sms.accountId ?? "", sms.secret) } },
+    TELNYX: { url: "https://api.telnyx.com/v2/balance", headers: { authorization: `Bearer ${sms.secret}` } },
+  }[sms.provider];
+  const response = await guardedFetch(request.url, {
+    headers: request.headers,
+    signal: AbortSignal.timeout(Number(process.env.WEBHOOK_TIMEOUT_MS ?? 10_000)),
+  });
+  if ([401, 403, 404].includes(response.status)) throw new Error("The SMS provider rejected these credentials");
+  if (!response.ok) throw new Error(`The SMS provider returned HTTP ${response.status}`);
 }

@@ -4,7 +4,7 @@ import { writePlatformAudit } from "@/lib/platform-policy";
 import { DESTINATION_CHANNELS } from "@/lib/notification-providers";
 import type { Updateable } from "kysely";
 import { database, type DatabaseExecutor } from "@/lib/postgres/client";
-import type { PlatformConfigurationTable } from "@/lib/postgres/schema";
+import type { PlatformConfigurationTable, SmsProvider } from "@/lib/postgres/schema";
 
 export type SmtpConfig = {
   host: string;
@@ -16,8 +16,10 @@ export type SmtpConfig = {
 };
 
 export type SmsConfig = {
-  accountSid: string;
-  authToken: string;
+  provider: SmsProvider;
+  /** Twilio SID, Vonage API key or Plivo auth ID; Telnyx needs none. */
+  accountId: string | null;
+  secret: string;
   fromNumber: string;
 };
 
@@ -71,10 +73,10 @@ export async function getDeliveryConfig(): Promise<DeliveryConfig> {
       };
     }
   }
-  if (row?.twilioAccountSid && row.twilioFromNumber) {
-    const authToken = decrypt(row.twilioAuthTokenCiphertext, "twilio_auth_token");
-    if (authToken) {
-      value.sms = { accountSid: row.twilioAccountSid, authToken, fromNumber: row.twilioFromNumber };
+  if (row?.smsFrom && (row.smsAccountId || row.smsProvider === "TELNYX")) {
+    const secret = decrypt(row.smsSecretCiphertext, "sms_secret");
+    if (secret) {
+      value.sms = { provider: row.smsProvider, accountId: row.smsAccountId, secret, fromNumber: row.smsFrom };
     }
   }
   cached = { value, expiresAt: Date.now() + CACHE_TTL_MS };
@@ -90,7 +92,7 @@ export async function importLegacyDeliveryEnvironment(executor: DatabaseExecutor
   const env = process.env;
   const row = await executor
     .selectFrom("platformConfiguration")
-    .select(["smtpHost", "twilioAccountSid"])
+    .select(["smtpHost", "smsFrom"])
     .where("id", "=", "global")
     .executeTakeFirst();
   const values: ProviderColumns = {};
@@ -104,21 +106,22 @@ export async function importLegacyDeliveryEnvironment(executor: DatabaseExecutor
       smtpFrom: env.SMTP_FROM || DEFAULT_SMTP_FROM,
     });
   }
-  if (env.TWILIO_ACCOUNT_SID && env.TWILIO_AUTH_TOKEN && env.TWILIO_FROM_NUMBER && !row?.twilioAccountSid) {
+  if (env.TWILIO_ACCOUNT_SID && env.TWILIO_AUTH_TOKEN && env.TWILIO_FROM_NUMBER && !row?.smsFrom) {
     Object.assign(values, {
-      twilioAccountSid: env.TWILIO_ACCOUNT_SID,
-      twilioAuthTokenCiphertext: encryptSecret(env.TWILIO_AUTH_TOKEN),
-      twilioFromNumber: env.TWILIO_FROM_NUMBER,
+      smsProvider: "TWILIO",
+      smsAccountId: env.TWILIO_ACCOUNT_SID,
+      smsSecretCiphertext: encryptSecret(env.TWILIO_AUTH_TOKEN),
+      smsFrom: env.TWILIO_FROM_NUMBER,
     });
   }
-  const imported = [values.smtpHost && "smtp", values.twilioAccountSid && "sms"].filter(Boolean) as string[];
+  const imported = [values.smtpHost && "smtp", values.smsFrom && "sms"].filter(Boolean) as string[];
   if (!imported.length) return imported;
   await upsertPlatformConfiguration(executor, { updatedBy: null, ...values });
   await writePlatformAudit({
     actorId: null, actorEmail: "system@signalhub", actorRole: "SYSTEM",
     action: "DELIVERY_PROVIDERS_IMPORTED", targetType: "platformConfiguration", targetId: "global",
     reason: "Imported from SMTP_* / TWILIO_* environment variables during upgrade",
-    metadata: { imported, smtpHost: values.smtpHost ?? null, twilioAccountSid: values.twilioAccountSid ?? null },
+    metadata: { imported, smtpHost: values.smtpHost ?? null, smsAccountId: values.smsAccountId ?? null },
   }, { executor });
   return imported;
 }

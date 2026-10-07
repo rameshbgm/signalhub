@@ -40,19 +40,25 @@ describe("delivery provider configuration", () => {
     store.row = {
       ...smtpRow,
       smtpPasswordCiphertext: encryptSecret("smtp-pass"),
-      twilioAccountSid: "AC123",
-      twilioAuthTokenCiphertext: encryptSecret("twilio-token"),
-      twilioFromNumber: "+15551234567",
+      smsProvider: "TWILIO",
+      smsAccountId: "AC123",
+      smsSecretCiphertext: encryptSecret("twilio-token"),
+      smsFrom: "+15551234567",
     };
     const config = await getDeliveryConfig();
     expect(config.smtp).toEqual({
       host: "smtp.example.com", port: 465, secure: true, username: "mailer", password: "smtp-pass", from: DEFAULT_SMTP_FROM,
     });
-    expect(config.sms).toEqual({ accountSid: "AC123", authToken: "twilio-token", fromNumber: "+15551234567" });
+    expect(config.sms).toEqual({ provider: "TWILIO", accountId: "AC123", secret: "twilio-token", fromNumber: "+15551234567" });
+  });
+
+  it("allows Telnyx without an account id", async () => {
+    store.row = { smsProvider: "TELNYX", smsAccountId: null, smsSecretCiphertext: encryptSecret("key"), smsFrom: "+15551234567" };
+    expect((await getDeliveryConfig()).sms).toEqual({ provider: "TELNYX", accountId: null, secret: "key", fromNumber: "+15551234567" });
   });
 
   it("treats an undecryptable secret as not configured instead of throwing", async () => {
-    store.row = { ...smtpRow, smtpPasswordCiphertext: "v1.gone.a.b.c", twilioAccountSid: "AC123", twilioFromNumber: "+1555", twilioAuthTokenCiphertext: null };
+    store.row = { ...smtpRow, smtpPasswordCiphertext: "v1.gone.a.b.c", smsProvider: "TWILIO", smsAccountId: "AC123", smsFrom: "+1555", smsSecretCiphertext: null };
     expect(await getDeliveryConfig()).toEqual({ smtp: null, sms: null });
   });
 

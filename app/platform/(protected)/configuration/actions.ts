@@ -9,11 +9,13 @@ import {
   upsertPlatformConfiguration,
   type ProviderColumns,
 } from "@/lib/delivery-config";
+import { SMS_PROVIDER_IDS, SMS_PROVIDERS } from "@/lib/delivery-providers";
 import { decryptSecret, encryptSecret } from "@/lib/encryption";
+import type { SmsProvider } from "@/lib/postgres/schema";
 import {
   DESTINATION_CHANNELS,
   deliverSms,
-  verifyTwilioCredentials,
+  verifySmsCredentials,
   type DestinationChannel,
 } from "@/lib/notification-providers";
 import { writePlatformAudit } from "@/lib/platform-policy";
@@ -60,16 +62,31 @@ const mailProviderSchema = z.object({
   from: text(320).min(3, "From address is required"),
 });
 
+const E164 = /^\+[1-9]\d{6,14}$/;
+
 const smsProviderSchema = z.object({
-  accountSid: text(64).regex(/^AC[0-9a-fA-F]{32}$/, "Twilio account SID starts with AC followed by 32 hex characters"),
-  authToken: z.string().trim().max(256),
-  fromNumber: text(32).regex(/^\+[1-9]\d{6,14}$/, "From number must be in E.164 format, for example +15551234567"),
+  provider: z.enum(SMS_PROVIDER_IDS as [SmsProvider, ...SmsProvider[]]),
+  accountId: text(128),
+  secret: z.string().trim().max(512),
+  fromNumber: text(32).min(1, "Sender is required"),
+}).superRefine((input, context) => {
+  if (input.provider === "TWILIO" && !/^AC[0-9a-fA-F]{32}$/.test(input.accountId)) {
+    context.addIssue({ code: "custom", path: ["accountId"], message: "Twilio account SID starts with AC followed by 32 hex characters" });
+  }
+  if (input.provider !== "TELNYX" && !input.accountId) {
+    context.addIssue({ code: "custom", path: ["accountId"], message: `${SMS_PROVIDERS[input.provider].accountLabel} is required` });
+  }
+  // Vonage also accepts an alphanumeric sender ID where the destination country allows it.
+  const alphanumericSender = input.provider === "VONAGE" && /^[A-Za-z0-9 ]{1,11}$/.test(input.fromNumber);
+  if (!E164.test(input.fromNumber) && !alphanumericSender) {
+    context.addIssue({ code: "custom", path: ["fromNumber"], message: "Sender must be in E.164 format, for example +15551234567" });
+  }
 });
 
 async function storedSecrets() {
   return database
     .selectFrom("platformConfiguration")
-    .select(["smtpHost", "smtpPort", "smtpUsername", "smtpPasswordCiphertext", "twilioAuthTokenCiphertext"])
+    .select(["smtpHost", "smtpPort", "smtpUsername", "smtpPasswordCiphertext", "smsProvider", "smsAccountId", "smsSecretCiphertext"])
     .where("id", "=", "global")
     .executeTakeFirst();
 }
@@ -152,36 +169,45 @@ export async function sendTestEmail() {
   if (!result.accepted?.length) throw new Error("SMTP server did not accept the recipient");
 }
 
-/** Saves Twilio settings only after Twilio accepts the credentials. */
+/** Saves SMS settings only after the provider accepts the credentials. */
 export async function updateSmsProvider(formData: FormData) {
   const actor = await requirePlatformCapability("configuration.manage");
   const input = smsProviderSchema.parse({
-    accountSid: formData.get("accountSid"),
-    authToken: formData.get("authToken") ?? "",
+    provider: formData.get("provider") ?? "TWILIO",
+    accountId: formData.get("accountId") ?? "",
+    secret: formData.get("secret") ?? "",
     fromNumber: formData.get("fromNumber"),
   });
-  const stored = (await storedSecrets())?.twilioAuthTokenCiphertext ?? null;
-  const authToken = input.authToken || (stored ? decryptSecret(stored) : "");
-  if (!authToken) throw new Error("Twilio auth token is required");
-  await verifyTwilioCredentials(input.accountSid, authToken);
-  if (testOnly(formData)) return "Twilio accepted these credentials. Nothing was saved.";
+  const accountId = input.provider === "TELNYX" ? null : input.accountId;
+  // As with SMTP, a blank secret keeps the stored one only for the same provider and account.
+  const row = await storedSecrets();
+  const sameAccount = row?.smsProvider === input.provider && row.smsAccountId === accountId;
+  if (!input.secret && row?.smsSecretCiphertext && !sameAccount) {
+    throw new Error(`Re-enter the ${SMS_PROVIDERS[input.provider].secretLabel.toLowerCase()} when changing the provider or account`);
+  }
+  const stored = sameAccount ? row?.smsSecretCiphertext ?? null : null;
+  const secret = input.secret || (stored ? decryptSecret(stored) : "");
+  if (!secret) throw new Error(`${SMS_PROVIDERS[input.provider].secretLabel} is required`);
+  await verifySmsCredentials({ provider: input.provider, accountId, secret });
+  if (testOnly(formData)) return `${SMS_PROVIDERS[input.provider].label} accepted these credentials. Nothing was saved.`;
   await saveProviders(actor, changeReason(formData), "SMS_PROVIDER_UPDATED", {
-    twilioAccountSid: input.accountSid,
-    twilioAuthTokenCiphertext: encryptSecret(authToken),
-    twilioFromNumber: input.fromNumber,
-  }, { accountSid: input.accountSid, fromNumber: input.fromNumber, authTokenChanged: Boolean(input.authToken) });
+    smsProvider: input.provider,
+    smsAccountId: accountId,
+    smsSecretCiphertext: encryptSecret(secret),
+    smsFrom: input.fromNumber,
+  }, { provider: input.provider, accountId, fromNumber: input.fromNumber, secretChanged: Boolean(input.secret) });
 }
 
 export async function removeSmsProvider(formData: FormData) {
   const actor = await requirePlatformCapability("configuration.manage");
   await saveProviders(actor, changeReason(formData), "SMS_PROVIDER_REMOVED", {
-    twilioAccountSid: null, twilioAuthTokenCiphertext: null, twilioFromNumber: null,
+    smsAccountId: null, smsSecretCiphertext: null, smsFrom: null,
   }, {});
 }
 
 export async function sendTestSms(formData: FormData) {
   await requirePlatformCapability("configuration.manage");
-  const to = z.string().trim().regex(/^\+[1-9]\d{6,14}$/, "Enter the test number in E.164 format").parse(formData.get("to"));
+  const to = z.string().trim().regex(E164, "Enter the test number in E.164 format").parse(formData.get("to"));
   clearDeliveryConfigCache();
   const { sms } = await getDeliveryConfig();
   if (!sms) throw new Error("Save the SMS provider first");

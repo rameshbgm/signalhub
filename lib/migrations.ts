@@ -32,7 +32,7 @@ async function migrationManifest(): Promise<MigrationManifestEntry[]> {
   }));
 }
 
-export const LATEST_MIGRATION_ID = "009_more_destination_providers.sql";
+export const LATEST_MIGRATION_ID = "010_sms_providers.sql";
 
 export async function inspectMigrationState(): Promise<MigrationInspection> {
   const manifest = await migrationManifest();

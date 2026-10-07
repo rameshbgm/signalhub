@@ -135,9 +135,10 @@ export default async function PlatformConfigurationPage() {
           smtpUsername: stored?.smtpUsername ?? null,
           smtpFrom: stored?.smtpFrom ?? null,
           smtpPasswordStored: Boolean(stored?.smtpPasswordCiphertext),
-          twilioAccountSid: stored?.twilioAccountSid ?? null,
-          twilioFromNumber: stored?.twilioFromNumber ?? null,
-          twilioAuthTokenStored: Boolean(stored?.twilioAuthTokenCiphertext),
+          smsProvider: stored?.smsProvider ?? "TWILIO",
+          smsAccountId: stored?.smsAccountId ?? null,
+          smsFrom: stored?.smsFrom ?? null,
+          smsSecretStored: Boolean(stored?.smsSecretCiphertext),
         }}
       />
 

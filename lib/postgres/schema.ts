@@ -519,6 +519,8 @@ export interface WorkerHeartbeatTable {
   lastError: string | null;
 }
 
+export type SmsProvider = "TWILIO" | "VONAGE" | "PLIVO" | "TELNYX";
+
 export interface PlatformConfigurationTable {
   id: "global";
   enabledDestinationChannels: Generated<string[]>;
@@ -530,9 +532,10 @@ export interface PlatformConfigurationTable {
   smtpUsername: string | null;
   smtpPasswordCiphertext: string | null;
   smtpFrom: string | null;
-  twilioAccountSid: string | null;
-  twilioAuthTokenCiphertext: string | null;
-  twilioFromNumber: string | null;
+  smsProvider: Generated<SmsProvider>;
+  smsAccountId: string | null;
+  smsSecretCiphertext: string | null;
+  smsFrom: string | null;
 }
 
 export interface MaintenanceLeaseTable {

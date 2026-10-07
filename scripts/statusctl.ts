@@ -122,7 +122,7 @@ const ENCRYPTED_COLUMNS = [
   { table: "users", field: "totp_secret_ciphertext" },
   { table: "users", field: "pending_totp_secret_ciphertext" },
   { table: "platform_configuration", field: "smtp_password_ciphertext" },
-  { table: "platform_configuration", field: "twilio_auth_token_ciphertext" },
+  { table: "platform_configuration", field: "sms_secret_ciphertext" },
 ] as const;
 
 async function rotateEncryption() {

@@ -8,10 +8,12 @@ import {
   updateMailProvider,
   updateSmsProvider,
 } from "@/app/platform/(protected)/configuration/actions";
+import { SmsConnectionFields, SmtpConnectionFields } from "@/components/platform/DeliveryProviderFields";
 import { PlatformActionForm } from "@/components/platform/PlatformActionForm";
+import { SMS_PROVIDERS } from "@/lib/delivery-providers";
+import type { SmsProvider } from "@/lib/postgres/schema";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Field } from "@/components/ui/field";
 import { IconTile } from "@/components/ui/icon-tile";
 import { Input } from "@/components/ui/input";
@@ -24,15 +26,16 @@ export type DeliveryProviderSettings = {
   smtpUsername: string | null;
   smtpFrom: string | null;
   smtpPasswordStored: boolean;
-  twilioAccountSid: string | null;
-  twilioFromNumber: string | null;
-  twilioAuthTokenStored: boolean;
+  smsProvider: SmsProvider;
+  smsAccountId: string | null;
+  smsFrom: string | null;
+  smsSecretStored: boolean;
 };
 
 /** Secrets are write-only: the browser only learns whether one is stored. */
 export function DeliveryProvidersCard({ settings, canManage }: { settings: DeliveryProviderSettings; canManage: boolean }) {
   const mailConfigured = Boolean(settings.smtpHost);
-  const smsConfigured = Boolean(settings.twilioAccountSid);
+  const smsConfigured = Boolean(settings.smsFrom);
   return (
     <Card>
       <CardHeader>
@@ -46,26 +49,13 @@ export function DeliveryProvidersCard({ settings, canManage }: { settings: Deliv
           {canManage ? (
             <>
               <PlatformActionForm action={updateMailProvider} successMessage="Email provider verified and saved" className="space-y-4">
-                <div className="grid gap-4 sm:grid-cols-[1fr_7rem]">
-                  <Field label="SMTP host" htmlFor="smtp-host" required>
-                    <Input id="smtp-host" name="host" required maxLength={255} defaultValue={settings.smtpHost ?? ""} placeholder="smtp.example.com" autoComplete="off" />
-                  </Field>
-                  <Field label="Port" htmlFor="smtp-port" required>
-                    <Input id="smtp-port" name="port" type="number" required min={1} max={65535} defaultValue={settings.smtpPort ?? 587} />
-                  </Field>
-                </div>
-                <label className="flex items-center gap-2.5 text-sm text-ink">
-                  <Checkbox name="secure" defaultChecked={settings.smtpSecure} />
-                  Use implicit TLS (usually port 465; leave off for STARTTLS on 587)
-                </label>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <Field label="Username" htmlFor="smtp-username" hint="Leave blank for servers without authentication.">
-                    <Input id="smtp-username" name="username" maxLength={255} defaultValue={settings.smtpUsername ?? ""} autoComplete="off" />
-                  </Field>
-                  <Field label="Password" htmlFor="smtp-password" hint={settings.smtpPasswordStored ? "Saved. Leave blank to keep it." : undefined}>
-                    <Input id="smtp-password" name="password" type="password" maxLength={1000} placeholder={settings.smtpPasswordStored ? "••••••••" : ""} autoComplete="new-password" />
-                  </Field>
-                </div>
+                <SmtpConnectionFields
+                  host={settings.smtpHost ?? ""}
+                  port={settings.smtpPort ?? 587}
+                  secure={settings.smtpSecure}
+                  username={settings.smtpUsername ?? ""}
+                  passwordStored={settings.smtpPasswordStored}
+                />
                 <Field label="From address" htmlFor="smtp-from" required hint="Status pages can replace the display name; the mailbox stays the same.">
                   <Input id="smtp-from" name="from" required maxLength={320} defaultValue={settings.smtpFrom ?? ""} placeholder="Status <status@example.com>" />
                 </Field>
@@ -86,19 +76,16 @@ export function DeliveryProvidersCard({ settings, canManage }: { settings: Deliv
           )}
         </ProviderSection>
 
-        <ProviderSection icon={Smartphone} title="SMS (Twilio)" configured={smsConfigured}>
+        <ProviderSection icon={Smartphone} title="SMS" configured={smsConfigured}>
           {canManage ? (
             <>
               <PlatformActionForm action={updateSmsProvider} successMessage="SMS provider verified and saved" className="space-y-4">
-                <Field label="Account SID" htmlFor="twilio-sid" required>
-                  <Input id="twilio-sid" name="accountSid" required maxLength={64} defaultValue={settings.twilioAccountSid ?? ""} placeholder="AC…" autoComplete="off" />
-                </Field>
-                <Field label="Auth token" htmlFor="twilio-token" required={!settings.twilioAuthTokenStored} hint={settings.twilioAuthTokenStored ? "Saved. Leave blank to keep it." : undefined}>
-                  <Input id="twilio-token" name="authToken" type="password" required={!settings.twilioAuthTokenStored} maxLength={256} placeholder={settings.twilioAuthTokenStored ? "••••••••" : ""} autoComplete="new-password" />
-                </Field>
-                <Field label="From number" htmlFor="twilio-from" required hint="E.164 format, for example +15551234567.">
-                  <Input id="twilio-from" name="fromNumber" required maxLength={32} defaultValue={settings.twilioFromNumber ?? ""} placeholder="+15551234567" />
-                </Field>
+                <SmsConnectionFields
+                  provider={settings.smsProvider}
+                  accountId={settings.smsAccountId ?? ""}
+                  fromNumber={settings.smsFrom ?? ""}
+                  secretStored={settings.smsSecretStored}
+                />
                 <ReasonField id="twilio-reason" />
                 <SubmitRow />
               </PlatformActionForm>
@@ -115,7 +102,7 @@ export function DeliveryProvidersCard({ settings, canManage }: { settings: Deliv
               )}
             </>
           ) : (
-            <ReadOnly rows={[["Account SID", settings.twilioAccountSid], ["From number", settings.twilioFromNumber]]} />
+            <ReadOnly rows={[["Provider", smsConfigured ? SMS_PROVIDERS[settings.smsProvider].label : null], ["Sender", settings.smsFrom]]} />
           )}
         </ProviderSection>
       </CardContent>
