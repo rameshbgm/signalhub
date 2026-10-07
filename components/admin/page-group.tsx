@@ -4,7 +4,7 @@ import { CopyPhrase } from "@/components/ui/copy-phrase";
 import { useCallback, useId, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { createPortal, useFormStatus } from "react-dom";
-import { ArrowUpRight, ChevronDown, Eye, EyeOff, Globe, Lock, Pencil, Rocket, Trash2, Unlink, Users, X } from "lucide-react";
+import { ArrowUpRight, ChevronDown, Eye, FolderInput, EyeOff, Globe, Lock, Pencil, Rocket, Trash2, Unlink, Users, X } from "lucide-react";
 import { PlatformActionForm } from "@/components/platform/PlatformActionForm";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -82,8 +82,37 @@ function RowAction({ action, pageId, intent, label, done, className, confirm, ch
   );
 }
 
+/** Standalone-row action: pick a hub in a dialog and move the page into it. */
+function MoveToHub({ action, pageId, name, hubs }: { action: (formData: FormData) => Promise<string | void>; pageId: string; name: string; hubs: { id: string; name: string }[] }) {
+  const [open, setOpen] = useState(false);
+  const [hubId, setHubId] = useState("");
+  const close = useCallback(() => { setOpen(false); setHubId(""); }, []);
+  return (
+    <>
+      <button type="button" aria-label={`Move ${name} to a hub`} title="Move to hub" data-button-guard="off" className={iconAction(toneIcon.view)} onClick={() => setOpen(true)}><FolderInput aria-hidden size={16} /></button>
+      {open && createPortal(
+        <Dialog open onOpenChange={close}>
+          <DialogSurface>
+            <DialogTitle>Move {name} to a hub</DialogTitle>
+            <PlatformActionForm action={action} successMessage="Page moved to hub" onSuccess={close} className="mt-3 space-y-4">
+              <input type="hidden" name="childPageId" value={pageId} />
+              <p className="text-sm leading-6 text-ink-soft">The page stops being standalone and appears on the chosen hub. Its content and URL are unchanged.</p>
+              <Select aria-label="Hub" name="hubId" required value={hubId} onChange={(event) => setHubId(event.target.value)} className="w-full"><option value="">Choose a hub</option>{hubs.map((hub) => <option key={hub.id} value={hub.id}>{hub.name}</option>)}</Select>
+              <DialogActions>
+                <Button type="button" variant="secondary" data-button-guard="off" onClick={close}>Cancel</Button>
+                <Button type="submit" disabled={!hubId}>Move to hub</Button>
+              </DialogActions>
+            </PlatformActionForm>
+          </DialogSurface>
+        </Dialog>,
+        document.body,
+      )}
+    </>
+  );
+}
+
 /** One collapsible group of pages (a hub's children, or standalone pages) with row selection and bulk actions. */
-export function PageGroup({ header, rows, hubId, action, attach, defaultOpen, canConfigure, label, empty, bare = false }: {
+export function PageGroup({ header, rows, hubId, action, attach, moveToHub, defaultOpen, canConfigure, label, empty, bare = false }: {
   header?: ReactNode;
   rows: PageRow[];
   hubId: string | null;
@@ -91,6 +120,8 @@ export function PageGroup({ header, rows, hubId, action, attach, defaultOpen, ca
   action: (formData: FormData) => Promise<string>;
   /** Hub only: attaches a chosen standalone page (attachChildPage bound to the hub on the server). */
   attach?: { action: (formData: FormData) => Promise<string | void>; options: { id: string; name: string }[] };
+  /** Standalone group only: lets each row move into one of these hubs. */
+  moveToHub?: { action: (formData: FormData) => Promise<string | void>; hubs: { id: string; name: string }[] };
   defaultOpen: boolean;
   canConfigure: boolean;
   label: string;
@@ -206,6 +237,7 @@ export function PageGroup({ header, rows, hubId, action, attach, defaultOpen, ca
                         {hubId && (
                           <RowAction action={action} pageId={row.id} intent="remove" label={`Remove ${row.name} from hub`} done="Removed from hub" confirm={{ title: `Remove ${row.name} from this hub?`, body: "The page becomes a standalone page and no longer appears on this hub. Its content is kept." }} className={toneIcon.remove}><Unlink aria-hidden size={16} /></RowAction>
                         )}
+                        {!hubId && moveToHub && moveToHub.hubs.length > 0 && <MoveToHub action={moveToHub.action} pageId={row.id} name={row.name} hubs={moveToHub.hubs} />}
                         <button type="button" aria-label={`Delete ${row.name}`} title="Delete page" data-button-guard="off" className={iconAction(toneIcon.delete)} onClick={() => { setSelected(new Set([row.id])); setConfirmingDelete(true); }}><Trash2 aria-hidden size={16} /></button>
                         <Link href={`/organization/pages/${row.id}`} aria-label={`Edit ${row.name}`} title="Edit page" className={iconAction(toneIcon.edit)}><Pencil aria-hidden size={16} /></Link>
                       </>}

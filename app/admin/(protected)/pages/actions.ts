@@ -204,6 +204,13 @@ export async function attachChildPage(hubId: string, formData: FormData) {
   if (publicPath) revalidatePath(publicPath, "layout");
 }
 
+/** Move a standalone page into the hub chosen in the form (attachChildPage re-checks hub and page ownership). */
+export async function moveToHub(formData: FormData) {
+  const hubId = String(formData.get("hubId") ?? "");
+  if (!isDatabaseId(hubId)) throw new Error("Choose a hub");
+  return attachChildPage(hubId, formData);
+}
+
 export async function detachChildPage(hubId: string, childId: string) {
   const session = await requireCapability("page.configure", hubId);
   let publicPath = "";

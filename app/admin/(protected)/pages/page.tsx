@@ -7,7 +7,7 @@ import { groupPageEvents, isOpenEvent } from "@/lib/page-events";
 import { database } from "@/lib/postgres/client";
 import { publicPagePath } from "@/lib/public-path";
 import { PageGroup, type PageRow } from "@/components/admin/page-group";
-import { attachChildPage, bulkPageAction, deletePage } from "./actions";
+import { attachChildPage, bulkPageAction, deletePage, moveToHub } from "./actions";
 import { DeletePageButton } from "@/components/admin/DeletePageButton";
 import { buttonVariants } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -189,6 +189,7 @@ export default async function PagesListPage() {
               rows={standalone.map(toRow)}
               hubId={null}
               action={bulkPageAction.bind(null, null)}
+              moveToHub={{ action: moveToHub, hubs: hubs.map((hub) => ({ id: hub.id, name: hub.name })) }}
               defaultOpen
               canConfigure={canConfigure}
             />
