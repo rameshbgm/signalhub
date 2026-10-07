@@ -1,6 +1,7 @@
 import { sql } from "kysely";
 import { database } from "@/lib/postgres/client";
 import { pruneAuditBefore } from "@/lib/audit-integrity";
+import { dropMonitorCheckPartitionsBefore, ensureMonitorCheckPartitions } from "@/lib/monitor-checks";
 
 export const RETENTION_BOUNDS = {
   monitorChecksDays: { min: 7, max: 3650 },
@@ -65,10 +66,14 @@ async function acquireRetentionLease(workerId: string, now: Date) {
 export async function runRetentionSweep(workerId: string, now = new Date()) {
   if (!(await acquireRetentionLease(workerId, now))) return false;
 
+  await ensureMonitorCheckPartitions(now);
   const organizations = await database.selectFrom("organizations").select("id")
     .where("status", "!=", "DELETING").execute();
+  // Whole monthly check partitions can go once they are past every tenant's window.
+  let longestMonitorChecksDays = (await effectiveRetention(null)).monitorChecksDays;
   for (const organization of organizations) {
     const policy = await effectiveRetention(organization.id);
+    longestMonitorChecksDays = Math.max(longestMonitorChecksDays, policy.monitorChecksDays);
     const pages = await database.selectFrom("pages").select("id")
       .where("orgId", "=", organization.id).execute();
     const pageIds = pages.map((page) => page.id);
@@ -121,6 +126,7 @@ export async function runRetentionSweep(workerId: string, now = new Date()) {
     }
   }
 
+  await dropMonitorCheckPartitionsBefore(cutoff(now, longestMonitorChecksDays));
   // Short-lived operational rows that are never read once expired.
   await Promise.all([
     database.deleteFrom("rateLimits").where("expiresAt", "<", now).execute(),

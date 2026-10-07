@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { AlertTriangle, Pause, Play, RefreshCw, Search, Trash2 } from "lucide-react";
-import { MonitorDrawer, type MonitorCheck } from "@/components/admin/MonitorDrawer";
+import { MonitorDrawer, MonitorHistoryDrawer, type MonitorCheck } from "@/components/admin/MonitorDrawer";
 import type { MonitorFormValues } from "@/components/admin/MonitorForm";
 import { PageSubmitButton } from "@/components/admin/PageSubmitButton";
 import { ActionRow, InlineActionForm } from "@/components/InlineActionForm";
@@ -111,8 +111,9 @@ function MonitorRowView({ monitor, components, canManage, now }: { monitor: Moni
             </InlineActionForm>
           </>
         )}
+        <MonitorHistoryDrawer monitorId={m.id} name={m.name} latest={monitor.checks} />
         {canManage && monitor.edit && (
-          <MonitorDrawer action={actions.update} components={components} monitor={monitor.edit} checks={monitor.checks} />
+          <MonitorDrawer action={actions.update} components={components} monitor={monitor.edit} />
         )}
         {canManage && (
           <InlineActionForm action={actions.remove}>

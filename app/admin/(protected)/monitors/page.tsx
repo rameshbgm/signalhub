@@ -1,7 +1,7 @@
 import { Info, MonitorDot } from "lucide-react";
-import { sql } from "kysely";
 import { requireSession } from "@/lib/require-session";
 import { database } from "@/lib/postgres/client";
+import { latestChecksByMonitor } from "@/lib/monitor-checks";
 import type { MonitorRow } from "@/lib/postgres/schema";
 import { createMonitor, toggleMonitorEnabled, deleteMonitor, runMonitorNow, updateMonitor } from "./actions";
 import type { MonitorFormValues } from "@/components/admin/MonitorForm";
@@ -48,17 +48,7 @@ export default async function MonitorsPage({ searchParams }: { searchParams: Pro
   const monitors = await database.selectFrom("monitors").selectAll()
     .where("pageId", "=", pageId).orderBy("createdAt", "desc").execute();
   const monitorIds = monitors.map((monitor) => monitor.id);
-  const rankedChecks = database.selectFrom("monitorChecks").selectAll()
-    .select(sql<number>`row_number() over (partition by monitor_id order by checked_at desc)`.as("rank"))
-    .$if(monitorIds.length > 0, (query) => query.where("monitorId", "in", monitorIds));
-  const checks = monitorIds.length
-    ? await database.selectFrom(rankedChecks.as("rankedChecks")).selectAll()
-        .where("rank", "<=", 30).execute()
-    : [];
-  const checksByMonitor = new Map(monitors.map((monitor) => [
-    monitor.id,
-    checks.filter((check) => check.monitorId === monitor.id),
-  ]));
+  const checksByMonitor = await latestChecksByMonitor(monitorIds, 30);
   const components = await database.selectFrom("components").selectAll().where("pageId", "=", pageId).execute();
   const componentsById = new Map(components.map((c) => [c.id, c.name]));
   const latestHeartbeat = await database.selectFrom("workerHeartbeats").selectAll()
@@ -82,10 +72,7 @@ export default async function MonitorsPage({ searchParams }: { searchParams: Pro
     lastError: m.lastError,
     lastCheckedAt: m.lastCheckedAt?.toISOString() ?? null,
     lastLatencyMs: m.lastLatencyMs,
-    checks: (checksByMonitor.get(m.id) ?? []).map((check) => ({
-      id: check.id, checkedAt: new Date(check.checkedAt).toISOString(), ok: check.ok,
-      statusCode: check.statusCode, latencyMs: check.latencyMs, error: check.error,
-    })),
+    checks: checksByMonitor.get(m.id) ?? [],
     actions: {
       run: runMonitorNow.bind(null, m.id),
       toggle: toggleMonitorEnabled.bind(null, m.id),
