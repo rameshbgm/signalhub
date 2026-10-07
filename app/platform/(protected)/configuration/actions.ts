@@ -69,7 +69,7 @@ const smsProviderSchema = z.object({
 async function storedSecrets() {
   return database
     .selectFrom("platformConfiguration")
-    .select(["smtpPasswordCiphertext", "twilioAuthTokenCiphertext"])
+    .select(["smtpHost", "smtpPort", "smtpUsername", "smtpPasswordCiphertext", "twilioAuthTokenCiphertext"])
     .where("id", "=", "global")
     .executeTakeFirst();
 }
@@ -105,8 +105,14 @@ export async function updateMailProvider(formData: FormData) {
     password: formData.get("password") ?? "",
     from: formData.get("from"),
   });
-  // A blank password keeps the stored one; there is no way to read it back.
-  const stored = (await storedSecrets())?.smtpPasswordCiphertext ?? null;
+  // A blank password keeps the stored one, but only for the same server and
+  // account: otherwise pointing the host elsewhere would send it there.
+  const row = await storedSecrets();
+  const sameTarget = row?.smtpHost === input.host && row.smtpPort === input.port && row.smtpUsername === (input.username || null);
+  if (input.username && !input.password && row?.smtpPasswordCiphertext && !sameTarget) {
+    throw new Error("Re-enter the SMTP password when changing the host, port, or username");
+  }
+  const stored = sameTarget ? row?.smtpPasswordCiphertext ?? null : null;
   const password = !input.username ? null : input.password || (stored ? decryptSecret(stored) : null);
   try {
     await createSmtpTransport({ ...input, username: input.username || null, password }).verify();

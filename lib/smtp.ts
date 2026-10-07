@@ -14,6 +14,8 @@ export function createSmtpTransport(config: SmtpConfig) {
     secure: config.secure,
     ...(config.username
       ? {
+          // Never send credentials in clear text: require STARTTLS when not using implicit TLS.
+          requireTLS: true,
           auth: {
             user: config.username,
             pass: config.password ?? "",
