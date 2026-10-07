@@ -1,3 +1,5 @@
+import { PageSubmitButton } from "@/components/admin/PageSubmitButton";
+import { PlatformActionForm } from "@/components/platform/PlatformActionForm";
 import { Eye, EyeOff, Gauge, Plus, Send, Trash2 } from "lucide-react";
 import { requireSession } from "@/lib/require-session";
 import { Select } from "@/components/ui/select";
@@ -73,7 +75,7 @@ export default async function MetricsPage({ searchParams }: { searchParams: Prom
             <CardDescription>Name it, choose how it is displayed, then push data points to it.</CardDescription>
           </CardHeader>
           <CardContent>
-            <form action={boundCreate} className="grid gap-4 sm:grid-cols-2">
+            <PlatformActionForm successMessage="Metric added" action={boundCreate} className="grid gap-4 sm:grid-cols-2">
               <Field label="Metric name" htmlFor="metric-name" required>
                 <Input id="metric-name" name="name" placeholder="Metric name (e.g. API Response Time)" required />
               </Field>
@@ -99,7 +101,7 @@ export default async function MetricsPage({ searchParams }: { searchParams: Prom
               <div className="flex justify-end sm:col-span-2">
                 <Button type="submit"><Plus aria-hidden size={16} />Add metric</Button>
               </div>
-            </form>
+            </PlatformActionForm>
           </CardContent>
         </Card>
       )}
@@ -137,10 +139,10 @@ export default async function MetricsPage({ searchParams }: { searchParams: Prom
                         </Button>
                       </form>
                       <form action={deleteMetric.bind(null, m.id)}>
-                        <Button type="submit" variant="ghost" size="sm" className="hover:bg-danger-bg hover:text-danger-fg [&_svg]:!text-ink-dim hover:[&_svg]:!text-danger-fg">
+                        <PageSubmitButton variant="ghost" size="sm" pendingLabel="Deleting…" confirmMessage={`Delete ${m.name} and all of its data points? This cannot be undone.`} className="hover:bg-danger-bg hover:text-danger-fg [&_svg]:!text-ink-dim hover:[&_svg]:!text-danger-fg">
                           <Trash2 aria-hidden size={14} />
                           Delete
-                        </Button>
+                        </PageSubmitButton>
                       </form>
                     </div>
                   )}
@@ -148,7 +150,7 @@ export default async function MetricsPage({ searchParams }: { searchParams: Prom
 
                 {canManage && (
                   <div className="grid gap-4 border-t border-line pt-4 sm:grid-cols-2">
-                    <form action={pushMetricPoint.bind(null, m.id)} className="flex items-end gap-2">
+                    <PlatformActionForm successMessage="Data point recorded" action={pushMetricPoint.bind(null, m.id)} className="flex items-end gap-2">
                       <Field label="Push data point" htmlFor={`metric-push-${m.id}`} className="min-w-0 flex-1">
                         <Input
                           id={`metric-push-${m.id}`}
@@ -161,8 +163,8 @@ export default async function MetricsPage({ searchParams }: { searchParams: Prom
                         />
                       </Field>
                       <Button type="submit" variant="secondary"><Send aria-hidden size={14} />Push</Button>
-                    </form>
-                    <form action={updateMetricDecimals.bind(null, m.id)} className="flex items-end gap-2">
+                    </PlatformActionForm>
+                    <PlatformActionForm successMessage="Decimal places saved" action={updateMetricDecimals.bind(null, m.id)} className="flex items-end gap-2">
                       <Field label="Decimal places" htmlFor={`metric-decimals-${m.id}`} className="min-w-0 flex-1">
                         <Input
                           id={`metric-decimals-${m.id}`}
@@ -175,7 +177,7 @@ export default async function MetricsPage({ searchParams }: { searchParams: Prom
                         />
                       </Field>
                       <Button type="submit" variant="secondary">Save precision</Button>
-                    </form>
+                    </PlatformActionForm>
                   </div>
                 )}
 

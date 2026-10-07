@@ -1,7 +1,12 @@
 import { CamelCasePlugin, Kysely, PostgresDialect, type Transaction } from "kysely";
-import { Pool } from "pg";
+import { Pool, types } from "pg";
 import type { SignalHubDatabase } from "@/lib/postgres/schema";
 import { logger } from "@/lib/logger";
+
+// DATE columns are calendar days, typed as "YYYY-MM-DD" strings in the schema.
+// The pg default turns them into local-midnight Date objects, which React
+// cannot render and which shift across time zones.
+types.setTypeParser(types.builtins.DATE, (value) => value);
 
 type PostgresGlobal = {
   signalHubPool?: Pool;

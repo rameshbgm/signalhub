@@ -1,3 +1,4 @@
+import { PageSubmitButton } from "@/components/admin/PageSubmitButton";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, Trash2, Wrench, Siren } from "lucide-react";
@@ -7,7 +8,7 @@ import { COMPONENT_STATUS_LABEL, IMPACT_LABEL, MAINTENANCE_STATUS_LABEL, INCIDEN
 import { editIncidentUpdate, postIncidentUpdate, deleteIncident, savePostmortem } from "../actions";
 import { deleteMaintenance, setMaintenanceStatus } from "../../maintenance/actions";
 import { Badge } from "@/components/ui/badge";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -211,10 +212,10 @@ export default async function IncidentDetailPage({ params }: { params: Promise<{
               </CardHeader>
               <CardContent>
                 <form action={boundDelete}>
-                  <Button type="submit" variant="destructive" size="sm">
+                  <PageSubmitButton variant="destructive" size="sm" pendingLabel="Deleting…" confirmMessage={`Permanently delete this ${noun} and its full update history? This cannot be undone.`}>
                     <Trash2 aria-hidden size={14} />
                     Delete {incident.isMaintenance ? "maintenance" : "incident"}
-                  </Button>
+                  </PageSubmitButton>
                 </form>
               </CardContent>
             </Card>

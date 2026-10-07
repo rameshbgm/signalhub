@@ -1,3 +1,4 @@
+import { PlatformActionForm } from "@/components/platform/PlatformActionForm";
 import { requireSession } from "@/lib/require-session";
 import { requestOrgExport, updateOrgRetention, updateOrgSettings } from "./actions";
 import { requireCapability } from "@/lib/admin-guard";
@@ -66,7 +67,7 @@ export default async function OrgSettingsPage() {
             <CardTitle>General</CardTitle>
             <CardDescription>The name and contact address shown across your workspace.</CardDescription>
           </CardHeader>
-          <form action={updateOrgSettings}>
+          <PlatformActionForm successMessage="Organization settings saved" action={updateOrgSettings}>
             <CardContent className="space-y-4">
               <Field label="Organization name" htmlFor="org-name">
                 <Input id="org-name" name="name" defaultValue={org.name} required disabled={!isAdmin} />
@@ -85,7 +86,7 @@ export default async function OrgSettingsPage() {
                 <Alert tone="info">Only Admins can change organization settings.</Alert>
               )}
             </CardContent>
-          </form>
+          </PlatformActionForm>
         </Card>
 
         {isAdmin && (
@@ -96,7 +97,7 @@ export default async function OrgSettingsPage() {
                 Organization overrides are bounded by installation safety limits and processed by the worker.
               </CardDescription>
             </CardHeader>
-            <form action={updateOrgRetention}>
+            <PlatformActionForm successMessage="Retention settings saved" action={updateOrgRetention}>
               <CardContent className="space-y-4">
                 <div className="grid gap-4 sm:grid-cols-2">
                   {Object.entries(RETENTION_BOUNDS).map(([key, bounds]) => (
@@ -119,7 +120,7 @@ export default async function OrgSettingsPage() {
                   </Button>
                 </div>
               </CardContent>
-            </form>
+            </PlatformActionForm>
           </Card>
         )}
 
@@ -167,12 +168,12 @@ export default async function OrgSettingsPage() {
                   Creates a checksummed JSON archive and asset manifest. Stored credential material is excluded.
                 </CardDescription>
               </div>
-              <form action={requestOrgExport}>
+              <PlatformActionForm successMessage="Export requested" action={requestOrgExport}>
                 <Button type="submit" variant="secondary" size="sm">
                   <FileDown aria-hidden size={14} />
                   Request export
                 </Button>
-              </form>
+              </PlatformActionForm>
             </CardHeader>
             <CardContent>
               {exports.length === 0 ? (

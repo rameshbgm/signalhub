@@ -1,3 +1,5 @@
+import { PageSubmitButton } from "@/components/admin/PageSubmitButton";
+import { PlatformActionForm } from "@/components/platform/PlatformActionForm";
 import Link from "next/link";
 import { BadgeCheck, Clock, Download, Mail, Plus, ShieldAlert, ShieldCheck, ShieldOff, Trash2, Upload, UsersRound, type LucideIcon } from "lucide-react";
 import { requireSession } from "@/lib/require-session";
@@ -153,7 +155,7 @@ export default async function SubscribersPage({ searchParams }: { searchParams: 
             <CardTitle>Add subscriber</CardTitle>
             <CardDescription>Subscribe one person to this page by email address or phone number.</CardDescription>
           </CardHeader>
-          <form action={boundAdd}>
+          <PlatformActionForm successMessage="Subscriber added" action={boundAdd}>
             <CardContent className="space-y-4">
               <Field label="Channel" htmlFor="add-channel">
                 <Select aria-label="Subscriber channel" id="add-channel" name="channel" defaultValue={channel} className="w-full">
@@ -175,7 +177,7 @@ export default async function SubscribersPage({ searchParams }: { searchParams: 
                 </Button>
               </div>
             </CardContent>
-          </form>
+          </PlatformActionForm>
         </Card>
 
         <Card>
@@ -186,7 +188,7 @@ export default async function SubscribersPage({ searchParams }: { searchParams: 
             </div>
             <CardDescription>Add many email subscribers at once.</CardDescription>
           </CardHeader>
-          <form action={boundImport}>
+          <PlatformActionForm successMessage="Import finished" action={boundImport}>
             <CardContent className="space-y-4">
               <Field label="Channel" htmlFor="import-channel">
                 <Select aria-label="Import channel" id="import-channel" name="channel" className="w-full">
@@ -204,7 +206,7 @@ export default async function SubscribersPage({ searchParams }: { searchParams: 
                 </Button>
               </div>
             </CardContent>
-          </form>
+          </PlatformActionForm>
         </Card>
       </div>
 
@@ -246,10 +248,10 @@ export default async function SubscribersPage({ searchParams }: { searchParams: 
                       </Button>
                     </form>
                     <form action={removeSubscriber.bind(null, s.id)}>
-                      <Button type="submit" variant="ghost" size="sm" className="hover:!bg-danger-bg hover:!text-danger-fg [&_svg]:!text-ink-dim hover:[&_svg]:!text-danger-fg">
+                      <PageSubmitButton variant="ghost" size="sm" pendingLabel="Removing…" confirmMessage={`Remove ${s.contact}? They will stop receiving updates.`} className="hover:!bg-danger-bg hover:!text-danger-fg [&_svg]:!text-ink-dim hover:[&_svg]:!text-danger-fg">
                         <Trash2 aria-hidden size={14} />
                         Remove
-                      </Button>
+                      </PageSubmitButton>
                     </form>
                   </div>
                 </li>

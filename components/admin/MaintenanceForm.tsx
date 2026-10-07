@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Boxes } from "lucide-react";
+import { PlatformActionForm } from "@/components/platform/PlatformActionForm";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -38,7 +39,7 @@ export function MaintenanceForm({
   const [sendReminder, setSendReminder] = useState(true);
 
   return (
-    <form action={action} className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
+    <PlatformActionForm action={action} successMessage="Maintenance scheduled" className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]" messageClassName="empty:hidden lg:col-span-2">
       <Input type="hidden" name="pageId" value={pageId} />
 
       <div className="space-y-6">
@@ -147,6 +148,6 @@ export function MaintenanceForm({
         </Card>
         <Button type="submit" size="lg" className="w-full">Schedule maintenance</Button>
       </div>
-    </form>
+    </PlatformActionForm>
   );
 }

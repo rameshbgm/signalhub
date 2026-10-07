@@ -44,6 +44,11 @@ describe.skipIf(!enabled)("PostgreSQL integration", () => {
     expect(state.missingIds).toEqual([]);
   });
 
+  it("returns DATE columns as calendar-day strings, as the schema declares", async () => {
+    const { rows } = await modules.client.postgresPool.query("select date '2026-10-07' as day");
+    expect(rows[0].day).toBe("2026-10-07");
+  });
+
   it("runs the retention sweep, then holds the lease for less than the hourly interval", async () => {
     const { database } = modules.client;
     await database.deleteFrom("maintenanceLeases").where("id", "=", "retention").execute();

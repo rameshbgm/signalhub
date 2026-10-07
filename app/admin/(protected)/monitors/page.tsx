@@ -1,10 +1,13 @@
+import { PageSubmitButton } from "@/components/admin/PageSubmitButton";
+import { PlatformActionForm } from "@/components/platform/PlatformActionForm";
 import type { ReactNode } from "react";
-import { AlertTriangle, ChevronDown, History, Info, Link2, MonitorDot, Pause, Pencil, Play, RefreshCw, Trash2, type LucideIcon } from "lucide-react";
+import { AlertTriangle, ChevronDown, History, Info, Link2, MonitorDot, Pause, Pencil, Play, Plus, RefreshCw, Trash2, type LucideIcon } from "lucide-react";
 import { requireSession } from "@/lib/require-session";
 import { sql } from "kysely";
 import { Select } from "@/components/ui/select";
 import { database } from "@/lib/postgres/client";
-import { toggleMonitorEnabled, deleteMonitor, runMonitorNow, updateMonitor } from "./actions";
+import { createMonitor, toggleMonitorEnabled, deleteMonitor, runMonitorNow, updateMonitor } from "./actions";
+import { MonitorForm } from "@/components/admin/MonitorForm";
 import { PageSelect } from "@/components/admin/PageSelect";
 import { HeartbeatTokenManager } from "@/components/admin/HeartbeatTokenManager";
 import { NoPagesState } from "@/components/admin/operate-ui";
@@ -127,6 +130,21 @@ export default async function MonitorsPage({ searchParams }: { searchParams: Pro
         </Alert>
       )}
 
+      {canManage && (
+        <details className="group rounded-card border border-line bg-surface shadow-card" open={monitors.length === 0}>
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-card px-5 py-4 outline-none focus-visible:ring-4 focus-visible:ring-primary/25">
+            <span className="inline-flex items-center gap-2 text-base font-semibold text-ink">
+              <Plus aria-hidden size={18} className="text-primary" />
+              Add a monitor
+            </span>
+            <ChevronDown aria-hidden size={18} className="text-primary transition-transform duration-200 ease-soft group-open:rotate-180" />
+          </summary>
+          <div className="border-t border-line p-5">
+            <MonitorForm action={createMonitor.bind(null, pageId)} components={components.map((c) => ({ id: c.id, name: c.name }))} />
+          </div>
+        </details>
+      )}
+
       {monitors.length === 0 ? (
         <EmptyState
           icon={MonitorDot}
@@ -182,10 +200,10 @@ export default async function MonitorsPage({ searchParams }: { searchParams: Pro
                           </Button>
                         </form>
                         <form action={deleteMonitor.bind(null, m.id)}>
-                          <Button type="submit" variant="ghost" size="sm" className="hover:bg-danger-bg hover:text-danger-fg [&_svg]:!text-ink-dim hover:[&_svg]:!text-danger-fg">
+                          <PageSubmitButton variant="ghost" size="sm" pendingLabel="Deleting…" confirmMessage={`Delete the monitor ${m.name} and its check history? This cannot be undone.`} className="hover:bg-danger-bg hover:text-danger-fg [&_svg]:!text-ink-dim hover:[&_svg]:!text-danger-fg">
                             <Trash2 aria-hidden size={14} />
                             Delete
-                          </Button>
+                          </PageSubmitButton>
                         </form>
                       </div>
                     )}
@@ -229,7 +247,7 @@ export default async function MonitorsPage({ searchParams }: { searchParams: Pro
 
                   {canManage && (
                     <Disclosure icon={Pencil} title="Edit monitor">
-                      <form action={updateMonitor.bind(null, m.id)} className="grid gap-4 p-4 sm:grid-cols-2">
+                      <PlatformActionForm successMessage="Monitor saved" action={updateMonitor.bind(null, m.id)} className="grid gap-4 p-4 sm:grid-cols-2">
                         <Field label="Monitor name" htmlFor={`monitor-name-${m.id}`} required>
                           <Input id={`monitor-name-${m.id}`} name="name" defaultValue={m.name} required />
                         </Field>
@@ -263,7 +281,7 @@ export default async function MonitorsPage({ searchParams }: { searchParams: Pro
                         <div className="flex justify-end sm:col-span-2">
                           <Button type="submit">Save monitor</Button>
                         </div>
-                      </form>
+                      </PlatformActionForm>
                     </Disclosure>
                   )}
 

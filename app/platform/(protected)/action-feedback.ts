@@ -41,6 +41,8 @@ export async function runPlatformActionWithFeedback(
             error.message.length <= 500
           ? error.message
           : GENERIC_ERROR;
+    // The visitor sees a generic message; operators need the real cause.
+    if (message === GENERIC_ERROR) console.error("Server action failed", error);
     return { status: "error", message };
   }
 }
