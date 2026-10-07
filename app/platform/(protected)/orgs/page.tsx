@@ -155,8 +155,6 @@ export default async function PlatformOrgsPage({
         />
       </section>
 
-      <OrganizationSettingsSection />
-
       {canCreate && (
         <Card id="provision-organization" className="scroll-mt-6">
           <CardHeader>
@@ -394,6 +392,8 @@ export default async function PlatformOrgsPage({
           </Table>
         )}
       </Card>
+
+      <OrganizationSettingsSection />
     </div>
   );
 }
