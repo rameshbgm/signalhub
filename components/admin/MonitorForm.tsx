@@ -96,7 +96,7 @@ export function MonitorForm({
           </Field>
         )}
 
-        <Field label="Component" htmlFor={`${idp}monitor-component`}>
+        <Field label="Component" htmlFor={`${idp}monitor-component`} hint="Linked: this monitor updates the component's public status. Not linked: it only records checks and alerts.">
           <Select id={`${idp}monitor-component`} aria-label="Component" name="componentId" defaultValue={monitor?.componentId ?? ""}>
             <option value="">Not tied to a component</option>
             {components.map((c) => (
