@@ -51,7 +51,7 @@ export async function createMaintenance(formData: FormData) {
     metadata: { pageId },
     tenantAuditExists: true,
   });
-  revalidatePath("/organization/maintenance");
+  revalidatePath("/organization/events");
   revalidatePath(`/${await pageSlug(pageId)}`);
   redirect(`/organization/maintenance/${maintenance.id}`);
 }
@@ -105,8 +105,7 @@ export async function deleteMaintenance(incidentId: string) {
     metadata: { pageId: incident.pageId },
     tenantAuditExists: true,
   });
-  revalidatePath("/organization/maintenance");
-  revalidatePath("/organization/incidents");
+  revalidatePath("/organization/events");
   if (slug) revalidatePath(`/${slug}`);
-  redirect("/organization/maintenance");
+  redirect(`/organization/events?pageId=${incident.pageId}`);
 }

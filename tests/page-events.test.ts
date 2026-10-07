@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { isActivePath } from "@/components/admin/AdminNav";
 import { eventHref, groupPageEvents } from "@/lib/page-events";
 
 const at = (day: number) => new Date(Date.UTC(2026, 9, day));
@@ -25,5 +26,14 @@ describe("groupPageEvents", () => {
   it("links each kind to its own section", () => {
     expect(eventHref({ id: "a", isMaintenance: false })).toBe("/organization/incidents/a");
     expect(eventHref({ id: "b", isMaintenance: true })).toBe("/organization/maintenance/b");
+  });
+});
+
+describe("isActivePath", () => {
+  it("highlights Events for incident and maintenance screens", () => {
+    expect(isActivePath("/organization/incidents/a", "/organization/events")).toBe(true);
+    expect(isActivePath("/organization/maintenance/new", "/organization/events")).toBe(true);
+    expect(isActivePath("/organization/maintenance-windows", "/organization/events")).toBe(false);
+    expect(isActivePath("/organization/pages/x/events", "/organization/events")).toBe(false);
   });
 });

@@ -53,7 +53,7 @@ export async function createIncident(formData: FormData) {
     metadata: { pageId },
     tenantAuditExists: true,
   });
-  revalidatePath("/organization/incidents");
+  revalidatePath("/organization/events");
   revalidatePath(`/${await pageSlug(pageId)}`);
   redirect(`/organization/incidents/${incident.id}`);
 }
@@ -172,8 +172,8 @@ export async function deleteIncident(incidentId: string) {
     metadata: { pageId: incident.pageId },
     tenantAuditExists: true,
   });
-  revalidatePath("/organization/incidents");
-  redirect("/organization/incidents");
+  revalidatePath("/organization/events");
+  redirect(`/organization/events?pageId=${incident.pageId}`);
 }
 
 export async function savePostmortem(incidentId: string, formData: FormData) {

@@ -16,7 +16,6 @@ import {
   Siren,
   Sparkles,
   UsersRound,
-  Wrench,
   Building2,
   type LucideIcon,
 } from "lucide-react";
@@ -58,8 +57,7 @@ export const NAV_SECTIONS: NavSection[] = [
     icon: Siren,
     hue: "amber",
     items: [
-      { href: "/organization/incidents", label: "Incidents", icon: Siren, hue: "amber", capability: "incident.update" },
-      { href: "/organization/maintenance", label: "Maintenance", icon: Wrench, hue: "amber", capability: "incident.update" },
+      { href: "/organization/events", label: "Events", icon: Siren, hue: "amber", capability: "incident.update" },
       { href: "/organization/monitors", label: "Monitors", icon: MonitorDot, hue: "sky", capability: "monitor.manage" },
       { href: "/organization/metrics", label: "Metrics", icon: Gauge, hue: "sky", capability: "monitor.manage" },
     ],
@@ -118,6 +116,8 @@ export function visibleSections(capabilities: Capability[]): NavSection[] {
 }
 
 export function isActivePath(pathname: string, href: string) {
+  // Incident and maintenance screens belong to the Events inbox.
+  pathname = pathname.replace(/^\/organization\/(incidents|maintenance)(?=\/|$)/, "/organization/events");
   return href === "/organization" ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);
 }
 

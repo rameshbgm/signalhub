@@ -164,7 +164,7 @@ export default async function AdminDashboard() {
         <StatTile label="Pages" value={pages.length} icon={PanelsTopLeft} hue="violet" href="/organization/pages" />
         <StatTile label="Components" value={componentDocs.length} icon={Boxes} hue="sky" />
         <StatTile label="Subscribers" value={subscriberCount} icon={UsersRound} hue="emerald" href={canManageSubscribers ? "/organization/subscribers" : undefined} />
-        <StatTile label="Upcoming maintenance" value={upcomingMaintenance} icon={Wrench} hue="amber" href={canManageIncidents ? "/organization/maintenance" : undefined} />
+        <StatTile label="Upcoming maintenance" value={upcomingMaintenance} icon={Wrench} hue="amber" href={canManageIncidents ? "/organization/events?show=maintenance" : undefined} />
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">

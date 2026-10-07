@@ -31,9 +31,9 @@ export default async function NewMaintenancePage({ searchParams }: { searchParam
         hue="amber"
         description="Pick the page, set the window, and tell subscribers what to expect."
         actions={
-          <Link href="/organization/maintenance" className={buttonVariants({ variant: "secondary" })}>
+          <Link href={pageId ? `/organization/events?pageId=${pageId}` : "/organization/events"} className={buttonVariants({ variant: "secondary" })}>
             <ArrowLeft aria-hidden size={16} />
-            All maintenance
+            Back to events
           </Link>
         }
       />

@@ -31,9 +31,9 @@ export default async function NewIncidentPage({ searchParams }: { searchParams: 
         hue="amber"
         description="Pick the page, describe what is wrong, and choose which components are affected."
         actions={
-          <Link href="/organization/incidents" className={buttonVariants({ variant: "secondary" })}>
+          <Link href={pageId ? `/organization/events?pageId=${pageId}` : "/organization/events"} className={buttonVariants({ variant: "secondary" })}>
             <ArrowLeft aria-hidden size={16} />
-            All incidents
+            Back to events
           </Link>
         }
       />

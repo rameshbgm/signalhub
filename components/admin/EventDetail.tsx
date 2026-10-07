@@ -34,10 +34,9 @@ export async function EventDetail({ incidentId, kind }: { incidentId: string; ki
   await assertPageInOrg(pageRow.id, org.id);
   const canUpdate = sessionHasCapability(session, "incident.update");
   const canManage = sessionHasCapability(session, "incident.manage");
-  // The page is this event's home; link back to it when the role may open page management.
+  // Events is the inbox; this event's page is a filter on it. Page management is linked only for roles that may open it.
   const pageBase = sessionHasCapability(session, "page.configure") ? `/organization/pages/${pageRow.id}` : null;
-  const listHref = kind === "maintenance" ? "/organization/maintenance" : "/organization/incidents";
-  const backHref = pageBase ? `${pageBase}/events` : listHref;
+  const backHref = `/organization/events?pageId=${pageRow.id}`;
 
   const [updates, links] = await Promise.all([
     database.selectFrom("incidentUpdates").selectAll().where("incidentId", "=", incidentRow.id).orderBy("createdAt").execute(),
@@ -79,10 +78,7 @@ export async function EventDetail({ incidentId, kind }: { incidentId: string; ki
       <div className="space-y-3">
         <nav aria-label="Breadcrumb">
           <ol className="flex flex-wrap items-center gap-1.5 text-sm text-ink-dim">
-            {(pageBase
-              ? [{ href: "/organization/pages", label: "Pages" }, { href: pageBase, label: incident.page.name }, { href: `${pageBase}/events`, label: "Events" }]
-              : [{ href: listHref, label: incident.isMaintenance ? "Maintenance" : "Incidents" }]
-            ).map((crumb) => (
+            {[{ href: "/organization/events", label: "Events" }, { href: backHref, label: incident.page.name }].map((crumb) => (
               <li key={crumb.href} className="flex items-center gap-1.5">
                 <Link href={crumb.href} className="rounded-chip font-medium text-ink-soft outline-none hover:text-ink hover:underline focus-visible:ring-4 focus-visible:ring-primary/25">{crumb.label}</Link>
                 <ChevronRight aria-hidden size={14} />
@@ -110,7 +106,7 @@ export async function EventDetail({ incidentId, kind }: { incidentId: string; ki
           actions={
             <Link href={backHref} className={buttonVariants({ variant: "secondary" })}>
               <ArrowLeft aria-hidden size={16} />
-              {pageBase ? `${incident.page.name} events` : incident.isMaintenance ? "All maintenance" : "All incidents"}
+              {incident.page.name} events
             </Link>
           }
         />

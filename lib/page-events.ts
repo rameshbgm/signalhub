@@ -9,7 +9,7 @@ type PageEvent = {
   createdAt: Date;
 };
 
-/** Canonical admin URL, so maintenance detail sits under Maintenance in the sidebar. */
+/** Canonical admin detail URL; both kinds highlight Events in the sidebar. */
 export function eventHref(event: { id: string; isMaintenance: boolean }) {
   return `/organization/${event.isMaintenance ? "maintenance" : "incidents"}/${event.id}`;
 }
