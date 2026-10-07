@@ -6,6 +6,7 @@
   "license": "Apache-2.0",
   "scripts": {
     "dev": "next dev --webpack -p 3301",
+    "dev:all": "trap 'kill 0' EXIT; npm run worker:dev & npm run dev",
     "build": "npm run build:web && npm run build:runtime",
     "build:web": "next build --webpack",
     "build:worker": "esbuild worker/index.ts --bundle --platform=node --format=esm --packages=external --outfile=dist-runtime/worker.mjs",

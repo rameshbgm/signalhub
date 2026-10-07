@@ -397,6 +397,12 @@ Run the Graphile Worker process separately:
 npm run worker:dev
 ```
 
+Or start the web server and the worker together (Ctrl+C stops both):
+
+```bash
+npm run dev:all
+```
+
 Development sample data is deliberately opt-in:
 
 ```bash
