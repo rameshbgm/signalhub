@@ -14,7 +14,7 @@ import { COMPONENT_STATUS_LABEL, COMPONENT_STATUS_TONE, type ComponentStatus } f
 import { attachChildPage, detachChildPage } from "../../actions";
 import { createComponent, deleteComponent, updateComponentDetails, updateComponentStatus } from "../components-actions";
 import { Badge } from "@/components/ui/badge";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -51,7 +51,7 @@ async function HubContent({ pageId, orgId }: { pageId: string; orgId: string }) 
             <div className="min-w-0 flex-1">
               <Select aria-label="Status page to add" name="childPageId" required className="w-full"><option value="">Choose a standalone status page</option>{available.map((candidate) => <option key={candidate.id} value={candidate.id}>{candidate.name}</option>)}</Select>
             </div>
-            <Button type="submit" variant="secondary">Add to hub</Button>
+            <PageSubmitButton variant="secondary" pendingLabel="Adding…">Add to hub</PageSubmitButton>
           </PlatformActionForm>
         )}
         {members.length > 0 ? (
@@ -67,7 +67,7 @@ async function HubContent({ pageId, orgId }: { pageId: string; orgId: string }) 
                   </div>
                   <div className="flex items-center gap-1">
                     <Link href={`/organization/pages/${member.id}`} className={buttonVariants({ variant: "secondary", size: "sm" })}>Manage</Link>
-                    <form action={detachChildPage.bind(null, pageId, member.id)}><Button type="submit" variant="ghost" size="sm" className={dangerGhost}>Remove</Button></form>
+                    <form action={detachChildPage.bind(null, pageId, member.id)}><PageSubmitButton variant="ghost" size="sm" className={dangerGhost} pendingLabel="Removing…">Remove</PageSubmitButton></form>
                   </div>
                 </li>
               );
