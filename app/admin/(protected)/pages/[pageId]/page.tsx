@@ -18,6 +18,9 @@ import {
 } from "lucide-react";
 import { CopyButton } from "@/components/CopyButton";
 import { SetupSteps, type SetupStep } from "@/components/admin/SetupSteps";
+import { PageGroup } from "@/components/admin/page-group";
+import { memberRow } from "@/lib/page-rows";
+import { bulkPageAction } from "../actions";
 import { buttonVariants } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -211,7 +214,7 @@ async function StatusPageOverview({ page }: { page: OverviewPage }) {
 }
 
 async function HubOverview({ page, orgId }: { page: OverviewPage; orgId: string }) {
-  const members = await database.selectFrom("pages").select(["id", "name", "slug", "setupCompletedAt", "publicVisible"])
+  const members = await database.selectFrom("pages").select(["id", "name", "slug", "brandColor", "type", "setupCompletedAt", "publicVisible"])
     .where("orgId", "=", orgId).where("hubParentId", "=", page.id).where("isHub", "=", false).where("deletedAt", "is", null)
     .orderBy("name").execute();
   const published = members.filter((member) => member.setupCompletedAt !== null && member.publicVisible !== false).length;
@@ -242,16 +245,7 @@ async function HubOverview({ page, orgId }: { page: OverviewPage; orgId: string 
           </CardHeader>
           <CardContent className="py-2">
             {members.length ? (
-              <ul className="divide-y divide-line">
-                {members.map((member) => {
-                  const state = member.setupCompletedAt === null ? "Draft" : member.publicVisible === false ? "Hidden" : "Published";
-                  return (
-                    <OverviewRow key={member.id} href={`/organization/pages/${member.id}`} title={member.name} meta={`/${member.slug}`}>
-                      <StatusBadge tone={state === "Published" ? "ok" : state === "Hidden" ? "neutral" : "warn"}>{state}</StatusBadge>
-                    </OverviewRow>
-                  );
-                })}
-              </ul>
+              <PageGroup bare label="Status pages in this hub" rows={members.map(memberRow)} hubId={page.id} action={bulkPageAction.bind(null, page.id)} defaultOpen canConfigure />
             ) : (
               <EmptyState icon={Layers3} hue="violet" title="No status pages yet" description="Add a status page to show it in this hub." className="py-10" />
             )}

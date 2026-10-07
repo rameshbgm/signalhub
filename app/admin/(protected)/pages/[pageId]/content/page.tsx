@@ -11,14 +11,16 @@ import { PlatformActionForm } from "@/components/platform/PlatformActionForm";
 import { assertPageInOrg, requireCapability } from "@/lib/admin-guard";
 import { database } from "@/lib/postgres/client";
 import { COMPONENT_STATUS_LABEL, COMPONENT_STATUS_TONE, type ComponentStatus } from "@/lib/status";
-import { attachChildPage, detachChildPage } from "../../actions";
+import { attachChildPage, bulkPageAction } from "../../actions";
+import { PageGroup } from "@/components/admin/page-group";
+import { memberRow } from "@/lib/page-rows";
 import { createComponent, deleteComponent, updateComponentDetails, updateComponentStatus } from "../components-actions";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { ActionRow, InlineActionForm } from "@/components/InlineActionForm";
+import { InlineActionForm } from "@/components/InlineActionForm";
 
 export default async function PageContent({ params }: { params: Promise<{ pageId: string }> }) {
   const { pageId } = await params;
@@ -56,24 +58,7 @@ async function HubContent({ pageId, orgId }: { pageId: string; orgId: string }) 
           </PlatformActionForm>
         )}
         {members.length > 0 ? (
-          <ul className="divide-y divide-line">
-            {members.map((member) => {
-              const state = member.setupCompletedAt === null ? "Draft" : member.publicVisible === false ? "Hidden" : "Published";
-              return (
-                <li key={member.id} className="flex flex-col gap-3 py-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
-                    <p className="truncate text-sm font-semibold text-ink">{member.name}</p>
-                    <span className="font-mono text-xs text-ink-dim">/{member.slug}</span>
-                    <StatusBadge tone={state === "Published" ? "ok" : state === "Hidden" ? "neutral" : "warn"}>{state}</StatusBadge>
-                  </div>
-                  <ActionRow className="flex items-center gap-1" messageClassName="justify-end">
-                    <Link href={`/organization/pages/${member.id}`} className={buttonVariants({ variant: "secondary", size: "sm" })}>Manage</Link>
-                    <InlineActionForm action={detachChildPage.bind(null, pageId, member.id)} messageClassName="justify-end"><PageSubmitButton variant="ghost" size="sm" className={dangerGhost} pendingLabel="Removing…">Remove</PageSubmitButton></InlineActionForm>
-                  </ActionRow>
-                </li>
-              );
-            })}
-          </ul>
+          <PageGroup bare label="Status pages in this hub" rows={members.map(memberRow)} hubId={pageId} action={bulkPageAction.bind(null, pageId)} defaultOpen canConfigure />
         ) : (
           <EmptyState
             icon={Layers3}

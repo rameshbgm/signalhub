@@ -30,16 +30,36 @@ export type PageRow = {
 
 const iconAction = (extra?: string) => buttonVariants({ variant: "ghost", size: "icon", className: cn("size-8", extra) });
 const accessIcon = (type: string) => (type === "PUBLIC" ? Globe : type === "PRIVATE" ? Lock : Users);
+const toneIcon = {
+  view: "[&_svg]:!text-info-fg",
+  edit: "[&_svg]:!text-primary-ink",
+  publish: "[&_svg]:!text-ok-fg",
+  hide: "[&_svg]:!text-warn-fg",
+  remove: "[&_svg]:!text-ink-soft",
+  setup: "[&_svg]:!text-warn-fg",
+  delete: "hover:bg-danger-bg [&_svg]:!text-danger-fg",
+};
 const accessLabel = (type: string) => (type === "PUBLIC" ? "Public" : type === "PRIVATE" ? "Private" : "Audience");
 
-function BulkButton({ intent, children, variant = "ghost", disabled = false, title }: { intent: string; children: ReactNode; variant?: "ghost" | "destructive"; disabled?: boolean; title?: string }) {
+/** Icon-only submit button; `label` is the accessible name and tooltip. */
+function BulkButton({ intent, children, variant = "ghost", disabled = false, label, className }: { intent: string; children: ReactNode; variant?: "ghost" | "destructive"; disabled?: boolean; label: string; className?: string }) {
   const { pending } = useFormStatus();
-  return <Button type="submit" name="intent" value={intent} size="sm" variant={variant} disabled={disabled || pending} title={title}>{children}</Button>;
+  return <Button type="submit" name="intent" value={intent} size="icon" variant={variant} className={cn("size-8", className)} disabled={disabled || pending} aria-label={label} title={label}>{children}</Button>;
+}
+
+/** Single-page action; submits through the same bulk server action with just this page. Feedback floats so rows keep their height. */
+function RowAction({ action, pageId, intent, label, done, className, children }: { action: (formData: FormData) => Promise<string>; pageId: string; intent: string; label: string; done: string; className?: string; children: ReactNode }) {
+  return (
+    <PlatformActionForm action={action} successMessage={done} className="relative flex" messageClassName="absolute right-0 top-full z-10 mt-1 w-max max-w-64 empty:hidden">
+      <input type="hidden" name="pageId" value={pageId} />
+      <BulkButton intent={intent} label={label} className={className}>{children}</BulkButton>
+    </PlatformActionForm>
+  );
 }
 
 /** One collapsible group of pages (a hub's children, or standalone pages) with row selection and bulk actions. */
-export function PageGroup({ header, rows, hubId, action, defaultOpen, canConfigure, label, empty }: {
-  header: ReactNode;
+export function PageGroup({ header, rows, hubId, action, defaultOpen, canConfigure, label, empty, bare = false }: {
+  header?: ReactNode;
   rows: PageRow[];
   hubId: string | null;
   // bulkPageAction bound to hubId on the server; a server action bound in the client cannot be passed back to the server.
@@ -48,9 +68,11 @@ export function PageGroup({ header, rows, hubId, action, defaultOpen, canConfigu
   canConfigure: boolean;
   label: string;
   empty?: ReactNode;
+  /** Render only the bulk bar and rows (no card or collapse header), for use inside an existing card. */
+  bare?: boolean;
 }) {
   const panelId = useId();
-  const [open, setOpen] = useState(defaultOpen);
+  const [open, setOpen] = useState(defaultOpen || bare);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [confirmation, setConfirmation] = useState("");
@@ -71,8 +93,8 @@ export function PageGroup({ header, rows, hubId, action, defaultOpen, canConfigu
   const hiddenIds = chosen.map((row) => <input key={row.id} type="hidden" name="pageId" value={row.id} />);
 
   return (
-    <section aria-label={label} className="overflow-hidden rounded-card border border-line bg-surface shadow-card">
-      <div className="flex items-center gap-1 py-3 pl-2 pr-4">
+    <section aria-label={label} className={bare ? undefined : "overflow-hidden rounded-card border border-line bg-surface shadow-card"}>
+      {!bare && <div className="flex items-center gap-1 py-3 pl-2 pr-4">
         <button
           type="button"
           onClick={() => setOpen(!open)}
@@ -85,10 +107,10 @@ export function PageGroup({ header, rows, hubId, action, defaultOpen, canConfigu
           <ChevronDown aria-hidden size={18} className={cn("text-ink-dim transition-transform duration-200 ease-soft", !open && "-rotate-90")} />
         </button>
         <div className="min-w-0 flex-1">{header}</div>
-      </div>
+      </div>}
 
       {open && (
-        <div id={panelId} className="border-t border-line">
+        <div id={panelId} className={bare ? undefined : "border-t border-line"}>
           {rows.length > 0 && canConfigure && (
             <div className="flex min-h-12 flex-wrap items-center gap-x-3 gap-y-2 bg-sunken/60 px-5 py-2">
               <label className="flex items-center gap-2 text-xs font-medium text-ink-soft">
@@ -105,11 +127,11 @@ export function PageGroup({ header, rows, hubId, action, defaultOpen, canConfigu
                 {chosen.length > 0 && <>
                   {hiddenIds}
                   {overLimit && <span role="alert" className="mr-auto text-xs font-medium text-danger-fg">Select {BULK_PAGE_LIMIT} pages or fewer</span>}
-                  <BulkButton intent="publish" disabled={overLimit || !publishable} title={publishable ? `Publish ${pageCountLabel(publishable)}` : "Selected pages are already published or still in setup"}><Eye aria-hidden size={14} />Publish</BulkButton>
-                  <BulkButton intent="hide" disabled={overLimit || !hideable} title={hideable ? `Hide ${pageCountLabel(hideable)}` : "Selected pages are already hidden"}><EyeOff aria-hidden size={14} />Hide</BulkButton>
-                  {hubId && <BulkButton intent="remove" disabled={overLimit}><Unlink aria-hidden size={14} />Remove from hub</BulkButton>}
-                  <Button type="button" size="sm" variant="ghost" className="text-danger-fg hover:bg-danger-bg" data-button-guard="off" disabled={overLimit} onClick={() => setConfirmingDelete(true)}><Trash2 aria-hidden size={14} />Delete…</Button>
-                  <Button type="button" size="icon" variant="ghost" className="size-8" aria-label="Clear selection" data-button-guard="off" onClick={clear}><X aria-hidden size={14} /></Button>
+                  <BulkButton intent="publish" disabled={overLimit || !publishable} label={publishable ? `Publish ${pageCountLabel(publishable)}` : "Selected pages are already published or still in setup"} className={toneIcon.publish}><Eye aria-hidden size={16} /></BulkButton>
+                  <BulkButton intent="hide" disabled={overLimit || !hideable} label={hideable ? `Unpublish ${pageCountLabel(hideable)}` : "Selected pages are already hidden"} className={toneIcon.hide}><EyeOff aria-hidden size={16} /></BulkButton>
+                  {hubId && <BulkButton intent="remove" disabled={overLimit} label="Remove from hub" className={toneIcon.remove}><Unlink aria-hidden size={16} /></BulkButton>}
+                  <Button type="button" size="icon" variant="ghost" className={cn("size-8", toneIcon.delete)} data-button-guard="off" disabled={overLimit} aria-label="Delete selected" title="Delete selected" onClick={() => setConfirmingDelete(true)}><Trash2 aria-hidden size={16} /></Button>
+                  <Button type="button" size="icon" variant="ghost" className="size-8" aria-label="Clear selection" title="Clear selection" data-button-guard="off" onClick={clear}><X aria-hidden size={14} /></Button>
                 </>}
               </PlatformActionForm>
             </div>
@@ -134,15 +156,23 @@ export function PageGroup({ header, rows, hubId, action, defaultOpen, canConfigu
                       </Link>
                     )}
                     <StatusBadge tone={row.tone}>{row.state}</StatusBadge>
-                    <div className="ml-auto flex items-center gap-1">
+                    <div className="ml-auto flex items-center gap-0.5">
                       {row.setupHref && canConfigure ? (
-                        <Link href={row.setupHref} className="mr-1 inline-flex items-center gap-1 rounded-chip text-xs font-semibold text-warn-fg outline-none hover:underline focus-visible:ring-4 focus-visible:ring-primary/25"><Rocket aria-hidden size={14} />Continue setup</Link>
+                        <Link href={row.setupHref} aria-label={`Continue setup of ${row.name}`} title="Continue setup" className={iconAction(toneIcon.setup)}><Rocket aria-hidden size={16} /></Link>
                       ) : row.liveHref ? (
-                        <a href={row.liveHref} target="_blank" rel="noreferrer" aria-label={`View ${row.name} live`} title="View live page" className={iconAction()}><ArrowUpRight aria-hidden size={16} /></a>
+                        <a href={row.liveHref} target="_blank" rel="noreferrer" aria-label={`View ${row.name} live`} title="View live page" className={iconAction(toneIcon.view)}><ArrowUpRight aria-hidden size={16} /></a>
                       ) : null}
                       {canConfigure && <>
-                        <Link href={`/organization/pages/${row.id}`} aria-label={`Edit ${row.name}`} title="Edit page" className={iconAction()}><Pencil aria-hidden size={15} /></Link>
-                        <Link href={`/organization/pages/${row.id}/settings#delete-page`} aria-label={`Delete ${row.name}`} title="Delete page" className={iconAction("hover:bg-danger-bg [&_svg]:!text-ink-dim hover:[&_svg]:!text-danger-fg")}><Trash2 aria-hidden size={15} /></Link>
+                        <Link href={`/organization/pages/${row.id}`} aria-label={`Edit ${row.name}`} title="Edit page" className={iconAction(toneIcon.edit)}><Pencil aria-hidden size={16} /></Link>
+                        {row.setupDone && (
+                          <RowAction action={action} pageId={row.id} intent={row.visible ? "hide" : "publish"} label={`${row.visible ? "Unpublish" : "Publish"} ${row.name}`} done={row.visible ? "Page unpublished" : "Page published"} className={row.visible ? toneIcon.hide : toneIcon.publish}>
+                            {row.visible ? <EyeOff aria-hidden size={16} /> : <Eye aria-hidden size={16} />}
+                          </RowAction>
+                        )}
+                        {hubId && (
+                          <RowAction action={action} pageId={row.id} intent="remove" label={`Remove ${row.name} from hub`} done="Removed from hub" className={toneIcon.remove}><Unlink aria-hidden size={16} /></RowAction>
+                        )}
+                        <button type="button" aria-label={`Delete ${row.name}`} title="Delete page" data-button-guard="off" className={iconAction(toneIcon.delete)} onClick={() => { setSelected(new Set([row.id])); setConfirmingDelete(true); }}><Trash2 aria-hidden size={16} /></button>
                       </>}
                     </div>
                   </li>
@@ -167,7 +197,7 @@ export function PageGroup({ header, rows, hubId, action, defaultOpen, canConfigu
               </label>
               <DialogActions>
                 <Button type="button" variant="secondary" data-button-guard="off" onClick={closeDelete}>Cancel</Button>
-                <BulkButton intent="delete" variant="destructive" disabled={!matchesBulkDeletePhrase(confirmation, chosen.length)}>Delete permanently</BulkButton>
+                <BulkButton intent="delete" variant="destructive" label="Delete permanently" className="h-9 w-auto px-3.5" disabled={!matchesBulkDeletePhrase(confirmation, chosen.length)}>Delete permanently</BulkButton>
               </DialogActions>
             </PlatformActionForm>
           </DialogSurface>
