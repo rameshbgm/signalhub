@@ -154,8 +154,8 @@ function CheckHistory({ monitorId, name, firstPage }: { monitorId: string; name:
         </Button>
       </div>
       {error && <p role="alert" className="rounded-control bg-danger-bg px-3 py-2 text-xs text-danger-fg">{error}</p>}
-      <div className="overflow-x-auto">
-        <Table className="min-w-[30rem]" aria-busy={loading}>
+      <div>
+        <Table aria-busy={loading}>
           <TableHeader>
             <TableRow><TableHead>Checked</TableHead><TableHead>Result</TableHead><TableHead>Latency</TableHead><TableHead>Response</TableHead></TableRow>
           </TableHeader>
@@ -165,7 +165,7 @@ function CheckHistory({ monitorId, name, firstPage }: { monitorId: string; name:
                 <TableCell className="whitespace-nowrap px-4 py-2.5 tabular-nums">{new Date(check.checkedAt).toLocaleString()}</TableCell>
                 <TableCell className="px-4 py-2.5"><StatusBadge tone={check.ok ? "ok" : "danger"}>{check.ok ? "Up" : "Down"}</StatusBadge></TableCell>
                 <TableCell className="whitespace-nowrap px-4 py-2.5 tabular-nums">{check.latencyMs === null ? "—" : `${check.latencyMs} ms`}</TableCell>
-                <TableCell className="min-w-44 whitespace-normal break-words px-4 py-2.5">{check.error ?? (check.statusCode ? `HTTP ${check.statusCode}` : "OK")}</TableCell>
+                <TableCell className="whitespace-normal break-words px-4 py-2.5">{check.error ?? (check.statusCode ? `HTTP ${check.statusCode}` : "OK")}</TableCell>
               </TableRow>
             ))}
             {page && page.checks.length === 0 && (
