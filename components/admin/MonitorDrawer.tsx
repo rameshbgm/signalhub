@@ -164,8 +164,8 @@ function CheckHistory({ monitorId, name, firstPage }: { monitorId: string; name:
               <TableRow key={check.id} tabIndex={0} className="cursor-pointer" onClick={() => setSelected(check)} onKeyDown={(event) => { if (event.key === "Enter") setSelected(check); }}>
                 <TableCell className="whitespace-nowrap px-4 py-2.5 tabular-nums">{new Date(check.checkedAt).toLocaleString()}</TableCell>
                 <TableCell className="px-4 py-2.5"><StatusBadge tone={check.ok ? "ok" : "danger"}>{check.ok ? "Up" : "Down"}</StatusBadge></TableCell>
-                <TableCell className="px-4 py-2.5 tabular-nums">{check.latencyMs === null ? "—" : `${check.latencyMs} ms`}</TableCell>
-                <TableCell className="max-w-56 truncate px-4 py-2.5" title={check.error ?? undefined}>{check.error ?? (check.statusCode ? `HTTP ${check.statusCode}` : "OK")}</TableCell>
+                <TableCell className="whitespace-nowrap px-4 py-2.5 tabular-nums">{check.latencyMs === null ? "—" : `${check.latencyMs} ms`}</TableCell>
+                <TableCell className="min-w-44 whitespace-normal break-words px-4 py-2.5">{check.error ?? (check.statusCode ? `HTTP ${check.statusCode}` : "OK")}</TableCell>
               </TableRow>
             ))}
             {page && page.checks.length === 0 && (
