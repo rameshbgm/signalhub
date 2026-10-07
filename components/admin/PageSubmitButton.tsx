@@ -15,6 +15,7 @@ export function PageSubmitButton({
   className,
   disabled = false,
   title,
+  "aria-label": ariaLabel,
 }: {
   children: ReactNode;
   pendingLabel?: string;
@@ -24,6 +25,7 @@ export function PageSubmitButton({
   className?: string;
   disabled?: boolean;
   title?: string;
+  "aria-label"?: string;
 }) {
   const { pending } = useFormStatus();
   const [confirm, confirmDialog] = useConfirm();
@@ -36,6 +38,7 @@ export function PageSubmitButton({
       disabled={disabled || pending}
       loading={pending}
       title={title}
+      aria-label={ariaLabel}
       className={className}
       onClick={async (event) => {
         if (!confirmMessage) return;

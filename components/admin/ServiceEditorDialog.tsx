@@ -1,5 +1,6 @@
 "use client";
 
+import { toneIcon } from "@/components/admin/page-management-styles";
 import { useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Pencil, Plus, X } from "lucide-react";
@@ -48,9 +49,8 @@ export function ServiceEditorDialog({
   let triggerButton: ReactNode;
   if (trigger === "icon") {
     triggerButton = (
-      <Button type="button" data-button-guard="off" variant="ghost" size="sm" onClick={() => { setSession((value) => value + 1); setOpen(true); }} aria-label={`Edit ${service?.name ?? "service"}`}>
-        <Pencil aria-hidden size={14} />
-        <span className="max-sm:sr-only">Edit</span>
+      <Button type="button" data-button-guard="off" variant="ghost" size="icon" className={`size-8 ${toneIcon.edit}`} onClick={() => { setSession((value) => value + 1); setOpen(true); }} aria-label={`Edit ${service?.name ?? "service"}`} title="Edit service">
+        <Pencil aria-hidden size={16} />
       </Button>
     );
   } else {
@@ -96,7 +96,7 @@ export function ServiceEditorDialog({
               {editing && (
                 <fieldset className="space-y-2">
                   <legend className="sr-only">Visibility</legend>
-                  <label className="flex items-center gap-2 text-sm text-ink-soft"><Checkbox name="visible" defaultChecked={service!.visible} /> Visible publicly</label>
+                  <label className="flex items-center gap-2 text-sm text-ink-soft"><Checkbox name="visible" defaultChecked={service!.visible} /> Published on the public page</label>
                   <label className="flex items-center gap-2 text-sm text-ink-soft"><Checkbox name="showUptime" defaultChecked={service!.showUptime} /> Show uptime</label>
                 </fieldset>
               )}

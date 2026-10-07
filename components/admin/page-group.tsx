@@ -1,5 +1,6 @@
 "use client";
 
+import { toneIcon } from "@/components/admin/page-management-styles";
 import { CopyPhrase } from "@/components/ui/copy-phrase";
 import { useCallback, useId, useState, type ReactNode } from "react";
 import Link from "next/link";
@@ -32,15 +33,6 @@ export type PageRow = {
 
 const iconAction = (extra?: string) => buttonVariants({ variant: "ghost", size: "icon", className: cn("size-8", extra) });
 const accessIcon = (type: string) => (type === "PUBLIC" ? Globe : type === "PRIVATE" ? Lock : Users);
-const toneIcon = {
-  view: "[&_svg]:!text-info-fg",
-  edit: "[&_svg]:!text-primary-ink",
-  publish: "[&_svg]:!text-ok-fg",
-  hide: "[&_svg]:!text-warn-fg",
-  remove: "[&_svg]:!text-ink-soft",
-  setup: "[&_svg]:!text-warn-fg",
-  delete: "hover:bg-danger-bg [&_svg]:!text-danger-fg",
-};
 const accessLabel = (type: string) => (type === "PUBLIC" ? "Public" : type === "PRIVATE" ? "Private" : "Audience");
 
 /** Icon-only submit button; `label` is the accessible name and tooltip. */

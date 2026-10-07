@@ -171,6 +171,20 @@ export async function updateComponentDetails(pageId: string, componentId: string
   await revalidatePageSurfaces(page);
 }
 
+/** Publish or unpublish one service: unpublished services disappear from the public page, feeds and subscriber choices. */
+export async function setComponentVisibility(pageId: string, componentId: string, visible: boolean) {
+  const session = await requireCapability("page.configure", pageId);
+  await assertPageInOrg(pageId, session.orgId);
+  const page = await assertStatusPage(pageId, session.orgId);
+  await assertComponentInPage(componentId, pageId);
+  await withDatabaseTransaction(async (transaction) => {
+    await fenceActiveOrganizationMutation(session.orgId, transaction);
+    await transaction.updateTable("components").set({ visible })
+      .where("id", "=", componentId).where("pageId", "=", pageId).execute();
+  });
+  await revalidatePageSurfaces(page);
+}
+
 export async function reorderComponentOrder(pageId: string, orderedIds: string[]) {
   const session = await requireCapability("page.configure", pageId);
   await assertPageInOrg(pageId, session.orgId);

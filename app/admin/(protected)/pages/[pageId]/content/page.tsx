@@ -1,11 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Boxes, Layers3, Plus, Trash2 } from "lucide-react";
+import { Boxes, Eye, EyeOff, Layers3, Plus, Trash2 } from "lucide-react";
 import { ComponentOrderList } from "@/components/admin/ComponentOrderList";
 import { PageSubmitButton } from "@/components/admin/PageSubmitButton";
 import { ServiceEditorDialog } from "@/components/admin/ServiceEditorDialog";
 import { ServiceStatusSelect } from "@/components/admin/ServiceStatusSelect";
-import { dangerGhost, formMessage } from "@/components/admin/page-management-styles";
+import { formMessage, toneIcon } from "@/components/admin/page-management-styles";
 import { Select } from "@/components/ui/select";
 import { PlatformActionForm } from "@/components/platform/PlatformActionForm";
 import { assertPageInOrg, requireCapability } from "@/lib/admin-guard";
@@ -14,7 +14,7 @@ import { COMPONENT_STATUS_LABEL, COMPONENT_STATUS_TONE, type ComponentStatus } f
 import { attachChildPage, bulkPageAction } from "../../actions";
 import { PageGroup } from "@/components/admin/page-group";
 import { memberRow } from "@/lib/page-rows";
-import { createComponent, deleteComponent, updateComponentDetails, updateComponentStatus } from "../components-actions";
+import { createComponent, deleteComponent, setComponentVisibility, updateComponentDetails, updateComponentStatus } from "../components-actions";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -110,12 +110,25 @@ async function StatusPageContent({ pageId }: { pageId: string }) {
                     <div className="flex flex-wrap items-center gap-2">
                       <h3 className="truncate text-sm font-semibold text-ink">{component.name}</h3>
                       <StatusBadge tone={COMPONENT_STATUS_TONE[status]}>{COMPONENT_STATUS_LABEL[status]}</StatusBadge>
-                      {!component.visible && <Badge>Hidden</Badge>}
+                      {!component.visible && <Badge>Unpublished</Badge>}
                     </div>
                     <p className="mt-0.5 truncate text-xs text-ink-dim" title={details}>{details}</p>
                   </div>
                   <div className="flex items-start gap-1 sm:shrink-0">
                     <ServiceStatusSelect action={updateComponentStatus.bind(null, pageId, component.id)} serviceId={component.id} serviceName={component.name} status={status} />
+                    <PlatformActionForm action={setComponentVisibility.bind(null, pageId, component.id, !component.visible)} successMessage={component.visible ? `${component.name} unpublished` : `${component.name} published`} className="flex">
+                      <PageSubmitButton
+                        variant="ghost"
+                        size="icon"
+                        className={`size-8 ${component.visible ? toneIcon.hide : toneIcon.publish}`}
+                        pendingLabel=""
+                        aria-label={`${component.visible ? "Unpublish" : "Publish"} ${component.name}`}
+                        title={component.visible ? "Unpublish service" : "Publish service"}
+                        confirmMessage={component.visible ? `Unpublish ${component.name}? It disappears from the public page until you publish it again.` : `Publish ${component.name}? It becomes visible on the public page.`}
+                      >
+                        {component.visible ? <EyeOff aria-hidden size={16} /> : <Eye aria-hidden size={16} />}
+                      </PageSubmitButton>
+                    </PlatformActionForm>
                     <ServiceEditorDialog
                       trigger="icon"
                       pageId={pageId}
@@ -123,10 +136,9 @@ async function StatusPageContent({ pageId }: { pageId: string }) {
                       action={updateComponentDetails.bind(null, pageId, component.id)}
                       service={{ id: component.id, name: component.name, description: component.description, groupId: component.groupId, visible: component.visible, showUptime: component.showUptime }}
                     />
-                    <InlineActionForm action={deleteComponent.bind(null, pageId, component.id)} messageClassName="justify-end">
-                      <PageSubmitButton variant="ghost" size="sm" className={dangerGhost} pendingLabel="Deleting…" confirmMessage={`Delete ${component.name}? This action cannot be undone.`} title={`Delete ${component.name}`}>
-                        <Trash2 aria-hidden size={14} />
-                        <span className="max-sm:sr-only">Delete</span>
+                    <InlineActionForm action={deleteComponent.bind(null, pageId, component.id)}>
+                      <PageSubmitButton variant="ghost" size="icon" className={`size-8 ${toneIcon.delete}`} pendingLabel="" aria-label={`Delete ${component.name}`} title="Delete service" confirmMessage={`Delete ${component.name}? This action cannot be undone.`}>
+                        <Trash2 aria-hidden size={16} />
                       </PageSubmitButton>
                     </InlineActionForm>
                   </div>
