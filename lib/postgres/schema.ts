@@ -536,6 +536,7 @@ export interface PlatformConfigurationTable {
   smsAccountId: string | null;
   smsSecretCiphertext: string | null;
   smsFrom: string | null;
+  destinationDefaults: Generated<Record<string, Record<string, string>>>;
 }
 
 export interface MaintenanceLeaseTable {

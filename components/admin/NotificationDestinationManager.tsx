@@ -13,6 +13,7 @@ import { Select } from "@/components/ui/select";
 import {
   defaultConfig,
   DESTINATION_CHANNELS,
+  type DestinationDefaults,
   DESTINATION_EVENT_TYPES,
   DESTINATION_PROVIDERS,
   fieldVisible,
@@ -39,11 +40,14 @@ export function NotificationDestinationManager({
   initial,
   enabledChannels,
   components = [],
+  defaults = {},
 }: {
   pageId: string;
   initial: Destination[];
   enabledChannels?: readonly string[];
   components?: Array<{ id: string; name: string }>;
+  /** Installation-wide defaults set by the platform administrator. */
+  defaults?: DestinationDefaults;
 }) {
   const availableProviders = CHANNELS.filter(
     (provider) => !enabledChannels || enabledChannels.includes(provider.value)
@@ -53,7 +57,7 @@ export function NotificationDestinationManager({
     availableProviders[0]?.value ?? "SLACK"
   );
   const [name, setName] = useState("");
-  const [config, setConfig] = useState<Record<string, string>>(() => defaultConfig(availableProviders[0]?.value ?? "SLACK"));
+  const [config, setConfig] = useState<Record<string, string>>(() => defaultConfig(availableProviders[0]?.value ?? "SLACK", defaults));
   const [eventTypes, setEventTypes] = useState<string[]>([]);
   const [componentIds, setComponentIds] = useState<string[]>([]);
   const [message, setMessage] = useState<string | null>(null);
@@ -91,7 +95,7 @@ export function NotificationDestinationManager({
       }
       setDestinations((items) => [...items, { ...data.destination, lastTestOk: true, lastError: null, eventTypes, componentIds: componentIds.length ? componentIds : null }]);
       setName("");
-      setConfig(defaultConfig(channel));
+      setConfig(defaultConfig(channel, defaults));
       setEventTypes([]);
       setComponentIds([]);
       setMessage("Destination verified and enabled.");
@@ -160,7 +164,7 @@ export function NotificationDestinationManager({
                   aria-pressed={selected}
                   onClick={() => {
                     setChannel(provider.value);
-                    setConfig(defaultConfig(provider.value));
+                    setConfig(defaultConfig(provider.value, defaults));
                     setMessage(null);
                   }}
                   variant="ghost"

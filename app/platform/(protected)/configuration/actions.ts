@@ -10,6 +10,8 @@ import {
   type ProviderColumns,
 } from "@/lib/delivery-config";
 import { SMS_PROVIDER_IDS, SMS_PROVIDERS } from "@/lib/delivery-providers";
+import { DESTINATION_PROVIDERS, sanitizeDestinationDefaults, type DestinationDefaults } from "@/lib/destination-catalog";
+import { validateHttpTarget } from "@/lib/target-validation";
 import { decryptSecret, encryptSecret } from "@/lib/encryption";
 import type { SmsProvider } from "@/lib/postgres/schema";
 import {
@@ -212,4 +214,33 @@ export async function sendTestSms(formData: FormData) {
   const { sms } = await getDeliveryConfig();
   if (!sms) throw new Error("Save the SMS provider first");
   await deliverSms(to, "SignalHub test SMS: SMS delivery is configured.", sms);
+}
+
+/**
+ * Saves installation-wide defaults for non-secret destination settings. Form
+ * fields are named `default:<CHANNEL>:<field>`; values equal to the built-in
+ * default are not stored.
+ */
+export async function updateDestinationDefaults(formData: FormData) {
+  const actor = await requirePlatformCapability("configuration.manage");
+  const reason = changeReason(formData);
+  const raw: Record<string, Record<string, string>> = {};
+  for (const [name, value] of formData.entries()) {
+    const [prefix, channel, key] = name.split(":");
+    if (prefix !== "default" || !channel || !key || typeof value !== "string") continue;
+    (raw[channel] ??= {})[key] = value;
+  }
+  const defaults: DestinationDefaults = sanitizeDestinationDefaults(raw);
+  for (const [channel, values] of Object.entries(defaults) as Array<[keyof typeof DESTINATION_PROVIDERS, Record<string, string>]>) {
+    for (const field of DESTINATION_PROVIDERS[channel].fields) {
+      const value = values[field.key];
+      if (value === undefined) continue;
+      if (value === field.defaultValue) delete values[field.key];
+      else if (field.kind === "url") {
+        values[field.key] = (await validateHttpTarget(value, { httpsOnly: true, allowPrivate: false })).toString();
+      }
+    }
+    if (!Object.keys(values).length) delete defaults[channel];
+  }
+  await saveProviders(actor, reason, "DESTINATION_DEFAULTS_UPDATED", { destinationDefaults: defaults }, { destinationDefaults: defaults });
 }

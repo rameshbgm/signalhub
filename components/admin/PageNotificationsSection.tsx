@@ -1,7 +1,7 @@
 import { Mail, MessageSquare, Rss } from "lucide-react";
 import { database } from "@/lib/postgres/client";
 import { subscriptionCapabilities } from "@/lib/notification-capabilities";
-import { enabledDestinationChannels } from "@/lib/platform-configuration";
+import { destinationDefaults, enabledDestinationChannels } from "@/lib/platform-configuration";
 import { secretLabel } from "@/lib/secrets";
 import { NotificationDestinationManager } from "@/components/admin/NotificationDestinationManager";
 import { WebhookEndpointManager } from "@/components/admin/WebhookEndpointManager";
@@ -17,13 +17,14 @@ import { IconTile } from "@/components/ui/icon-tile";
 import { StatusBadge } from "@/components/ui/status-badge";
 
 export async function PageNotificationsSection({ pageId }: { pageId: string }) {
-  const [page, endpointDocs, destinations, capabilities, enabledChannels, components] = await Promise.all([
+  const [page, endpointDocs, destinations, capabilities, enabledChannels, components, defaults] = await Promise.all([
     database.selectFrom("pages").select(["name", "emailFromName", "emailReplyTo", "emailFooter"]).where("id", "=", pageId).executeTakeFirst(),
     database.selectFrom("webhookEndpoints").selectAll().where("pageId", "=", pageId).execute(),
     database.selectFrom("notificationDestinations").selectAll().where("pageId", "=", pageId).orderBy("createdAt").execute(),
     subscriptionCapabilities(),
     enabledDestinationChannels(),
     database.selectFrom("components").select(["id", "name"]).where("pageId", "=", pageId).orderBy("name", "asc").execute(),
+    destinationDefaults(),
   ]);
   const endpoints = endpointDocs;
 
@@ -95,6 +96,7 @@ export async function PageNotificationsSection({ pageId }: { pageId: string }) {
             pageId={pageId}
             enabledChannels={enabledChannels}
             components={components}
+            defaults={defaults}
             initial={destinations.map((destination) => ({
               id: destination.id,
               name: destination.name,

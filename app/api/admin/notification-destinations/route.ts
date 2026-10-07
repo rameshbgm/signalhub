@@ -13,7 +13,7 @@ import {
 } from "@/lib/destination-catalog";
 import { deliverDestination } from "@/lib/notification-providers";
 import { fenceActiveOrganizationMutation } from "@/lib/organization-mutation";
-import { enabledDestinationChannels } from "@/lib/platform-configuration";
+import { destinationDefaults, enabledDestinationChannels } from "@/lib/platform-configuration";
 import { database, withDatabaseTransaction } from "@/lib/postgres/client";
 import type { NotificationDestinationRow } from "@/lib/postgres/schema";
 import { validateHttpTarget } from "@/lib/target-validation";
@@ -34,7 +34,7 @@ const schema = z.object({
 const RESERVED_HEADERS = new Set(["host", "content-type", "content-length", "transfer-encoding", "connection", "cookie"]);
 
 async function validateConfig(channel: DestinationChannel, input: Record<string, string>) {
-  const config = normalizeDestinationConfig(channel, input);
+  const config = normalizeDestinationConfig(channel, input, await destinationDefaults());
   for (const field of DESTINATION_PROVIDERS[channel].fields) {
     if (field.kind === "url" && config[field.key]) {
       config[field.key] = (await validateHttpTarget(config[field.key], { httpsOnly: true, allowPrivate: false })).toString();

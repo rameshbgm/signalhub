@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { Activity, ArrowRight, Cpu, Globe, HardDrive, KeyRound, Mail, Save, Smartphone, SlidersHorizontal, type LucideIcon } from "lucide-react";
 import { DeliveryProvidersCard } from "@/components/platform/DeliveryProvidersCard";
+import { DestinationDefaultsCard } from "@/components/platform/DestinationDefaultsCard";
+import { sanitizeDestinationDefaults } from "@/lib/destination-catalog";
 import { PlatformActionForm } from "@/components/platform/PlatformActionForm";
 import { database } from "@/lib/postgres/client";
 import { requirePlatformPageCapability } from "@/lib/platform-page-guard";
@@ -125,6 +127,8 @@ export default async function PlatformConfigurationPage() {
           )}
         </CardContent>
       </Card>
+
+      <DestinationDefaultsCard canManage={canManage} defaults={sanitizeDestinationDefaults(stored?.destinationDefaults)} />
 
       <DeliveryProvidersCard
         canManage={canManage}

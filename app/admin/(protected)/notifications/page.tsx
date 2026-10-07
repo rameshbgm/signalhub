@@ -5,7 +5,7 @@ import { NotificationDestinationManager } from "@/components/admin/NotificationD
 import { WebhookEndpointManager } from "@/components/admin/WebhookEndpointManager";
 import { getScopedPages, requireCapability } from "@/lib/admin-guard";
 import { subscriptionCapabilities } from "@/lib/notification-capabilities";
-import { enabledDestinationChannels } from "@/lib/platform-configuration";
+import { destinationDefaults, enabledDestinationChannels } from "@/lib/platform-configuration";
 import { secretLabel } from "@/lib/secrets";
 import { BellRing, Mail, Radio, Rss } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -25,12 +25,13 @@ export default async function NotificationsPage({
   const pages = await getScopedPages(session, org.id, { orderBy: "name" });
   const page = pages.find((item) => item.id === requested) ?? pages[0];
   if (!page) return <div className="space-y-8"><PageHeader title="Notifications and destinations" icon={BellRing} hue="teal" description="Configure subscriber delivery and team integrations for your status pages." /><EmptyState icon={BellRing} hue="teal" title="Create a status page first" description="Notifications and destinations belong to a status page." /></div>;
-  const [destinations, endpoints, capabilities, enabledChannels, components] = await Promise.all([
+  const [destinations, endpoints, capabilities, enabledChannels, components, defaults] = await Promise.all([
     database.selectFrom("notificationDestinations").selectAll().where("pageId", "=", page.id).orderBy("createdAt", "asc").execute(),
     database.selectFrom("webhookEndpoints").selectAll().where("pageId", "=", page.id).orderBy("createdAt", "asc").execute(),
     subscriptionCapabilities(),
     enabledDestinationChannels(),
     database.selectFrom("components").select(["id", "name"]).where("pageId", "=", page.id).orderBy("name", "asc").execute(),
+    destinationDefaults(),
   ]);
   return (
     <div className="space-y-8">
@@ -57,6 +58,7 @@ export default async function NotificationsPage({
           pageId={page.id}
           enabledChannels={enabledChannels}
           components={components}
+          defaults={defaults}
           initial={destinations.map((destination) => ({
             id: destination.id,
             name: destination.name,

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { alertAction, DESTINATION_CHANNELS, DESTINATION_PROVIDERS, normalizeDestinationConfig } from "@/lib/destination-catalog";
+import { alertAction, defaultConfig, DESTINATION_CHANNELS, DESTINATION_PROVIDERS, normalizeDestinationConfig, sanitizeDestinationDefaults } from "@/lib/destination-catalog";
 
 describe("destination catalog", () => {
   it("keeps only the fields of the chosen auth mode", () => {
@@ -33,5 +33,17 @@ describe("destination catalog", () => {
     expect(alertAction("incident.created")).toBe("trigger");
     expect(alertAction("monitor.recovered")).toBe("resolve");
     expect(alertAction("maintenance.scheduled")).toBeNull();
+  });
+
+  it("applies platform defaults but never secrets or invalid options", () => {
+    const defaults = sanitizeDestinationDefaults({
+      OPSGENIE: { region: "eu", apiKey: "leaked" },
+      PAGERDUTY: { severity: "apocalyptic" },
+      NTFY: { serverUrl: "https://ntfy.example.com" },
+      NOPE: { x: "y" },
+    });
+    expect(defaults).toEqual({ OPSGENIE: { region: "eu" }, NTFY: { serverUrl: "https://ntfy.example.com" } });
+    expect(defaultConfig("OPSGENIE", defaults)).toEqual({ region: "eu", priority: "P3" });
+    expect(normalizeDestinationConfig("NTFY", { topic: "t" }, defaults)).toMatchObject({ serverUrl: "https://ntfy.example.com", topic: "t" });
   });
 });

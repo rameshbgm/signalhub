@@ -37,6 +37,8 @@ export type ProviderField = {
   hint?: string;
   /** Only shown, validated and stored when another field has one of these values. */
   when?: { field: string; is: readonly string[] };
+  /** A platform administrator may set an installation-wide default (selects always can). */
+  platformDefault?: boolean;
 };
 
 export type DestinationProvider = {
@@ -108,7 +110,7 @@ export const DESTINATION_PROVIDERS: Record<DestinationChannel, DestinationProvid
         { value: "token", label: "Bot access token" },
       ] },
       { key: "url", label: "Incoming webhook URL", kind: "url", required: true, when: { field: "auth", is: ["webhook"] } },
-      { key: "serverUrl", label: "Server URL", kind: "url", required: true, placeholder: "https://chat.example.com", when: { field: "auth", is: ["token"] } },
+      { key: "serverUrl", label: "Server URL", kind: "url", required: true, placeholder: "https://chat.example.com", when: { field: "auth", is: ["token"] }, platformDefault: true },
       { key: "token", label: "Bot access token", kind: "secret", required: true, when: { field: "auth", is: ["token"] } },
       { key: "channelId", label: "Channel ID", required: true, when: { field: "auth", is: ["token"] } },
     ],
@@ -135,7 +137,7 @@ export const DESTINATION_PROVIDERS: Record<DestinationChannel, DestinationProvid
     group: "Chat",
     description: "Post to a Zulip stream topic with a bot account.",
     fields: [
-      { key: "siteUrl", label: "Zulip URL", kind: "url", required: true, placeholder: "https://example.zulipchat.com" },
+      { key: "siteUrl", label: "Zulip URL", kind: "url", required: true, placeholder: "https://example.zulipchat.com", platformDefault: true },
       { key: "botEmail", label: "Bot email", required: true },
       { key: "apiKey", label: "Bot API key", kind: "secret", required: true },
       { key: "stream", label: "Stream", required: true },
@@ -209,7 +211,7 @@ export const DESTINATION_PROVIDERS: Record<DestinationChannel, DestinationProvid
     group: "Push",
     description: "Publish to ntfy.sh or your own ntfy server.",
     fields: [
-      { key: "serverUrl", label: "Server URL", kind: "url", placeholder: "https://ntfy.sh", hint: "Leave blank for ntfy.sh." },
+      { key: "serverUrl", label: "Server URL", kind: "url", placeholder: "https://ntfy.sh", hint: "Leave blank for ntfy.sh.", platformDefault: true },
       { key: "topic", label: "Topic", required: true },
       { key: "auth", label: "Authentication", kind: "select", defaultValue: "none", options: [
         { value: "none", label: "None (public topic)" },
@@ -243,7 +245,7 @@ export const DESTINATION_PROVIDERS: Record<DestinationChannel, DestinationProvid
     group: "Push",
     description: "Push to a self-hosted Gotify server.",
     fields: [
-      { key: "serverUrl", label: "Server URL", kind: "url", required: true, placeholder: "https://gotify.example.com" },
+      { key: "serverUrl", label: "Server URL", kind: "url", required: true, placeholder: "https://gotify.example.com", platformDefault: true },
       { key: "appToken", label: "Application token", kind: "secret", required: true },
       { key: "priority", label: "Priority", kind: "select", defaultValue: "normal", options: PRIORITY_3 },
     ],
@@ -284,12 +286,39 @@ export const DESTINATION_EVENT_TYPES = [
   { value: "monitor.recovered", label: "Monitor recovered" },
 ] as const;
 
-export function defaultConfig(channel: DestinationChannel) {
-  return Object.fromEntries(
-    DESTINATION_PROVIDERS[channel].fields
-      .filter((field) => field.defaultValue !== undefined)
-      .map((field) => [field.key, field.defaultValue as string])
-  );
+export type DestinationDefaults = Partial<Record<DestinationChannel, Record<string, string>>>;
+
+export const defaultable = (field: ProviderField) => field.kind === "select" || Boolean(field.platformDefault);
+
+/** Catalog defaults, overridden by the platform administrator's defaults for this channel. */
+export function defaultConfig(channel: DestinationChannel, platform: DestinationDefaults = {}) {
+  return {
+    ...Object.fromEntries(
+      DESTINATION_PROVIDERS[channel].fields
+        .filter((field) => field.defaultValue !== undefined)
+        .map((field) => [field.key, field.defaultValue as string])
+    ),
+    ...(platform[channel] ?? {}),
+  };
+}
+
+/** Keeps only defaultable fields and valid select options; URLs are checked by the caller. */
+export function sanitizeDestinationDefaults(raw: unknown): DestinationDefaults {
+  const output: DestinationDefaults = {};
+  if (!raw || typeof raw !== "object") return output;
+  for (const channel of DESTINATION_CHANNELS) {
+    const values = (raw as Record<string, unknown>)[channel];
+    if (!values || typeof values !== "object") continue;
+    const kept: Record<string, string> = {};
+    for (const field of DESTINATION_PROVIDERS[channel].fields.filter(defaultable)) {
+      const value = (values as Record<string, unknown>)[field.key];
+      if (typeof value !== "string" || !value.trim()) continue;
+      if (field.kind === "select" && !field.options?.some((option) => option.value === value)) continue;
+      kept[field.key] = value.trim();
+    }
+    if (Object.keys(kept).length) output[channel] = kept;
+  }
+  return output;
 }
 
 /** `values` must already include the provider's defaults (see defaultConfig). */
@@ -301,8 +330,8 @@ export function fieldVisible(field: ProviderField, values: Record<string, string
  * Applies defaults, drops fields hidden by the chosen auth mode, and checks
  * required fields and select options. URL reachability is checked by the caller.
  */
-export function normalizeDestinationConfig(channel: DestinationChannel, input: Record<string, string>) {
-  const values: Record<string, string> = { ...defaultConfig(channel) };
+export function normalizeDestinationConfig(channel: DestinationChannel, input: Record<string, string>, platform: DestinationDefaults = {}) {
+  const values: Record<string, string> = { ...defaultConfig(channel, platform) };
   for (const [key, value] of Object.entries(input)) if (value.trim()) values[key] = value.trim();
   const output: Record<string, string> = {};
   for (const field of DESTINATION_PROVIDERS[channel].fields) {
