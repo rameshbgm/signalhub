@@ -330,7 +330,7 @@ export function SimpleAppearanceEditor({
               </div>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4" role="radiogroup" aria-labelledby="style-heading">
+              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3" role="radiogroup" aria-labelledby="style-heading">
                 {PAGE_THEME_PRESET_KEYS.map((preset) => {
                   const selected = design.theme.preset === preset;
                   return (
@@ -347,10 +347,13 @@ export function SimpleAppearanceEditor({
                       )}
                     >
                       {/* The selected tile previews the page's current brand color. */}
-                      <StylePreview preset={preset} pageName={page.name} brandOverride={selected ? design.theme.palette.brand : undefined} />
-                      <span className="flex items-center justify-between gap-2 border-t border-line bg-surface px-3 py-2" title={PAGE_THEME_PRESET_DESCRIPTIONS[preset]}>
-                        <span className="min-w-0 truncate text-sm font-semibold text-ink">{PAGE_THEME_PRESET_LABELS[preset]}</span>
-                        {selected && <Check aria-hidden size={15} className="shrink-0 text-primary" />}
+                      <StylePreview preset={preset} brandOverride={selected ? design.theme.palette.brand : undefined} />
+                      <span className="flex items-start justify-between gap-2 border-t border-line bg-surface px-4 py-3">
+                        <span className="min-w-0">
+                          <span className="block text-sm font-semibold text-ink">{PAGE_THEME_PRESET_LABELS[preset]}</span>
+                          <span className="mt-0.5 block text-xs leading-5 text-ink-soft">{PAGE_THEME_PRESET_DESCRIPTIONS[preset]}</span>
+                        </span>
+                        {selected && <Check aria-hidden size={16} className="mt-0.5 shrink-0 text-primary" />}
                       </span>
                     </button>
                   );
@@ -519,57 +522,32 @@ function VisitorDetailsCard({ design, tryCommit }: { design: StatusPageDesign; t
 const PREVIEW_RADIUS: Record<StatusPageDesign["theme"]["radius"], number> = { NONE: 0, SMALL: 3, MEDIUM: 6, LARGE: 9 };
 
 /**
- * A miniature public status page drawn from the preset's real theme values, so
- * the tile is the preview: background, card surface, brand banner, text, and
- * corner radius all match what visitors will see.
+ * A swatch of the preset's real theme values: background, card surface, brand
+ * bar, text, corner radius, and depth. Placeholder lines only, no status copy.
  */
-const PREVIEW_UPTIME = Array.from({ length: 24 }, (_, index) => (index === 17 ? "degraded" : "ok"));
-
-/**
- * A miniature of the real public page in this style: header, status banner,
- * uptime bars, services, and the subscribe button, using the preset's actual
- * palette, corner radius, and shadow. Text sizes are arbitrary on purpose:
- * this is a scaled-down miniature, not readable interface copy.
- */
-function StylePreview({ preset, pageName, brandOverride }: { preset: PageThemePresetKey; pageName: string; brandOverride?: string }) {
+function StylePreview({ preset, brandOverride }: { preset: PageThemePresetKey; brandOverride?: string }) {
   const theme = pageThemePreset(preset);
   const palette = { ...theme.palette, ...(brandOverride ? { brand: brandOverride } : {}) };
   const radius = PREVIEW_RADIUS[theme.radius] ?? 6;
-  const shadow = theme.shadow === "NONE" ? "none" : theme.shadow === "ELEVATED" ? "0 4px 10px rgb(15 23 42 / 0.12)" : "0 1px 2px rgb(15 23 42 / 0.10)";
-  const panel = { background: palette.surface, borderRadius: radius, boxShadow: shadow, border: `1px solid ${palette.text}14` };
-  const line = (width: string, color: string, opacity = 1) => <span className="block h-[3px] rounded-full" style={{ width, background: color, opacity }} />;
+  const shadow = theme.shadow === "NONE" ? "none" : theme.shadow === "ELEVATED" ? "0 6px 16px rgb(15 23 42 / 0.12)" : "0 1px 3px rgb(15 23 42 / 0.10)";
+  const rows = [0, 1, 2];
   return (
-    <span aria-hidden="true" className="block select-none" style={{ background: palette.background, color: palette.text }}>
-      {/* Header */}
-      <span className="flex items-center justify-between px-2.5 py-1.5" style={{ background: palette.surface, borderBottom: `1px solid ${palette.text}14` }}>
-        <span className="flex min-w-0 items-center gap-1">
-          <span className="block size-2.5 shrink-0" style={{ background: palette.brand, borderRadius: Math.min(radius, 3) }} />
-          <span className="truncate text-[7px] font-semibold leading-none">{pageName}</span>
-        </span>
-        <span className="block px-1.5 py-[2px] text-[6px] font-semibold leading-none text-white" style={{ background: palette.brand, borderRadius: Math.min(radius, 4) }}>Subscribe</span>
+    <span aria-hidden="true" className="block p-3.5" style={{ background: palette.background }}>
+      <span className="mb-2 flex items-center gap-1.5">
+        <span className="block size-3" style={{ background: palette.brand, borderRadius: Math.min(radius, 4) }} />
+        <span className="block h-1.5 w-14 rounded-full" style={{ background: palette.text, opacity: 0.75 }} />
       </span>
-      <span className="block space-y-1.5 p-2">
-        {/* Overall status banner */}
-        <span className="flex items-center gap-1 px-1.5 py-1" style={{ ...panel, borderColor: "#16a34a55" }}>
-          <span className="flex size-2.5 shrink-0 items-center justify-center rounded-full bg-[#16a34a] text-white"><Check size={7} /></span>
-          <span className="text-[6.5px] font-semibold leading-none text-[#15803d]">All systems operational</span>
+      <span className="block overflow-hidden" style={{ background: palette.surface, borderRadius: radius, boxShadow: shadow, border: `1px solid ${palette.text}14` }}>
+        <span className="flex items-center gap-1.5 px-2.5 py-2" style={{ background: palette.brand }}>
+          <span className="block size-2 rounded-full bg-white/90" />
+          <span className="block h-1.5 w-20 rounded-full bg-white/85" />
         </span>
-        {/* Services with uptime */}
-        <span className="block space-y-1 px-1.5 py-1.5" style={panel}>
-          <span className="flex items-center justify-between">
-            {line("38%", palette.text, 0.7)}
-            <span className="block size-1 rounded-full bg-[#16a34a]" />
+        {rows.map((index) => (
+          <span key={index} className="flex items-center justify-between gap-2 px-2.5 py-1.5" style={{ borderTop: index ? `1px solid ${palette.text}12` : undefined }}>
+            <span className="block h-1.5 rounded-full" style={{ width: `${44 - index * 8}%`, background: palette.mutedText, opacity: 0.7 }} />
+            <span className="block size-2 rounded-full" style={{ background: index === 2 ? palette.accent : palette.brand, opacity: 0.8 }} />
           </span>
-          <span className="grid grid-cols-[repeat(24,minmax(0,1fr))] gap-px">
-            {PREVIEW_UPTIME.map((state, index) => (
-              <span key={index} className="block h-2" style={{ background: state === "ok" ? "#22c55e" : "#eab308", borderRadius: radius ? 1 : 0, opacity: state === "ok" ? 0.85 : 1 }} />
-            ))}
-          </span>
-          <span className="flex items-center justify-between pt-0.5">
-            {line("30%", palette.mutedText, 0.8)}
-            <span className="block size-1 rounded-full" style={{ background: palette.accent }} />
-          </span>
-        </span>
+        ))}
       </span>
     </span>
   );

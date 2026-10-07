@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowUpRight, ExternalLink, Globe, Layers3, LayoutGrid, Lock, PanelsTopLeft, Pencil, Plus, Rocket, Trash2, Users } from "lucide-react";
+import { ArrowUpRight, Globe, Layers3, LayoutGrid, Lock, PanelsTopLeft, Pencil, Plus, Rocket, Trash2, Users } from "lucide-react";
 import { requireSession } from "@/lib/require-session";
 import { getScopedPages, sessionHasCapability } from "@/lib/admin-guard";
 import { publicPagePath } from "@/lib/public-path";
@@ -96,7 +96,6 @@ export default async function PagesListPage() {
                         ) : <span className="text-xs text-ink-dim">Not visible to visitors</span>}
                       </div>
                       <div className="flex shrink-0 items-center">
-                        {live && <a href={publicPagePath(page)} target="_blank" rel="noreferrer" aria-label={`Open ${page.name} live`} title="Open live" className={iconAction()}><ExternalLink aria-hidden size={16} /></a>}
                         {canConfigure && <>
                           <Link href={`/organization/pages/${page.id}`} aria-label={`Edit ${page.name}`} title="Edit page" className={iconAction()}><Pencil aria-hidden size={16} /></Link>
                           {page.isHub && <Link href={`/organization/pages/new?hubParentId=${page.id}`} aria-label="Create status page in this hub" title="Add page to hub" className={iconAction()}><Plus aria-hidden size={16} /></Link>}

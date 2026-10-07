@@ -437,10 +437,8 @@ select:not([multiple]) {
   min-height: 4rem;
   border-bottom-color: var(--public-rule) !important;
   padding: 0.85rem 0.25rem !important;
-  transition: background-color 200ms ease, transform 200ms ease;
 }
 .public-service-row:last-child { border-bottom: 0 !important; }
-.public-service-row:hover { background: var(--public-tint); }
 
 .public-subscribe-trigger { border-radius: 0.375rem !important; font-weight: 700; }
 .public-subscribe-dialog { border-radius: 0.875rem !important; }
