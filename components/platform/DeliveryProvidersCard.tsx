@@ -23,6 +23,7 @@ import { Field } from "@/components/ui/field";
 import { IconTile } from "@/components/ui/icon-tile";
 import { Input } from "@/components/ui/input";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { E164_PATTERN, INPUT_LIMITS } from "@/lib/input-limits";
 
 export type DeliveryProviderSettings = {
   smtpHost: string | null;
@@ -75,7 +76,7 @@ export function DeliveryProvidersCard({ settings, canManage }: { settings: Deliv
             <ProviderForm action={updateMailProvider} successMessage="Email provider verified and saved" onSaved={done}>
               <SmtpConnectionFields host={settings.smtpHost ?? ""} port={port} secure={settings.smtpSecure} username={settings.smtpUsername ?? ""} passwordStored={settings.smtpPasswordStored} />
               <Field label="From address" htmlFor="smtp-from" required hint="Status pages can replace the display name; the mailbox stays the same.">
-                <Input id="smtp-from" name="from" required maxLength={320} defaultValue={settings.smtpFrom ?? ""} placeholder="Status <status@example.com>" />
+                <Input id="smtp-from" name="from" required maxLength={INPUT_LIMITS.smtpFrom} defaultValue={settings.smtpFrom ?? ""} placeholder="Status <status@example.com>" />
               </Field>
             </ProviderForm>
           )}
@@ -98,7 +99,7 @@ export function DeliveryProvidersCard({ settings, canManage }: { settings: Deliv
           sendTest={
             <PlatformActionForm action={sendTestSms} successMessage="Test SMS sent" className="flex items-end gap-2">
               <Field label="Send test SMS to" htmlFor="sms-test-to" className="min-w-0 flex-1">
-                <Input id="sms-test-to" name="to" required maxLength={32} placeholder="+15551234567" />
+                <Input id="sms-test-to" name="to" required maxLength={16} pattern={E164_PATTERN} title="International format, such as +15551234567" placeholder="+15551234567" />
               </Field>
               <Button type="submit" variant="secondary"><Send aria-hidden size={16} />Send</Button>
             </PlatformActionForm>

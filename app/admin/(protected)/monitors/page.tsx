@@ -22,7 +22,8 @@ import { Input } from "@/components/ui/input";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { INPUT_LIMITS } from "@/lib/input-limits";
+import { INPUT_LIMITS, MONITOR_TAGS_HINT, MONITOR_TAGS_PATTERN } from "@/lib/input-limits";
+import { ActionRow, InlineActionForm } from "@/components/InlineActionForm";
 
 function relativeTime(date: Date | null): string {
   if (!date) return "never";
@@ -190,23 +191,23 @@ export default async function MonitorsPage({ searchParams }: { searchParams: Pro
                       </p>
                     </div>
                     {canManage && (
-                      <div className="flex flex-wrap items-center gap-2">
-                        <form action={runMonitorNow.bind(null, m.id)}>
+                      <ActionRow className="flex flex-wrap items-center gap-2">
+                        <InlineActionForm action={runMonitorNow.bind(null, m.id)}>
                           <Button type="submit" variant="secondary" size="sm"><RefreshCw aria-hidden size={14} />Check on next poll</Button>
-                        </form>
-                        <form action={toggleMonitorEnabled.bind(null, m.id)}>
+                        </InlineActionForm>
+                        <InlineActionForm action={toggleMonitorEnabled.bind(null, m.id)}>
                           <Button type="submit" variant="outline" size="sm">
                             {m.enabled ? <Pause aria-hidden size={14} /> : <Play aria-hidden size={14} />}
                             {m.enabled ? "Disable" : "Enable"}
                           </Button>
-                        </form>
-                        <form action={deleteMonitor.bind(null, m.id)}>
+                        </InlineActionForm>
+                        <InlineActionForm action={deleteMonitor.bind(null, m.id)}>
                           <PageSubmitButton variant="ghost" size="sm" pendingLabel="Deleting…" confirmMessage={`Delete the monitor ${m.name} and its check history? This cannot be undone.`} className="hover:bg-danger-bg hover:text-danger-fg [&_svg]:!text-ink-dim hover:[&_svg]:!text-danger-fg">
                             <Trash2 aria-hidden size={14} />
                             Delete
                           </PageSubmitButton>
-                        </form>
-                      </div>
+                        </InlineActionForm>
+                      </ActionRow>
                     )}
                   </div>
 
@@ -277,7 +278,7 @@ export default async function MonitorsPage({ searchParams }: { searchParams: Pro
                           <Input id={`monitor-recover-${m.id}`} name="recoverThreshold" type="number" min={1} max={20} defaultValue={m.recoverThreshold} />
                         </Field>
                         <Field label="Tags" htmlFor={`monitor-tags-${m.id}`} className="sm:col-span-2">
-                          <Input id={`monitor-tags-${m.id}`} name="tags" defaultValue={m.tags?.join(", ") ?? ""} placeholder="Tags, comma separated" />
+                          <Input id={`monitor-tags-${m.id}`} name="tags" maxLength={INPUT_LIMITS.monitorTags * (INPUT_LIMITS.monitorTag + 2)} pattern={MONITOR_TAGS_PATTERN} title={MONITOR_TAGS_HINT} defaultValue={m.tags?.join(", ") ?? ""} placeholder="Tags, comma separated" />
                         </Field>
                         <div className="flex justify-end sm:col-span-2">
                           <Button type="submit">Save monitor</Button>

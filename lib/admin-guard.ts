@@ -1,4 +1,5 @@
 import { headers } from "next/headers";
+import { notFound } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { addressAllowed, trustedClientIp } from "@/lib/network-policy";
 import { database } from "@/lib/postgres/client";
@@ -261,4 +262,14 @@ export async function assertGroupInPage(groupId: string, pageId: string) {
     .executeTakeFirst();
   if (!doc) throw new AdminAuthError("Component group not found on this page", 404, "GROUP_NOT_FOUND");
   return doc;
+}
+
+/** For route segments: a missing, malformed or deleted page renders the 404 page instead of the error screen. */
+export async function notFoundIfMissing<T>(load: Promise<T>): Promise<T> {
+  try {
+    return await load;
+  } catch (error) {
+    if (error instanceof AdminAuthError && error.status === 404) notFound();
+    throw error;
+  }
 }

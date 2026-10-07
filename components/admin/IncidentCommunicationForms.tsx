@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { Send } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { PageSubmitButton } from "@/components/admin/PageSubmitButton";
+import { PlatformActionForm } from "@/components/platform/PlatformActionForm";
 import { Field } from "@/components/ui/field";
 import { Textarea } from "@/components/ui/textarea";
 import { Select } from "@/components/ui/select";
@@ -26,10 +27,12 @@ export function IncidentUpdateComposer({
 }) {
   const [status, setStatus] = useState(currentStatus);
   const [body, setBody] = useState("");
+  // Keep the composer open after posting, empty for the next update.
+  const clearBody = useCallback(() => setBody(""), []);
   const [notify, setNotify] = useState(true);
 
   return (
-    <form action={action} className="space-y-4">
+    <PlatformActionForm action={action} successMessage="Update posted" onSuccess={clearBody} className="space-y-4">
       <Field label="Status" htmlFor="incident-update-status" className="sm:max-w-xs">
         <Select id="incident-update-status" aria-label="Update status" name="status" value={status} onChange={(event) => setStatus(event.target.value)}>
           {INCIDENT_STATUSES.map((value) => <option key={value} value={value}>{INCIDENT_STATUS_LABEL[value]}</option>)}
@@ -40,9 +43,9 @@ export function IncidentUpdateComposer({
       </Field>
       <CheckRow name="notify" checked={notify} onChange={(event) => setNotify(event.target.checked)} label="Notify subscribers" />
       <div className="flex justify-end">
-        <Button type="submit"><Send aria-hidden size={16} />Post update</Button>
+        <PageSubmitButton pendingLabel="Posting…"><Send aria-hidden size={16} />Post update</PageSubmitButton>
       </div>
-    </form>
+    </PlatformActionForm>
   );
 }
 
@@ -55,6 +58,8 @@ export function MaintenanceUpdateComposer({
 }) {
   const [status, setStatus] = useState(currentStatus);
   const [body, setBody] = useState("");
+  // Keep the composer open after posting, empty for the next update.
+  const clearBody = useCallback(() => setBody(""), []);
   const [notify, setNotify] = useState(true);
   const allowedStatuses =
     ({
@@ -67,7 +72,7 @@ export function MaintenanceUpdateComposer({
     ] ?? [];
 
   return (
-    <form action={action} className="space-y-4">
+    <PlatformActionForm action={action} successMessage="Maintenance update posted" onSuccess={clearBody} className="space-y-4">
       <Field label="Status" htmlFor="maintenance-update-status" className="sm:max-w-xs">
         <Select
           id="maintenance-update-status"
@@ -102,9 +107,9 @@ export function MaintenanceUpdateComposer({
         label="Notify subscribers about this update"
       />
       <div className="flex justify-end">
-        <Button type="submit"><Send aria-hidden size={16} />Post maintenance update</Button>
+        <PageSubmitButton pendingLabel="Posting…"><Send aria-hidden size={16} />Post maintenance update</PageSubmitButton>
       </div>
-    </form>
+    </PlatformActionForm>
   );
 }
 
@@ -122,7 +127,7 @@ export function PostmortemComposer({
   const [notify, setNotify] = useState(!published);
 
   return (
-    <form action={action} className="space-y-4">
+    <PlatformActionForm action={action} successMessage="Postmortem saved" className="space-y-4">
       <Field label="Postmortem" htmlFor="postmortem-body" hint="Shown as plain text on the public incident page, with line breaks kept.">
         <Textarea id="postmortem-body" name="postmortemBody" maxLength={INPUT_LIMITS.postmortem} rows={10} value={body} onChange={(event) => setBody(event.target.value)} placeholder={"## Summary\n## Timeline\n## Root cause\n## Remediation"} className="font-mono" />
       </Field>
@@ -144,8 +149,8 @@ export function PostmortemComposer({
         />
       </div>
       <div className="flex justify-end">
-        <Button type="submit">Save postmortem</Button>
+        <PageSubmitButton pendingLabel="Saving…">Save postmortem</PageSubmitButton>
       </div>
-    </form>
+    </PlatformActionForm>
   );
 }

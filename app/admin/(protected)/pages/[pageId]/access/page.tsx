@@ -14,6 +14,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { INPUT_LIMITS } from "@/lib/input-limits";
+import { InlineActionForm } from "@/components/InlineActionForm";
 
 export default async function PageAccess({ params }: { params: Promise<{ pageId: string }> }) {
   const { pageId } = await params;
@@ -56,7 +57,7 @@ export default async function PageAccess({ params }: { params: Promise<{ pageId:
               {!page.isHub && <ComponentChoices components={components} />}
               <Button type="submit" variant="secondary">Add group</Button>
             </PlatformActionForm>
-            {groupDocs.length > 0 ? <ul className="space-y-2">{groupDocs.map((group) => <li key={group.id} className="flex flex-wrap items-center justify-between gap-3 rounded-control border border-line px-3.5 py-3 text-sm"><span className="font-medium text-ink">{group.name}</span><form action={deleteAccessGroup.bind(null, pageId, group.id)}><Button type="submit" variant="destructive" size="sm">Delete</Button></form></li>)}</ul> : <EmptyState icon={UsersRound} hue="rose" title="No access groups yet" description="Add a group above to share service access across visitors." />}
+            {groupDocs.length > 0 ? <ul className="space-y-2">{groupDocs.map((group) => <li key={group.id} className="flex flex-wrap items-center justify-between gap-3 rounded-control border border-line px-3.5 py-3 text-sm"><span className="font-medium text-ink">{group.name}</span><InlineActionForm action={deleteAccessGroup.bind(null, pageId, group.id)} messageClassName="justify-end"><Button type="submit" variant="destructive" size="sm">Delete</Button></InlineActionForm></li>)}</ul> : <EmptyState icon={UsersRound} hue="rose" title="No access groups yet" description="Add a group above to share service access across visitors." />}
           </CardContent>
         </Card>
         <Card>
@@ -71,7 +72,7 @@ export default async function PageAccess({ params }: { params: Promise<{ pageId:
               {!page.isHub && <ComponentChoices components={components} />}
               <Button type="submit">Add user</Button>
             </PlatformActionForm>
-            {users.length > 0 ? <ul className="space-y-2">{users.map((user) => <li key={user.id} className="flex flex-wrap items-center justify-between gap-3 rounded-control border border-line px-3.5 py-3 text-sm"><div className="min-w-0"><p className="break-all font-medium text-ink">{user.email}</p>{user.groupName && <p className="mt-0.5 text-xs text-ink-dim">{user.groupName}</p>}</div><form action={deleteAccessUser.bind(null, pageId, user.id)}><Button type="submit" variant="destructive" size="sm">Delete</Button></form></li>)}</ul> : <EmptyState icon={UsersRound} hue="rose" title="No access users yet" description="Add a visitor above to grant access to this page." />}
+            {users.length > 0 ? <ul className="space-y-2">{users.map((user) => <li key={user.id} className="flex flex-wrap items-center justify-between gap-3 rounded-control border border-line px-3.5 py-3 text-sm"><div className="min-w-0"><p className="break-all font-medium text-ink">{user.email}</p>{user.groupName && <p className="mt-0.5 text-xs text-ink-dim">{user.groupName}</p>}</div><InlineActionForm action={deleteAccessUser.bind(null, pageId, user.id)} messageClassName="justify-end"><Button type="submit" variant="destructive" size="sm">Delete</Button></InlineActionForm></li>)}</ul> : <EmptyState icon={UsersRound} hue="rose" title="No access users yet" description="Add a visitor above to grant access to this page." />}
           </CardContent>
         </Card>
       </div>

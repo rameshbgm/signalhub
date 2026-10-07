@@ -25,25 +25,26 @@ import {
 import { writePlatformAudit } from "@/lib/platform-policy";
 import { database, withDatabaseTransaction } from "@/lib/postgres/client";
 import { createSmtpTransport, smtpTransport } from "@/lib/smtp";
+import { E164_PATTERN, INPUT_LIMITS } from "@/lib/input-limits";
 
 const text = (max: number) => z.string().trim().max(max);
 
 const mailProviderSchema = z.object({
-  host: text(255).min(1, "SMTP host is required"),
+  host: text(INPUT_LIMITS.smtpHost).min(1, "SMTP host is required"),
   port: z.coerce.number().int().min(1).max(65535),
   secure: z.boolean(),
-  username: text(255),
-  password: z.string().max(1_000),
-  from: text(320).min(3, "From address is required"),
+  username: text(INPUT_LIMITS.smtpUsername),
+  password: z.string().max(INPUT_LIMITS.smtpPassword),
+  from: text(INPUT_LIMITS.smtpFrom).min(3, "From address is required"),
 });
 
-const E164 = /^\+[1-9]\d{6,14}$/;
+const E164 = new RegExp(`^${E164_PATTERN}$`);
 
 const smsProviderSchema = z.object({
   provider: z.enum(SMS_PROVIDER_IDS as [SmsProvider, ...SmsProvider[]]),
-  accountId: text(128),
-  secret: z.string().trim().max(512),
-  fromNumber: text(32).min(1, "Sender is required"),
+  accountId: text(INPUT_LIMITS.smsAccountId),
+  secret: z.string().trim().max(INPUT_LIMITS.smsSecret),
+  fromNumber: text(INPUT_LIMITS.smsSender).min(1, "Sender is required"),
 }).superRefine((input, context) => {
   if (input.provider === "TWILIO" && !/^AC[0-9a-fA-F]{32}$/.test(input.accountId)) {
     context.addIssue({ code: "custom", path: ["accountId"], message: "Twilio account SID starts with AC followed by 32 hex characters" });

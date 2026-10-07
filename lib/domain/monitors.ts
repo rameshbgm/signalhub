@@ -38,7 +38,7 @@ const monitorInputSchema = z.object({
   actionRecordMetric: z.boolean(),
   actionAutoIncident: z.boolean(),
   actionNotify: z.boolean(),
-  tags: z.array(z.string().trim().min(1).max(50)).max(20).optional(),
+  tags: z.array(z.string().trim().min(1).max(INPUT_LIMITS.monitorTag)).max(INPUT_LIMITS.monitorTags).optional(),
   groupName: z.string().trim().max(INPUT_LIMITS.monitorGroup).nullable().optional(),
   heartbeatGraceSec: z.number().int().min(0).max(86_400).nullable().optional(),
   dnsRecordType: z.enum(["A", "AAAA", "CNAME", "MX", "TXT", "NS"]).nullable().optional(),

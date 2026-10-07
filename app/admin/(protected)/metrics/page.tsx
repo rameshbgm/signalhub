@@ -23,6 +23,7 @@ import { Input } from "@/components/ui/input";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { INPUT_LIMITS } from "@/lib/input-limits";
+import { ActionRow, InlineActionForm } from "@/components/InlineActionForm";
 
 export default async function MetricsPage({ searchParams }: { searchParams: Promise<{ pageId?: string }> }) {
   const { session, org } = await requireSession();
@@ -132,20 +133,20 @@ export default async function MetricsPage({ searchParams }: { searchParams: Prom
                     </p>
                   </div>
                   {canManage && (
-                    <div className="flex shrink-0 items-center gap-1.5">
-                      <form action={toggleMetricVisible.bind(null, m.id)}>
+                    <ActionRow className="flex shrink-0 items-center gap-1.5" messageClassName="justify-end">
+                      <InlineActionForm action={toggleMetricVisible.bind(null, m.id)}>
                         <Button type="submit" variant="outline" size="sm">
                           {m.visible ? <EyeOff aria-hidden size={14} /> : <Eye aria-hidden size={14} />}
                           {m.visible ? "Hide" : "Show"}
                         </Button>
-                      </form>
-                      <form action={deleteMetric.bind(null, m.id)}>
+                      </InlineActionForm>
+                      <InlineActionForm action={deleteMetric.bind(null, m.id)}>
                         <PageSubmitButton variant="ghost" size="sm" pendingLabel="Deleting…" confirmMessage={`Delete ${m.name} and all of its data points? This cannot be undone.`} className="hover:bg-danger-bg hover:text-danger-fg [&_svg]:!text-ink-dim hover:[&_svg]:!text-danger-fg">
                           <Trash2 aria-hidden size={14} />
                           Delete
                         </PageSubmitButton>
-                      </form>
-                    </div>
+                      </InlineActionForm>
+                    </ActionRow>
                   )}
                 </div>
 

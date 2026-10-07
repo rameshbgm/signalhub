@@ -18,6 +18,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { ActionRow, InlineActionForm } from "@/components/InlineActionForm";
 
 export default async function PageContent({ params }: { params: Promise<{ pageId: string }> }) {
   const { pageId } = await params;
@@ -65,10 +66,10 @@ async function HubContent({ pageId, orgId }: { pageId: string; orgId: string }) 
                     <span className="font-mono text-xs text-ink-dim">/{member.slug}</span>
                     <StatusBadge tone={state === "Published" ? "ok" : state === "Hidden" ? "neutral" : "warn"}>{state}</StatusBadge>
                   </div>
-                  <div className="flex items-center gap-1">
+                  <ActionRow className="flex items-center gap-1" messageClassName="justify-end">
                     <Link href={`/organization/pages/${member.id}`} className={buttonVariants({ variant: "secondary", size: "sm" })}>Manage</Link>
-                    <form action={detachChildPage.bind(null, pageId, member.id)}><PageSubmitButton variant="ghost" size="sm" className={dangerGhost} pendingLabel="Removing…">Remove</PageSubmitButton></form>
-                  </div>
+                    <InlineActionForm action={detachChildPage.bind(null, pageId, member.id)} messageClassName="justify-end"><PageSubmitButton variant="ghost" size="sm" className={dangerGhost} pendingLabel="Removing…">Remove</PageSubmitButton></InlineActionForm>
+                  </ActionRow>
                 </li>
               );
             })}
@@ -137,12 +138,12 @@ async function StatusPageContent({ pageId }: { pageId: string }) {
                       action={updateComponentDetails.bind(null, pageId, component.id)}
                       service={{ id: component.id, name: component.name, description: component.description, groupId: component.groupId, visible: component.visible, showUptime: component.showUptime }}
                     />
-                    <form action={deleteComponent.bind(null, pageId, component.id)}>
+                    <InlineActionForm action={deleteComponent.bind(null, pageId, component.id)} messageClassName="justify-end">
                       <PageSubmitButton variant="ghost" size="sm" className={dangerGhost} pendingLabel="Deleting…" confirmMessage={`Delete ${component.name}? This action cannot be undone.`} title={`Delete ${component.name}`}>
                         <Trash2 aria-hidden size={14} />
                         <span className="max-sm:sr-only">Delete</span>
                       </PageSubmitButton>
-                    </form>
+                    </InlineActionForm>
                   </div>
                 </article>
               );

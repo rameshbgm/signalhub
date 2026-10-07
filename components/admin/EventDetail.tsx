@@ -1,6 +1,8 @@
 import { PageSubmitButton } from "@/components/admin/PageSubmitButton";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { isDatabaseId } from "@/lib/database-id";
+import { InlineActionForm } from "@/components/InlineActionForm";
 import { ArrowLeft, ChevronRight, Trash2, Wrench, Siren } from "lucide-react";
 import { requireSession } from "@/lib/require-session";
 import { database } from "@/lib/postgres/client";
@@ -26,6 +28,7 @@ import { TimelineItem, TimelineList, componentTone, incidentStatusTone, maintena
 /** Detail screen for an incident or maintenance window at /organization/events/{id}. */
 export async function EventDetail({ incidentId }: { incidentId: string }) {
   const { session, org } = await requireSession();
+  if (!isDatabaseId(incidentId)) notFound();
   const incidentRow = await database.selectFrom("incidents").selectAll().where("id", "=", incidentId).executeTakeFirst();
   if (!incidentRow) notFound();
   const pageRow = await database.selectFrom("pages").selectAll().where("id", "=", incidentRow.pageId).executeTakeFirst();
@@ -181,8 +184,8 @@ export async function EventDetail({ incidentId }: { incidentId: string }) {
                     createdAtLabel: new Date(update.createdAt).toLocaleString(),
                     editedAtLabel: update.editedAt ? new Date(update.editedAt).toLocaleString() : null,
                     notified: update.notified,
+                    action: editIncidentUpdate.bind(null, incidentId, update.id),
                   }))}
-                  action={editIncidentUpdate.bind(null, incidentId)}
                 />
               ) : (
                 <TimelineList>
@@ -265,12 +268,12 @@ export async function EventDetail({ incidentId }: { incidentId: string }) {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <form action={boundDelete}>
+                <InlineActionForm action={boundDelete}>
                   <PageSubmitButton variant="destructive" size="sm" pendingLabel="Deleting…" confirmMessage={`Permanently delete this ${noun} and its full update history? This cannot be undone.`}>
                     <Trash2 aria-hidden size={14} />
                     Delete {incident.isMaintenance ? "maintenance" : "incident"}
                   </PageSubmitButton>
-                </form>
+                </InlineActionForm>
               </CardContent>
             </Card>
           )}

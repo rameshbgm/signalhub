@@ -76,6 +76,7 @@ export async function importSubscribersCsv(pageId: string, formData: FormData) {
   await assertPageInOrg(pageId, session.orgId);
   requireConsentAttestation(formData);
   const csv = String(formData.get("csv") ?? "");
+  if (csv.length > INPUT_LIMITS.csvText) throw new Error(`Paste at most ${INPUT_LIMITS.csvText.toLocaleString("en-US")} characters at a time`);
   const channel = String(formData.get("channel") ?? "EMAIL");
   if (channel !== "EMAIL") throw new Error("CSV import currently supports email subscribers only");
   const rawContacts = [...new Set(csv.split(/[\n,]/).map((value) => value.trim()).filter(Boolean))];

@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { Pencil } from "lucide-react";
+import { PlatformActionForm } from "@/components/platform/PlatformActionForm";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -23,6 +24,8 @@ type TimelineUpdate = {
   createdAtLabel: string;
   editedAtLabel: string | null;
   notified: boolean;
+  /** editIncidentUpdate bound to the incident and this update on the server, so failures can be reported inline. */
+  action: (formData: FormData) => Promise<void>;
 };
 
 function SaveUpdateButton() {
@@ -38,14 +41,9 @@ function SaveUpdateButton() {
   );
 }
 
-export function IncidentTimelineEditor({
-  updates,
-  action,
-}: {
-  updates: TimelineUpdate[];
-  action: (updateId: string, formData: FormData) => Promise<void>;
-}) {
+export function IncidentTimelineEditor({ updates }: { updates: TimelineUpdate[] }) {
   const [editingId, setEditingId] = useState<string | null>(null);
+  const stopEditing = useCallback(() => setEditingId(null), []);
 
   return (
     <TimelineList>
@@ -55,11 +53,10 @@ export function IncidentTimelineEditor({
         return (
           <TimelineItem key={update.id} current={newest}>
             {editing ? (
-              <form
-                action={async (formData) => {
-                  await action(update.id, formData);
-                  setEditingId(null);
-                }}
+              <PlatformActionForm
+                action={update.action}
+                successMessage="Update saved"
+                onSuccess={stopEditing}
                 className="space-y-4 rounded-card bg-sunken/50 p-4"
               >
                 <Field label="Status" htmlFor={`timeline-status-${update.id}`} className="sm:max-w-xs">
@@ -102,7 +99,7 @@ export function IncidentTimelineEditor({
                   </Button>
                   <SaveUpdateButton />
                 </div>
-              </form>
+              </PlatformActionForm>
             ) : (
               <>
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1">

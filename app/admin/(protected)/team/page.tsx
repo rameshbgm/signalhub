@@ -20,6 +20,7 @@ import { Field } from "@/components/ui/field";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatusBadge, type StatusTone } from "@/components/ui/status-badge";
 import { cn } from "@/lib/utils";
+import { InlineActionForm } from "@/components/InlineActionForm";
 
 const STATUS_TONE: Record<string, StatusTone> = { ACTIVE: "ok", INVITED: "warn" };
 
@@ -84,7 +85,7 @@ export default async function TeamPage() {
                           <Pencil aria-hidden size={14} />
                           Edit access
                         </summary>
-                        <form
+                        <InlineActionForm
                           action={updateMemberRole.bind(null, m.id)}
                           className="absolute left-0 z-20 mt-2 w-72 max-w-[calc(100vw-3rem)] space-y-4 rounded-card border border-line bg-surface shadow-card p-4 shadow-float sm:left-auto sm:right-0"
                         >
@@ -117,18 +118,18 @@ export default async function TeamPage() {
                           <Button type="submit" className="w-full">
                             Save access
                           </Button>
-                        </form>
+                        </InlineActionForm>
                       </details>
                     )}
                     {m.status === "REVOKED" ? (
                       <span className="text-xs text-ink-dim">Create this email again to reactivate</span>
                     ) : (
-                      <form action={removeMember.bind(null, m.id)}>
+                      <InlineActionForm action={removeMember.bind(null, m.id)} messageClassName="justify-end">
                         <Button type="submit" variant="ghost" size="sm" className="hover:!bg-danger-bg hover:!text-danger-fg [&_svg]:!text-ink-dim hover:[&_svg]:!text-danger-fg">
                           <Trash2 aria-hidden size={14} />
                           Remove
                         </Button>
-                      </form>
+                      </InlineActionForm>
                     )}
                   </div>
                 </li>

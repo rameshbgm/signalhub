@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { SMS_PROVIDER_IDS, SMS_PROVIDERS, SMTP_PRESETS } from "@/lib/delivery-providers";
 import type { SmsProvider } from "@/lib/postgres/schema";
+import { INPUT_LIMITS } from "@/lib/input-limits";
 
 /** Host, port, TLS and username, with presets for common SMTP services. */
 export function SmtpConnectionFields({ host, port, secure, username, passwordStored }: {
@@ -31,7 +32,7 @@ export function SmtpConnectionFields({ host, port, secure, username, passwordSto
       </Field>
       <div className="grid gap-4 sm:grid-cols-[1fr_7rem]">
         <Field label="SMTP host" htmlFor="smtp-host" required>
-          <Input id="smtp-host" name="host" required maxLength={255} value={values.host} onChange={(event) => setValues({ ...values, host: event.target.value })} placeholder="smtp.example.com" autoComplete="off" />
+          <Input id="smtp-host" name="host" required maxLength={INPUT_LIMITS.smtpHost} value={values.host} onChange={(event) => setValues({ ...values, host: event.target.value })} placeholder="smtp.example.com" autoComplete="off" />
         </Field>
         <Field label="Port" htmlFor="smtp-port" required>
           <Input id="smtp-port" name="port" type="number" required min={1} max={65535} value={values.port} onChange={(event) => setValues({ ...values, port: event.target.value })} />
@@ -43,10 +44,10 @@ export function SmtpConnectionFields({ host, port, secure, username, passwordSto
       </label>
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Username" htmlFor="smtp-username" hint="Leave blank for servers without authentication.">
-          <Input id="smtp-username" name="username" maxLength={255} value={values.username} onChange={(event) => setValues({ ...values, username: event.target.value })} autoComplete="off" />
+          <Input id="smtp-username" name="username" maxLength={INPUT_LIMITS.smtpUsername} value={values.username} onChange={(event) => setValues({ ...values, username: event.target.value })} autoComplete="off" />
         </Field>
         <Field label="Password" htmlFor="smtp-password" hint={passwordStored ? "Saved. Leave blank to keep it." : undefined}>
-          <Input id="smtp-password" name="password" type="password" maxLength={1000} placeholder={passwordStored ? "••••••••" : ""} autoComplete="new-password" />
+          <Input id="smtp-password" name="password" type="password" maxLength={INPUT_LIMITS.smtpPassword} placeholder={passwordStored ? "••••••••" : ""} autoComplete="new-password" />
         </Field>
       </div>
     </>
@@ -70,14 +71,14 @@ export function SmsConnectionFields({ provider: initialProvider, accountId, from
       </Field>
       {meta.accountLabel && (
         <Field label={meta.accountLabel} htmlFor="sms-account" required>
-          <Input key={provider} id="sms-account" name="accountId" required maxLength={128} defaultValue={provider === initialProvider ? accountId : ""} placeholder={provider === "TWILIO" ? "AC…" : ""} autoComplete="off" />
+          <Input key={provider} id="sms-account" name="accountId" required maxLength={INPUT_LIMITS.smsAccountId} defaultValue={provider === initialProvider ? accountId : ""} placeholder={provider === "TWILIO" ? "AC…" : ""} autoComplete="off" />
         </Field>
       )}
       <Field label={meta.secretLabel} htmlFor="sms-secret" required={!keepsSecret} hint={keepsSecret ? "Saved. Leave blank to keep it." : undefined}>
-        <Input key={provider} id="sms-secret" name="secret" type="password" required={!keepsSecret} maxLength={512} placeholder={keepsSecret ? "••••••••" : ""} autoComplete="new-password" />
+        <Input key={provider} id="sms-secret" name="secret" type="password" required={!keepsSecret} maxLength={INPUT_LIMITS.smsSecret} placeholder={keepsSecret ? "••••••••" : ""} autoComplete="new-password" />
       </Field>
       <Field label="Sender" htmlFor="sms-from" required hint={provider === "VONAGE" ? "E.164 number, or an alphanumeric sender ID of up to 11 characters." : "E.164 format, for example +15551234567."}>
-        <Input id="sms-from" name="fromNumber" required maxLength={32} defaultValue={fromNumber} placeholder="+15551234567" />
+        <Input id="sms-from" name="fromNumber" required maxLength={INPUT_LIMITS.smsSender} defaultValue={fromNumber} placeholder="+15551234567" />
       </Field>
     </>
   );

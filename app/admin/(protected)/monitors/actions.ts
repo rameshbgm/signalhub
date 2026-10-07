@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { assertPageInOrg, requireCapability } from "@/lib/admin-guard";
 import { isDatabaseId } from "@/lib/database-id";
-import { INPUT_LIMITS } from "@/lib/input-limits";
+import { INPUT_LIMITS, MONITOR_TAGS_HINT } from "@/lib/input-limits";
 import { deleteMonitorCascade } from "@/lib/cascade";
 import { createMonitor as createMonitorDomain, type MonitorInput } from "@/lib/domain/monitors";
 import { fenceActiveOrganizationMutation } from "@/lib/organization-mutation";
@@ -152,7 +152,7 @@ export async function updateMonitor(monitorId: string, formData: FormData) {
   if (!Number.isInteger(intervalSec) || intervalSec < 10 || intervalSec > 86_400) throw new Error("Interval must be between 10 and 86400 seconds");
   if (!Number.isInteger(timeoutMs) || timeoutMs < 100 || timeoutMs > 60_000) throw new Error("Timeout must be between 100 and 60000 milliseconds");
   if (![failThreshold, recoverThreshold].every((value) => Number.isInteger(value) && value >= 1 && value <= 20)) throw new Error("Thresholds must be between 1 and 20");
-  if (tags.length > 20 || tags.some((tag) => tag.length > 50)) throw new Error("Use no more than 20 tags of 50 characters each");
+  if (tags.length > INPUT_LIMITS.monitorTags || tags.some((tag) => tag.length > INPUT_LIMITS.monitorTag)) throw new Error(MONITOR_TAGS_HINT);
   if (groupName && groupName.length > INPUT_LIMITS.monitorGroup) throw new Error(`Group names must be ${INPUT_LIMITS.monitorGroup} characters or fewer`);
   if (componentId && !isDatabaseId(componentId)) throw new Error("Component not found on this page");
   if (componentId) {

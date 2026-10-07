@@ -9,7 +9,7 @@ import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { CheckRow } from "@/components/admin/operate-ui";
 import { COMPONENT_STATUSES, COMPONENT_STATUS_LABEL, type ComponentStatus } from "@/lib/status";
-import { INPUT_LIMITS } from "@/lib/input-limits";
+import { INPUT_LIMITS, MONITOR_TAGS_HINT, MONITOR_TAGS_PATTERN } from "@/lib/input-limits";
 
 const MONITOR_TYPES = ["HTTP", "KEYWORD", "TCP", "TLS", "ICMP", "DNS", "HEARTBEAT"] as const;
 
@@ -220,7 +220,7 @@ export function MonitorForm({
           <Input id="monitor-group" name="groupName" maxLength={INPUT_LIMITS.monitorGroup} placeholder="Monitor group (optional)" />
         </Field>
         <Field label="Tags" htmlFor="monitor-tags">
-          <Input id="monitor-tags" name="tags" placeholder="Tags, comma separated" />
+          <Input id="monitor-tags" name="tags" maxLength={INPUT_LIMITS.monitorTags * (INPUT_LIMITS.monitorTag + 2)} pattern={MONITOR_TAGS_PATTERN} title={MONITOR_TAGS_HINT} placeholder="Tags, comma separated" />
         </Field>
       </div>
 

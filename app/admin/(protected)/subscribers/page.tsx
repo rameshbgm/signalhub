@@ -21,6 +21,7 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { INPUT_LIMITS } from "@/lib/input-limits";
+import { ActionRow, InlineActionForm } from "@/components/InlineActionForm";
 
 const CHANNELS = [
   { value: "EMAIL", label: "Email" },
@@ -139,9 +140,9 @@ export default async function SubscribersPage({ searchParams }: { searchParams: 
                       <p className="truncate font-medium text-ink">{job.contact}</p>
                       <p className="mt-0.5 text-xs text-danger-fg">{job.lastError ?? "Delivery failed"} <span className="text-ink-dim">· attempt {job.attempts}/{job.maxAttempts}</span></p>
                     </div>
-                    <form action={retryNotificationJob.bind(null, job.id)}>
+                    <InlineActionForm action={retryNotificationJob.bind(null, job.id)} messageClassName="justify-end">
                       <Button type="submit" variant="secondary" size="sm">Retry now</Button>
-                    </form>
+                    </InlineActionForm>
                   </li>
                 ))}
               </ul>
@@ -196,8 +197,8 @@ export default async function SubscribersPage({ searchParams }: { searchParams: 
                   <option value="EMAIL">Email</option>
                 </Select>
               </Field>
-              <Field label="Email addresses" htmlFor="import-csv">
-                <Textarea id="import-csv" name="csv" rows={3} placeholder="one@example.com, two@example.com" />
+              <Field label="Email addresses" htmlFor="import-csv" hint={`Up to ${INPUT_LIMITS.csvContacts.toLocaleString("en-US")} addresses, separated by commas or new lines.`}>
+                <Textarea id="import-csv" name="csv" maxLength={INPUT_LIMITS.csvText} rows={3} placeholder="one@example.com, two@example.com" />
               </Field>
               <CheckRow name="consent" required label="Everyone listed agreed to receive status updates" hint="Existing subscribers are skipped, including quarantined ones." />
               <div className="flex justify-end border-t border-line pt-4">
@@ -241,20 +242,20 @@ export default async function SubscribersPage({ searchParams }: { searchParams: 
                     {s.quarantined && <StatusBadge tone="danger">Quarantined</StatusBadge>}
                     {s.verified && !s.quarantined && <StatusBadge tone="ok">Active</StatusBadge>}
                   </div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <form action={toggleQuarantine.bind(null, s.id)}>
+                  <ActionRow className="flex flex-wrap items-center gap-2" messageClassName="justify-end">
+                    <InlineActionForm action={toggleQuarantine.bind(null, s.id)} messageClassName="justify-end">
                       <Button type="submit" variant="secondary" size="sm">
                         {s.quarantined ? <ShieldCheck aria-hidden size={14} /> : <ShieldOff aria-hidden size={14} />}
                         {s.quarantined ? "Unquarantine" : "Quarantine"}
                       </Button>
-                    </form>
-                    <form action={removeSubscriber.bind(null, s.id)}>
+                    </InlineActionForm>
+                    <InlineActionForm action={removeSubscriber.bind(null, s.id)} messageClassName="justify-end">
                       <PageSubmitButton variant="ghost" size="sm" pendingLabel="Removing…" confirmMessage={`Remove ${s.contact}? They will stop receiving updates.`} className="hover:!bg-danger-bg hover:!text-danger-fg [&_svg]:!text-ink-dim hover:[&_svg]:!text-danger-fg">
                         <Trash2 aria-hidden size={14} />
                         Remove
                       </PageSubmitButton>
-                    </form>
-                  </div>
+                    </InlineActionForm>
+                  </ActionRow>
                 </li>
               ))}
             </ul>

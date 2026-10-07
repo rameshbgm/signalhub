@@ -1,7 +1,7 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { databaseInputErrorMessage } from "@/lib/database-errors";
-import { INPUT_LIMITS, isValidEmail, isValidSmsCountryCode } from "@/lib/input-limits";
+import { INPUT_LIMITS, MONITOR_TAGS_PATTERN, isValidEmail, isValidSmsCountryCode } from "@/lib/input-limits";
 
 const source = (path: string) => readFileSync(path, "utf8");
 
@@ -66,5 +66,57 @@ describe("server and form limits stay in sync", () => {
 
   it("keeps the email cap at the RFC limit", () => {
     expect(INPUT_LIMITS.email).toBe(254);
+  });
+
+  it("drives delivery provider limits from the shared module on both sides", () => {
+    const server = source("app/platform/(protected)/configuration/actions.ts");
+    for (const limit of ["smtpHost", "smtpPassword", "smtpFrom", "smsAccountId", "smsSecret", "smsSender"]) {
+      expect(server).toContain(`INPUT_LIMITS.${limit}`);
+    }
+    expect(server).toContain("E164_PATTERN");
+    expect(source("components/platform/DeliveryProviderFields.tsx")).toContain("INPUT_LIMITS.smsSecret");
+    expect(source("components/platform/DeliveryProvidersCard.tsx")).toContain("pattern={E164_PATTERN}");
+  });
+
+  it("keeps CSV imports under the server action body limit", () => {
+    // Next's default server action body limit is 1 MB; leave room for the multipart envelope.
+    expect(INPUT_LIMITS.csvText).toBeLessThan(1_000_000);
+    expect(source("app/admin/(protected)/subscribers/actions.ts")).toContain("INPUT_LIMITS.csvText");
+    expect(source("app/admin/(protected)/subscribers/page.tsx")).toContain("maxLength={INPUT_LIMITS.csvText}");
+  });
+});
+
+describe("monitor tags pattern", () => {
+  // Browsers compile the pattern attribute with the v flag and anchor it.
+  const matches = (value: string) => new RegExp(`^(?:${MONITOR_TAGS_PATTERN})$`, "v").test(value);
+
+  it("accepts what the server accepts and rejects what it rejects", () => {
+    expect(matches("")).toBe(true);
+    expect(matches("api, prod , eu-west")).toBe(true);
+    expect(matches(`edge, ${"a".repeat(INPUT_LIMITS.monitorTag)}`)).toBe(true);
+    expect(matches("a".repeat(INPUT_LIMITS.monitorTag + 1))).toBe(false);
+    expect(matches(Array(INPUT_LIMITS.monitorTags).fill("t").join(", "))).toBe(true);
+    expect(matches(Array(INPUT_LIMITS.monitorTags + 1).fill("t").join(", "))).toBe(false);
+  });
+
+  it("is used by both monitor forms", () => {
+    expect(source("components/admin/MonitorForm.tsx")).toContain("pattern={MONITOR_TAGS_PATTERN}");
+    expect(source("app/admin/(protected)/monitors/page.tsx")).toContain("pattern={MONITOR_TAGS_PATTERN}");
+  });
+});
+
+describe("route errors", () => {
+  it("renders a 404 for missing or malformed page and event ids", () => {
+    expect(source("app/admin/(protected)/pages/[pageId]/layout.tsx")).toContain("notFoundIfMissing(requireCapability");
+    expect(source("components/admin/EventDetail.tsx")).toContain("if (!isDatabaseId(incidentId)) notFound();");
+    expect(source("app/admin/(protected)/not-found.tsx")).toContain("export default function AdminNotFound");
+  });
+
+  it("leaves no server action form that bypasses inline error feedback", () => {
+    const plain = ["app", "components"]
+      .flatMap((dir) => readdirSync(dir, { recursive: true, encoding: "utf8" }).map((file) => `${dir}/${file}`))
+      .filter((file) => file.endsWith(".tsx") && source(file).includes("<form action={"));
+    // These two already report errors through useActionState.
+    expect(plain.sort()).toEqual(["components/admin/TeamMemberCreateForm.tsx", "components/platform/CreateOrganizationForm.tsx"]);
   });
 });

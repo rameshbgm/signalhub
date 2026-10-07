@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { BellOff, Save } from "lucide-react";
 import { PageSubmitButton } from "@/components/admin/PageSubmitButton";
+import { InlineActionForm } from "@/components/InlineActionForm";
 import { Checkbox } from "@/components/ui/checkbox";
 
 type Service = { id: string; name: string };
@@ -32,7 +33,7 @@ export function SubscriptionPreferencesForm({
   return (
     <div className="space-y-6">
       {canChoose ? (
-        <form action={saveAction} className="space-y-4">
+        <InlineActionForm action={saveAction} className="space-y-4">
           <fieldset className="space-y-2">
             <legend className="mb-2 text-sm font-semibold text-[var(--fg)]">What do you want to hear about?</legend>
             <label className="flex cursor-pointer items-start gap-3 border border-[var(--line)] bg-[var(--surface)] px-3.5 py-3 text-sm page-panel">
@@ -71,20 +72,20 @@ export function SubscriptionPreferencesForm({
             <Save aria-hidden size={16} />
             Save preferences
           </PageSubmitButton>
-        </form>
+        </InlineActionForm>
       ) : (
         <p className="text-sm text-[var(--fg-soft)]">
           {scopeLocked ? "Service choices for this private page are set when you subscribe." : "You receive every update for this page."}
         </p>
       )}
 
-      <form action={unsubscribeAction} className="border-t border-[var(--line)] pt-5">
+      <InlineActionForm action={unsubscribeAction} className="border-t border-[var(--line)] pt-5">
         <p className="mb-3 text-sm text-[var(--fg-soft)]">Stop all incident and maintenance messages from this page. You can subscribe again at any time.</p>
         <PageSubmitButton variant="secondary" pendingLabel="Unsubscribing…" confirmMessage="Unsubscribe from all updates for this page?">
           <BellOff aria-hidden size={16} />
           Unsubscribe from all updates
         </PageSubmitButton>
-      </form>
+      </InlineActionForm>
     </div>
   );
 }

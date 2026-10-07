@@ -17,6 +17,10 @@ export const INPUT_LIMITS = {
   metricSuffix: 20,
   monitorGroup: 100,
   csvContacts: 5_000,
+  /** Characters in a CSV import; keeps the request well under Next's 1 MB server action body limit. */
+  csvText: 500_000,
+  monitorTags: 20,
+  monitorTag: 50,
   /** Audited operator reasons (suspend, purge, retry, disable). */
   reasonMin: 10,
   reason: 2_000,
@@ -28,10 +32,28 @@ export const INPUT_LIMITS = {
   monitorAuthSecret: 10_000,
   monitorAuthHeaderName: 200,
   monitorStatusRange: 7,
+  /** Platform delivery providers (SMTP and SMS). */
+  smtpHost: 255,
+  smtpUsername: 255,
+  smtpPassword: 1_000,
+  /** RFC 5321 path limit for a From address including a display name. */
+  smtpFrom: 320,
+  smsAccountId: 128,
+  smsSecret: 512,
+  smsSender: 32,
 } as const;
 
 /** Leading "+" and 1–4 digits, e.g. +1 or +353. Also used as the input's pattern attribute. */
 export const SMS_COUNTRY_CODE_PATTERN = "\\+[1-9]\\d{0,3}";
+
+/** E.164 phone number: + then 7–15 digits. Also used as the input's pattern attribute. */
+export const E164_PATTERN = "\\+[1-9]\\d{6,14}";
+
+/** Comma-separated tags: at most monitorTags entries of monitorTag characters. Used as the input's pattern attribute. */
+// Spaces around commas are allowed and not counted, matching the server, which trims each tag.
+const TAG = `\\s*[^,]{0,${INPUT_LIMITS.monitorTag}}?\\s*`;
+export const MONITOR_TAGS_PATTERN = `${TAG}(,${TAG}){0,${INPUT_LIMITS.monitorTags - 1}}`;
+export const MONITOR_TAGS_HINT = `Up to ${INPUT_LIMITS.monitorTags} tags of ${INPUT_LIMITS.monitorTag} characters, separated by commas`;
 
 export function isValidEmail(value: string) {
   return value.length <= INPUT_LIMITS.email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
