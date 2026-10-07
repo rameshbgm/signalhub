@@ -10,6 +10,7 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogActions, DialogSurface, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { BULK_PAGE_LIMIT, bulkDeletePhrase, matchesBulkDeletePhrase, pageCountLabel } from "@/lib/page-bulk";
 import { cn } from "@/lib/utils";
@@ -82,12 +83,14 @@ function RowAction({ action, pageId, intent, label, done, className, confirm, ch
 }
 
 /** One collapsible group of pages (a hub's children, or standalone pages) with row selection and bulk actions. */
-export function PageGroup({ header, rows, hubId, action, defaultOpen, canConfigure, label, empty, bare = false }: {
+export function PageGroup({ header, rows, hubId, action, attach, defaultOpen, canConfigure, label, empty, bare = false }: {
   header?: ReactNode;
   rows: PageRow[];
   hubId: string | null;
   // bulkPageAction bound to hubId on the server; a server action bound in the client cannot be passed back to the server.
   action: (formData: FormData) => Promise<string>;
+  /** Hub only: attaches a chosen standalone page (attachChildPage bound to the hub on the server). */
+  attach?: { action: (formData: FormData) => Promise<string | void>; options: { id: string; name: string }[] };
   defaultOpen: boolean;
   canConfigure: boolean;
   label: string;
@@ -135,6 +138,14 @@ export function PageGroup({ header, rows, hubId, action, defaultOpen, canConfigu
 
       {open && (
         <div id={panelId} className={bare ? undefined : "border-t border-line"}>
+          {hubId && canConfigure && attach && attach.options.length > 0 && (
+            <PlatformActionForm action={attach.action} successMessage="Status page added to hub" className="flex flex-col gap-2 border-b border-line px-5 py-3 sm:flex-row sm:items-center" messageClassName="sm:flex-1">
+              <div className="min-w-0 sm:w-72">
+                <Select aria-label="Standalone page to add" name="childPageId" required className="w-full"><option value="">Add a standalone page…</option>{attach.options.map((option) => <option key={option.id} value={option.id}>{option.name}</option>)}</Select>
+              </div>
+              <Button type="submit" variant="secondary" size="sm">Add to hub</Button>
+            </PlatformActionForm>
+          )}
           {rows.length > 0 && canConfigure && (
             <div className="flex min-h-12 flex-wrap items-center gap-x-3 gap-y-2 bg-sunken/60 px-5 py-2">
               <label className="flex items-center gap-2 text-xs font-medium text-ink-soft">
@@ -193,7 +204,7 @@ export function PageGroup({ header, rows, hubId, action, defaultOpen, canConfigu
                           </RowAction>
                         )}
                         {hubId && (
-                          <RowAction action={action} pageId={row.id} intent="remove" label={`Remove ${row.name} from hub`} done="Removed from hub" className={toneIcon.remove}><Unlink aria-hidden size={16} /></RowAction>
+                          <RowAction action={action} pageId={row.id} intent="remove" label={`Remove ${row.name} from hub`} done="Removed from hub" confirm={{ title: `Remove ${row.name} from this hub?`, body: "The page becomes a standalone page and no longer appears on this hub. Its content is kept." }} className={toneIcon.remove}><Unlink aria-hidden size={16} /></RowAction>
                         )}
                         <button type="button" aria-label={`Delete ${row.name}`} title="Delete page" data-button-guard="off" className={iconAction(toneIcon.delete)} onClick={() => { setSelected(new Set([row.id])); setConfirmingDelete(true); }}><Trash2 aria-hidden size={16} /></button>
                         <Link href={`/organization/pages/${row.id}`} aria-label={`Edit ${row.name}`} title="Edit page" className={iconAction(toneIcon.edit)}><Pencil aria-hidden size={16} /></Link>

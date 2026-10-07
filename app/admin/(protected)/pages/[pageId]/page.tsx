@@ -20,7 +20,7 @@ import { CopyButton } from "@/components/CopyButton";
 import { SetupSteps, type SetupStep } from "@/components/admin/SetupSteps";
 import { PageGroup } from "@/components/admin/page-group";
 import { memberRow } from "@/lib/page-rows";
-import { bulkPageAction } from "../actions";
+import { attachChildPage, bulkPageAction } from "../actions";
 import { buttonVariants } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -217,6 +217,9 @@ async function HubOverview({ page, orgId }: { page: OverviewPage; orgId: string 
   const members = await database.selectFrom("pages").select(["id", "name", "slug", "brandColor", "type", "setupCompletedAt", "publicVisible"])
     .where("orgId", "=", orgId).where("hubParentId", "=", page.id).where("isHub", "=", false).where("deletedAt", "is", null)
     .orderBy("name").execute();
+  const available = await database.selectFrom("pages").select(["id", "name"])
+    .where("orgId", "=", orgId).where("isHub", "=", false).where("hubParentId", "is", null).where("deletedAt", "is", null)
+    .orderBy("name").execute();
   const published = members.filter((member) => member.setupCompletedAt !== null && member.publicVisible !== false).length;
   const live = page.setupCompletedAt !== null && page.publicVisible !== false;
   const base = `/organization/pages/${page.id}`;
@@ -245,7 +248,7 @@ async function HubOverview({ page, orgId }: { page: OverviewPage; orgId: string 
           </CardHeader>
           <CardContent className="py-2">
             {members.length ? (
-              <PageGroup bare label="Status pages in this hub" rows={members.map(memberRow)} hubId={page.id} action={bulkPageAction.bind(null, page.id)} defaultOpen canConfigure />
+              <PageGroup bare label="Status pages in this hub" rows={members.map(memberRow)} hubId={page.id} action={bulkPageAction.bind(null, page.id)} attach={{ action: attachChildPage.bind(null, page.id), options: available }} defaultOpen canConfigure />
             ) : (
               <EmptyState icon={Layers3} hue="violet" title="No status pages yet" description="Add a status page to show it in this hub." className="py-10" />
             )}
