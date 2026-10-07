@@ -31,28 +31,6 @@ function changeReason(formData: FormData) {
   return reason;
 }
 
-export async function updatePlatformConfiguration(formData: FormData) {
-  const actor = await requirePlatformCapability("configuration.manage");
-  const reason = changeReason(formData);
-  const submitted = new Set(formData.getAll("enabledDestinationChannels").map(String));
-  const enabledDestinationChannels = DESTINATION_CHANNELS.filter((channel) => submitted.has(channel)) satisfies DestinationChannel[];
-  const now = new Date();
-  await withDatabaseTransaction(async (transaction) => {
-    await transaction.insertInto("platformConfiguration").values({
-      id: "global", enabledDestinationChannels, updatedBy: actor.platformAdminId, updatedAt: now,
-    }).onConflict((conflict) => conflict.column("id").doUpdateSet({
-      enabledDestinationChannels, updatedBy: actor.platformAdminId, updatedAt: now,
-    })).execute();
-    await writePlatformAudit({
-      actorId: actor.platformAdminId, actorEmail: actor.email, actorRole: actor.role,
-      action: "PLATFORM_CONFIGURATION_UPDATED", targetType: "platformConfiguration",
-      targetId: "global", reason, metadata: { enabledDestinationChannels },
-    }, { executor: transaction });
-  });
-  revalidatePath("/organization/platform/configuration");
-  revalidatePath("/organization/notifications");
-}
-
 const text = (max: number) => z.string().trim().max(max);
 
 const mailProviderSchema = z.object({
@@ -221,7 +199,8 @@ export async function sendTestSms(formData: FormData) {
  * fields are named `default:<CHANNEL>:<field>`; values equal to the built-in
  * default are not stored.
  */
-export async function updateDestinationDefaults(formData: FormData) {
+/** One form: which team destination providers are enabled, and the starting values for each. */
+export async function updatePlatformConfiguration(formData: FormData) {
   const actor = await requirePlatformCapability("configuration.manage");
   const reason = changeReason(formData);
   const raw: Record<string, Record<string, string>> = {};
@@ -230,6 +209,8 @@ export async function updateDestinationDefaults(formData: FormData) {
     if (prefix !== "default" || !channel || !key || typeof value !== "string") continue;
     (raw[channel] ??= {})[key] = value;
   }
+  const submitted = new Set(formData.getAll("enabledDestinationChannels").map(String));
+  const enabledDestinationChannels = DESTINATION_CHANNELS.filter((channel) => submitted.has(channel)) satisfies DestinationChannel[];
   const defaults: DestinationDefaults = sanitizeDestinationDefaults(raw);
   for (const [channel, values] of Object.entries(defaults) as Array<[keyof typeof DESTINATION_PROVIDERS, Record<string, string>]>) {
     for (const field of DESTINATION_PROVIDERS[channel].fields) {
@@ -242,5 +223,6 @@ export async function updateDestinationDefaults(formData: FormData) {
     }
     if (!Object.keys(values).length) delete defaults[channel];
   }
-  await saveProviders(actor, reason, "DESTINATION_DEFAULTS_UPDATED", { destinationDefaults: defaults }, { destinationDefaults: defaults });
+  const values = { enabledDestinationChannels, destinationDefaults: defaults };
+  await saveProviders(actor, reason, "PLATFORM_CONFIGURATION_UPDATED", values, values);
 }
