@@ -71,7 +71,7 @@ function escapeHtml(value: string) {
  * Keeps the configured SMTP mailbox (deliverability, SPF/DKIM) and only
  * replaces the display name with the page's sender name when one is set.
  */
-export function senderAddress(displayName: string | null, configured = process.env.SMTP_FROM ?? "SignalHub <signalhub@localhost>") {
+export function senderAddress(displayName: string | null, configured: string) {
   if (!displayName) return configured;
   const address = /<([^>]+)>/.exec(configured)?.[1] ?? configured.trim();
   return { name: displayName, address };
@@ -152,8 +152,9 @@ async function deliver(job: NotificationJobRow) {
         .executeTakeFirst();
       const footer = subscriptionFooter(job.body);
       const withPageFooter = (text: string) => (page?.emailFooter ? `${text}\n\n${page.emailFooter}` : text);
-      result = await smtpTransport().sendMail({
-        from: senderAddress(page?.emailFromName ?? null),
+      const smtp = await smtpTransport();
+      result = await smtp.transporter.sendMail({
+        from: senderAddress(page?.emailFromName ?? null, smtp.from),
         ...(page?.emailReplyTo ? { replyTo: page.emailReplyTo } : {}),
         to: job.contact,
         subject: job.subject,

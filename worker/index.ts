@@ -32,7 +32,7 @@ const state = {
   stopping: false,
   lastLoopAt: null as Date | null,
   lastError: null as string | null,
-  smtp: { configured: Boolean(process.env.SMTP_HOST), ok: false },
+  smtp: { configured: false, ok: false },
 };
 
 const CONTINUOUS_TASKS: SignalHubJobTask[] = [

@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { Activity, ArrowRight, Cpu, Globe, HardDrive, KeyRound, Mail, Save, Smartphone, SlidersHorizontal, type LucideIcon } from "lucide-react";
+import { DeliveryProvidersCard } from "@/components/platform/DeliveryProvidersCard";
 import { PlatformActionForm } from "@/components/platform/PlatformActionForm";
+import { database } from "@/lib/postgres/client";
 import { requirePlatformPageCapability } from "@/lib/platform-page-guard";
 import { hasPlatformCapability } from "@/lib/platform-policy";
 import { subscriptionCapabilities } from "@/lib/notification-capabilities";
@@ -33,9 +35,10 @@ const PROVIDER_LABELS: Record<(typeof DESTINATION_CHANNELS)[number], string> = {
 export default async function PlatformConfigurationPage() {
   const actor = await requirePlatformPageCapability("configuration.read");
   const canManage = hasPlatformCapability(actor.role, "configuration.manage");
-  const [enabledChannels, capabilities] = await Promise.all([
+  const [enabledChannels, capabilities, stored] = await Promise.all([
     enabledDestinationChannels(),
     subscriptionCapabilities(),
+    database.selectFrom("platformConfiguration").selectAll().where("id", "=", "global").executeTakeFirst(),
   ]);
   const enabled = new Set(enabledChannels);
   const appUrlConfigured = Boolean(process.env.NEXT_PUBLIC_APP_URL);
@@ -46,7 +49,7 @@ export default async function PlatformConfigurationPage() {
     <div className="space-y-8">
       <PageHeader
         title="Platform configuration"
-        description="Set installation-wide product policy here. Credentials, encryption keys, storage access, and mail provider secrets remain deployment-managed so they cannot leak through the web console."
+        description="Set installation-wide product policy and subscriber delivery providers here. Encryption keys and storage access remain deployment-managed; provider secrets are encrypted and write-only."
         icon={SlidersHorizontal}
         hue="violet"
       />
@@ -133,6 +136,21 @@ export default async function PlatformConfigurationPage() {
           )}
         </CardContent>
       </Card>
+
+      <DeliveryProvidersCard
+        canManage={canManage}
+        settings={{
+          smtpHost: stored?.smtpHost ?? null,
+          smtpPort: stored?.smtpPort ?? null,
+          smtpSecure: stored?.smtpSecure ?? false,
+          smtpUsername: stored?.smtpUsername ?? null,
+          smtpFrom: stored?.smtpFrom ?? null,
+          smtpPasswordStored: Boolean(stored?.smtpPasswordCiphertext),
+          twilioAccountSid: stored?.twilioAccountSid ?? null,
+          twilioFromNumber: stored?.twilioFromNumber ?? null,
+          twilioAuthTokenStored: Boolean(stored?.twilioAuthTokenCiphertext),
+        }}
+      />
 
       <section aria-label="Related settings" className="grid gap-4 md:grid-cols-2">
         <ManagementLink href="/organization/platform/identity" icon={KeyRound} hue="teal" title="Identity and provisioning" detail="Manage OIDC, SAML, SCIM, and enterprise authentication policy." />

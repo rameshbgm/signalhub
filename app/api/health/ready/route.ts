@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getDeliveryConfig } from "@/lib/delivery-config";
 import { inspectMigrationState } from "@/lib/migrations";
 import { database, verifyDatabaseConnection } from "@/lib/postgres/client";
 
@@ -7,12 +8,8 @@ export async function GET() {
     database: false,
     migrations: false,
     worker: false,
-    smtpConfigured: Boolean(process.env.SMTP_HOST),
-    smsConfigured: Boolean(
-      process.env.TWILIO_ACCOUNT_SID &&
-      process.env.TWILIO_AUTH_TOKEN &&
-      process.env.TWILIO_FROM_NUMBER
-    ),
+    smtpConfigured: false,
+    smsConfigured: false,
     assetStorage: (process.env.ASSET_STORAGE_DRIVER ?? "local").toLowerCase(),
     oidcConfigured: Boolean(
       process.env.OIDC_ISSUER && process.env.OIDC_CLIENT_ID && process.env.OIDC_CLIENT_SECRET
@@ -37,6 +34,9 @@ export async function GET() {
       .orderBy("lastSeenAt", "desc")
       .executeTakeFirst();
     checks.worker = Boolean(heartbeat);
+    const delivery = await getDeliveryConfig();
+    checks.smtpConfigured = Boolean(delivery.smtp);
+    checks.smsConfigured = Boolean(delivery.sms);
   } catch {
     // The structured response below identifies which dependency is unavailable.
   }

@@ -1,24 +1,22 @@
 import nodemailer from "nodemailer";
+import { getDeliveryConfig, type SmtpConfig } from "@/lib/delivery-config";
 
-let transporter: nodemailer.Transporter | null = null;
+let cached: { key: string; transporter: nodemailer.Transporter } | null = null;
 
-export function smtpConfigured() {
-  return Boolean(process.env.SMTP_HOST);
+export async function smtpConfigured() {
+  return Boolean((await getDeliveryConfig()).smtp);
 }
 
-export function smtpTransport() {
-  if (transporter) return transporter;
-  const host = process.env.SMTP_HOST;
-  if (!host) throw new Error("SMTP is not configured");
-  transporter = nodemailer.createTransport({
-    host,
-    port: Number(process.env.SMTP_PORT ?? 587),
-    secure: process.env.SMTP_SECURE === "true",
-    ...(process.env.SMTP_USERNAME
+export function createSmtpTransport(config: SmtpConfig) {
+  return nodemailer.createTransport({
+    host: config.host,
+    port: config.port,
+    secure: config.secure,
+    ...(config.username
       ? {
           auth: {
-            user: process.env.SMTP_USERNAME,
-            pass: process.env.SMTP_PASSWORD ?? "",
+            user: config.username,
+            pass: config.password ?? "",
           },
         }
       : {}),
@@ -26,13 +24,21 @@ export function smtpTransport() {
     greetingTimeout: 5_000,
     socketTimeout: 10_000,
   });
-  return transporter;
+}
+
+/** Rebuilds the transporter whenever the stored SMTP configuration changes. */
+export async function smtpTransport() {
+  const { smtp } = await getDeliveryConfig();
+  if (!smtp) throw new Error("SMTP is not configured");
+  const key = JSON.stringify(smtp);
+  if (cached?.key !== key) cached = { key, transporter: createSmtpTransport(smtp) };
+  return { transporter: cached.transporter, from: smtp.from };
 }
 
 export async function verifySmtp() {
-  if (!smtpConfigured()) return { configured: false, ok: false, error: null };
+  if (!(await smtpConfigured())) return { configured: false, ok: false, error: null };
   try {
-    await smtpTransport().verify();
+    await (await smtpTransport()).transporter.verify();
     return { configured: true, ok: true, error: null };
   } catch (error) {
     return {

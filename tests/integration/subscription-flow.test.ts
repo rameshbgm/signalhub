@@ -13,8 +13,6 @@ const enabled = Boolean(url) && /test/i.test(databaseName);
 if (enabled) {
   process.env.DATABASE_URL = url;
   process.env.STATUS_EXPOSE_OTP = "true";
-  process.env.SMTP_HOST ??= "smtp.invalid";
-  process.env.SMTP_FROM ??= "SignalHub <status@example.invalid>";
   process.env.NEXT_PUBLIC_APP_URL ??= "https://status.example.invalid";
 }
 
@@ -36,6 +34,7 @@ describe.skipIf(!enabled)("visitor subscription flow", () => {
     requestOtp: typeof import("../../app/api/v1/subscribe/request-otp/route");
     verifyOtp: typeof import("../../app/api/v1/subscribe/verify-otp/route");
     notify: typeof import("../../lib/notify");
+    deliveryConfig: typeof import("../../lib/delivery-config");
   };
 
   beforeAll(async () => {
@@ -45,9 +44,15 @@ describe.skipIf(!enabled)("visitor subscription flow", () => {
       requestOtp: await import("../../app/api/v1/subscribe/request-otp/route"),
       verifyOtp: await import("../../app/api/v1/subscribe/verify-otp/route"),
       notify: await import("../../lib/notify"),
+      deliveryConfig: await import("../../lib/delivery-config"),
     };
     await modules.migrations.runMigrations();
     const { database } = modules.client;
+    // Email subscriptions require a configured SMTP provider; nothing is sent.
+    await modules.deliveryConfig.upsertPlatformConfiguration(database, {
+      updatedBy: null, smtpHost: "smtp.invalid", smtpPort: 587, smtpFrom: "SignalHub <status@example.invalid>",
+    });
+    modules.deliveryConfig.clearDeliveryConfigCache();
     const org = await database.insertInto("organizations")
       .values({ name: "Subscription test", slug: `org-${slug}` } as never)
       .returning("id").executeTakeFirstOrThrow();

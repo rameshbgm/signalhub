@@ -522,8 +522,17 @@ export interface WorkerHeartbeatTable {
 export interface PlatformConfigurationTable {
   id: "global";
   enabledDestinationChannels: Generated<string[]>;
-  updatedBy: string;
+  updatedBy: string | null;
   updatedAt: GeneratedTimestamp;
+  smtpHost: string | null;
+  smtpPort: number | null;
+  smtpSecure: Generated<boolean>;
+  smtpUsername: string | null;
+  smtpPasswordCiphertext: string | null;
+  smtpFrom: string | null;
+  twilioAccountSid: string | null;
+  twilioAuthTokenCiphertext: string | null;
+  twilioFromNumber: string | null;
 }
 
 export interface MaintenanceLeaseTable {

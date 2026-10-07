@@ -121,6 +121,8 @@ const ENCRYPTED_COLUMNS = [
   { table: "monitors", field: "auth_secret" },
   { table: "users", field: "totp_secret_ciphertext" },
   { table: "users", field: "pending_totp_secret_ciphertext" },
+  { table: "platform_configuration", field: "smtp_password_ciphertext" },
+  { table: "platform_configuration", field: "twilio_auth_token_ciphertext" },
 ] as const;
 
 async function rotateEncryption() {
@@ -133,7 +135,7 @@ async function rotateEncryption() {
     for (const row of rows.rows) {
       try {
         const ciphertext = encryptSecret(decryptSecret(row.value));
-        await postgresPool.query(`update ${target.table} set ${target.field} = $1 where id = $2::uuid`, [ciphertext, row.id]);
+        await postgresPool.query(`update ${target.table} set ${target.field} = $1 where id = $2${target.table === "platform_configuration" ? "" : "::uuid"}`, [ciphertext, row.id]);
         rotated += 1;
       } catch {
         failures.push({ table: target.table, id: row.id, field: target.field });

@@ -1,5 +1,5 @@
 import { database } from "@/lib/postgres/client";
-import { smtpConfigured } from "@/lib/smtp";
+import { getDeliveryConfig } from "@/lib/delivery-config";
 
 export async function subscriptionCapabilities() {
   const worker = await database
@@ -9,16 +9,14 @@ export async function subscriptionCapabilities() {
     .where("lastSeenAt", ">", new Date(Date.now() - 30_000))
     .executeTakeFirst();
   const workerReady = Boolean(worker);
-  const smsConfigured = Boolean(
-    process.env.TWILIO_ACCOUNT_SID &&
-    process.env.TWILIO_AUTH_TOKEN &&
-    process.env.TWILIO_FROM_NUMBER
-  );
+  const delivery = await getDeliveryConfig();
+  const smtpConfigured = Boolean(delivery.smtp);
+  const smsConfigured = Boolean(delivery.sms);
   return {
     workerReady,
     email: {
-      enabled: workerReady && smtpConfigured(),
-      reason: !smtpConfigured()
+      enabled: workerReady && smtpConfigured,
+      reason: !smtpConfigured
         ? "Email delivery is not configured"
         : !workerReady
           ? "The delivery worker is unavailable"

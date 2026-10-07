@@ -2,6 +2,8 @@ import { createHash } from "node:crypto";
 import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import { runMigrations as runGraphileMigrations } from "graphile-worker";
+import { importLegacyDeliveryEnvironment } from "@/lib/delivery-config";
+import { log } from "@/lib/logger";
 import { postgresPool } from "@/lib/postgres/client";
 import {
   evaluateMigrationState,
@@ -30,7 +32,7 @@ async function migrationManifest(): Promise<MigrationManifestEntry[]> {
   }));
 }
 
-export const LATEST_MIGRATION_ID = "007_tenant_audit_actor.sql";
+export const LATEST_MIGRATION_ID = "008_delivery_providers.sql";
 
 export async function inspectMigrationState(): Promise<MigrationInspection> {
   const manifest = await migrationManifest();
@@ -43,6 +45,7 @@ export async function inspectMigrationState(): Promise<MigrationInspection> {
 export async function runMigrations() {
   const manifest = await migrationManifest();
   const client = await postgresPool.connect();
+  const newlyApplied: string[] = [];
   try {
     await client.query("begin");
     await client.query("select pg_advisory_xact_lock(hashtext('signalhub-schema-migrations'))");
@@ -70,6 +73,7 @@ export async function runMigrations() {
         "insert into schema_migrations (id, checksum) values ($1, $2)",
         [migration.id, migration.checksum]
       );
+      newlyApplied.push(migration.id);
     }
     await client.query("commit");
   } catch (error) {
@@ -77,6 +81,14 @@ export async function runMigrations() {
     throw error;
   } finally {
     client.release();
+  }
+  // Only on the upgrade itself: a later "clear" in the console must stick even
+  // if the old environment variables are still set.
+  if (newlyApplied.includes("008_delivery_providers.sql")) {
+    const imported = await importLegacyDeliveryEnvironment();
+    if (imported.length) {
+      log("warn", "Imported delivery providers from environment; manage them in Platform configuration and remove SMTP_* / TWILIO_* variables", { imported });
+    }
   }
   // Web requests enqueue jobs with graphile_worker.add_job, so the queue schema
   // must exist before any web process serves traffic, not only after the

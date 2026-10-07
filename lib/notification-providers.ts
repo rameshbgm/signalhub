@@ -1,4 +1,5 @@
 import type { NotificationDestinationRow } from "@/lib/postgres/schema";
+import { getDeliveryConfig, type SmsConfig } from "@/lib/delivery-config";
 import { decryptSecret } from "@/lib/encryption";
 import { guardedFetch } from "@/lib/guarded-fetch";
 
@@ -130,14 +131,10 @@ export async function deliverDestination(
   }
 }
 
-export async function deliverSms(to: string, body: string) {
-  return deliverTwilio(
-    required(process.env.TWILIO_ACCOUNT_SID, "TWILIO_ACCOUNT_SID"),
-    required(process.env.TWILIO_AUTH_TOKEN, "TWILIO_AUTH_TOKEN"),
-    required(process.env.TWILIO_FROM_NUMBER, "TWILIO_FROM_NUMBER"),
-    to,
-    body
-  );
+export async function deliverSms(to: string, body: string, config?: SmsConfig) {
+  const sms = config ?? (await getDeliveryConfig()).sms;
+  if (!sms) throw new Error("SMS delivery is not configured");
+  return deliverTwilio(sms.accountSid, sms.authToken, sms.fromNumber, to, body);
 }
 
 async function deliverTwilio(
@@ -162,4 +159,17 @@ async function deliverTwilio(
   );
   if (!response.ok) throw new ProviderHttpError(`Messaging provider returned HTTP ${response.status}`, response.status);
   return response.status;
+}
+
+/** Confirms a Twilio account SID and auth token pair without sending a message. */
+export async function verifyTwilioCredentials(accountSid: string, authToken: string) {
+  const response = await fetch(
+    `https://api.twilio.com/2010-04-01/Accounts/${encodeURIComponent(accountSid)}.json`,
+    {
+      headers: { authorization: `Basic ${Buffer.from(`${accountSid}:${authToken}`).toString("base64")}` },
+      signal: AbortSignal.timeout(Number(process.env.WEBHOOK_TIMEOUT_MS ?? 10_000)),
+    }
+  );
+  if (response.status === 401 || response.status === 404) throw new Error("Twilio rejected the account SID or auth token");
+  if (!response.ok) throw new Error(`Twilio returned HTTP ${response.status}`);
 }

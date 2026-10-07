@@ -26,6 +26,8 @@ x-signalhub-environment: &signalhub-environment
   MONITOR_ENABLE_ICMP: ${MONITOR_ENABLE_ICMP:-false}
   MONITOR_MAX_RESPONSE_BYTES: ${MONITOR_MAX_RESPONSE_BYTES:-1048576}
   REQUIRE_WORKER: ${REQUIRE_WORKER:-true}
+  # Legacy: SMTP_* / TWILIO_* are imported once by db:migrate on upgrade,
+  # then managed in Platform configuration. Remove after upgrading.
   SMTP_HOST: ${SMTP_HOST:-}
   SMTP_PORT: ${SMTP_PORT:-587}
   SMTP_SECURE: ${SMTP_SECURE:-false}
