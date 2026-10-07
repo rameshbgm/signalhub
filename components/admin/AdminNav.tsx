@@ -11,7 +11,6 @@ import {
   LayoutDashboard,
   MonitorDot,
   PanelsTopLeft,
-  Settings2,
   ShieldCheck,
   Siren,
   Sparkles,
@@ -93,7 +92,6 @@ export const NAV_SECTIONS: NavSection[] = [
     items: [
       { href: "/organization/security", label: "Security", icon: ShieldCheck, hue: "rose" },
       { href: "/organization/team", label: "Users & Roles", icon: UsersRound, hue: "indigo", capability: "team.manage" },
-      { href: "/organization/settings", label: "Settings", icon: Settings2, hue: "slate", capability: "organization.manage" },
     ],
   },
   {
@@ -118,6 +116,8 @@ export function visibleSections(capabilities: Capability[]): NavSection[] {
 export function isActivePath(pathname: string, href: string) {
   // Incident and maintenance screens belong to the Events inbox.
   pathname = pathname.replace(/^\/organization\/(incidents|maintenance)(?=\/|$)/, "/organization/events");
+  // Organization settings is a tab inside Platform administration.
+  pathname = pathname.replace(/^\/organization\/settings(?=\/|$)/, "/organization/platform/settings");
   return href === "/organization" ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);
 }
 

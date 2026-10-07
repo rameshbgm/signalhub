@@ -1,4 +1,5 @@
 import { PlatformActionForm } from "@/components/platform/PlatformActionForm";
+import { PlatformNav } from "@/components/platform/PlatformNav";
 import { requireSession } from "@/lib/require-session";
 import { requestOrgExport, updateOrgRetention, updateOrgSettings } from "./actions";
 import { requireCapability } from "@/lib/admin-guard";
@@ -54,6 +55,7 @@ export default async function OrgSettingsPage() {
 
   return (
     <div className="space-y-8">
+      <PlatformNav platformAccess={isAdmin} />
       <PageHeader
         title="Organization settings"
         description="Manage your organization profile, data retention, enterprise sign-in, and exports."
