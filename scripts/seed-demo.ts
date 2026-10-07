@@ -6,7 +6,9 @@ import type { Insertable } from "kysely";
 import type { SignalHubDatabase } from "@/lib/postgres/schema";
 import { createPreparedMonitor, prepareMonitorInput, type MonitorInput } from "@/lib/domain/monitors";
 import { generateAutomationToken } from "@/lib/tokens";
-import { assertDevelopmentSeedEnabled } from "@/scripts/dev-seed";
+import { assertDevelopmentSeedEnabled, generateDevelopmentPassword, printGeneratedSecrets } from "@/scripts/dev-seed";
+import { hashPassword } from "@/lib/auth";
+import { EXTRA_HUBS, type HubSpec, type PageSpec, type Spec } from "@/scripts/demo-catalog";
 
 /**
  * Wipes every page (and everything under it: components, monitors, checks, metrics,
@@ -31,20 +33,6 @@ function rng(seed: number) {
 }
 const ago = (ms: number) => new Date(Date.now() - ms);
 const ahead = (ms: number) => new Date(Date.now() + ms);
-
-type Kind = "HTTP" | "KEYWORD" | "DNS" | "TCP" | "TLS" | "ICMP";
-type Spec = {
-  name: string;
-  target: string;
-  kind?: Kind;
-  port?: number;
-  range?: string;
-  keyword?: string;
-  expectFail?: boolean; // the endpoint really returns an error: shows a live outage
-  minutes?: number; // check interval
-};
-type Group = { name: string; description: string; monitors: Spec[] };
-type PageSpec = { slug: string; name: string; headline: string; about: string; color: string; groups: Group[] };
 
 const h = (path: string) => `https://httpbin.org${path}`;
 const PAGES: PageSpec[] = [
@@ -201,6 +189,11 @@ const PAGES: PageSpec[] = [
   },
 ];
 
+const ACME_HUB: HubSpec = {
+  slug: "acme-hub", name: "Acme Service Hub", headline: "All Acme services", about: "Every service status in one place.", color: "#0f9fab", pages: PAGES,
+};
+const ALL_HUBS: HubSpec[] = [ACME_HUB, ...EXTRA_HUBS];
+
 // Incident timelines: [hours-ago-started, hours-ago-resolved|null, component name, ...]
 type IncidentSpec = {
   page: string; name: string; impact: "MINOR" | "MAJOR" | "CRITICAL"; component: string;
@@ -238,6 +231,37 @@ const INCIDENTS: IncidentSpec[] = [
     ["RESOLVED", "Backlog cleared."] ] },
 ];
 
+const GENERATED_INCIDENTS: Array<{ name: string; impact: "MINOR" | "MAJOR" | "CRITICAL"; componentStatus: string; steps: (component: string) => Array<[string, string]> }> = [
+  { name: "Elevated error rates", impact: "MAJOR", componentStatus: "PARTIAL_OUTAGE", steps: (c) => [
+    ["INVESTIGATING", `We are seeing elevated error rates when reaching ${c}.`],
+    ["IDENTIFIED", `The cause for the errors on ${c} was identified and a fix is being prepared.`],
+    ["RESOLVED", `Error rates on ${c} are back to normal.`] ] },
+  { name: "Increased latency", impact: "MINOR", componentStatus: "DEGRADED_PERFORMANCE", steps: (c) => [
+    ["INVESTIGATING", `Responses from ${c} are slower than usual.`],
+    ["MONITORING", `A mitigation is in place for ${c}; latency is dropping.`],
+    ["RESOLVED", `Latency on ${c} has returned to baseline.`] ] },
+  { name: "Intermittent connection failures", impact: "MINOR", componentStatus: "DEGRADED_PERFORMANCE", steps: (c) => [
+    ["INVESTIGATING", `Some connections to ${c} fail intermittently.`],
+    ["RESOLVED", `Connections to ${c} are stable again.`] ] },
+  { name: "Regional disruption", impact: "MAJOR", componentStatus: "PARTIAL_OUTAGE", steps: (c) => [
+    ["INVESTIGATING", `Users in one region cannot reach ${c}.`],
+    ["IDENTIFIED", `A routing issue affecting ${c} was identified.`],
+    ["MONITORING", `Routing was corrected for ${c}; we are watching recovery.`],
+    ["RESOLVED", `${c} is reachable from all regions.`] ] },
+  { name: "Service disruption", impact: "CRITICAL", componentStatus: "MAJOR_OUTAGE", steps: (c) => [
+    ["INVESTIGATING", `${c} is currently unavailable.`],
+    ["IDENTIFIED", `The root cause of the ${c} outage was found.`],
+    ["MONITORING", `${c} is recovering; we are verifying stability.`],
+    ["RESOLVED", `${c} is fully operational again.`] ] },
+  { name: "Delayed data synchronization", impact: "MINOR", componentStatus: "DEGRADED_PERFORMANCE", steps: (c) => [
+    ["INVESTIGATING", `Data shown for ${c} may be out of date.`],
+    ["RESOLVED", `Synchronization for ${c} caught up.`] ] },
+];
+const GENERATED_MAINTENANCE = [
+  "Database upgrade", "Certificate rotation", "Network configuration change", "Storage migration",
+  "Platform security patching", "Load balancer replacement", "Cache cluster resize", "DNS provider cutover",
+];
+
 type MaintenanceSpec = {
   page: string; name: string; components: string[]; startH: number; durationH: number; body: string;
 };
@@ -256,19 +280,31 @@ const ANNOUNCEMENTS: Array<{ page: string; title: string; body: string; severity
   { page: "cloud-hosting", title: "Upcoming maintenance", body: "Edge certificate rotation is scheduled in the next two days.", severity: "WARNING" },
 ];
 
-const SUBSCRIBER_NAMES = ["alice", "bob", "carol", "dave", "erin", "frank", "grace", "heidi", "ivan", "judy", "mallory", "niaj"];
+const CUSTOM_METRICS = [
+  { name: "Requests per second", suffix: "req/s", description: "Traffic served across all services", base: 420, decimals: 0 },
+  { name: "Error rate", suffix: "%", description: "Share of failed requests", base: 0.8, decimals: 2 },
+  { name: "Queue depth", suffix: "jobs", description: "Pending background jobs", base: 140, decimals: 0 },
+  { name: "Apdex score", suffix: "", description: "User satisfaction index", base: 0.94, decimals: 2 },
+  { name: "Data transferred", suffix: "MB/s", description: "Outbound bandwidth", base: 85, decimals: 1 },
+];
+const SUBSCRIBER_NAMES = ["alice", "bob", "carol", "dave", "erin", "frank", "grace", "heidi", "ivan", "judy", "mallory", "niaj", "olivia", "peggy", "quinn", "rupert"];
 
-async function createPage(tx: DatabaseTransaction, orgId: string, spec: { slug: string; name: string; headline: string; about: string; color: string; isHub?: boolean; hubParentId?: string }) {
+async function createPage(
+  tx: DatabaseTransaction,
+  orgId: string,
+  spec: { slug: string; name: string; headline: string; about: string; color: string; isHub?: boolean; hubParentId?: string; access?: "PUBLIC" | "PRIVATE" | "AUDIENCE"; state?: "published" | "draft" | "hidden"; passwordHash?: string | null },
+) {
   const now = new Date();
   return tx.insertInto("pages").values({
-    orgId, name: spec.name, slug: spec.slug, type: "PUBLIC",
+    orgId, name: spec.name, slug: spec.slug, type: spec.access ?? "PUBLIC",
     isHub: spec.isHub ?? false, hubParentId: spec.hubParentId ?? null,
     timezone: "UTC", language: "en", headline: spec.headline, aboutText: spec.about,
     coverImageFit: "CONTAIN", coverImagePositionX: 50, coverImagePositionY: 50,
-    brandColor: spec.color, layout: "CENTERED_SUMMARY", passwordHash: null, removeBranding: false,
+    brandColor: spec.color, layout: "CENTERED_SUMMARY", passwordHash: spec.passwordHash ?? null, removeBranding: false,
     customCss: null, themePreset: "DEFAULT", analyticsEnabled: true,
     publishedDesign: templateDesign("CENTERED_SUMMARY", spec.color), publishedDesignVersion: 1,
-    designPublishedAt: now, publicVisible: true, setupCompletedAt: now, deletedAt: null, deletedBy: null, createdAt: now,
+    designPublishedAt: now, publicVisible: spec.state !== "hidden",
+    setupCompletedAt: spec.state === "draft" ? null : now, deletedAt: null, deletedBy: null, createdAt: now,
   }).returningAll().executeTakeFirstOrThrow();
 }
 
@@ -309,37 +345,57 @@ async function main() {
   const ids = new Map<string, { pageId: string; components: Map<string, string> }>();
   const monitorRows: Array<{ id: string; componentId: string; metricId: string | null; ok: boolean; base: number; pageSlug: string }> = [];
 
-  const hub = await database.transaction().execute((tx) => createPage(tx, org.id, {
-    slug: "acme-hub", name: "Acme Service Hub", headline: "All Acme services", about: "Every service status in one place.", color: "#0f9fab", isHub: true,
-  }));
+  const sharedPassword = process.env.DEV_AUDIENCE_PASSWORD || generateDevelopmentPassword();
+  const sharedPasswordHash = await hashPassword(sharedPassword);
+  const hubIds: Array<{ id: string; slug: string }> = [];
+  const pageMeta = new Map<string, PageSpec>();
 
-  for (const spec of PAGES) {
-    const page = await database.transaction().execute((tx) => createPage(tx, org.id, { ...spec, hubParentId: hub.id }));
-    const components = new Map<string, string>();
-    let order = 0;
-    for (const [groupIndex, group] of spec.groups.entries()) {
-      const g = await database.insertInto("componentGroups").values({
-        pageId: page.id, name: group.name, description: group.description, order: groupIndex, collapsed: false,
-      }).returning("id").executeTakeFirstOrThrow();
-      for (const m of group.monitors) {
-        const token = generateAutomationToken();
-        const component = await database.insertInto("components").values({
-          pageId: page.id, groupId: g.id, name: m.name, description: `${m.name} availability`,
-          status: "OPERATIONAL", order: order++, visible: true, showUptime: true, manualStatus: "OPERATIONAL",
-          isThirdParty: false, thirdPartyProvider: null, automationTokenHash: token.hash,
-          automationTokenPrefix: token.prefix, automationTokenLastFour: token.lastFour, createdAt: ago(HISTORY_DAYS * DAY),
+  for (const hubSpec of ALL_HUBS) {
+    const hub = await database.transaction().execute((tx) => createPage(tx, org.id, { ...hubSpec, isHub: true }));
+    hubIds.push({ id: hub.id, slug: hub.slug });
+    console.log(`hub ${hubSpec.slug}: ${hubSpec.pages.length} pages`);
+    for (const spec of hubSpec.pages) {
+      const page = await database.transaction().execute((tx) => createPage(tx, org.id, {
+        ...spec, hubParentId: hub.id, passwordHash: spec.access && spec.access !== "PUBLIC" ? sharedPasswordHash : null,
+      }));
+      pageMeta.set(spec.slug, spec);
+      const components = new Map<string, string>();
+      let order = 0;
+      for (const [groupIndex, group] of spec.groups.entries()) {
+        const g = await database.insertInto("componentGroups").values({
+          pageId: page.id, name: group.name, description: group.description, order: groupIndex, collapsed: false,
         }).returning("id").executeTakeFirstOrThrow();
-        components.set(m.name, component.id);
-        const input = await prepareMonitorInput(monitorInput(m, component.id, group.name, spec.slug));
-        const monitor = await database.transaction().execute((tx) => createPreparedMonitor(org.id, page.id, input, tx));
-        monitorRows.push({
-          id: monitor.id, componentId: component.id, metricId: monitor.metricId, ok: !m.expectFail,
-          base: m.kind === "DNS" ? 20 : m.kind === "TCP" || m.kind === "ICMP" ? 15 : 80 + random() * 400, pageSlug: spec.slug,
-        });
+        for (const m of group.monitors) {
+          const token = generateAutomationToken();
+          const component = await database.insertInto("components").values({
+            pageId: page.id, groupId: g.id, name: m.name, description: `${m.name} availability`,
+            status: "OPERATIONAL", order: order++, visible: !m.unpublished, showUptime: true, manualStatus: "OPERATIONAL",
+            isThirdParty: false, thirdPartyProvider: null, automationTokenHash: token.hash,
+            automationTokenPrefix: token.prefix, automationTokenLastFour: token.lastFour, createdAt: ago(HISTORY_DAYS * DAY),
+          }).returning("id").executeTakeFirstOrThrow();
+          components.set(m.name, component.id);
+          const input = await prepareMonitorInput(monitorInput(m, component.id, group.name, spec.slug));
+          const monitor = await database.transaction().execute((tx) => createPreparedMonitor(org.id, page.id, input, tx));
+          if (m.paused) await database.updateTable("monitors").set({ enabled: false, runRequestedAt: null }).where("id", "=", monitor.id).execute();
+          monitorRows.push({
+            id: monitor.id, componentId: component.id, metricId: monitor.metricId, ok: !m.expectFail,
+            base: m.kind === "DNS" ? 20 : m.kind === "TCP" || m.kind === "ICMP" ? 15 : 80 + random() * 400, pageSlug: spec.slug,
+          });
+        }
       }
+      ids.set(spec.slug, { pageId: page.id, components });
+
+      if (spec.access === "AUDIENCE") {
+        const names = [...components.keys()];
+        const groupA = await database.insertInto("pageAccessGroups").values({ pageId: page.id, name: "Partners", componentIds: [...components.values()].slice(0, Math.ceil(names.length / 2)) }).returning("id").executeTakeFirstOrThrow();
+        await database.insertInto("pageAccessGroups").values({ pageId: page.id, name: "Auditors", componentIds: [...components.values()] }).execute();
+        await database.insertInto("pageAccessUsers").values([
+          { pageId: page.id, email: `partner@${spec.slug}.example.com`, passwordHash: sharedPasswordHash, groupId: groupA.id, componentIds: [], createdAt: new Date() },
+          { pageId: page.id, email: `analyst@${spec.slug}.example.com`, passwordHash: sharedPasswordHash, groupId: null, componentIds: [...components.values()].slice(0, 2), createdAt: new Date() },
+        ]).execute();
+      }
+      console.log(`  page ${spec.slug}: ${components.size} monitors`);
     }
-    ids.set(spec.slug, { pageId: page.id, components });
-    console.log(`  page ${spec.slug}: ${components.size} monitors`);
   }
 
   // Incident and maintenance outage windows per component, used to build status timelines and check failures.
@@ -347,7 +403,7 @@ async function main() {
   const addOutage = (componentId: string, o: { from: Date; to: Date | null; status: string; maintenance: boolean; note: string }) =>
     outages.set(componentId, [...(outages.get(componentId) ?? []), o]);
 
-  for (const inc of INCIDENTS) {
+  const makeIncident = async (inc: IncidentSpec) => {
     const page = ids.get(inc.page)!;
     const componentId = page.components.get(inc.component)!;
     const started = ago(inc.startedH * HOUR);
@@ -366,29 +422,70 @@ async function main() {
     }))).execute();
     addOutage(componentId, { from: started, to: resolved, status: inc.componentStatus, maintenance: false, note: inc.name });
     if (!resolved) await database.updateTable("components").set({ status: inc.componentStatus, manualStatus: inc.componentStatus }).where("id", "=", componentId).execute();
-  }
+  };
+  for (const inc of INCIDENTS) await makeIncident(inc);
 
-  for (const m of MAINTENANCES) {
+  const makeMaintenance = async (m: MaintenanceSpec) => {
     const page = ids.get(m.page)!;
     const start = ahead(m.startH * HOUR);
     const end = new Date(start.getTime() + m.durationH * HOUR);
     const done = end.getTime() < Date.now();
+    const running = !done && start.getTime() <= Date.now();
+    const state = done ? "COMPLETED" : running ? "IN_PROGRESS" : "SCHEDULED";
     const componentIds = m.components.map((name) => page.components.get(name)!);
     const incident = await database.insertInto("incidents").values({
       pageId: page.pageId, name: m.name, status: done ? "RESOLVED" : "INVESTIGATING", impact: "NONE", pageWide: false,
-      isMaintenance: true, maintenanceStatus: done ? "COMPLETED" : "SCHEDULED", scheduledStart: start, scheduledEnd: end,
-      autoTransition: true, reminderMinutesBefore: done ? null : 60, notifySubscribers: true, postmortemBody: null,
+      isMaintenance: true, maintenanceStatus: state, scheduledStart: start, scheduledEnd: end,
+      autoTransition: true, reminderMinutesBefore: state === "SCHEDULED" ? 60 : null, notifySubscribers: true, postmortemBody: null,
       createdAt: new Date(Math.min(start.getTime(), Date.now()) - 2 * DAY), resolvedAt: done ? end : null, backfilled: false,
     }).returning("id").executeTakeFirstOrThrow();
     await database.insertInto("incidentComponents").values(componentIds.map((componentId) => ({ incidentId: incident.id, componentId, newStatus: "UNDER_MAINTENANCE" }))).execute();
     await database.insertInto("incidentUpdates").values([
-      { incidentId: incident.id, status: "INVESTIGATING", body: m.body, notified: true, createdAt: new Date(start.getTime() - 2 * DAY) },
-      ...(done ? [
-        { incidentId: incident.id, status: "INVESTIGATING", body: "Maintenance window has started.", notified: true, createdAt: start },
-        { incidentId: incident.id, status: "RESOLVED", body: "Maintenance completed successfully.", notified: true, createdAt: end },
-      ] : []),
+      { incidentId: incident.id, status: "INVESTIGATING", body: m.body, notified: true, createdAt: new Date(Math.min(start.getTime(), Date.now()) - 2 * DAY) },
+      ...(done || running ? [{ incidentId: incident.id, status: "INVESTIGATING", body: "Maintenance window has started.", notified: true, createdAt: start }] : []),
+      ...(done ? [{ incidentId: incident.id, status: "RESOLVED", body: "Maintenance completed successfully.", notified: true, createdAt: end }] : []),
     ]).execute();
-    if (done) for (const componentId of componentIds) addOutage(componentId, { from: start, to: end, status: "UNDER_MAINTENANCE", maintenance: true, note: m.name });
+    for (const componentId of componentIds) {
+      if (done || running) addOutage(componentId, { from: start, to: done ? end : null, status: "UNDER_MAINTENANCE", maintenance: true, note: m.name });
+      if (running) await database.updateTable("components").set({ status: "UNDER_MAINTENANCE", manualStatus: "UNDER_MAINTENANCE" }).where("id", "=", componentId).execute();
+    }
+  };
+  for (const m of MAINTENANCES) await makeMaintenance(m);
+
+  // Generated history for every other page so each hub looks lived-in.
+  const explicitPages = new Set([...INCIDENTS.map((i) => i.page), ...MAINTENANCES.map((m) => m.page)]);
+  const draftSlugs = new Set([...pageMeta].filter(([, spec]) => spec.state === "draft").map(([slug]) => slug));
+  let generatedIncidents = 0;
+  let generatedMaintenances = 0;
+  for (const [slug, page] of ids) {
+    if (explicitPages.has(slug) || draftSlugs.has(slug)) continue;
+    const names = [...page.components.keys()];
+    const pick = () => names[Math.floor(random() * names.length)]!;
+    const count = 1 + Math.floor(random() * 3);
+    let activeUsed = false;
+    for (let i = 0; i < count; i++) {
+      const template = GENERATED_INCIDENTS[Math.floor(random() * GENERATED_INCIDENTS.length)]!;
+      const component = pick();
+      const startedH = 6 + Math.floor(random() * 150);
+      const active: boolean = !activeUsed && i === 0 && random() < 0.35;
+      activeUsed ||= active;
+      const durationH = 1 + Math.floor(random() * 6);
+      const incident: IncidentSpec = {
+        page: slug, name: `${template.name}: ${component}`, impact: template.impact, component, componentStatus: template.componentStatus,
+        startedH: active ? 1 + Math.floor(random() * 5) : startedH, resolvedH: active ? null : Math.max(startedH - durationH, 1),
+        postmortem: !active && template.impact !== "MINOR" ? `${template.name} on ${component}. Root cause was identified, a fix was rolled out and monitoring was tightened.` : undefined,
+        steps: template.steps(component).filter((_, idx, all) => !active || idx < all.length - 1),
+      };
+      await makeIncident(incident);
+      generatedIncidents++;
+    }
+    const maintenanceKinds = [[-(30 + Math.floor(random() * 100)), 2], [12 + Math.floor(random() * 150), 3], [-1, 4]] as const;
+    for (const [startH, durationH] of maintenanceKinds) {
+      if (random() > (startH === -1 ? 0.12 : 0.5)) continue;
+      const components = [pick(), pick()].filter((n, idx, all) => all.indexOf(n) === idx);
+      await makeMaintenance({ page: slug, name: GENERATED_MAINTENANCE[Math.floor(random() * GENERATED_MAINTENANCE.length)]!, components, startH, durationH, body: "Planned work on the listed services. Brief interruptions are possible." });
+      generatedMaintenances++;
+    }
   }
 
   // Component status timelines.
@@ -420,44 +517,68 @@ async function main() {
   await chunked(checks, 2000, (c) => database.insertInto("monitorChecks").values(c).execute());
   await chunked(points, 2000, (c) => database.insertInto("metricPoints").values(c).execute());
 
-  // Subscribers, announcements, analytics.
+  // Subscribers (skipped for draft pages), custom metrics, announcements, analytics.
   const subscribers: Insertable<SignalHubDatabase["subscribers"]>[] = [];
   for (const [slug, page] of ids) {
+    if (draftSlugs.has(slug)) continue;
     const componentIds = [...page.components.values()];
-    SUBSCRIBER_NAMES.forEach((name, i) => {
+    const total = 6 + Math.floor(random() * 7);
+    SUBSCRIBER_NAMES.slice(0, total).forEach((name, i) => {
       const sms = i % 5 === 4;
       subscribers.push({
         pageId: page.pageId, channel: sms ? "SMS" : "EMAIL",
-        contact: sms ? `+1555010${String(i).padStart(4, "0")}` : `${name}+${slug}@example.com`,
+        contact: sms ? `+1555${slug.length}${String(i).padStart(5, "0")}` : `${name}+${slug}@example.com`,
         componentIds: i % 3 === 0 ? [] : componentIds.slice(i % 4, (i % 4) + 3),
         eventTypes: [], verified: i % 6 !== 5, quarantined: i === 11, unsubscribeToken: randomBytes(32).toString("hex"),
         createdAt: ago((i + 1) * 9 * HOUR),
       });
     });
   }
-  await database.insertInto("subscribers").values(subscribers).execute();
+  await chunked(subscribers, 500, (c) => database.insertInto("subscribers").values(c).execute());
 
-  for (const a of ANNOUNCEMENTS) {
+  // One business metric per published page that is not tied to a monitor.
+  let customMetrics = 0;
+  for (const [slug, page] of ids) {
+    if (draftSlugs.has(slug)) continue;
+    const kind = CUSTOM_METRICS[customMetrics % CUSTOM_METRICS.length]!;
+    const metric = await database.insertInto("metrics").values({
+      pageId: page.pageId, componentId: null, name: kind.name, suffix: kind.suffix, description: kind.description, visible: true, decimals: kind.decimals,
+    }).returning("id").executeTakeFirstOrThrow();
+    await chunked(Array.from({ length: HISTORY_DAYS * 24 }, (_, i) => ({
+      metricId: metric.id, timestamp: ago((HISTORY_DAYS * 24 - i) * HOUR),
+      value: Number((kind.base * (1 + 0.25 * Math.sin(i / 8) + (random() - 0.5) * 0.2)).toFixed(kind.decimals)),
+    })), 1000, (c) => database.insertInto("metricPoints").values(c).execute());
+    customMetrics++;
+  }
+
+  const announcements = [
+    ...ANNOUNCEMENTS.map((a) => ({ ...a, pageId: ids.get(a.page)!.pageId })),
+    ...hubIds.map((hub) => ({ pageId: hub.id, title: "Welcome", body: "Every service in this hub is monitored continuously from public endpoints.", severity: "INFO" as const })),
+    ...[...ids].filter((_, i) => i % 6 === 2).map(([slug, page]) => ({ pageId: page.pageId, title: "Scheduled improvements", body: `We are improving the ${slug} services this week.`, severity: "WARNING" as const })),
+  ];
+  for (const a of announcements) {
     await database.insertInto("pageAnnouncements").values({
-      pageId: ids.get(a.page)!.pageId, title: a.title, body: a.body, severity: a.severity,
+      pageId: a.pageId, title: a.title, body: a.body, severity: a.severity,
       ctaLabel: null, ctaUrl: null, startsAt: ago(DAY), endsAt: ahead(7 * DAY), dismissible: true, priority: 0,
       surfaces: ["PAGE"], createdBy: admin.userId,
     }).execute();
   }
 
   const days = Array.from({ length: HISTORY_DAYS }, (_, i) => i);
-  await database.insertInto("analyticsDaily").values([...ids].flatMap(([slug, page]) => days.map((d) => {
+  const analyticsTargets = [...[...ids].map(([slug, page]) => [slug, page.pageId] as const), ...hubIds.map((hub) => [hub.slug, hub.id] as const)];
+  await database.insertInto("analyticsDaily").values(analyticsTargets.flatMap(([slug, pageId]) => days.map((d) => {
     const date = new Date(Date.now() - d * DAY).toISOString().slice(0, 10);
     const views = 120 + Math.floor(random() * 900);
     return {
-      id: `${page.pageId}:${date}`, pageId: page.pageId, date, views, incidentViews: Math.floor(views * 0.2),
+      id: `${pageId}:${date}`, pageId, date, views, incidentViews: Math.floor(views * 0.2),
       subscriptionStarts: Math.floor(random() * 12), subscriptionCompletions: Math.floor(random() * 8),
       referrers: JSON.stringify({ direct: Math.floor(views * 0.6), "github.com": Math.floor(views * 0.2), [`${slug}.example.com`]: Math.floor(views * 0.1) }) as unknown as Record<string, number>,
       expiresAt: ahead(90 * DAY), updatedAt: new Date(),
     };
   }))).execute();
 
-  console.log(`Seeded ${ids.size + 1} pages, ${monitorRows.length} monitors, ${INCIDENTS.length} incidents, ${MAINTENANCES.length} maintenances, ${subscribers.length} subscribers, ${checks.length} checks, ${points.length} metric points.`);
+  printGeneratedSecrets("Demo seed", [{ label: "Password for PRIVATE page and AUDIENCE access users", value: sharedPassword }]);
+  console.log(`Seeded ${hubIds.length} hubs, ${ids.size} status pages, ${monitorRows.length} monitors, ${INCIDENTS.length + generatedIncidents} incidents, ${MAINTENANCES.length + generatedMaintenances} maintenances, ${subscribers.length} subscribers, ${customMetrics} custom metrics, ${announcements.length} announcements, ${checks.length} checks, ${points.length} monitor metric points.`);
 }
 
 main()
