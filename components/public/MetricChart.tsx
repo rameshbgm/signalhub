@@ -1,10 +1,10 @@
 "use client";
 
-import { useCallback, useId, useMemo, useSyncExternalStore, type ReactElement } from "react";
+import { useCallback, useMemo, useSyncExternalStore, type ReactElement } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import {
-  Area, AreaChart, Bar, BarChart, CartesianGrid, ComposedChart, Line, LineChart, PolarAngleAxis,
-  RadialBar, RadialBarChart, ResponsiveContainer, Scatter, ScatterChart, Tooltip, XAxis, YAxis,
+  Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, ComposedChart, Line, LineChart, PolarAngleAxis,
+  RadialBar, RadialBarChart, ReferenceLine, ResponsiveContainer, Scatter, ScatterChart, Tooltip, XAxis, YAxis,
 } from "recharts";
 import { ChartArea, ChartCandlestick, ChartColumn, ChartLine, ChartNoAxesCombined, ChartScatter, Gauge, Grid3x3, type LucideIcon } from "lucide-react";
 import { formatMetricValue, metricDecimals } from "@/lib/status";
@@ -26,7 +26,10 @@ type ViewId = (typeof VIEWS)[number]["id"];
 
 const CHART_HEIGHT = 160;
 const ANIMATION_MS = 700;
-const BAND_BUCKETS = 24;
+// Few, wide buckets so the band view summarises the series instead of tracing the line.
+const BAND_BUCKETS = 8;
+// Scatter marks samples above the series average with this color so outliers stand out.
+const OUTLIER_COLOR = "#f59e0b";
 
 /** The remembered view lives in localStorage; useSyncExternalStore keeps server HTML on "line" and avoids an effect. */
 function useStoredView(storageKey: string): [ViewId, (view: ViewId) => void] {
@@ -77,7 +80,6 @@ export function MetricChart({
   const precision = metricDecimals(decimals);
   const reduceMotion = Boolean(useReducedMotion());
   const [view, setView] = useStoredView(`signalhub:metric-view:${id}`);
-  const gradientId = `metric-fill-${useId().replace(/:/g, "")}`;
   const animate = !reduceMotion;
   const animation = { isAnimationActive: animate, animationDuration: ANIMATION_MS, animationEasing: "ease-out" as const };
 
@@ -107,6 +109,8 @@ export function MetricChart({
       buckets.push({
         t: slice[0].t,
         full: slice[0].full,
+        min: Math.min(...values),
+        max: Math.max(...values),
         range: [Math.min(...values), Math.max(...values)] as [number, number],
         average: Number((values.reduce((sum, value) => sum + value, 0) / values.length).toFixed(precision)),
       });
@@ -144,14 +148,8 @@ export function MetricChart({
   if (view === "area") {
     chart = (
       <AreaChart data={data}>
-        <defs>
-          <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={color} stopOpacity={0.45} />
-            <stop offset="100%" stopColor={color} stopOpacity={0.02} />
-          </linearGradient>
-        </defs>
         {axisProps.grid}{axisProps.xAxis}{axisProps.yAxis}{tooltip}
-        <Area type="monotone" dataKey="value" stroke={color} strokeWidth={2} fill={`url(#${gradientId})`} dot={false} {...animation} />
+        <Area type="monotone" dataKey="value" stroke={color} strokeWidth={1.5} fill={color} fillOpacity={0.35} dot={false} {...animation} />
       </AreaChart>
     );
   } else if (view === "bar") {
@@ -172,18 +170,31 @@ export function MetricChart({
     chart = (
       <ScatterChart>
         {axisProps.grid}
-        <XAxis type="number" dataKey="index" hide domain={["dataMin", "dataMax"]} />
+        <XAxis
+          type="number"
+          dataKey="index"
+          domain={["dataMin", "dataMax"]}
+          tickFormatter={(index: number) => data[index]?.t ?? ""}
+          tick={{ fontSize: 10, fill: "var(--fg-dim)" }}
+          minTickGap={30}
+          axisLine={{ stroke: "var(--line)" }}
+          tickLine={false}
+        />
         {axisProps.yAxis}
         {tooltip}
-        <Scatter data={data} dataKey="value" fill={color} fillOpacity={0.75} {...animation} />
+        <Scatter data={data} dataKey="value" fill={color} fillOpacity={0.85} {...animation}>
+          {data.map((point) => <Cell key={point.index} fill={point.value > stats.average ? OUTLIER_COLOR : color} />)}
+        </Scatter>
       </ScatterChart>
     );
   } else if (view === "bands") {
     chart = (
       <ComposedChart data={bands}>
         {axisProps.grid}{axisProps.xAxis}{axisProps.yAxis}{tooltip}
-        <Area type="monotone" dataKey="range" stroke="none" fill={color} fillOpacity={0.18} name="Range" {...animation} />
-        <Line type="monotone" dataKey="average" stroke={color} dot={false} strokeWidth={2} name="Average" {...animation} />
+        <Area type="monotone" dataKey="range" stroke="none" fill={color} fillOpacity={0.3} name="Range" {...animation} />
+        <Line type="monotone" dataKey="max" stroke={color} strokeOpacity={0.5} strokeDasharray="3 3" dot={false} strokeWidth={1} name="Max" {...animation} />
+        <Line type="monotone" dataKey="min" stroke={color} strokeOpacity={0.5} strokeDasharray="3 3" dot={false} strokeWidth={1} name="Min" {...animation} />
+        <Line type="monotone" dataKey="average" stroke={color} dot={{ r: 3, fill: color }} strokeWidth={2} name="Average" {...animation} />
       </ComposedChart>
     );
   } else if (view === "gauge") {
@@ -197,6 +208,7 @@ export function MetricChart({
     chart = (
       <LineChart data={data}>
         {axisProps.grid}{axisProps.xAxis}{axisProps.yAxis}{tooltip}
+        <ReferenceLine y={stats.average} stroke="var(--fg-dim)" strokeDasharray="4 4" label={{ value: `avg ${format(stats.average)}`, position: "insideBottomRight", fontSize: 10, fill: "var(--fg-dim)" }} />
         <Line type="monotone" dataKey="value" stroke={color} dot={false} strokeWidth={2} {...animation} />
       </LineChart>
     );
