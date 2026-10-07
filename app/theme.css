@@ -173,6 +173,28 @@
   background-color: var(--color-canvas);
 }
 
+/* Always-visible thin scrollbar (macOS hides overlay scrollbars unless they are styled). */
+@utility scroll-thin {
+  overflow-y: auto;
+  &::-webkit-scrollbar {
+    width: 5px;
+  }
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  &::-webkit-scrollbar-thumb {
+    background: var(--color-line-strong);
+    border-radius: 999px;
+  }
+  &::-webkit-scrollbar-thumb:hover {
+    background: var(--color-ink-dim);
+  }
+  @supports not selector(::-webkit-scrollbar) {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-line-strong) transparent;
+  }
+}
+
 /* Frosted glass panel. */
 @utility glass {
   background-color: color-mix(in srgb, var(--color-surface) 78%, transparent);

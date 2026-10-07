@@ -93,7 +93,7 @@ export function OrgSwitcher({
           {organizations.length > 1 && (
             <>
               <p className="shrink-0 px-2.5 py-1 text-2xs font-bold uppercase tracking-[0.08em] text-ink-dim">Organizations</p>
-              <div className="max-h-[7.5rem] shrink-0 overflow-y-auto overscroll-contain">
+              <div className="max-h-[7.5rem] shrink-0 scroll-thin overscroll-contain pr-1">
               {organizations.map((organization) => (
                 <button
                   key={organization.id}
@@ -112,7 +112,7 @@ export function OrgSwitcher({
             </>
           )}
           <p className="shrink-0 px-2.5 py-1 text-2xs font-bold uppercase tracking-[0.08em] text-ink-dim">Your pages</p>
-          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+          <div className="min-h-0 flex-1 scroll-thin overscroll-contain pr-1">
           {canConfigurePages &&
             pages.map((p) => (
               <Link
