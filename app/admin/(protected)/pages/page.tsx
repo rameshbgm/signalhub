@@ -2,6 +2,9 @@ import Link from "next/link";
 import { ArrowUpRight, Globe, Layers3, LayoutGrid, Lock, PanelsTopLeft, Pencil, Plus, Rocket, Trash2, Users } from "lucide-react";
 import { requireSession } from "@/lib/require-session";
 import { getScopedPages, sessionHasCapability } from "@/lib/admin-guard";
+import { formatPageDate } from "@/lib/page-locale";
+import { groupPageEvents } from "@/lib/page-events";
+import { database } from "@/lib/postgres/client";
 import { publicPagePath } from "@/lib/public-path";
 import { buttonVariants } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -20,6 +23,18 @@ export default async function PagesListPage() {
   const publishedCount = pages.filter((page) => page.setupCompletedAt !== null && page.publicVisible).length;
   const draftCount = pages.filter((page) => page.setupCompletedAt === null).length;
   const hiddenCount = pages.length - publishedCount - draftCount;
+  // Open incidents and pending maintenance, so each card can say whether its page needs attention.
+  const statusPageIds = pages.filter((page) => !page.isHub).map((page) => page.id);
+  const openEvents = sessionHasCapability(session, "incident.update") && statusPageIds.length
+    ? await database.selectFrom("incidents")
+      .select(["id", "pageId", "isMaintenance", "status", "maintenanceStatus", "scheduledStart", "createdAt"])
+      .where("pageId", "in", statusPageIds)
+      .where((eb) => eb.or([
+        eb.and([eb("isMaintenance", "=", false), eb("status", "!=", "RESOLVED")]),
+        eb.and([eb("isMaintenance", "=", true), eb.or([eb("maintenanceStatus", "is", null), eb("maintenanceStatus", "in", ["SCHEDULED", "IN_PROGRESS", "VERIFYING"])])]),
+      ]))
+      .execute()
+    : null;
 
   return (
     <div className="space-y-8">
@@ -80,6 +95,18 @@ export default async function PagesListPage() {
                         <dd className="mt-0.5 truncate font-medium text-ink">{page.publicVisible ? "Visible to visitors" : "Hidden from visitors"}</dd>
                       </div>
                     </dl>
+
+                    {openEvents && !page.isHub && (() => {
+                      const { active, upcoming } = groupPageEvents(openEvents.filter((event) => event.pageId === page.id));
+                      const next = upcoming[0]?.scheduledStart;
+                      return (
+                        <Link href={`/organization/events?pageId=${page.id}`} className="mt-4 inline-flex w-fit rounded-chip outline-none focus-visible:ring-4 focus-visible:ring-primary/25">
+                          {active.length ? <StatusBadge tone="warn" live>{active.length} active event{active.length === 1 ? "" : "s"}</StatusBadge>
+                            : next ? <StatusBadge tone="info">Maintenance {formatPageDate(next, { language: page.language, timeZone: page.timezone, month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</StatusBadge>
+                            : <StatusBadge tone="ok">No active events</StatusBadge>}
+                        </Link>
+                      );
+                    })()}
 
                     <div className="mt-5 flex items-center justify-between gap-3 border-t border-line pt-4">
                       <div className="min-w-0">
