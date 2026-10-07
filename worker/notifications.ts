@@ -1,7 +1,6 @@
-import { createHmac } from "node:crypto";
 import { database, withDatabaseTransaction, type DatabaseExecutor } from "@/lib/postgres/client";
 import type { NotificationJobRow } from "@/lib/postgres/schema";
-import { decryptSecret } from "@/lib/encryption";
+import { signedWebhookHeaders } from "@/lib/domain/webhooks";
 import { BlockedAddressError, guardedFetch } from "@/lib/guarded-fetch";
 import { smtpTransport, verifySmtp } from "@/lib/smtp";
 import { deliverDestination, deliverSms, ProviderHttpError } from "@/lib/notification-providers";
@@ -218,16 +217,7 @@ async function deliver(job: NotificationJobRow) {
     if (!endpoint) throw new DeliveryError("Webhook endpoint is no longer active", false);
     const payload = job.payload && typeof job.payload === "object" ? job.payload : {};
     const body = JSON.stringify({ id: job.id, ...payload });
-    const timestamp = Math.floor(Date.now() / 1000).toString();
-    const signature = createHmac("sha256", decryptSecret(endpoint.secretCiphertext))
-      .update(`${timestamp}.${body}`)
-      .digest("hex");
-    return postJson(endpoint.url, body, {
-      "x-status-event": job.eventType,
-      "x-status-timestamp": timestamp,
-      "x-status-signature": `sha256=${signature}`,
-      "x-status-delivery": job.id,
-    });
+    return postJson(endpoint.url, body, signedWebhookHeaders(endpoint.secretCiphertext, job.eventType, job.id, body));
   }
   throw new DeliveryError(`Unsupported notification channel ${job.channel}`, false);
 }

@@ -4,7 +4,7 @@ import { fetchWithTimeout } from "@/lib/client-fetch";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { RefreshCw, Trash2, Webhook } from "lucide-react";
+import { RefreshCw, Send, Trash2, Webhook } from "lucide-react";
 import { SecretField } from "@/components/admin/SecretReveal";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -32,6 +32,7 @@ export function WebhookEndpointManager({
   const [pending, setPending] = useState<string | null>(null);
   const [secret, setSecret] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   async function create(event: React.FormEvent) {
     event.preventDefault();
@@ -56,6 +57,23 @@ export function WebhookEndpointManager({
       router.refresh();
     } catch {
       setError("Unable to verify the webhook. Check your connection and try again.");
+    } finally {
+      setPending(null);
+    }
+  }
+
+  async function test(id: string) {
+    if (pending) return;
+    setPending(id);
+    setError(null);
+    setNotice(null);
+    try {
+      const response = await fetchWithTimeout(`/api/admin/webhook-endpoints/${id}/test`, { method: "POST" });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) setError(data.error?.message ?? "Test delivery failed");
+      else setNotice("Signed test event delivered (event type status.test).");
+    } catch {
+      setError("Unable to send the test event. Check your connection and try again.");
     } finally {
       setPending(null);
     }
@@ -97,6 +115,7 @@ export function WebhookEndpointManager({
   return (
     <div className="space-y-4">
       {error && <Alert tone="danger">{error}</Alert>}
+      {notice && <Alert tone="ok" role="status">{notice}</Alert>}
       {secret && (
         <Alert tone="warn" role="status" title="Copy this signing secret now. It will not be shown again.">
           <SecretField value={secret} copyLabel="Copy secret" className="mt-3" />
@@ -137,6 +156,10 @@ export function WebhookEndpointManager({
                     <p className="mt-0.5 font-mono text-xs text-ink-dim">signature: {endpoint.secretLabel}</p>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
+                    <Button type="button" variant="secondary" size="sm" disabled={Boolean(pending)} onClick={() => test(endpoint.id)}>
+                      <Send aria-hidden size={14} />
+                      Send test
+                    </Button>
                     <Button type="button" variant="secondary" size="sm" disabled={Boolean(pending)} onClick={() => mutate(endpoint.id, "rotate")}>
                       <RefreshCw aria-hidden size={14} />
                       Rotate

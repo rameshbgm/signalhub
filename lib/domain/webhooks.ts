@@ -1,9 +1,9 @@
-import { randomBytes } from "node:crypto";
+import { createHmac, randomBytes } from "node:crypto";
 import type { Insertable } from "kysely";
 import type { DatabaseTransaction } from "@/lib/postgres/client";
 import type { WebhookEndpointTable } from "@/lib/postgres/schema";
 import { newDatabaseId } from "@/lib/database-id";
-import { encryptSecret } from "@/lib/encryption";
+import { decryptSecret, encryptSecret } from "@/lib/encryption";
 import { guardedFetch } from "@/lib/guarded-fetch";
 import { hashSecret } from "@/lib/secrets";
 import { validateHttpTarget } from "@/lib/target-validation";
@@ -69,4 +69,18 @@ export async function rotateWebhookEndpointSecret(endpointId: string, transactio
   }).where("id", "=", endpointId).where("active", "=", true)
     .returning("id").executeTakeFirst();
   return result ? secret : null;
+}
+
+/** Headers for one signed delivery: HMAC-SHA256 over `${timestamp}.${body}`. */
+export function signedWebhookHeaders(secretCiphertext: string, eventType: string, deliveryId: string, body: string) {
+  const timestamp = Math.floor(Date.now() / 1000).toString();
+  const signature = createHmac("sha256", decryptSecret(secretCiphertext))
+    .update(`${timestamp}.${body}`)
+    .digest("hex");
+  return {
+    "x-status-event": eventType,
+    "x-status-timestamp": timestamp,
+    "x-status-signature": `sha256=${signature}`,
+    "x-status-delivery": deliveryId,
+  };
 }

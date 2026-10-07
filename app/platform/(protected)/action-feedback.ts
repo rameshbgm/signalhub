@@ -2,7 +2,8 @@
 
 import { unstable_rethrow } from "next/navigation";
 
-type PlatformAction = (formData: FormData) => void | Promise<void>;
+/** An action may return a message that replaces the default success text. */
+type PlatformAction = (formData: FormData) => void | string | Promise<void | string>;
 
 type ActionFeedbackState =
   | { status: "idle"; message: "" }
@@ -18,8 +19,8 @@ export async function runPlatformActionWithFeedback(
   formData: FormData
 ): Promise<ActionFeedbackState> {
   try {
-    await action(formData);
-    return { status: "success", message: successMessage };
+    const result = await action(formData);
+    return { status: "success", message: typeof result === "string" ? result : successMessage };
   } catch (error) {
     // Preserve redirect/not-found and other framework control flow while
     // converting expected operator errors into serializable action state.

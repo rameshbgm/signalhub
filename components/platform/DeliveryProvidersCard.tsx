@@ -1,4 +1,4 @@
-import { Mail, Save, Send, Smartphone, Trash2, type LucideIcon } from "lucide-react";
+import { Mail, PlugZap, Save, Send, Smartphone, Trash2, type LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import {
   removeMailProvider,
@@ -70,9 +70,7 @@ export function DeliveryProvidersCard({ settings, canManage }: { settings: Deliv
                   <Input id="smtp-from" name="from" required maxLength={320} defaultValue={settings.smtpFrom ?? ""} placeholder="Status <status@example.com>" />
                 </Field>
                 <ReasonField id="smtp-reason" />
-                <div className="flex justify-end">
-                  <Button type="submit"><Save aria-hidden size={16} />Verify and save</Button>
-                </div>
+                <SubmitRow />
               </PlatformActionForm>
               {mailConfigured && (
                 <div className="flex flex-wrap gap-3 border-t border-line pt-4">
@@ -102,9 +100,7 @@ export function DeliveryProvidersCard({ settings, canManage }: { settings: Deliv
                   <Input id="twilio-from" name="fromNumber" required maxLength={32} defaultValue={settings.twilioFromNumber ?? ""} placeholder="+15551234567" />
                 </Field>
                 <ReasonField id="twilio-reason" />
-                <div className="flex justify-end">
-                  <Button type="submit"><Save aria-hidden size={16} />Verify and save</Button>
-                </div>
+                <SubmitRow />
               </PlatformActionForm>
               {smsConfigured && (
                 <div className="space-y-4 border-t border-line pt-4">
@@ -139,6 +135,16 @@ function ProviderSection({ icon, title, configured, children }: { icon: LucideIc
       </div>
       {children}
     </section>
+  );
+}
+
+/** "Test connection" skips the change reason, so it bypasses browser validation; the server still validates. */
+function SubmitRow() {
+  return (
+    <div className="flex flex-wrap justify-end gap-3">
+      <Button type="submit" name="intent" value="test" variant="secondary" formNoValidate><PlugZap aria-hidden size={16} />Test connection</Button>
+      <Button type="submit" name="intent" value="save"><Save aria-hidden size={16} />Verify and save</Button>
+    </div>
   );
 }
 

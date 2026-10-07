@@ -5,7 +5,7 @@ import { runPlatformActionWithFeedback } from "@/app/platform/(protected)/action
 import { Alert } from "@/components/ui/alert";
 import { cn } from "@/lib/utils";
 
-type PlatformAction = (formData: FormData) => void | Promise<void>;
+type PlatformAction = (formData: FormData) => void | string | Promise<void | string>;
 
 type ActionFeedbackState =
   | { status: "idle"; message: "" }

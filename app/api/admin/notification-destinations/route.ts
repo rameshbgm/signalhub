@@ -20,6 +20,8 @@ const schema = z.object({
   name: z.string().trim().min(1).max(100),
   channel: z.enum(DESTINATION_CHANNELS),
   config: z.record(z.string(), z.string()),
+  /** Send the verification message without storing the destination. */
+  dryRun: z.boolean().optional(),
 });
 
 const URL_CHANNELS = new Set<DestinationChannel>([
@@ -90,11 +92,16 @@ export async function POST(request: NextRequest) {
       componentIds: null,
       createdAt: now,
     };
-    await deliverDestination(destination, {
-      subject: `${page.name} connection test`,
-      body: "This destination is ready to receive incident and maintenance updates.",
-      eventType: "destination.test",
-    });
+    try {
+      await deliverDestination(destination, {
+        subject: `${page.name} connection test`,
+        body: "This destination is ready to receive incident and maintenance updates.",
+        eventType: "destination.test",
+      });
+    } catch (error) {
+      return apiError(502, "TEST_FAILED", error instanceof Error ? error.message.slice(0, 300) : "Connection test failed");
+    }
+    if (parsed.data.dryRun) return NextResponse.json({ ok: true, tested: true });
     await withDatabaseTransaction(async (transaction) => {
       await fenceActiveOrganizationMutation(session.orgId, transaction);
       const currentPage = await transaction

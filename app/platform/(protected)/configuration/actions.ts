@@ -93,10 +93,12 @@ async function saveProviders(
   revalidatePath("/organization/notifications");
 }
 
+/** The form's "Test connection" button checks the entered values without saving. */
+const testOnly = (formData: FormData) => formData.get("intent") === "test";
+
 /** Saves SMTP settings only after the server accepts a connection with them. */
 export async function updateMailProvider(formData: FormData) {
   const actor = await requirePlatformCapability("configuration.manage");
-  const reason = changeReason(formData);
   const input = mailProviderSchema.parse({
     host: formData.get("host"),
     port: formData.get("port"),
@@ -119,7 +121,8 @@ export async function updateMailProvider(formData: FormData) {
   } catch (error) {
     throw new Error(`SMTP connection failed: ${error instanceof Error ? error.message.slice(0, 300) : "unknown error"}`);
   }
-  await saveProviders(actor, reason, "MAIL_PROVIDER_UPDATED", {
+  if (testOnly(formData)) return `Connected to ${input.host}:${input.port}${input.username ? " and signed in" : ""}. Nothing was saved.`;
+  await saveProviders(actor, changeReason(formData), "MAIL_PROVIDER_UPDATED", {
     smtpHost: input.host,
     smtpPort: input.port,
     smtpSecure: input.secure,
@@ -152,7 +155,6 @@ export async function sendTestEmail() {
 /** Saves Twilio settings only after Twilio accepts the credentials. */
 export async function updateSmsProvider(formData: FormData) {
   const actor = await requirePlatformCapability("configuration.manage");
-  const reason = changeReason(formData);
   const input = smsProviderSchema.parse({
     accountSid: formData.get("accountSid"),
     authToken: formData.get("authToken") ?? "",
@@ -162,7 +164,8 @@ export async function updateSmsProvider(formData: FormData) {
   const authToken = input.authToken || (stored ? decryptSecret(stored) : "");
   if (!authToken) throw new Error("Twilio auth token is required");
   await verifyTwilioCredentials(input.accountSid, authToken);
-  await saveProviders(actor, reason, "SMS_PROVIDER_UPDATED", {
+  if (testOnly(formData)) return "Twilio accepted these credentials. Nothing was saved.";
+  await saveProviders(actor, changeReason(formData), "SMS_PROVIDER_UPDATED", {
     twilioAccountSid: input.accountSid,
     twilioAuthTokenCiphertext: encryptSecret(authToken),
     twilioFromNumber: input.fromNumber,

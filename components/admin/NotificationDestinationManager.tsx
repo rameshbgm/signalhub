@@ -130,9 +130,11 @@ export function NotificationDestinationManager({
     availableProviders.find((provider) => provider.value === channel) ??
     availableProviders[0];
 
-  async function create(event: React.FormEvent) {
+  async function create(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (loading || pendingAction) return;
+    // "Send test" delivers the verification message without saving.
+    const dryRun = (event.nativeEvent as SubmitEvent).submitter?.getAttribute("value") === "test";
     setLoading(true);
     setMessageIsError(false);
     setMessage("Testing destination…");
@@ -141,12 +143,16 @@ export function NotificationDestinationManager({
       const response = await fetchWithTimeout("/api/admin/notification-destinations", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ pageId, name, channel, config }),
+        body: JSON.stringify({ pageId, name, channel, config, dryRun }),
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
         setMessageIsError(true);
         setMessage(data.error?.message ?? "Destination could not be added");
+        return;
+      }
+      if (dryRun) {
+        setMessage(`Test message delivered to ${selectedProvider?.label ?? "the destination"}. Nothing was saved yet.`);
         return;
       }
       setDestinations((items) => [...items, { ...data.destination, lastTestOk: true, lastError: null }]);
@@ -261,8 +267,11 @@ export function NotificationDestinationManager({
             ))}
           </div>
         </div>
-        <div className="flex justify-end border-t border-line pt-4">
-          <Button type="submit" loading={loading} disabled={Boolean(pendingAction)} className="w-full sm:w-auto">
+        <div className="flex flex-col-reverse justify-end gap-2 border-t border-line pt-4 sm:flex-row">
+          <Button type="submit" name="intent" value="test" variant="secondary" disabled={loading || Boolean(pendingAction)} className="w-full sm:w-auto">
+            Send test
+          </Button>
+          <Button type="submit" name="intent" value="add" loading={loading} disabled={Boolean(pendingAction)} className="w-full sm:w-auto">
             {loading ? `Testing ${selectedProvider.label}…` : `Test and add ${selectedProvider.label}`}
           </Button>
         </div>
