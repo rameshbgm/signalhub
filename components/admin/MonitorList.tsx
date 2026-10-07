@@ -17,7 +17,10 @@ type Action = (formData: FormData) => Promise<void>;
 type MonitorState = "up" | "down" | "pending" | "paused";
 
 export type MonitorListItem = {
-  values: MonitorFormValues;
+  /** Safe for every viewer. */
+  values: Pick<MonitorFormValues, "id" | "name" | "type" | "target" | "port" | "tags" | "groupName">;
+  /** Edit-form values (headers, body, auth names); only sent to viewers who can manage monitors. */
+  edit: MonitorFormValues | null;
   enabled: boolean;
   state: MonitorState;
   componentName: string | null;
@@ -108,9 +111,9 @@ function MonitorRowView({ monitor, components, canManage, now }: { monitor: Moni
             </InlineActionForm>
           </>
         )}
-        {canManage ? (
-          <MonitorDrawer action={actions.update} components={components} monitor={m} checks={monitor.checks} />
-        ) : null}
+        {canManage && monitor.edit && (
+          <MonitorDrawer action={actions.update} components={components} monitor={monitor.edit} checks={monitor.checks} />
+        )}
         {canManage && (
           <InlineActionForm action={actions.remove}>
             <PageSubmitButton variant="ghost" size="icon" pendingLabel="…" title="Delete" className="size-8 hover:bg-danger-bg [&_svg]:!text-danger-fg" confirmMessage={`Delete the monitor ${m.name} and its check history? This cannot be undone.`}>

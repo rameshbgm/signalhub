@@ -105,6 +105,7 @@ describe("monitor tags pattern", () => {
     // Edit values are picked field by field so stored secrets never reach the client.
     const monitorsPage = source("app/admin/(protected)/monitors/page.tsx");
     expect(monitorsPage).toContain("hasAuthSecret: Boolean(m.authSecret)");
+    expect(monitorsPage).toContain("edit: canManage ? formValues(m) : null");
     expect(monitorsPage).not.toMatch(/authSecret: m\.authSecret|heartbeatTokenHash: m\./);
   });
 });

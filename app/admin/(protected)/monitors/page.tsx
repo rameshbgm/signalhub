@@ -74,7 +74,8 @@ export default async function MonitorsPage({ searchParams }: { searchParams: Pro
   const canManage = sessionHasCapability(session, "monitor.manage");
   const componentOptions = components.map((c) => ({ id: c.id, name: c.name }));
   const items: MonitorListItem[] = monitors.map((m) => ({
-    values: formValues(m),
+    values: { id: m.id, name: m.name, type: m.type, target: m.target, port: m.port, tags: m.tags ?? [], groupName: m.groupName },
+    edit: canManage ? formValues(m) : null,
     enabled: m.enabled,
     state: !m.enabled ? "paused" : m.lastOk === null ? "pending" : m.isDown ? "down" : "up",
     componentName: m.componentId ? componentsById.get(m.componentId) ?? "unknown component" : null,
