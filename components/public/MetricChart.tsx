@@ -149,11 +149,11 @@ export function MetricChart({
   const summary = insight.summary;
   const lowerIsBetter = suffix.trim().toLowerCase() === "ms";
   const stats = summary ? [
-    { label: "Latest", value: summary.latest, delta: null },
-    { label: "Average", value: summary.avg, delta: percentChange(summary.avg, insight.previous.summary?.avg) },
-    { label: "Min", value: summary.min, delta: null },
-    { label: "Max", value: summary.max, delta: null },
-    { label: "p95", value: summary.p95, delta: percentChange(summary.p95, insight.previous.summary?.p95) },
+    { label: "Latest", value: summary.latest, delta: null, tone: color },
+    { label: "Avg", value: summary.avg, delta: percentChange(summary.avg, insight.previous.summary?.avg), tone: "#3b82f6" },
+    { label: "Min", value: summary.min, delta: null, tone: "#10b981" },
+    { label: "Max", value: summary.max, delta: null, tone: "#ef4444" },
+    { label: "p95", value: summary.p95, delta: percentChange(summary.p95, insight.previous.summary?.p95), tone: "#f59e0b" },
   ] : [];
 
   const canCompare = prefs.lens === "trend" && COMPARABLE_VIEWS.includes(prefs.view) && insight.previous.buckets.length > 0;
@@ -211,14 +211,15 @@ export function MetricChart({
       {windowState?.error && <p role="alert" className="mb-2 text-xs text-[#dc2626]">{windowState.error}</p>}
 
       {stats.length > 0 && (
-        <dl className="mb-4 grid grid-cols-3 gap-y-2 border border-[var(--line)] bg-[var(--bg)] px-1 py-2.5 sm:grid-cols-5 sm:divide-x sm:divide-[var(--line)]" style={{ borderRadius: "var(--page-radius, 8px)" }}>
+        <dl className="mb-3 flex flex-wrap gap-x-4 gap-y-1 text-xs">
           {stats.map((stat) => {
             const worse = stat.delta !== null && lowerIsBetter && stat.delta > 0;
             const better = stat.delta !== null && lowerIsBetter && stat.delta < 0;
             return (
-              <div key={stat.label} className="min-w-0 px-3">
-                <dt className="text-[10px] uppercase tracking-wide text-[var(--fg-dim)]">{stat.label}</dt>
-                <dd className="mt-0.5 text-sm font-semibold tabular-nums text-[var(--fg)]">
+              <div key={stat.label} className="flex items-center gap-1.5">
+                <span aria-hidden className="size-1.5 rounded-full" style={{ background: stat.tone }} />
+                <dt className="text-[var(--fg-dim)]">{stat.label}</dt>
+                <dd className="font-semibold tabular-nums" style={{ color: stat.tone }}>
                   {format(stat.value)}
                   {stat.delta !== null && Math.abs(stat.delta) >= 0.1 && (
                     <span className="ml-1 text-[10px] font-medium" style={{ color: worse ? "#d97706" : better ? "#059669" : "var(--fg-dim)" }} title="Compared with the previous period">
