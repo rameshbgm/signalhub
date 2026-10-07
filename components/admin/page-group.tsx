@@ -10,6 +10,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogActions, DialogSurface, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { BULK_PAGE_LIMIT, bulkDeletePhrase, matchesBulkDeletePhrase, pageCountLabel } from "@/lib/page-bulk";
 import { cn } from "@/lib/utils";
 
 export type PageRow = {
@@ -21,6 +22,8 @@ export type PageRow = {
   tone: "ok" | "warn" | "neutral";
   type: string;
   event: { label: string; tone: "warn" | "info"; live: boolean } | null;
+  visible: boolean;
+  setupDone: boolean;
   liveHref: string | null;
   setupHref: string | null;
 };
@@ -28,11 +31,10 @@ export type PageRow = {
 const iconAction = (extra?: string) => buttonVariants({ variant: "ghost", size: "icon", className: cn("size-8", extra) });
 const accessIcon = (type: string) => (type === "PUBLIC" ? Globe : type === "PRIVATE" ? Lock : Users);
 const accessLabel = (type: string) => (type === "PUBLIC" ? "Public" : type === "PRIVATE" ? "Private" : "Audience");
-const plural = (count: number) => `${count} page${count === 1 ? "" : "s"}`;
 
-function BulkButton({ intent, children, variant = "ghost" }: { intent: string; children: ReactNode; variant?: "ghost" | "destructive" }) {
+function BulkButton({ intent, children, variant = "ghost", disabled = false, title }: { intent: string; children: ReactNode; variant?: "ghost" | "destructive"; disabled?: boolean; title?: string }) {
   const { pending } = useFormStatus();
-  return <Button type="submit" name="intent" value={intent} size="sm" variant={variant} disabled={pending}>{children}</Button>;
+  return <Button type="submit" name="intent" value={intent} size="sm" variant={variant} disabled={disabled || pending} title={title}>{children}</Button>;
 }
 
 /** One collapsible group of pages (a hub's children, or standalone pages) with row selection and bulk actions. */
@@ -51,15 +53,21 @@ export function PageGroup({ header, rows, hubId, action, defaultOpen, canConfigu
   const [open, setOpen] = useState(defaultOpen);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [confirmation, setConfirmation] = useState("");
   // Rows can vanish after an action (removed, deleted), so only count ids still listed.
   const chosen = rows.filter((row) => selected.has(row.id));
-  const clear = useCallback(() => { setSelected(new Set()); setConfirmingDelete(false); }, []);
+  const clear = useCallback(() => { setSelected(new Set()); setConfirmingDelete(false); setConfirmation(""); }, []);
+  const closeDelete = () => { setConfirmingDelete(false); setConfirmation(""); };
   const toggle = (id: string) => setSelected((current) => {
     const next = new Set(current);
     if (!next.delete(id)) next.add(id);
     return next;
   });
   const allSelected = rows.length > 0 && chosen.length === rows.length;
+  // Same rules bulkPageAction enforces server-side; the server stays authoritative and reports skipped pages.
+  const overLimit = chosen.length > BULK_PAGE_LIMIT;
+  const publishable = chosen.filter((row) => row.setupDone && !row.visible).length;
+  const hideable = chosen.filter((row) => row.visible).length;
   const hiddenIds = chosen.map((row) => <input key={row.id} type="hidden" name="pageId" value={row.id} />);
 
   return (
@@ -96,10 +104,11 @@ export function PageGroup({ header, rows, hubId, action, defaultOpen, canConfigu
               <PlatformActionForm action={action} successMessage="Done" onSuccess={clear} className="flex flex-1 items-center justify-end gap-1" messageClassName="sm:text-right">
                 {chosen.length > 0 && <>
                   {hiddenIds}
-                  <BulkButton intent="publish"><Eye aria-hidden size={14} />Publish</BulkButton>
-                  <BulkButton intent="hide"><EyeOff aria-hidden size={14} />Hide</BulkButton>
-                  {hubId && <BulkButton intent="remove"><Unlink aria-hidden size={14} />Remove from hub</BulkButton>}
-                  <Button type="button" size="sm" variant="ghost" className="text-danger-fg hover:bg-danger-bg" data-button-guard="off" onClick={() => setConfirmingDelete(true)}><Trash2 aria-hidden size={14} />Delete…</Button>
+                  {overLimit && <span role="alert" className="mr-auto text-xs font-medium text-danger-fg">Select {BULK_PAGE_LIMIT} pages or fewer</span>}
+                  <BulkButton intent="publish" disabled={overLimit || !publishable} title={publishable ? `Publish ${pageCountLabel(publishable)}` : "Selected pages are already published or still in setup"}><Eye aria-hidden size={14} />Publish</BulkButton>
+                  <BulkButton intent="hide" disabled={overLimit || !hideable} title={hideable ? `Hide ${pageCountLabel(hideable)}` : "Selected pages are already hidden"}><EyeOff aria-hidden size={14} />Hide</BulkButton>
+                  {hubId && <BulkButton intent="remove" disabled={overLimit}><Unlink aria-hidden size={14} />Remove from hub</BulkButton>}
+                  <Button type="button" size="sm" variant="ghost" className="text-danger-fg hover:bg-danger-bg" data-button-guard="off" disabled={overLimit} onClick={() => setConfirmingDelete(true)}><Trash2 aria-hidden size={14} />Delete…</Button>
                   <Button type="button" size="icon" variant="ghost" className="size-8" aria-label="Clear selection" data-button-guard="off" onClick={clear}><X aria-hidden size={14} /></Button>
                 </>}
               </PlatformActionForm>
@@ -145,20 +154,20 @@ export function PageGroup({ header, rows, hubId, action, defaultOpen, canConfigu
       )}
 
       {confirmingDelete && createPortal(
-        <Dialog open onOpenChange={() => setConfirmingDelete(false)}>
+        <Dialog open onOpenChange={closeDelete}>
           <DialogSurface>
-            <DialogTitle>Delete {plural(chosen.length)} permanently?</DialogTitle>
+            <DialogTitle>Delete {pageCountLabel(chosen.length)} permanently?</DialogTitle>
             <PlatformActionForm action={action} successMessage="Pages deleted" onSuccess={clear} className="mt-3 space-y-4">
               {hiddenIds}
               <p className="text-sm leading-6 text-ink-soft">Deletes each page with its services, incidents, subscribers, metrics, monitors and assets. This cannot be undone.</p>
               <ul className="max-h-40 list-disc overflow-y-auto pl-5 text-sm text-ink">{chosen.map((row) => <li key={row.id}>{row.name}</li>)}</ul>
               <label className="block space-y-1.5 text-sm text-ink-soft">
-                <span>Type <code className="font-mono text-ink">delete {plural(chosen.length)}</code> to confirm</span>
-                <Input name="confirmation" autoComplete="off" required autoFocus />
+                <span>Type <code className="font-mono text-ink">{bulkDeletePhrase(chosen.length)}</code> to confirm</span>
+                <Input name="confirmation" autoComplete="off" required autoFocus value={confirmation} onChange={(event) => setConfirmation(event.target.value)} />
               </label>
               <DialogActions>
-                <Button type="button" variant="secondary" data-button-guard="off" onClick={() => setConfirmingDelete(false)}>Cancel</Button>
-                <BulkButton intent="delete" variant="destructive">Delete permanently</BulkButton>
+                <Button type="button" variant="secondary" data-button-guard="off" onClick={closeDelete}>Cancel</Button>
+                <BulkButton intent="delete" variant="destructive" disabled={!matchesBulkDeletePhrase(confirmation, chosen.length)}>Delete permanently</BulkButton>
               </DialogActions>
             </PlatformActionForm>
           </DialogSurface>

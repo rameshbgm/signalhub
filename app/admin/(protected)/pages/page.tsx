@@ -67,6 +67,8 @@ export default async function PagesListPage() {
       event: events?.active.length ? { label: `${events.active.length} active event${events.active.length === 1 ? "" : "s"}`, tone: "warn", live: true }
         : next ? { label: `Maintenance ${formatPageDate(next, { language: page.language, timeZone: page.timezone, month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}`, tone: "info", live: false }
         : null,
+      visible: page.publicVisible,
+      setupDone: page.setupCompletedAt !== null,
       liveHref: page.publicVisible && page.setupCompletedAt ? publicPagePath(page) : null,
       setupHref: page.setupCompletedAt ? null : `/organization/pages/${page.id}`,
     };

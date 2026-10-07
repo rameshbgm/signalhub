@@ -6,7 +6,9 @@ import { redirect } from "next/navigation";
 import { requireCapability, assertPageInOrg } from "@/lib/admin-guard";
 import { hashPassword } from "@/lib/auth";
 import { deletePageCascade, withTransaction } from "@/lib/cascade";
+import { isDatabaseId } from "@/lib/database-id";
 import { fenceActiveOrganizationMutation } from "@/lib/organization-mutation";
+import { BULK_PAGE_LIMIT, bulkDeletePhrase, isBulkPageIntent, matchesBulkDeletePhrase, pageCountLabel } from "@/lib/page-bulk";
 import { templateDesign } from "@/lib/page-design";
 import { isValidTimeZone } from "@/lib/page-locale";
 import { publicPagePath } from "@/lib/public-path";
@@ -176,6 +178,7 @@ export async function attachChildPage(hubId: string, formData: FormData) {
   const session = await requireCapability("page.configure", hubId);
   const childId = String(formData.get("childPageId") ?? "");
   if (!childId) throw new Error("Choose a status page to add");
+  if (!isDatabaseId(childId)) throw new Error("Status page is unavailable or already belongs to another hub");
   let publicPath = "";
   await withTransaction(async (transaction) => {
     await fenceActiveOrganizationMutation(session.orgId, transaction);
@@ -300,24 +303,34 @@ async function assertHubEmpty(hubId: string) {
   if (children > 0) throw new Error(`Remove or delete this hub's ${children} page${children === 1 ? "" : "s"} before deleting it`);
 }
 
-const BULK_INTENTS = ["publish", "hide", "remove", "delete"] as const;
-
-/** Bulk action over pages from the pages list; hubId scopes "remove" to one hub's children. */
+/** Bulk action over pages from the pages list. With hubId, every selected page must be a child of that hub. */
 export async function bulkPageAction(hubId: string | null, formData: FormData) {
-  const intent = String(formData.get("intent") ?? "") as (typeof BULK_INTENTS)[number];
-  if (!BULK_INTENTS.includes(intent)) throw new Error("Choose a bulk action");
-  const pageIds = [...new Set(formData.getAll("pageId").map(String).filter(Boolean))];
+  const intent = formData.get("intent");
+  if (!isBulkPageIntent(intent)) throw new Error("Choose a bulk action");
+  if (hubId !== null && !isDatabaseId(hubId)) throw new Error("Hub not found in your organization");
+  if (intent === "remove" && !hubId) throw new Error("Only pages inside a hub can be removed from a hub");
+  const pageIds = [...new Set(formData.getAll("pageId").map(String))];
   if (!pageIds.length) throw new Error("Select at least one page");
-  if (pageIds.length > 100) throw new Error("Select 100 pages or fewer");
+  if (pageIds.length > BULK_PAGE_LIMIT) throw new Error(`Select ${BULK_PAGE_LIMIT} pages or fewer`);
+  if (!pageIds.every(isDatabaseId)) throw new Error("One or more selected pages are invalid. Reload and try again.");
   let session = await requireCapability("page.configure", hubId ?? undefined);
   for (const id of pageIds) session = await requireCapability("page.configure", id);
-  const label = `${pageIds.length} page${pageIds.length === 1 ? "" : "s"}`;
+  if (hubId) {
+    const hub = await database.selectFrom("pages").select("id")
+      .where("id", "=", hubId).where("orgId", "=", session.orgId).where("isHub", "=", true).where("deletedAt", "is", null)
+      .executeTakeFirst();
+    if (!hub) throw new Error("Hub not found in your organization");
+    const members = await database.selectFrom("pages").select("id")
+      .where("id", "in", pageIds).where("hubParentId", "=", hubId).where("deletedAt", "is", null).execute();
+    if (members.length !== pageIds.length) throw new Error("Some selected pages are no longer in this hub. Reload and try again.");
+  }
+  const label = pageCountLabel(pageIds.length);
   const publicPaths = new Set<string>();
   let message: string;
 
   if (intent === "delete") {
-    if (String(formData.get("confirmation") ?? "").trim().toLowerCase() !== `delete ${label}`) {
-      throw new Error(`Type "delete ${label}" to confirm`);
+    if (!matchesBulkDeletePhrase(String(formData.get("confirmation") ?? ""), pageIds.length)) {
+      throw new Error(`Type "${bulkDeletePhrase(pageIds.length)}" to confirm`);
     }
     let deleted = 0;
     try {
@@ -338,11 +351,10 @@ export async function bulkPageAction(hubId: string | null, formData: FormData) {
       await fenceActiveOrganizationMutation(session.orgId, transaction);
       let query = transaction.updateTable("pages")
         .where("id", "in", pageIds).where("orgId", "=", session.orgId).where("deletedAt", "is", null);
-      if (intent === "remove") {
-        if (!hubId) throw new Error("Only hub pages can be removed from a hub");
-        query = query.where("hubParentId", "=", hubId).where("isHub", "=", false);
-      }
-      if (intent === "publish") query = query.where("setupCompletedAt", "is not", null);
+      // Filters match the UI's enabled states: publish needs finished setup and a hidden page, hide needs a visible one.
+      if (intent === "remove") query = query.where("hubParentId", "=", hubId).where("isHub", "=", false);
+      if (intent === "publish") query = query.where("setupCompletedAt", "is not", null).where("publicVisible", "=", false);
+      if (intent === "hide") query = query.where("publicVisible", "=", true);
       const changed = await query
         .set(intent === "remove" ? { hubParentId: null } : { publicVisible: intent === "publish" })
         .returning(["id", "slug", "isHub"]).execute();
@@ -353,7 +365,8 @@ export async function bulkPageAction(hubId: string | null, formData: FormData) {
       }
       const verb = intent === "remove" ? "Removed" : intent === "publish" ? "Published" : "Hid";
       const skipped = pageIds.length - changed.length;
-      return `${verb} ${changed.length} page${changed.length === 1 ? "" : "s"}${skipped ? `, skipped ${skipped} ${intent === "publish" ? "still in setup" : "unchanged"}` : ""}`;
+      const reason = intent === "publish" ? "already published or still in setup" : intent === "hide" ? "already hidden" : "not in this hub";
+      return `${verb} ${pageCountLabel(changed.length)}${skipped ? `, skipped ${skipped} ${reason}` : ""}`;
     });
   }
 
