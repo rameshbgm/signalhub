@@ -3,16 +3,17 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, type ReactNode } from "react";
-import { ArrowLeft, ArrowUpRight, Bell, Boxes, Layers3, LayoutDashboard, LayoutGrid, Palette, Settings, ShieldCheck, type LucideIcon } from "lucide-react";
+import { ArrowLeft, ArrowUpRight, Bell, Boxes, Layers3, LayoutDashboard, LayoutGrid, Palette, Settings, ShieldCheck, Siren, type LucideIcon } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { cn } from "@/lib/utils";
 
-type ManagedPage = { id: string; name: string; slug: string; isHub: boolean; type: string; setupCompleted: boolean; publicVisible: boolean; publicPath: string; parentHub: { id: string; name: string } | null; canPublish: boolean };
-const sections: ReadonlyArray<{ key: "overview" | "content" | "appearance" | "access" | "notifications" | "settings"; label: string; suffix: string; icon: LucideIcon }> = [
+type ManagedPage = { id: string; name: string; slug: string; isHub: boolean; type: string; setupCompleted: boolean; publicVisible: boolean; publicPath: string; parentHub: { id: string; name: string } | null; canPublish: boolean; canSeeEvents: boolean };
+const sections: ReadonlyArray<{ key: "overview" | "events" | "content" | "appearance" | "access" | "notifications" | "settings"; label: string; suffix: string; icon: LucideIcon }> = [
   { key: "overview", label: "Overview", suffix: "", icon: LayoutDashboard },
+  { key: "events", label: "Events", suffix: "/events", icon: Siren },
   { key: "content", label: "Content", suffix: "/content", icon: Boxes },
   { key: "appearance", label: "Appearance", suffix: "/appearance", icon: Palette },
   { key: "access", label: "Access", suffix: "/access", icon: ShieldCheck },
@@ -24,7 +25,9 @@ export function PageManagementShell({ page, actions, children }: { page: Managed
   const pathname = usePathname();
   const tabs = useRef<HTMLElement>(null);
   const base = `/organization/pages/${page.id}`;
-  const visibleSections = page.type === "PUBLIC" ? sections.filter((section) => section.key !== "access") : sections;
+  const accessSections = page.type === "PUBLIC" ? sections.filter((section) => section.key !== "access") : sections;
+  // Hubs keep no incidents of their own, so they get no Events tab.
+  const visibleSections = page.isHub || !page.canSeeEvents ? accessSections.filter((section) => section.key !== "events") : accessSections;
   const current = visibleSections.find((section) => section.suffix && (pathname === `${base}${section.suffix}` || pathname.startsWith(`${base}${section.suffix}/`))) ?? visibleSections[0];
 
   // On narrow screens the tabs scroll sideways: keep the active one in view.

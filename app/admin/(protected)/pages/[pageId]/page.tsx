@@ -28,6 +28,7 @@ import { assertPageInOrg, requireCapability } from "@/lib/admin-guard";
 import { formatPageDate } from "@/lib/page-locale";
 import { database } from "@/lib/postgres/client";
 import type { PageRow } from "@/lib/postgres/schema";
+import { eventHref } from "@/lib/page-events";
 import { publicPagePath } from "@/lib/public-path";
 import {
   COMPONENT_STATUS_LABEL,
@@ -123,10 +124,10 @@ async function StatusPageOverview({ page }: { page: OverviewPage }) {
             ? <StatusBadge tone={COMPONENT_STATUS_TONE[banner.status]}>{banner.label}</StatusBadge>
             : <span className="text-sm font-semibold text-ink-soft">No services yet</span>}
         </StatCard>
-        <StatCard href={`/organization/incidents/new?pageId=${page.id}`} icon={TriangleAlert} hue="amber" label="Open incidents" caption="Report an incident">
+        <StatCard href={`${base}/events`} icon={TriangleAlert} hue="amber" label="Open incidents" caption="View page events">
           <span className={cn("text-2xl font-bold tabular-nums", openIncidents.length ? "text-danger-fg" : "text-ink")}>{openIncidents.length}</span>
         </StatCard>
-        <StatCard href={`/organization/maintenance/new?pageId=${page.id}`} icon={CalendarClock} hue="sky" label="Maintenance" caption={nextWindow ? MAINTENANCE_STATUS_LABEL[(nextWindow.maintenanceStatus ?? "SCHEDULED") as MaintenanceStatus] : "Schedule a window"}>
+        <StatCard href={`${base}/events`} icon={CalendarClock} hue="sky" label="Maintenance" caption={nextWindow ? MAINTENANCE_STATUS_LABEL[(nextWindow.maintenanceStatus ?? "SCHEDULED") as MaintenanceStatus] : "Schedule a window"}>
           <span className="text-base font-semibold text-ink">{nextWindow?.scheduledStart ? date(nextWindow.scheduledStart) : "None scheduled"}</span>
         </StatCard>
         <StatCard href={`/organization/subscribers?pageId=${page.id}`} icon={UsersRound} hue="emerald" label="Subscribers" caption="Verified and active">
@@ -145,12 +146,12 @@ async function StatusPageOverview({ page }: { page: OverviewPage }) {
               <CardContent className="py-2">
                 <ul className="divide-y divide-line">
                   {openIncidents.map((incident) => (
-                    <OverviewRow key={incident.id} href={`/organization/incidents/${incident.id}`} title={incident.name} meta={`Opened ${date(incident.createdAt)}`}>
+                    <OverviewRow key={incident.id} href={eventHref({ id: incident.id, isMaintenance: false })} title={incident.name} meta={`Opened ${date(incident.createdAt)}`}>
                       <StatusBadge tone="danger">{INCIDENT_STATUS_LABEL[incident.status as IncidentStatus]}</StatusBadge>
                     </OverviewRow>
                   ))}
                   {maintenance.map((window) => (
-                    <OverviewRow key={window.id} href={`/organization/incidents/${window.id}`} title={window.name} meta={window.scheduledStart ? `${date(window.scheduledStart)}${window.scheduledEnd ? ` – ${date(window.scheduledEnd)}` : ""}` : "Maintenance"}>
+                    <OverviewRow key={window.id} href={eventHref({ id: window.id, isMaintenance: true })} title={window.name} meta={window.scheduledStart ? `${date(window.scheduledStart)}${window.scheduledEnd ? ` – ${date(window.scheduledEnd)}` : ""}` : "Maintenance"}>
                       <StatusBadge tone="info">{MAINTENANCE_STATUS_LABEL[(window.maintenanceStatus ?? "SCHEDULED") as MaintenanceStatus]}</StatusBadge>
                     </OverviewRow>
                   ))}

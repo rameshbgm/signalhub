@@ -53,7 +53,7 @@ export async function createMaintenance(formData: FormData) {
   });
   revalidatePath("/organization/maintenance");
   revalidatePath(`/${await pageSlug(pageId)}`);
-  redirect(`/organization/incidents/${maintenance.id}`);
+  redirect(`/organization/maintenance/${maintenance.id}`);
 }
 
 export async function setMaintenanceStatus(incidentId: string, formData: FormData) {
@@ -78,7 +78,7 @@ export async function setMaintenanceStatus(incidentId: string, formData: FormDat
     targetId: incidentId,
     metadata: { pageId: incident.pageId, status },
   });
-  revalidatePath(`/organization/incidents/${incidentId}`);
+  revalidatePath(`/organization/maintenance/${incidentId}`);
   revalidatePath(`/${await pageSlug(incident.pageId)}`);
 }
 
