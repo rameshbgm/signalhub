@@ -21,6 +21,8 @@ const HOUR = 3_600_000;
 const DAY = 24 * HOUR;
 const HISTORY_DAYS = 7;
 const ORG_SLUG = "acme";
+// Organizations created with no data, for testing empty states and the organization switcher.
+const EMPTY_ORGS = [["Globex Industries", "globex"], ["Initech Labs", "initech"], ["Umbrella Health", "umbrella-health"], ["Stark Systems", "stark-systems"], ["Wayne Logistics", "wayne-logistics"]] as const;
 
 // Deterministic PRNG so reruns produce the same history.
 function rng(seed: number) {
@@ -336,6 +338,11 @@ async function main() {
   }
   const org = await database.selectFrom("organizations").selectAll().where("slug", "=", ORG_SLUG).executeTakeFirstOrThrow();
   const admin = await database.selectFrom("memberships").select("userId").where("orgId", "=", org.id).where("role", "=", "ADMIN").executeTakeFirstOrThrow();
+
+  for (const [name, slug] of EMPTY_ORGS) {
+    await database.insertInto("organizations").values({ name, slug, contactEmail: null, suspended: false, status: "ACTIVE", statusReason: null, statusChangedAt: new Date(), statusChangedBy: null })
+      .onConflict((conflict) => conflict.column("slug").doNothing()).execute();
+  }
 
   // Cascades through components, monitors, checks, metrics, incidents, subscribers, analytics, notifications.
   const wiped = await database.deleteFrom("pages").executeTakeFirst();
