@@ -1,93 +1,182 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
+import { motion } from "motion/react";
+import { Check, ChevronDown } from "lucide-react";
 import { formatWindow, MAX_WINDOW_MINUTES, MIN_WINDOW_MINUTES, QUICK_WINDOWS } from "@/lib/metric-ranges";
+import type { MetricRange } from "@/lib/page-design";
+import { RANGE_LABELS } from "@/components/public/metric/shared";
 
 const UNITS = [
-  { label: "minutes", minutes: 1 },
+  { label: "min", minutes: 1 },
   { label: "hours", minutes: 60 },
   { label: "days", minutes: 1_440 },
 ] as const;
 
-const controlClass = "border border-[var(--line)] bg-[var(--surface)] px-2 py-1 text-xs text-[var(--fg)] outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1";
+const radius = "var(--page-radius, 8px)";
+const tint = (color: string, percent: number) => `color-mix(in srgb, ${color} ${percent}%, transparent)`;
 
 /**
- * Dropdown of quick windows (1 minute to 12 hours) plus a custom value. `active` is the selected window in
- * minutes, or null while one of the fixed ranges is selected.
+ * Segmented range control for a public metric chart: the fixed ranges plus a "More" menu with quick windows
+ * (1 minute to 12 hours) and a custom value. Styled with the page's theme variables like the other public controls.
  */
-export function WindowPicker({ name, color, active, loading, onSelect }: {
+export function RangeControl({ id, name, color, ranges, activeRange, activeMinutes, loading, animate, onRange, onWindow }: {
+  id: string;
   name: string;
   color: string;
-  active: number | null;
+  ranges: readonly MetricRange[];
+  activeRange: MetricRange | null;
+  activeMinutes: number | null;
   loading: boolean;
-  onSelect: (minutes: number) => void;
+  animate: boolean;
+  onRange: (range: MetricRange) => void;
+  onWindow: (minutes: number) => void;
 }) {
-  const [editing, setEditing] = useState(false);
+  const [open, setOpen] = useState(false);
   const [amount, setAmount] = useState("90");
   const [unit, setUnit] = useState<(typeof UNITS)[number]["minutes"]>(1);
   const [error, setError] = useState<string | null>(null);
-  const id = useId();
-  const isQuick = active !== null && QUICK_WINDOWS.some((window) => window.minutes === active);
-  const selectValue = active === null ? "" : isQuick ? String(active) : "custom";
+  const rootRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const menuId = useId();
 
-  function apply() {
-    const minutes = Math.round(Number(amount) * unit);
-    if (!Number.isFinite(minutes) || minutes < MIN_WINDOW_MINUTES) return setError("Enter a value of at least 1 minute.");
-    if (minutes > MAX_WINDOW_MINUTES) return setError("The longest window is 90 days.");
+  useEffect(() => {
+    if (!open) return;
+    const dismiss = (event: PointerEvent) => { if (!rootRef.current?.contains(event.target as Node)) setOpen(false); };
+    const escape = (event: KeyboardEvent) => { if (event.key === "Escape") setOpen(false); };
+    document.addEventListener("pointerdown", dismiss);
+    document.addEventListener("keydown", escape);
+    requestAnimationFrame(() => menuRef.current?.querySelector<HTMLElement>("[role=menuitemradio]")?.focus());
+    return () => {
+      document.removeEventListener("pointerdown", dismiss);
+      document.removeEventListener("keydown", escape);
+    };
+  }, [open]);
+
+  function pick(minutes: number) {
     setError(null);
-    setEditing(false);
-    onSelect(minutes);
+    setOpen(false);
+    onWindow(minutes);
   }
 
+  function applyCustom() {
+    const minutes = Math.round(Number(amount) * unit);
+    if (!Number.isFinite(minutes) || minutes < MIN_WINDOW_MINUTES) return setError("Enter at least 1 minute.");
+    if (minutes > MAX_WINDOW_MINUTES) return setError("The longest window is 90 days.");
+    pick(minutes);
+  }
+
+  const segment = "relative px-2.5 py-1 text-xs font-medium tabular-nums transition-colors outline-none focus-visible:ring-2";
+  const activeStyle = { color, background: tint(color, 14) };
+
   return (
-    <div className="relative">
-      <select
-        aria-label={`${name} quick or custom time window`}
-        aria-busy={loading}
-        value={selectValue}
-        onChange={(event) => {
-          const value = event.target.value;
-          if (value === "custom") { setEditing(true); return; }
-          if (value === "") return;
-          setEditing(false);
-          setError(null);
-          onSelect(Number(value));
-        }}
-        className={`${controlClass} cursor-pointer`}
-        style={active !== null ? { color, borderColor: color } : { color: "var(--fg-dim)" }}
-      >
-        <option value="" disabled>Quick range</option>
-        {QUICK_WINDOWS.map((window) => <option key={window.minutes} value={window.minutes}>{window.label}</option>)}
-        <option value="custom">{active !== null && !isQuick ? `Custom: ${formatWindow(active)}` : "Custom…"}</option>
-      </select>
-      {editing && (
-        <form
-          onSubmit={(event) => { event.preventDefault(); apply(); }}
-          className="absolute right-0 top-full z-20 mt-1 w-64 space-y-2 border border-[var(--line-bright)] bg-[var(--surface-raised)] p-3 shadow-lg"
+    <div ref={rootRef} className="relative">
+      <div className="inline-flex items-center gap-0.5 border border-[var(--line)] bg-[var(--surface)] p-0.5" style={{ borderRadius: radius }}>
+        <div role="radiogroup" aria-label={`${name} time range`} className="flex gap-0.5">
+          {ranges.map((range) => {
+            const active = activeRange === range;
+            return (
+              <button
+                key={range}
+                type="button"
+                role="radio"
+                aria-checked={active}
+                onClick={() => onRange(range)}
+                className={`${segment} ${active ? "" : "text-[var(--fg-dim)] hover:text-[var(--fg)]"}`}
+                style={{ borderRadius: `calc(${radius} - 2px)`, color: active ? color : undefined }}
+              >
+                {active && <motion.span layoutId={`metric-range-${id}`} className="absolute inset-0" style={{ background: tint(color, 14), borderRadius: `calc(${radius} - 2px)` }} transition={animate ? { type: "spring", stiffness: 500, damping: 36 } : { duration: 0 }} />}
+                <span className="relative">{RANGE_LABELS[range]}</span>
+              </button>
+            );
+          })}
+        </div>
+        <span aria-hidden className="mx-0.5 h-4 w-px bg-[var(--line)]" />
+        <button
+          type="button"
+          aria-haspopup="menu"
+          aria-expanded={open}
+          aria-controls={open ? menuId : undefined}
+          aria-busy={loading}
+          onClick={() => setOpen((current) => !current)}
+          className={`${segment} inline-flex items-center gap-1 ${activeMinutes === null ? "text-[var(--fg-dim)] hover:text-[var(--fg)]" : ""}`}
+          style={{ borderRadius: `calc(${radius} - 2px)`, ...(activeMinutes !== null ? activeStyle : {}) }}
         >
-          <label htmlFor={`${id}-amount`} className="block text-xs text-[var(--fg-soft)]">Show the last</label>
-          <div className="flex gap-2">
-            <input
-              id={`${id}-amount`}
-              type="number"
-              min={1}
-              step="any"
-              inputMode="decimal"
-              autoFocus
-              value={amount}
-              onChange={(event) => setAmount(event.target.value)}
-              className={`${controlClass} w-20`}
-            />
-            <select aria-label="Unit" value={unit} onChange={(event) => setUnit(Number(event.target.value) as typeof unit)} className={`${controlClass} flex-1`}>
-              {UNITS.map((option) => <option key={option.label} value={option.minutes}>{option.label}</option>)}
-            </select>
+          {activeMinutes === null ? "More" : formatWindow(activeMinutes)}
+          <ChevronDown aria-hidden size={13} className={`transition-transform ${open ? "rotate-180" : ""}`} />
+        </button>
+      </div>
+
+      {open && (
+        <motion.div
+          ref={menuRef}
+          id={menuId}
+          role="menu"
+          aria-label={`${name} time window`}
+          initial={animate ? { opacity: 0, y: -4, scale: 0.98 } : false}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ duration: animate ? 0.15 : 0 }}
+          className="absolute right-0 top-full z-30 mt-1.5 w-60 border border-[var(--line-bright)] bg-[var(--surface)] p-1.5 text-[var(--fg)] shadow-xl"
+          style={{ borderRadius: `calc(${radius} + 4px)` }}
+        >
+          <p className="px-2 pb-1 pt-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--fg-dim)]">Last</p>
+          <div className="grid grid-cols-2 gap-0.5">
+            {QUICK_WINDOWS.map((window) => {
+              const active = activeMinutes === window.minutes;
+              return (
+                <button
+                  key={window.minutes}
+                  type="button"
+                  role="menuitemradio"
+                  aria-checked={active}
+                  onClick={() => pick(window.minutes)}
+                  className="flex items-center justify-between px-2 py-1.5 text-left text-xs outline-none transition-colors hover:bg-[var(--bg)] focus-visible:bg-[var(--bg)]"
+                  style={{ borderRadius: `calc(${radius} - 2px)`, ...(active ? activeStyle : {}) }}
+                >
+                  {window.label}
+                  {active && <Check aria-hidden size={12} />}
+                </button>
+              );
+            })}
           </div>
-          {error && <p role="alert" className="text-xs text-[#dc2626]">{error}</p>}
-          <div className="flex justify-end gap-2">
-            <button type="button" onClick={() => { setEditing(false); setError(null); }} className="px-2 py-1 text-xs text-[var(--fg-dim)] hover:text-[var(--fg)]">Cancel</button>
-            <button type="submit" className="px-3 py-1 text-xs font-medium text-white" style={{ background: color }}>Apply</button>
-          </div>
-        </form>
+
+          <div className="my-1.5 h-px bg-[var(--line)]" />
+          <form onSubmit={(event) => { event.preventDefault(); applyCustom(); }} className="space-y-2 px-1 pb-1">
+            <label htmlFor={`${menuId}-amount`} className="block px-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--fg-dim)]">Custom</label>
+            <div className="flex items-center gap-1.5">
+              <input
+                id={`${menuId}-amount`}
+                type="number"
+                min={1}
+                step="any"
+                inputMode="decimal"
+                value={amount}
+                onChange={(event) => setAmount(event.target.value)}
+                className="h-8 w-16 border border-[var(--line)] bg-[var(--bg)] px-2 text-xs text-[var(--fg)] outline-none focus:border-[var(--fg-dim)]"
+                style={{ borderRadius: `calc(${radius} - 2px)` }}
+              />
+              <div role="radiogroup" aria-label="Unit" className="flex flex-1 border border-[var(--line)] p-0.5" style={{ borderRadius: `calc(${radius} - 2px)` }}>
+                {UNITS.map((option) => (
+                  <button
+                    key={option.label}
+                    type="button"
+                    role="radio"
+                    aria-checked={unit === option.minutes}
+                    onClick={() => setUnit(option.minutes)}
+                    className="flex-1 py-1 text-[11px] transition-colors"
+                    style={{ borderRadius: `calc(${radius} - 4px)`, ...(unit === option.minutes ? activeStyle : { color: "var(--fg-dim)" }) }}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {error && <p role="alert" className="px-1 text-[11px] text-[var(--red)]">{error}</p>}
+            <button type="submit" className="h-8 w-full text-xs font-medium text-white transition-opacity hover:opacity-90" style={{ background: color, borderRadius: `calc(${radius} - 2px)` }}>
+              Show this window
+            </button>
+          </form>
+        </motion.div>
       )}
     </div>
   );

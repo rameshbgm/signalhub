@@ -114,7 +114,7 @@ const visitorUrl = z.string().refine(
   (value) => /^https?:\/\//i.test(value) || /^mailto:/i.test(value),
   "Use an HTTP(S) or email URL"
 );
-// What visitors can switch between on a metric chart; owners choose a subset per page.
+// What visitors can switch between on a public metric chart.
 export const METRIC_RANGES = ["24h", "7d", "30d", "90d"] as const;
 export const METRIC_LENSES = ["trend", "percentiles", "distribution", "uptime", "responses"] as const;
 export const METRIC_VIEWS = ["line", "area", "bar", "step", "scatter", "bands", "gauge", "heatmap"] as const;
@@ -188,14 +188,6 @@ export const pageDesignBlockSchema = z.discriminatedUnion("type", [
     settings: z.object({
       heading: z.string().max(120).default("System metrics"),
       columns: z.union([z.literal(1), z.literal(2)]).default(2),
-      // Defaults show everything, so designs saved before these existed keep every option.
-      ranges: z.array(z.enum(METRIC_RANGES)).min(1).default([...METRIC_RANGES]),
-      defaultRange: z.enum(METRIC_RANGES).default("24h"),
-      lenses: z.array(z.enum(METRIC_LENSES)).min(1).default([...METRIC_LENSES]),
-      chartViews: z.array(z.enum(METRIC_VIEWS)).min(1).default([...METRIC_VIEWS]),
-      showStats: z.boolean().default(true),
-      // Quick (1 minute to 12 hours) and custom windows, fetched on demand.
-      allowCustomRange: z.boolean().default(true),
     }),
   }),
   z.object({
@@ -604,7 +596,7 @@ function baseDesign(templateKey: PageTemplateKey, brand = "#0f8ca8"): StatusPage
         primary: [
           b({ id: "active-incidents", type: "ACTIVE_INCIDENTS", hidden: false, settings: { heading: "Active incidents" } }),
           components,
-          b({ id: "metrics", type: "METRICS", hidden: false, settings: { heading: "System metrics", columns: 2, ranges: [...METRIC_RANGES], defaultRange: "24h", lenses: [...METRIC_LENSES], chartViews: [...METRIC_VIEWS], showStats: true, allowCustomRange: true } }),
+          b({ id: "metrics", type: "METRICS", hidden: false, settings: { heading: "System metrics", columns: 2 } }),
           b({ id: "history-preview", type: "HISTORY_PREVIEW", hidden: false, settings: { heading: "Past incidents", days: 14 } }),
         ],
         sidebar: [
@@ -893,25 +885,6 @@ export function allSurfaceBlocks(design: StatusPageDesign, surface: PageSurfaceK
     ...design.surfaces[surface].primary,
     ...design.surfaces[surface].sidebar,
   ];
-}
-
-export type MetricBlockSettings = Extract<PageDesignBlock, { type: "METRICS" }>["settings"];
-
-/** Settings of the status page's METRICS block, or null when the page has none. */
-export function metricBlockSettings(design: StatusPageDesign): MetricBlockSettings | null {
-  const block = allSurfaceBlocks(design, "status").find((candidate) => candidate.type === "METRICS");
-  return block?.type === "METRICS" ? block.settings : null;
-}
-
-/** Returns a copy of the design with the METRICS block settings patched. */
-export function withMetricBlockSettings(design: StatusPageDesign, patch: Partial<MetricBlockSettings>): StatusPageDesign {
-  const next = structuredClone(design);
-  for (const region of ["full", "primary", "sidebar"] as const) {
-    for (const block of next.surfaces.status[region]) {
-      if (block.type === "METRICS") block.settings = { ...block.settings, ...patch };
-    }
-  }
-  return statusPageDesignSchema.parse(next);
 }
 
 export function applyPageTemplateLayout(design: StatusPageDesign, templateKey: PageTemplateKey) {

@@ -144,7 +144,6 @@ export default async function PublicStatusPage({ params }: { params: Promise<{ s
                   timeZone={page.timezone}
                   color={design.theme.palette.brand}
                   insights={metricInsights.get(metric.id)!}
-                  options={block.settings}
                 />
               ))}
             </div>

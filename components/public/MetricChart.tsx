@@ -6,20 +6,17 @@ import { formatMetricValue, metricDecimals } from "@/lib/status";
 import { formatPageDate } from "@/lib/page-locale";
 import { fetchWithTimeout } from "@/lib/client-fetch";
 import type { MetricInsights, RangeInsight } from "@/lib/metric-series";
-import type { MetricLens, MetricRange, MetricView } from "@/lib/page-design";
+import { METRIC_LENSES, METRIC_RANGES, METRIC_VIEWS, type MetricLens, type MetricRange, type MetricView } from "@/lib/page-design";
 import { COMPARABLE_VIEWS, TrendChart } from "@/components/public/metric/TrendChart";
 import { DistributionChart, PercentileChart, ResponsesPanel, UptimePanel } from "@/components/public/metric/InsightCharts";
-import { WindowPicker } from "@/components/public/metric/WindowPicker";
-import { CHART_HEIGHT, LENS_LABELS, RANGE_LABELS, VIEWS, type TrendRow } from "@/components/public/metric/shared";
+import { RangeControl } from "@/components/public/metric/WindowPicker";
+import { CHART_HEIGHT, LENS_LABELS, VIEWS, type TrendRow } from "@/components/public/metric/shared";
 
-export type MetricChartOptions = {
-  ranges: MetricRange[];
-  defaultRange: MetricRange;
-  lenses: MetricLens[];
-  chartViews: MetricView[];
-  showStats: boolean;
-  allowCustomRange: boolean;
-};
+const RANGES: MetricRange[] = [...METRIC_RANGES];
+const LENSES: MetricLens[] = [...METRIC_LENSES];
+const VIEW_IDS: MetricView[] = [...METRIC_VIEWS];
+const ALLOWED = { ranges: RANGES, lenses: LENSES, views: VIEW_IDS };
+const DEFAULTS: Prefs = { range: "24h", lens: "trend", view: "line", compare: false };
 
 /** A quick or custom window chosen by the visitor. These are fetched on demand, so they live in memory only. */
 type WindowState = { minutes: number; insight: RangeInsight | null; loading: boolean; error: string | null };
@@ -76,7 +73,6 @@ export function MetricChart({
   color,
   decimals,
   insights,
-  options,
   locale = "en",
   timeZone = "UTC",
 }: {
@@ -87,27 +83,15 @@ export function MetricChart({
   color: string;
   decimals: number;
   insights: MetricInsights;
-  options: MetricChartOptions;
   locale?: string;
   timeZone?: string;
 }) {
   const precision = metricDecimals(decimals);
   const animate = !useReducedMotion();
   const hasChecks = Boolean(insights["24h"]?.checks);
-  const lenses = useMemo(() => {
-    const available = options.lenses.filter((lens) => (lens === "uptime" || lens === "responses" ? hasChecks : true));
-    return available.length ? available : (["trend"] as MetricLens[]);
-  }, [options.lenses, hasChecks]);
-  const ranges = options.ranges;
-  const views = useMemo(() => VIEWS.filter((view) => options.chartViews.includes(view.id)), [options.chartViews]);
-  const defaults = useMemo<Prefs>(() => ({
-    range: ranges.includes(options.defaultRange) ? options.defaultRange : ranges[0],
-    lens: lenses[0],
-    view: options.chartViews.includes("line") ? "line" : options.chartViews[0],
-    compare: false,
-  }), [ranges, lenses, options.defaultRange, options.chartViews]);
-  const allowed = useMemo(() => ({ ranges, lenses, views: options.chartViews }), [ranges, lenses, options.chartViews]);
-  const [prefs, setPrefs] = usePrefs(`signalhub:metric:${id}`, defaults, allowed);
+  // Uptime and Responses need monitor check data; metrics fed by hand or by API do not have it.
+  const lenses = hasChecks ? LENSES : LENSES.filter((lens) => lens !== "uptime" && lens !== "responses");
+  const [prefs, setPrefs] = usePrefs(`signalhub:metric:${id}`, DEFAULTS, ALLOWED);
 
   const [windowState, setWindowState] = useState<WindowState | null>(null);
   const windowCache = useRef(new Map<number, { at: number; insight: RangeInsight }>());
@@ -210,37 +194,23 @@ export function MetricChart({
         <h4 className="text-sm font-mono font-semibold text-[var(--fg)]">
           {name} <span className="text-[var(--fg-dim)] font-normal">({suffix || "value"})</span>
         </h4>
-        <div className="flex flex-wrap items-center justify-end gap-2">
-          {ranges.length > 1 && (
-            <div role="radiogroup" aria-label={`${name} time range`} className="flex gap-0.5">
-              {ranges.map((range) => {
-                const active = !windowState && prefs.range === range;
-                return (
-                  <button
-                    key={range}
-                    type="button"
-                    role="radio"
-                    aria-checked={active}
-                    onClick={() => { setWindowState(null); setPrefs({ range }); }}
-                    className="relative px-2 py-1 text-xs font-medium tabular-nums transition-colors hover:text-[var(--fg)]"
-                    style={{ color: active ? color : "var(--fg-dim)" }}
-                  >
-                    {active && <motion.span layoutId={`metric-range-${id}`} className="absolute inset-0" style={{ background: `color-mix(in srgb, ${color} 14%, transparent)`, border: `1px solid color-mix(in srgb, ${color} 40%, transparent)` }} transition={animate ? { type: "spring", stiffness: 500, damping: 36 } : { duration: 0 }} />}
-                    <span className="relative">{RANGE_LABELS[range]}</span>
-                  </button>
-                );
-              })}
-            </div>
-          )}
-          {options.allowCustomRange && (
-            <WindowPicker name={name} color={color} active={windowState?.minutes ?? null} loading={Boolean(windowState?.loading)} onSelect={(minutes) => void chooseWindow(minutes)} />
-          )}
-        </div>
+        <RangeControl
+          id={id}
+          name={name}
+          color={color}
+          ranges={RANGES}
+          activeRange={windowState ? null : prefs.range}
+          activeMinutes={windowState?.minutes ?? null}
+          loading={Boolean(windowState?.loading)}
+          animate={animate}
+          onRange={(range) => { setWindowState(null); setPrefs({ range }); }}
+          onWindow={(minutes) => void chooseWindow(minutes)}
+        />
       </div>
 
       {windowState?.error && <p role="alert" className="mb-2 text-xs text-[#dc2626]">{windowState.error}</p>}
 
-      {options.showStats && stats.length > 0 && (
+      {stats.length > 0 && (
         <dl className="mb-3 grid grid-cols-3 gap-x-3 gap-y-2 sm:grid-cols-5">
           {stats.map((stat) => {
             const worse = stat.delta !== null && lowerIsBetter && stat.delta > 0;
@@ -300,9 +270,9 @@ export function MetricChart({
       </div>
 
       <div className="mt-3 flex min-h-8 flex-wrap items-center justify-center gap-x-4 gap-y-1">
-        {prefs.lens === "trend" && views.length > 1 && (
+        {prefs.lens === "trend" && (
           <div role="radiogroup" aria-label={`${name} chart style`} className="flex flex-wrap items-center justify-center gap-1">
-            {views.map(({ id: viewId, label, icon: Icon, tone }) => {
+            {VIEWS.map(({ id: viewId, label, icon: Icon, tone }) => {
               const active = prefs.view === viewId;
               return (
                 <button
