@@ -47,12 +47,35 @@ function BulkButton({ intent, children, variant = "ghost", disabled = false, lab
   return <Button type="submit" name="intent" value={intent} size="icon" variant={variant} className={cn("size-8", className)} disabled={disabled || pending} aria-label={label} title={label}>{children}</Button>;
 }
 
-/** Single-page action; submits through the same bulk server action with just this page. Feedback floats so rows keep their height. */
-function RowAction({ action, pageId, intent, label, done, className, children }: { action: (formData: FormData) => Promise<string>; pageId: string; intent: string; label: string; done: string; className?: string; children: ReactNode }) {
+/** Single-page action; submits through the same bulk server action with just this page. Feedback floats so rows keep their height. With `confirm`, asks in a dialog first. */
+function RowAction({ action, pageId, intent, label, done, className, confirm, children }: { action: (formData: FormData) => Promise<string>; pageId: string; intent: string; label: string; done: string; className?: string; confirm?: { title: string; body: string }; children: ReactNode }) {
+  const [asking, setAsking] = useState(false);
+  const formId = useId();
+  const close = useCallback(() => setAsking(false), []);
   return (
-    <PlatformActionForm action={action} successMessage={done} className="relative flex" messageClassName="absolute right-0 top-full z-10 mt-1 w-max max-w-64 empty:hidden">
+    <PlatformActionForm id={formId} action={action} successMessage={done} className="relative flex" messageClassName="absolute right-0 top-full z-10 mt-1 w-max max-w-64 empty:hidden">
       <input type="hidden" name="pageId" value={pageId} />
-      <BulkButton intent={intent} label={label} className={className}>{children}</BulkButton>
+      {confirm ? (
+        <>
+          <input type="hidden" name="intent" value={intent} />
+          <Button type="button" size="icon" variant="ghost" data-button-guard="off" className={cn("size-8", className)} aria-label={label} title={label} onClick={() => setAsking(true)}>{children}</Button>
+          {asking && createPortal(
+            <Dialog open onOpenChange={close}>
+              <DialogSurface>
+                <DialogTitle>{confirm.title}</DialogTitle>
+                <p className="mt-3 text-sm leading-6 text-ink-soft">{confirm.body}</p>
+                <DialogActions>
+                  <Button type="button" variant="secondary" data-button-guard="off" onClick={close}>Cancel</Button>
+                  <Button type="button" data-button-guard="off" onClick={() => { (document.getElementById(formId) as HTMLFormElement | null)?.requestSubmit(); close(); }}>{label.split(" ")[0]}</Button>
+                </DialogActions>
+              </DialogSurface>
+            </Dialog>,
+            document.body,
+          )}
+        </>
+      ) : (
+        <BulkButton intent={intent} label={label} className={className}>{children}</BulkButton>
+      )}
     </PlatformActionForm>
   );
 }
@@ -163,9 +186,8 @@ export function PageGroup({ header, rows, hubId, action, defaultOpen, canConfigu
                         <a href={row.liveHref} target="_blank" rel="noreferrer" aria-label={`View ${row.name} live`} title="View live page" className={iconAction(toneIcon.view)}><ArrowUpRight aria-hidden size={16} /></a>
                       ) : null}
                       {canConfigure && <>
-                        <Link href={`/organization/pages/${row.id}`} aria-label={`Edit ${row.name}`} title="Edit page" className={iconAction(toneIcon.edit)}><Pencil aria-hidden size={16} /></Link>
                         {row.setupDone && (
-                          <RowAction action={action} pageId={row.id} intent={row.visible ? "hide" : "publish"} label={`${row.visible ? "Unpublish" : "Publish"} ${row.name}`} done={row.visible ? "Page unpublished" : "Page published"} className={row.visible ? toneIcon.hide : toneIcon.publish}>
+                          <RowAction action={action} pageId={row.id} intent={row.visible ? "hide" : "publish"} label={`${row.visible ? "Unpublish" : "Publish"} ${row.name}`} done={row.visible ? "Page unpublished" : "Page published"} confirm={row.visible ? { title: `Unpublish ${row.name}?`, body: "The public status page goes offline until you publish it again." } : { title: `Publish ${row.name}?`, body: "The status page becomes visible to everyone with access." }} className={row.visible ? toneIcon.hide : toneIcon.publish}>
                             {row.visible ? <EyeOff aria-hidden size={16} /> : <Eye aria-hidden size={16} />}
                           </RowAction>
                         )}
@@ -173,6 +195,7 @@ export function PageGroup({ header, rows, hubId, action, defaultOpen, canConfigu
                           <RowAction action={action} pageId={row.id} intent="remove" label={`Remove ${row.name} from hub`} done="Removed from hub" className={toneIcon.remove}><Unlink aria-hidden size={16} /></RowAction>
                         )}
                         <button type="button" aria-label={`Delete ${row.name}`} title="Delete page" data-button-guard="off" className={iconAction(toneIcon.delete)} onClick={() => { setSelected(new Set([row.id])); setConfirmingDelete(true); }}><Trash2 aria-hidden size={16} /></button>
+                        <Link href={`/organization/pages/${row.id}`} aria-label={`Edit ${row.name}`} title="Edit page" className={iconAction(toneIcon.edit)}><Pencil aria-hidden size={16} /></Link>
                       </>}
                     </div>
                   </li>
