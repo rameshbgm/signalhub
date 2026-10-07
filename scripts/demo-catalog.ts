@@ -46,7 +46,7 @@ export const EXTRA_HUBS: HubSpec[] = [
       }),
       page("databases", "Databases", "#2563eb", "Project sites and docs of popular databases.", {
         Relational: [["PostgreSQL", "https://www.postgresql.org"], ["MySQL", "https://www.mysql.com"], ["MariaDB", "https://mariadb.org"], ["SQLite", "https://www.sqlite.org"]],
-        "NoSQL & cache": [["MongoDB", "https://www.mongodb.com"], ["Redis", "https://redis.io"], ["Apache Cassandra", "https://cassandra.apache.org"], ["CouchDB", "https://couchdb.apache.org"]],
+        "NoSQL & cache": [["Elasticsearch", "https://www.elastic.co"], ["Redis", "https://redis.io"], ["Apache Cassandra", "https://cassandra.apache.org"], ["CouchDB", "https://couchdb.apache.org"]],
       }),
       page("web-frameworks", "Web Frameworks", "#0ea5e9", "Documentation sites of frontend and backend frameworks.", {
         Frontend: [["React", "https://react.dev"], ["Vue", "https://vuejs.org"], ["Angular", "https://angular.dev"], ["Svelte", "https://svelte.dev"], ["Next.js", "https://nextjs.org"]],

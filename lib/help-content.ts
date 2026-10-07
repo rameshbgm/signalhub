@@ -17,54 +17,86 @@ export type HelpCategory = {
 export const HELP_CATEGORIES: HelpCategory[] = [
   {
     slug: "overview",
-    label: "Overview",
+    label: "Getting started",
     icon: "◧",
     articles: [
       {
-        slug: "dashboard",
-        title: "Dashboard",
-        summary: "Your organization's home screen — page count, open incidents, upcoming maintenance at a glance.",
+        slug: "getting-started",
+        title: "How SignalHub works",
+        summary: "The model behind the console: organizations, hubs, status pages, services, monitors, and the background worker.",
         body: [
           {
-            heading: "What you see here",
+            heading: "The building blocks",
             paragraphs: [
-              "The Dashboard summarizes your whole organization in four numbers: total pages, total components across those pages, total subscribers, and upcoming maintenance windows.",
-              "Below that, two lists: Open Incidents (anything not yet Resolved, across every page) and Your Pages (quick View/Manage links).",
+              "An organization owns everything you see in the console. Inside it you create status pages. A status page lists services (the systems whose health you report) and publishes incidents, maintenance, metrics, and a subscribe option to visitors.",
+              "A hub is a landing page that groups several status pages. Hubs never own services directly; they summarize the status pages assigned to them.",
+            ],
+            list: [
+              "Services are what customers care about, such as API, Website, or Payments. Each service has a public status and can have a monitor attached.",
+              "Monitors check a target on a schedule (HTTP, keyword, TCP, TLS, ICMP, DNS, or heartbeat) and can update a service's status, record a response-time metric, open incidents, and notify subscribers.",
+              "Events is the console's single home for incidents and scheduled maintenance.",
+              "Subscribers receive updates by email or SMS; feeds (RSS and Atom) and signed webhooks cover everything else.",
             ],
           },
           {
-            heading: "Common tasks",
-            paragraphs: ["Jump to an open incident to post an update, or click Manage on a page to edit its components and settings."],
+            heading: "Two processes, one database",
+            paragraphs: [
+              "SignalHub runs as a web application and a separate worker process that share one PostgreSQL database. The web application serves the console, public pages, and API. The worker runs monitor checks, automatic maintenance transitions, queued notifications, exports, audit delivery, and retention.",
+              "If the worker is stopped, pages and the console keep working but checks stop, scheduled maintenance does not start on its own, and queued notifications wait. Monitors and notification screens warn you when the worker looks offline.",
+            ],
+          },
+          {
+            heading: "A first useful setup",
+            paragraphs: [],
+            list: [
+              "Pages: create a status page, give it a name, and choose its visibility.",
+              "Content: add your services and optional groups.",
+              "Monitors: attach a monitor to each service you can check automatically.",
+              "Publish: use Publish page on the page Overview; the page stays a private draft until you do.",
+              "Notifications: confirm email or SMS delivery is ready so visitors can subscribe.",
+            ],
           },
         ],
       },
       {
-        slug: "pages",
-        title: "Pages",
-        summary: "Create, list, and manage every status page your organization publishes.",
+        slug: "dashboard",
+        title: "Dashboard",
+        summary: "Overall health, key counts, open incidents, and your pages at a glance.",
         body: [
           {
-            heading: "Creating a page",
+            heading: "What you see here",
             paragraphs: [
-              "Go to Pages → Create page, choose Status page or Hub, then enter the name, optional custom slug, and visibility. A status page can optionally be added to an existing hub now or later.",
-              "The first save creates a hidden draft. Use the page navigation to complete Content, Appearance, Access, Notifications, and Settings, then publish from Overview.",
+              "The top banner shows the worst current status across your pages. Below it, four tiles count Pages, Components (services), Subscribers, and Upcoming maintenance. Tiles that lead somewhere are links, shown only when your role may open that screen.",
+              "Open incidents lists everything not yet resolved across all pages, with an All events link. Your pages lists each page with a status dot for quick access.",
             ],
           },
           {
-            heading: "Page types",
-            paragraphs: [],
-            list: [
-              "Public — anyone with the URL can view it.",
-              "Private — requires a shared password to view.",
-              "Audience-specific — each visitor logs in and sees only the components assigned to their user or group.",
-              "Hub — groups several normal status pages into one directory-style landing page and never owns services directly.",
+            heading: "Common tasks",
+            paragraphs: [
+              "Open an incident to post an update, click a page to manage it, or use New page. What you can do depends on your role; see Users and roles.",
+            ],
+          },
+        ],
+      },
+      {
+        slug: "console-basics",
+        title: "Using the console",
+        summary: "Navigation, quick search, organization switching, confirmations, and feedback messages.",
+        body: [
+          {
+            heading: "Navigation",
+            paragraphs: [
+              "The sidebar groups screens into Workspace (Dashboard, Pages), Operate (Events, Monitors, Metrics), Audience (Subscribers, Destinations, Analytics), Tools (SignalHub Embed, API Keys, Help Center), and Platform. Items you are not permitted to use are hidden.",
+              "Press Ctrl+K (Cmd+K on macOS) to open the command palette. Type to jump to a screen or a page; use the arrow keys and Enter, and Escape to close.",
+              "If your account belongs to more than one organization, the organization switcher in the shell changes the active organization.",
             ],
           },
           {
-            heading: "Managing a page",
+            heading: "Feedback and confirmations",
             paragraphs: [
-              "Click Manage to open the page Overview. Content holds services or hub membership, Appearance holds everyday branding, Access holds visitor controls, and Notifications holds delivery integrations.",
-              "Draft pages show Continue setup. Published pages show Manage page for ongoing changes.",
+              "Results appear as short toasts at the top of the screen and dismiss themselves. Errors stay visible a little longer and name the problem.",
+              "Risky actions ask first. A small confirmation appears next to the button you clicked; press Escape to dismiss only that confirmation. Permanent deletions of pages ask you to type a phrase, such as the page name or delete 3 pages, and offer a copy button for the phrase.",
+              "Row actions are icon buttons with a colored tint (view, edit, publish, unpublish, delete). Hover or focus an icon to see its label.",
             ],
           },
         ],
@@ -72,18 +104,233 @@ export const HELP_CATEGORIES: HelpCategory[] = [
       {
         slug: "analytics",
         title: "Analytics",
-        summary: "Understand status-page visits, subscriber activity, and public engagement without exposing visitor identities.",
+        summary: "Page views, incident views, and subscription conversion for each status page.",
         body: [
           {
             heading: "Reading the dashboard",
             paragraphs: [
-              "Use Analytics to compare page views, unique sessions, subscription events, and traffic over time. Select a page and date range before drawing conclusions from the totals.",
-              "Public analytics are operational signals rather than billing-grade measurements. Privacy controls, blocked scripts, and cached status responses can affect counts.",
+              "Choose a page to see Page views, Incident views, Subscription starts, and Conversion (completed subscriptions as a share of starts). Daily activity lists the most recent 30 days that have recorded activity, and the totals above cover those same days.",
+              "Analytics are privacy-friendly operational signals, not billing-grade measurements. Blocked scripts, caching, and page-level analytics settings can change counts.",
             ],
           },
           {
             heading: "Using the data",
-            paragraphs: ["Watch for traffic spikes during incidents, verify that subscription calls to action are working, and compare engagement before and after a page redesign."],
+            paragraphs: ["Look for traffic spikes during incidents, verify that the subscribe option converts, and compare engagement before and after a redesign. Viewing analytics is available to every role."],
+          },
+        ],
+      },
+    ],
+  },
+  {
+    slug: "pages",
+    label: "Pages & hubs",
+    icon: "▦",
+    articles: [
+      {
+        slug: "pages",
+        title: "Pages",
+        summary: "Create, list, publish, group, and delete the status pages and hubs your organization runs.",
+        body: [
+          {
+            heading: "The Pages list",
+            paragraphs: [
+              "Pages shows a summary of how many pages are published, draft, or hidden. Hubs appear as collapsible groups with their status pages inside; pages that belong to no hub sit under Standalone pages. A hub starts collapsed unless something inside it has an active incident or maintenance.",
+              "Each row has icon actions: Continue setup (drafts), View live page, Publish or Unpublish, Move to hub (standalone pages), Edit, and Delete.",
+            ],
+          },
+          {
+            heading: "Creating a page",
+            paragraphs: [
+              "Choose Create page, then set a name, a page type (Status page or Hub), a visibility, an optional URL slug, and optionally the hub to add it to. The first save creates a draft that only your team can see.",
+              "Draft, published, and hidden are separate states: a draft has never been published, a published page is visible according to its access setting, and a hidden page was published earlier but is currently unpublished.",
+            ],
+          },
+          {
+            heading: "Visibility",
+            paragraphs: [],
+            list: [
+              "Public: anyone with the URL can view the page.",
+              "Private (password protected): visitors enter one shared password of at least 12 characters.",
+              "Audience-specific (per-user login): each visitor signs in and sees only the services assigned to them or their group.",
+            ],
+          },
+          {
+            heading: "Bulk actions",
+            paragraphs: [
+              "Select rows with the checkboxes to Publish, Unpublish, Remove from hub, or Delete up to 100 pages at once. Bulk delete asks you to type the phrase shown, such as delete 3 pages. Pages that are already in the target state or still in setup are skipped for publish and unpublish.",
+              "Deleting a page permanently removes its services, incidents, subscribers, metrics, monitors, and uploaded assets.",
+            ],
+          },
+        ],
+      },
+      {
+        slug: "hubs",
+        title: "Hubs",
+        summary: "Group several status pages under one landing page and keep access rules independent.",
+        body: [
+          {
+            heading: "What a hub is",
+            paragraphs: [
+              "A hub is a page whose content is the list of status pages assigned to it. It shows their combined health and links to each one. Services always belong to the status pages, never directly to the hub. A hub's public address is /hub/<slug>.",
+            ],
+          },
+          {
+            heading: "Managing hub members",
+            paragraphs: [
+              "On a hub, the Content tab lists its status pages. Use Create status page in this hub to start a new one, or choose a standalone page and Add to hub. From the Pages list, a standalone page can also be moved into a hub with the Move to hub icon, and selected members can be removed from the hub in bulk.",
+              "Removing a page from a hub leaves the page itself intact; it becomes standalone again.",
+            ],
+          },
+          {
+            heading: "Access and deletion",
+            paragraphs: [
+              "A hub has its own visibility. Visitors who may open the hub still meet each member page's own access rules, so a private member stays private.",
+              "A hub that still contains pages cannot be deleted. Remove or delete its pages first.",
+            ],
+          },
+        ],
+      },
+      {
+        slug: "page-overview",
+        title: "Page overview",
+        summary: "The home of a single page: setup progress, current status, events, subscribers, and quick actions.",
+        body: [
+          {
+            heading: "Page tabs",
+            paragraphs: [
+              "Every page has Overview, Content, Appearance, Access, Notifications, and Settings tabs. Access appears only for private and audience-specific pages.",
+            ],
+          },
+          {
+            heading: "Setup and publishing",
+            paragraphs: [
+              "A new page shows three steps: Name your page, Add services, and Publish. Publishing needs at least one visible service. After publishing, the main action becomes Hide page, and the Overview stat cards show Current status, Open incidents, Maintenance, and Subscribers, each linking to the relevant screen.",
+              "Preview public page opens the live page in a new tab and is available once the page is published. Page details shows the public address with copy and open buttons, access type, time zone, the published design version, and creation date.",
+            ],
+          },
+          {
+            heading: "Quick actions",
+            paragraphs: ["Report an incident, Schedule maintenance, Customize appearance, and Page settings are one click away. Reporting and scheduling require a role that can manage incidents."],
+          },
+        ],
+      },
+      {
+        slug: "components",
+        title: "Services & groups",
+        summary: "Add, order, group, publish, and change the status of the services a page reports on.",
+        body: [
+          {
+            heading: "Adding and editing services",
+            paragraphs: [
+              "Open the Content tab. Add service asks for a Name, an optional Group, and an optional Description shown to visitors. Editing also offers Show uptime. Use the plus control beside Group to create or manage groups; related services appear together on the public page.",
+              "Drag rows to reorder them; numeric order fields are not used.",
+            ],
+          },
+          {
+            heading: "Status changes",
+            paragraphs: [
+              "Each row has a status selector: Operational, Degraded Performance, Partial Outage, Major Outage, or Under Maintenance. Changes are published immediately. The effective public status combines this manual value with open incidents, maintenance windows, and linked monitors; the worst of them wins, and recovering from one source never clears another that is still active.",
+              "Status history feeds the uptime bars on the public page.",
+            ],
+          },
+          {
+            heading: "Publish, unpublish, delete",
+            paragraphs: [
+              "The eye icon publishes or unpublishes a single service after a confirmation. Unpublished services carry an Unpublished badge and disappear from the public page until published again.",
+              "Deleting a service is permanent and also affects incidents and monitors that referenced it.",
+            ],
+          },
+        ],
+      },
+      {
+        slug: "designer-and-saving",
+        title: "Appearance and publishing",
+        summary: "Pick a layout and style, set brand color and assets, add footer links, and publish deliberately.",
+        body: [
+          {
+            heading: "Layout, style, and brand",
+            paragraphs: [
+              "Layout offers Standard (a clear overview for most pages), Banner (leads with a cover image and page identity), and Compact (more service detail in less space). Style presets such as Default, Ocean, Emerald, Sunset, Violet, Slate, High contrast, and Warm paper preview colors, corners, and depth on each card.",
+              "Choosing a layout changes the page header, spacing, content width, and how services are laid out, so the public page looks different once you publish. Choose a Brand color; if it is too light for white button text, the editor asks for a darker one. Brand assets are a Logo (public page header), a Site icon (browser tab), and an optional Cover image, which is shown in full by default.",
+            ],
+          },
+          {
+            heading: "Visitor links and search",
+            paragraphs: [
+              "Add a Support link (an https URL or a mailto: address), Terms of service, and Privacy policy links for the public footer. Links that are empty are not shown. Search title and Search description control how the page appears in search results and link previews; they default to the page name, headline, and about text.",
+            ],
+          },
+          {
+            heading: "Draft versus live",
+            paragraphs: [
+              "Changes autosave to a private draft after a short pause. The public page does not change until you press Publish changes. The editor shows Unpublished changes or No unpublished changes, and publishing an unchanged draft does not create another version.",
+              "If someone else changes the draft or live page while you are editing, the editor stops and asks you to reload instead of overwriting their work.",
+            ],
+          },
+        ],
+      },
+      {
+        slug: "access-groups",
+        title: "Audience access",
+        summary: "Control who can open a private or audience-specific page and which services they see.",
+        body: [
+          {
+            heading: "Shared password (Private)",
+            paragraphs: ["Private pages use one shared password. Replace it from the Access tab; the new password applies the next time anyone opens the page and the old one is never displayed."],
+          },
+          {
+            heading: "Per-user access (Audience-specific)",
+            paragraphs: [
+              "Create access groups, each with a set of services, then add access users with an email address and a temporary password of at least 12 characters, optionally assigned to a group. A user sees the union of the services assigned to them directly and through their group.",
+              "On a hub, each visitor signs in to the hub, and member pages continue to enforce their own rules. Deleting a group or user takes effect immediately.",
+            ],
+          },
+          {
+            heading: "Feeds and embeds on protected pages",
+            paragraphs: ["RSS, Atom, the badge, and the embed script need a revocable feed token on non-public pages. Create tokens under API Keys."],
+          },
+        ],
+      },
+      {
+        slug: "settings",
+        title: "Page settings",
+        summary: "Page name, headline, about text, time zone, SMS defaults, and permanent deletion.",
+        body: [
+          {
+            heading: "Page details",
+            paragraphs: [
+              "Settings holds the Page name, Headline (the large title on the public page), About this page (also the default search description), Organization name, Company website, Timezone (an IANA name such as Europe/Berlin, used for public dates and maintenance windows), and the Default SMS country code. Changes apply to this page only.",
+            ],
+          },
+          {
+            heading: "Delete page",
+            paragraphs: ["Delete permanently removes the page with its services, incidents, subscribers, metrics, monitors, and assets. Type the page name to confirm. This cannot be undone."],
+          },
+        ],
+      },
+      {
+        slug: "public-page-experience",
+        title: "What visitors see",
+        summary: "How a published page, its incident pages, history, and hub appear to your customers.",
+        body: [
+          {
+            heading: "The status page",
+            paragraphs: [
+              "A status page is at /<slug>. It shows an overall status banner, active incidents and upcoming or in-progress maintenance, the services with daily uptime bars (hover a segment for date, status, duration, and notes), published metric charts, and a Subscribe button.",
+              "Past incidents are listed on the history page at /<slug>/history, and each incident has its own page at /<slug>/incidents/<id> with a chronological timeline and, if published, a postmortem.",
+            ],
+          },
+          {
+            heading: "Metric charts",
+            paragraphs: [
+              "Visitors can switch the time range (24h, 7d, 30d, 90d, plus quick and custom windows), the lens (Trend, Percentiles, Distribution, Uptime, Responses), and the chart style (Line, Area, Bars, Step, Scatter, Min / avg / max, Gauge, Heatmap). A metric only appears once it has data.",
+            ],
+          },
+          {
+            heading: "Subscribing",
+            paragraphs: [
+              "Visitors subscribe by email or SMS after verifying a one-time code, can follow all services or only chosen ones, and manage or cancel from the preferences page linked in every message. RSS and Atom feeds are offered on public pages.",
+            ],
           },
         ],
       },
@@ -91,32 +338,50 @@ export const HELP_CATEGORIES: HelpCategory[] = [
   },
   {
     slug: "incidents",
-    label: "Incidents",
+    label: "Incidents & maintenance",
     icon: "!",
     articles: [
       {
+        slug: "events",
+        title: "Events",
+        summary: "One list for incidents and scheduled maintenance: active now, upcoming, and history.",
+        body: [
+          {
+            heading: "Reading the list",
+            paragraphs: [
+              "Events shows Active now (open incidents and maintenance in progress, which visitors can see), Upcoming (scheduled maintenance, soonest first), and History (resolved incidents and completed maintenance, newest first with paging).",
+              "Filter by kind (all, incidents, or maintenance) and, if you have several pages, by page. Hubs hold no events of their own. Opening a row shows its detail page.",
+            ],
+          },
+          {
+            heading: "Who can do what",
+            paragraphs: [
+              "Anyone who can update incidents (Incident Manager, Responder, Admin) can open Events, post updates, and move maintenance through its statuses. Declaring incidents, scheduling maintenance, publishing postmortems, and deleting events require the Incident Manager or Admin role.",
+            ],
+          },
+        ],
+      },
+      {
         slug: "incidents",
         title: "Incidents",
-        summary: "Declare, update, and resolve incidents — the core of what your status page communicates.",
+        summary: "Declare, update, and resolve incidents, the core of what your status page communicates.",
         body: [
           {
             heading: "The lifecycle",
-            paragraphs: [
-              "An incident moves through four statuses: Investigating → Identified → Monitoring → Resolved. Each status change is a timestamped update that appears on your public page.",
-            ],
+            paragraphs: ["An incident moves through Investigating, Identified, Monitoring, and Resolved. Every status change is a timestamped update shown publicly."],
           },
           {
             heading: "Declaring an incident",
             paragraphs: [
-              "Go to Incidents → Declare Incident. Pick the page, name it, choose impact (None/Minor/Major/Critical), select affected components and their new status, write the first update, and choose whether to notify subscribers.",
-              "Check 'Backfill an incident that happened in the past' if you're logging something retroactively — this skips subscriber notifications by default.",
+              "Use Report an incident (from the page Overview or Events). Pick the page, name the incident, write the Message, choose Status and Impact (None, Minor, Major, or Critical), then mark affected components and the status each should show. Tick This incident affects the page as a whole when it is not tied to specific services.",
+              "Notify subscribers sends the first update. Backfill (past incident, no notification) records something that is already over without notifying anyone.",
             ],
           },
           {
-            heading: "Posting updates",
+            heading: "Posting updates and resolving",
             paragraphs: [
-              "Open an incident's detail page to post further updates, change its status, or (once Resolved) write and publish a postmortem.",
-              "Affected component status is reconciled against every remaining incident, maintenance window, monitor, and manual override when an incident resolves.",
+              "Open the incident and use Post an update to add a timeline entry and move to the next status, optionally notifying subscribers. When you resolve, affected components are reconciled against every remaining incident, maintenance window, monitor, and manual override rather than blindly set to Operational.",
+              "Monitors with Auto open/close incident create and resolve incidents on their own; these appear in Events like any other.",
             ],
           },
         ],
@@ -124,44 +389,139 @@ export const HELP_CATEGORIES: HelpCategory[] = [
       {
         slug: "timeline-and-postmortems",
         title: "Timeline and postmortems",
-        summary: "Edit public incident updates, maintain an accurate line-and-dot timeline, and publish a durable retrospective.",
+        summary: "Correct public updates and publish a retrospective after resolution.",
         body: [
           {
-            heading: "Editing timeline entries",
+            heading: "Editing the timeline",
             paragraphs: [
-              "Open an incident and use the timeline editor to correct an update's public status or message. Editing historical content does not silently change the incident's current lifecycle state.",
-              "The public incident page renders updates chronologically with a vertical rail and status dots. Keep each entry concise, customer-facing, and specific about what changed.",
+              "The incident detail page lists the timeline. Edit an entry's status or message to correct it; editing history does not change the incident's current state, and edited entries are attributed.",
             ],
           },
           {
             heading: "Writing a postmortem",
             paragraphs: [
-              "After resolution, document the impact, root cause, recovery, and preventive actions. Publish only when the content is ready for customers; drafts remain private to administrators.",
+              "Postmortem is plain text with line breaks preserved. Tick Publish to the public page when it is ready (drafts stay private) and optionally Notify subscribers when publishing.",
             ],
             list: [
               "State customer impact before internal technical detail.",
               "Use exact times and avoid unsupported certainty.",
-              "List owned follow-up actions and expected completion windows.",
+              "List owned follow-up actions with expected completion windows.",
             ],
+          },
+          {
+            heading: "Deleting",
+            paragraphs: ["The Danger zone deletes an incident or maintenance permanently with its full update history. Only Incident Managers and Admins see it."],
           },
         ],
       },
       {
         slug: "maintenance",
         title: "Maintenance",
-        summary: "Schedule planned downtime windows that automatically start and complete on time.",
+        summary: "Schedule planned work with a start and end time, optional reminders, and automatic transitions.",
         body: [
           {
             heading: "Scheduling a window",
             paragraphs: [
-              "Go to Maintenance → Schedule Maintenance. Pick the page, name, a start time, and a duration. Select affected components and the status they should show during the window (usually Under Maintenance).",
-              "Enable auto-transition and the window will flip to In Progress at the start time and Completed at the end time automatically — no one has to remember to update it.",
+              "Use Schedule maintenance. Enter a Title, a Message, a Start and an End (the end must be after the start), then select affected components or tick This maintenance affects the page as a whole.",
+              "Automatically start/complete based on the window moves the maintenance to In Progress at the start and Completed at the end; the worker performs the transition. Notify subscribers also enables Send one reminder before maintenance starts, set between 5 minutes and 7 days ahead.",
+            ],
+          },
+          {
+            heading: "Statuses",
+            paragraphs: [
+              "Maintenance is Scheduled, In Progress, Verifying, or Completed. Post a maintenance update from the detail page to move between them manually. Affected services show Under Maintenance while it is in progress.",
             ],
           },
           {
             heading: "Where it shows up",
+            paragraphs: ["Upcoming windows appear on the public page ahead of time; once in progress they behave like an active event with a maintenance badge."],
+          },
+        ],
+      },
+    ],
+  },
+  {
+    slug: "monitoring",
+    label: "Monitoring & metrics",
+    icon: "◉",
+    articles: [
+      {
+        slug: "monitors",
+        title: "Monitors",
+        summary: "Check services on a schedule and keep component status, metrics, and incidents up to date automatically.",
+        body: [
+          {
+            heading: "The Monitors screen",
             paragraphs: [
-              "Scheduled (future) maintenance appears in its own section on the public page. Once In Progress, it behaves like an active incident with the maintenance badge.",
+              "Choose a page, then use Add monitor (a side drawer) to create one. The list is grouped by Monitor group, shows problems first, and can be filtered by status (All, Down, Up, Pending, Paused), by tag, and by a search of name or target. Each row shows recent check results as small bars, the last latency, and the last error.",
+              "Row actions: Check on next poll, Pause or Resume, open the status page, Check history, Edit, and Delete (which removes the monitor's history). A banner warns when the worker looks offline.",
+            ],
+          },
+          {
+            heading: "Monitor types",
+            paragraphs: [],
+            list: [
+              "HTTP: request a URL (GET, POST, or HEAD) and check the response status against an expected range such as 200-299.",
+              "Keyword: HTTP plus a text the body must contain and/or must not contain.",
+              "TCP: open a connection to a host and port.",
+              "TLS: connect and warn when the certificate expires within a number of days.",
+              "ICMP: ping a host.",
+              "DNS: resolve A, AAAA, CNAME, MX, TXT, or NS records, optionally asserting the expected value.",
+              "Heartbeat: your own job calls a generated URL; the monitor goes down if no call arrives within its interval plus a grace period.",
+            ],
+          },
+          {
+            heading: "Settings that matter",
+            paragraphs: [
+              "Interval is 10 to 86400 seconds and Timeout is 100 to 60000 ms. Fails before down and OKs before recovered (1 to 20) stop one transient result from flipping status. Component status on failure chooses Degraded Performance, Partial Outage, or Major Outage.",
+              "Optional sections cover the HTTP request (custom headers as a JSON object, request body), authentication (Basic, Bearer token, or Custom header; secrets are write-only), Verify TLS certificate, Monitor group (existing groups are suggested), and up to 20 tags.",
+              "Targets that resolve to private or internal addresses are blocked unless the installation explicitly allows them.",
+            ],
+          },
+          {
+            heading: "Linking and automated actions",
+            paragraphs: [
+              "Linked to a component, a monitor updates that component's public status. Not linked, it only records checks and alerts. Automated actions are Flip component status, Record response-time metric (creates a metric you can chart), Auto open/close incident, and Notify subscribers.",
+              "Start with a linked monitor and only the metric enabled, watch the check history, then turn on automation once thresholds behave. Incidents, maintenance, manual status, and other monitors are reconciled together, so one recovery never hides another outage.",
+            ],
+          },
+        ],
+      },
+      {
+        slug: "monitor-history",
+        title: "Check history",
+        summary: "Inspect every check a monitor has run, filter and sort it, and open a single result.",
+        body: [
+          {
+            heading: "Browsing history",
+            paragraphs: [
+              "The history icon on a monitor row opens a drawer with Checked, Result, Latency, and Response columns, 25 checks per page. Filter by All results, Up only, or Down only, and sort Newest first, Oldest first, Slowest first, or Fastest first. Use First, Previous, Next, and Last to page through results.",
+              "Click a row to open the full check detail, including the complete response text or error.",
+            ],
+          },
+          {
+            heading: "Retention",
+            paragraphs: ["Checks are stored in monthly partitions. The worker drops whole partitions once they pass every organization's retention window, so history length follows the retention policy set by the platform administrator."],
+          },
+        ],
+      },
+      {
+        slug: "metrics",
+        title: "Metrics",
+        summary: "Publish numeric time series, such as response time or error rate, on your status page.",
+        body: [
+          {
+            heading: "Creating a metric",
+            paragraphs: [
+              "Pick a page, then Add a metric: a name, an optional unit suffix (ms, %, req/s, any text), a description, an optional linked component, and 0 to 10 Decimal places. You can change precision later from the metric card, which also shows the latest value.",
+              "Monitors with Record response-time metric create and feed their own metric automatically.",
+            ],
+          },
+          {
+            heading: "Pushing data",
+            paragraphs: [
+              "Enter a value under Push data point on the card, or automate it with POST /api/v1/manage/metrics/<id>/points and a key with the metrics.write scope. An optional timestamp backfills history.",
+              "A metric appears on the public page once it has at least one point. Visitors can change the range, lens, and chart style; see What visitors see.",
             ],
           },
         ],
@@ -176,31 +536,31 @@ export const HELP_CATEGORIES: HelpCategory[] = [
       {
         slug: "subscribers",
         title: "Subscribers",
-        summary: "Verified email subscribers, feeds, and administrator-managed webhook integrations.",
+        summary: "Manage who receives email and SMS updates, with verification, import, quarantine, and export.",
         body: [
           {
-            heading: "Channels supported",
+            heading: "Channels",
             paragraphs: [],
             list: [
-              "Email — verified via a one-time code sent to the inbox.",
-              "Slack — posts to a channel via an incoming webhook URL.",
-              "Microsoft Teams — posts to a channel via an incoming webhook URL.",
-              "Webhook — signs and POSTs every event as JSON to a verified HTTPS endpoint.",
-              "RSS and Atom — public feeds, or revocable signed feed URLs for protected pages.",
+              "Email: verified with a one-time code sent to the inbox.",
+              "SMS: verified with a one-time code to the phone number, in international format.",
+              "RSS and Atom: public feeds, or revocable signed feed URLs for protected pages.",
+              "Slack, Microsoft Teams, and generic webhooks are not subscriber channels; they are configured as destinations.",
             ],
           },
           {
-            heading: "Adding subscribers",
+            heading: "Managing the list",
             paragraphs: [
-              "Visitors verify email subscriptions with a one-time code and receive a confirmation email. Administrators manage Slack, Teams, and generic webhook integrations separately and can import email addresses after confirming those people agreed to receive updates.",
-              "Quarantine a subscriber to stop notifications without deleting them; Export CSV downloads the full list for a page.",
+              "Subscribers is per page and per channel, with counts for Active, Quarantined, and Unconfirmed. Add subscriber takes a channel and contact and requires you to confirm the person agreed to receive updates; admin-added contacts skip verification.",
+              "Bulk import (CSV) accepts up to 5,000 email addresses separated by commas or new lines, skips existing subscribers including quarantined ones, and treats imports as verified. Export CSV downloads the list.",
+              "Quarantine stops notifications without deleting the subscriber. The delivery state panel shows delivery readiness and lets you retry now.",
             ],
           },
           {
             heading: "Preferences and unsubscribing",
             paragraphs: [
-              "Every subscriber message links to a preferences page, styled like the status page, where the subscriber can follow all services or only chosen ones, or unsubscribe. Mail clients also show their own one-click Unsubscribe button.",
-              "If an email address is permanently refused by the receiving server, delivery stops and the subscriber is quarantined automatically. Subscribing again releases the quarantine.",
+              "Every message links to a preferences page, where a subscriber follows all services or chosen ones, or unsubscribes. Mail clients also show a one-click Unsubscribe.",
+              "If an address is permanently refused by the receiving server, delivery stops and the subscriber is quarantined automatically. Subscribing again releases the quarantine.",
             ],
           },
         ],
@@ -208,87 +568,51 @@ export const HELP_CATEGORIES: HelpCategory[] = [
       {
         slug: "destinations",
         title: "Notifications and destinations",
-        summary: "Configure subscriber delivery, tested team destinations, and signed outbound webhooks for each page.",
+        summary: "Check delivery readiness, brand outgoing email, connect team tools, and register signed webhooks per page.",
         body: [
+          {
+            heading: "Where to find it",
+            paragraphs: ["Per-page settings are on the page's Notifications tab; the Destinations item in the sidebar opens the same screen for a chosen page."],
+          },
           {
             heading: "Delivery readiness",
             paragraphs: [
-              "The Destinations screen shows whether Email, SMS, RSS, and Atom are available. Email and SMS require both a configured provider and a healthy delivery worker; feeds remain available without the worker.",
-              "Only destination providers enabled by a platform administrator appear. Slack, Teams, and similar team destinations are tested before their credentials are stored.",
+              "Subscriber channels shows whether Email, SMS, and RSS/Atom are Available or Need setup. Email and SMS need a platform-configured provider and a healthy worker; feeds work without the worker.",
+              "Email branding sets the sender name, reply-to address, and a plain-text footer for subscriber emails; the page logo and brand color are applied automatically.",
             ],
+          },
+          {
+            heading: "Team and on-call destinations",
+            paragraphs: ["Only providers enabled by a platform administrator are offered (for example Slack, Microsoft Teams, and others). Each destination is tested before its credentials are stored."],
           },
           {
             heading: "Signed status-event webhooks",
             paragraphs: [
-              "Register a verified HTTPS endpoint to receive incident, maintenance, and postmortem events. SignalHub signs deliveries with the endpoint secret and retries transient failures.",
-              "Copy a newly issued secret immediately, store it in a secret manager, verify signatures against the raw request body, and rotate the secret if it may have been exposed.",
+              "Register an HTTPS endpoint to receive incident, maintenance, and postmortem events. SignalHub verifies the endpoint first, signs each delivery, retries transient failures, and lets you send a test and rotate the secret. See Outbound webhook verification.",
             ],
           },
           {
             heading: "Troubleshooting",
-            paragraphs: ["If delivery is paused, check the worker status first, then the provider readiness message, destination verification state, and last recorded error."],
-          },
-        ],
-      },
-      {
-        slug: "metrics",
-        title: "Metrics",
-        summary: "Time-series charts (response time, uptime %, or anything numeric) shown publicly on your status page.",
-        body: [
-          {
-            heading: "Creating a metric",
-            paragraphs: [
-              "Go to Metrics → Add Metric. Give it a name, an optional unit suffix (ms, %, s, req/s, MB — any free text), and optionally link it to a component.",
-              "The suffix field is unrestricted — type whatever unit makes sense for the number you're charting.",
-            ],
-          },
-          {
-            heading: "Pushing data",
-            paragraphs: [
-              "Push a single point manually from the Metrics page, or automate it via POST /api/v1/manage/metrics/<id>/points using an API key.",
-              "A metric only appears on the public page once it has at least one data point, under the 'System Metrics' section.",
-            ],
+            paragraphs: ["If delivery is paused, check the worker status, then provider readiness, destination verification, and the last recorded error. Deliveries that exhaust their retries show in Platform operations as dead letters."],
           },
         ],
       },
       {
         slug: "embed",
         title: "SignalHub Embed",
-        summary: "A small script tag that shows an auto-appearing incident banner on your own website.",
+        summary: "Add an incident banner or a live status badge to your own website.",
         body: [
           {
-            heading: "How it works",
+            heading: "Incident banner",
             paragraphs: [
-              "Go to SignalHub Embed, pick a page, and copy the generated <script> tag into your site. It stays invisible during normal operation and automatically shows a floating banner when there's an active incident or maintenance window.",
-              "A static status badge snippet is also provided if you'd rather show an always-visible 'All Systems Operational' link.",
+              "Choose a page and copy the script tag. It is invisible during normal operation and shows a banner while there is an active incident or maintenance.",
             ],
-          },
-        ],
-      },
-      {
-        slug: "monitors",
-        title: "Monitors",
-        summary: "Run HTTP, TCP, DNS, and heartbeat checks with thresholds, history, and optional component automation.",
-        body: [
-          {
-            heading: "Creating a check",
-            paragraphs: [
-              "Choose the page, monitor type, target, interval, timeout, and optional component. HTTP monitors can validate status and response behavior; TCP and DNS checks validate reachability; heartbeat monitors expect your system to call a generated URL.",
-              "Failure and recovery thresholds prevent one transient result from flipping public status. A monitor changes state only after the configured number of consecutive outcomes.",
-            ],
+            code: "<script async src=\"https://status.example.com/api/v1/embed/<slug>\"></script>",
           },
           {
-            heading: "Worker health",
-            paragraphs: [
-              "Checks, automatic maintenance transitions, and queued notifications run in the worker process. If the Monitors screen reports a stale or offline worker, fix worker health before interpreting missing checks as service health.",
-            ],
-          },
-          {
-            heading: "Safe automation",
-            paragraphs: [
-              "Linking a component lets monitor state participate in effective component status. Incidents, maintenance, manual status, and other monitors are reconciled together, so recovery from one source does not incorrectly clear another active outage.",
-              "Use Check on next poll for validation, inspect recent check history and latency, then enable automated actions only after thresholds behave as expected.",
-            ],
+            heading: "Live status badge",
+            paragraphs: ["The badge snippet links an image of the current status to your page. For private and audience-specific pages, append ?feed_token=<token> using a token from API Keys."],
+            code: "<a href=\"https://status.example.com/<slug>\"><img src=\"https://status.example.com/api/v1/badge/<slug>\" alt=\"Status\"></a>",
           },
         ],
       },
@@ -302,22 +626,23 @@ export const HELP_CATEGORIES: HelpCategory[] = [
       {
         slug: "team",
         title: "Users and roles",
-        summary: "Create active organization users and control what they can do with roles.",
+        summary: "Create organization users, assign a role, and limit access to selected pages.",
         body: [
           {
             heading: "Roles",
             paragraphs: [],
             list: [
-              "ADMIN — every organization capability, including team, pages, integrations, organization settings, and installation administration.",
-              "INCIDENT MANAGER — incident lifecycle, subscriber management, and analytics.",
-              "RESPONDER — incidents, maintenance, monitors, metrics, and component status.",
-              "VIEWER — read-only analytics access.",
+              "Admin: every capability, including pages, integrations, users, organization settings, and the Platform administration entry.",
+              "Incident Manager: declare and delete incidents and maintenance, publish postmortems, post updates, change component status, manage subscribers, view analytics.",
+              "Responder: post incident and maintenance updates, manage monitors and metrics, change component status, view analytics. Cannot declare incidents or schedule maintenance.",
+              "Viewer: read-only analytics.",
             ],
           },
           {
-            heading: "Creating a user",
+            heading: "Creating and managing users",
             paragraphs: [
-              "Go to Users & Roles, enter the user's name, email, role, page scope, and a temporary password for a new local identity. The membership becomes active immediately and a new local user must change the temporary password at first sign-in. Existing password or SSO identities keep their current authentication. Admins can create users and change or revoke organization access.",
+              "On Users and roles, enter the full name, User ID, email, role, and a temporary password for a new local identity, and optionally limit the user to selected pages (leave empty for all pages). Admins always have organization-wide access. A new local user must change the temporary password at first sign-in; existing SSO or password identities keep their current authentication.",
+              "Each member row lets an Admin change the role or revoke access. Creating the same email again reactivates a revoked user.",
             ],
           },
         ],
@@ -325,189 +650,60 @@ export const HELP_CATEGORIES: HelpCategory[] = [
       {
         slug: "security",
         title: "Security",
-        summary: "Manage your multi-factor authentication and the devices signed in to your account.",
+        summary: "Authenticator-app MFA, recovery codes, and the devices signed in to your account.",
         body: [
           {
             heading: "Multi-factor authentication",
             paragraphs: [
-              "Enroll an authenticator app from Security. When MFA is required, you must finish enrollment before other console actions are available.",
-              "New local users receive a temporary password and must change it at first sign-in. Existing SSO or password identities retain their configured authentication method.",
+              "Enroll an authenticator app under Security by entering a verification code. You receive one-time recovery codes: save them, because you are signed out after enrollment. When MFA is required for your installation you must finish enrollment before other console actions are available.",
             ],
+          },
+          {
+            heading: "Sessions",
+            paragraphs: ["Active sessions lists signed-in devices. Revoke suspicious or stale sessions, and rotate affected API keys and webhook secrets if an account may be compromised."],
           },
           {
             heading: "SSO and SCIM",
-            paragraphs: [
-              "Single sign-on (OIDC or SAML) and SCIM provisioning are configured by installation Admins under installation administration, not on this page. Ask them to test a connection before enforcing it and to rotate SCIM tokens after any exposure.",
-            ],
-          },
-          {
-            heading: "Sessions and incident response",
-            paragraphs: [
-              "Review active sessions, revoke suspicious or stale sessions, and rotate affected API and webhook secrets. Organization suspension immediately fences tenant mutations and automation.",
-            ],
+            paragraphs: ["OIDC or SAML single sign-on and SCIM provisioning are configured by platform administrators under Platform administration, Identity. Ask them to test a connection before enforcing it."],
           },
         ],
       },
       {
         slug: "api-keys",
         title: "API Keys",
-        summary: "Bearer tokens for the management API, plus outbound webhook endpoints per page.",
+        summary: "Scoped bearer tokens for the management API, and revocable feed tokens for protected pages.",
         body: [
           {
-            heading: "Management API keys",
+            heading: "Creating a key",
             paragraphs: [
-              "Generate a key here, then authenticate requests to /api/v1/manage/* with Authorization: Bearer <key>. Everything the console does — creating incidents, updating component status, pushing metric points — is also available as an API call.",
-              "Revoking a key takes effect immediately.",
+              "Give the key a name and tick only the scopes it needs, optionally restrict it to chosen pages, set an expiry, and restrict allowed IPv4 addresses or CIDRs. The secret is shown once; copy it immediately. Keys can be rotated and revoked, and either takes effect immediately.",
+            ],
+            list: [
+              "status.read",
+              "components.read, components.write",
+              "incidents.read, incidents.write",
+              "metrics.read, metrics.write",
+              "analytics.read",
             ],
           },
           {
-            heading: "Outbound webhooks",
-            paragraphs: [
-              "Separately, each page can register webhook endpoints that receive a real HTTP POST for every incident/maintenance/postmortem event, signed with a per-endpoint secret.",
-            ],
+            heading: "Feed tokens",
+            paragraphs: ["For private and audience-specific pages, create a named feed token (with an optional expiry) to get revocable RSS and Atom URLs that can also unlock the badge and embed script."],
           },
         ],
       },
       {
-        slug: "settings",
-        title: "Settings",
-        summary: "Organization name, contact email, and the platform-managed deletion process.",
+        slug: "org-settings",
+        title: "Organization settings",
+        summary: "Where the organization name, contact, and deletion are managed.",
         body: [
           {
             heading: "General settings",
-            paragraphs: ["Update your organization's display name and optional operational contact email. Admins can change these."],
+            paragraphs: ["Organization settings now live on Platform administration, Organizations (it is reachable from the old Settings address, which redirects there). Admins can update the display name and operational contact email."],
           },
           {
             heading: "Deleting the organization",
-            paragraphs: [
-              "Contact an installation Admin with the organization slug. The Admin must suspend the tenant, reauthenticate, and queue the retryable purge; the console preserves the request, job, and tombstone audit evidence.",
-            ],
-          },
-        ],
-      },
-    ],
-  },
-  {
-    slug: "page-settings",
-    label: "Inside a Page",
-    icon: "▦",
-    articles: [
-      {
-        slug: "designer-and-saving",
-        title: "Appearance and publishing",
-        summary: "Choose a simple layout, add brand assets, autosave a private draft, and publish deliberately.",
-        body: [
-          {
-            heading: "Everyday appearance",
-            paragraphs: [
-              "Appearance keeps page styling focused on three choices: layout, style, and brand assets.",
-              "Choose Standard for most status pages, Banner for a cover-led page, or Compact when service detail needs less space. Existing tailored layouts stay unchanged until you select a new layout.",
-            ],
-          },
-          {
-            heading: "Draft versus live",
-            paragraphs: [
-              "Designer changes autosave to a private draft after a short pause. The public page remains unchanged until you choose Publish.",
-              "Publishing an unchanged draft does not create another live version. If another session changes the draft or live page, the designer stops and asks you to reload rather than overwriting it.",
-            ],
-          },
-          {
-            heading: "Brand assets",
-            paragraphs: [
-              "Add a logo, site icon, and optional cover image. New cover images display in full by default.",
-              "Choose a style preset and brand color to match your organization. Existing specialized page settings remain active but are not edited from this screen.",
-            ],
-          },
-        ],
-      },
-      {
-        slug: "page-branding",
-        title: "Branding & layout",
-        summary: "Logo, brand color, layout (standard vs cover image), and custom CSS for one page.",
-        body: [
-          {
-            heading: "Layout picker",
-            paragraphs: [
-              "Standard layout shows a small logo at the top. Cover image gives the page a large hero band using your brand color or an uploaded cover image URL — pick whichever fits your brand.",
-            ],
-          },
-          {
-            heading: "Custom CSS",
-            paragraphs: ["Custom CSS is size-limited, scoped beneath the public page root, and rejects imports and external URLs to protect viewers."],
-          },
-        ],
-      },
-      {
-        slug: "public-page-content",
-        title: "Public page content",
-        summary: "Configure summaries, service directories, announcements, uptime presentation, footer links, and visitor-facing behavior.",
-        body: [
-          {
-            heading: "Service presentation",
-            paragraphs: [
-              "Keep the default flat rows for a simple page, or enable grouping when customers recognize product families, regions, or platforms. Optional summary cards and search are most useful on large directories.",
-              "Uptime defaults to the responsive thin-segment timeline. The designer also offers square, rounded, pill, and solid lines; responsive, compact, and block sizes; and optional dot or status icons.",
-            ],
-          },
-          {
-            heading: "Announcements and subscription",
-            paragraphs: [
-              "Announcements can be scheduled, prioritized, made dismissible, and shown across status, history, incident, and hub surfaces. Use them for notices that are not full incidents.",
-              "Subscription blocks can be placed in the main layout or sidebar. Actual delivery depends on the channels enabled under Destinations.",
-            ],
-          },
-          {
-            heading: "Footer links",
-            paragraphs: [
-              "Support, Terms of Service, and Privacy Policy belong in the footer. Support is shown only when a valid Support URL exists; absent links render nothing rather than empty placeholders.",
-            ],
-          },
-        ],
-      },
-      {
-        slug: "components",
-        title: "Components & groups",
-        summary: "The services that make up your product, grouped and ordered the way your customers understand them.",
-        body: [
-          {
-            heading: "Adding components",
-            paragraphs: [
-              "Components are the functioning pieces of your product that can go down — API, Website, Mobile App. Group related ones (e.g. by region) with Component Groups, which collapse together on the public page.",
-              "Use the drag handle to reorder components; numeric order fields are intentionally not used. In the designer, grouping is optional: the default remains a flat service list, while grouped pages can use sections, cards, or accordion dropdowns.",
-            ],
-          },
-          {
-            heading: "Changing status and adding notes",
-            paragraphs: [
-              "Select Operational, Degraded Performance, Partial Outage, Major Outage, or Under Maintenance. Add an optional public note before Update Status when customers need context.",
-              "Status notes are retained with uptime history. Affected uptime segments show date, status, duration, and related notes on hover; days without recorded information do not display an empty tooltip.",
-            ],
-          },
-          {
-            heading: "Public directory options",
-            paragraphs: [
-              "The Component status block controls summary counters, search, descriptions, grouping, service rows or pills, column count, uptime window, line style, segment size, and icons. Preview changes before saving because every save updates the public page.",
-            ],
-          },
-          {
-            heading: "Automation token",
-            paragraphs: [
-              "Every component gets a unique automation webhook: POST /api/v1/webhook-component/<token> with {\"status\": \"...\"}. Any monitoring tool that can fire an HTTP request can flip status with zero human involvement.",
-            ],
-          },
-        ],
-      },
-      {
-        slug: "access-groups",
-        title: "Audience access",
-        summary: "For Audience-specific pages: per-user or per-group login with scoped component visibility.",
-        body: [
-          {
-            heading: "How scoping works",
-            paragraphs: [
-              "Create Access Groups, each with a set of visible components. Then create Access Users with an email/password, optionally assigned to a group. A user sees the union of their own assigned components plus their group's.",
-              "Audience-specific pages are useful when customers should each see a different, explicitly assigned slice of your systems.",
-            ],
+            paragraphs: ["Deletion is a platform operation: the organization is suspended, the administrator reauthenticates, and a retryable purge job is queued. Request, job, and tombstone audit evidence are kept."],
           },
         ],
       },
@@ -524,30 +720,44 @@ export const HELP_CATEGORIES: HelpCategory[] = [
         summary: "Authenticate with scoped API keys and automate incidents, component status, and metric points.",
         body: [
           {
-            heading: "Create and protect a key",
+            heading: "Authenticate",
             paragraphs: [
-              "Create an API key under API Keys, grant only the scopes and pages the integration needs, and copy the token when it is displayed. Store it in a secret manager; the full value cannot be recovered later.",
-              "Send the key as a Bearer token. A revoked or rotated key stops working immediately. Use /api/openapi as the machine-readable reference for available endpoints and schemas.",
+              "Create a key under API Keys with the smallest scopes and page access the integration needs, and store the secret in a secret manager. Send it as a Bearer token. /api/openapi is the machine-readable reference.",
             ],
             code: "curl -H 'Authorization: Bearer $SIGNALHUB_API_KEY' \\\n  'https://status.example.com/api/v1/manage/incidents?pageId=<page-id>'",
           },
           {
-            heading: "Error handling",
-            paragraphs: [
-              "API errors return a stable code and message. Treat 401 as an invalid credential, 404 as a missing or out-of-scope resource, 400 as invalid input, 429 as rate limiting, and retry 5xx responses with bounded exponential backoff.",
+            heading: "Endpoints",
+            paragraphs: [],
+            list: [
+              "GET and POST /api/v1/manage/incidents: list or create incidents.",
+              "POST /api/v1/manage/incidents/<id>/updates: add an incident update.",
+              "PATCH /api/v1/manage/components/<id>: change a component's status.",
+              "POST /api/v1/manage/metrics/<id>/points: publish a metric point.",
+              "GET /api/v1/status/<slug>: read a public status page.",
+              "POST or GET /api/v1/heartbeat/<token>: record a heartbeat.",
             ],
+          },
+          {
+            heading: "Error handling",
+            paragraphs: ["Errors return a stable code and message. Treat 401 as an invalid credential, 404 as missing or out of scope, 400 as invalid input, 429 as rate limiting (honor Retry-After), and retry 5xx with bounded exponential backoff."],
           },
         ],
       },
       {
         slug: "component-automation",
         title: "Component status automation",
-        summary: "Update component health with a scoped API key or a per-component automation token.",
+        summary: "Update component health from your tooling with a scoped API key or a per-component automation token.",
         body: [
+          {
+            heading: "Management API",
+            paragraphs: ["Use PATCH /api/v1/manage/components/<component-id> with a components.write key. One integration can manage many components."],
+            code: "curl -X PATCH 'https://status.example.com/api/v1/manage/components/<component-id>' \\\n  -H 'Authorization: Bearer $SIGNALHUB_API_KEY' \\\n  -H 'Content-Type: application/json' \\\n  -d '{\"status\":\"OPERATIONAL\"}'",
+          },
           {
             heading: "Per-component webhook",
             paragraphs: [
-              "The automation token is embedded in the URL and acts as the credential. Use it for monitoring systems that can send a simple JSON POST but cannot manage Bearer headers. Rotate the token after exposure.",
+              "Every component also has an automation token for tools that can only send a simple JSON POST. The token is the credential, so keep the URL secret. The console does not display it; an Admin can issue a fresh one by calling POST /api/admin/components/<id>/rotate-token while signed in, which returns the new token once and invalidates the old one. Requests are rate limited to 120 per minute per client.",
             ],
             code: "curl -X POST 'https://status.example.com/api/v1/webhook-component/<token>' \\\n  -H 'Content-Type: application/json' \\\n  -d '{\"status\":\"MAJOR_OUTAGE\"}'",
           },
@@ -556,30 +766,39 @@ export const HELP_CATEGORIES: HelpCategory[] = [
             paragraphs: [],
             list: ["OPERATIONAL", "DEGRADED_PERFORMANCE", "PARTIAL_OUTAGE", "MAJOR_OUTAGE", "UNDER_MAINTENANCE"],
           },
+        ],
+      },
+      {
+        slug: "heartbeats",
+        title: "Heartbeat monitors",
+        summary: "Let cron jobs and workers report in, and alert when they stop.",
+        body: [
           {
-            heading: "Management API alternative",
-            paragraphs: ["Use PATCH /api/v1/manage/components/<component-id> with a components.write API key when one integration manages multiple components."],
-            code: "curl -X PATCH 'https://status.example.com/api/v1/manage/components/<component-id>' \\\n  -H 'Authorization: Bearer $SIGNALHUB_API_KEY' \\\n  -H 'Content-Type: application/json' \\\n  -d '{\"status\":\"OPERATIONAL\"}'",
+            heading: "Setup",
+            paragraphs: [
+              "Create a monitor of type Heartbeat, open it, and choose Create or rotate heartbeat URL. Set the interval and the grace period; the monitor turns down once the interval plus grace passes without a call.",
+              "Call the URL with GET or POST at the end of each successful run. Rotating the URL invalidates the previous one.",
+            ],
+            code: "curl -fsS -X POST 'https://status.example.com/api/v1/heartbeat/<token>'",
           },
         ],
       },
       {
         slug: "public-status-api",
         title: "Public status API and feeds",
-        summary: "Consume page health as JSON, RSS, Atom, badges, or embeds with the page's access rules enforced.",
+        summary: "Read page health as JSON, RSS, Atom, badges, or an embed, with page access rules enforced.",
         body: [
           {
             heading: "JSON status",
             paragraphs: [
-              "GET /api/v1/status/<slug> returns the public page summary, components, active incidents, and canonical URL. Public responses are CORS-enabled and briefly cached; protected pages enforce their configured access policy.",
+              "GET /api/v1/status/<slug> returns the page summary, components, active incidents, and canonical URL. Public pages are CORS-enabled and cached for about 15 seconds; protected pages return private, no-store responses and enforce their access policy. Requests are rate limited.",
             ],
             code: "curl 'https://status.example.com/api/v1/status/<slug>'",
           },
           {
-            heading: "Feeds and embeds",
+            heading: "Feeds, badge, and embed",
             paragraphs: [
-              "RSS and Atom are suitable for feed readers and automation. Protected pages use revocable signed feed URLs. The badge endpoint provides a compact status asset, while the embed script can place an incident banner on another site.",
-              "Do not expose protected feed tokens in public source code. Revoke and regenerate a token if it leaks.",
+              "RSS is at /api/v1/feeds/<slug>/rss and Atom at /api/v1/feeds/<slug>/atom. The badge is /api/v1/badge/<slug> and the banner script is /api/v1/embed/<slug>. Protected pages use revocable feed tokens; never publish a token in public source code, and revoke and recreate it if it leaks.",
             ],
           },
         ],
@@ -587,24 +806,52 @@ export const HELP_CATEGORIES: HelpCategory[] = [
       {
         slug: "webhook-verification",
         title: "Outbound webhook verification",
-        summary: "Verify HTTPS endpoints, validate HMAC signatures, handle retries safely, and rotate secrets.",
+        summary: "Register an endpoint, validate HMAC signatures, handle retries safely, and rotate secrets.",
         body: [
           {
-            heading: "Receiver requirements",
+            heading: "Registering an endpoint",
             paragraphs: [
-              "Use an HTTPS endpoint that can accept JSON quickly. Verify the signature using the raw request bytes before parsing, reject invalid signatures, and return a 2xx response only after the event is accepted for processing.",
-              "Make processing idempotent because retries can deliver the same logical event more than once. Queue slow downstream work instead of blocking the response.",
+              "Endpoints must be public HTTPS URLs. When you register one, SignalHub POSTs a JSON body of type signalhub.webhook.verify containing a challenge, and the endpoint must respond with JSON that echoes the same challenge. Copy the secret when it is shown; it is not displayed again.",
             ],
+          },
+          {
+            heading: "Verifying deliveries",
+            paragraphs: [
+              "Each delivery carries x-status-event, x-status-timestamp, x-status-delivery, and x-status-signature headers. The signature is sha256= followed by the hex HMAC-SHA256 of the timestamp, a dot, and the raw request body, using your endpoint secret. Compute it over the raw bytes before parsing, compare in constant time, and reject stale timestamps.",
+            ],
+            code: "expected = 'sha256=' + hmac_sha256_hex(secret, timestamp + '.' + raw_body)",
           },
           {
             heading: "Operational checklist",
             paragraphs: [],
             list: [
-              "Store the endpoint secret outside source control.",
-              "Log delivery identifiers without logging secrets or full subscriber data.",
-              "Accept secret overlap during a planned rotation when your receiver supports it.",
-              "Alert on sustained non-2xx delivery results rather than a single transient retry.",
+              "Return 2xx only after the event is accepted; make processing idempotent using x-status-delivery, because retries can repeat an event.",
+              "Queue slow downstream work instead of blocking the response.",
+              "Store the secret outside source control and rotate it if it may be exposed; use Send test to check the endpoint.",
+              "Alert on sustained non-2xx results rather than a single retry.",
             ],
+          },
+        ],
+      },
+      {
+        slug: "operations-cli",
+        title: "Running and operating SignalHub",
+        summary: "Processes, health endpoints, and the signalhubctl command.",
+        body: [
+          {
+            heading: "Processes",
+            paragraphs: [
+              "Run the web application and the worker as separate processes against the same database. In development, npm run dev:all starts both; npm run worker:dev starts only the worker. In production the worker runs from the bundled dist-runtime/worker.mjs (npm run start:worker).",
+            ],
+          },
+          {
+            heading: "Health endpoints",
+            paragraphs: ["Use /api/health/live for liveness and /api/health/ready for readiness probes. Treat a stale worker heartbeat as degradation even when the web application still responds."],
+          },
+          {
+            heading: "signalhubctl",
+            paragraphs: ["The operator command supports doctor, preflight, migrate (optionally --check), backup, restore, audit, export --org <id>, and rotate-encryption-key. statusctl remains as an alias for existing automation."],
+            code: "npm run signalhubctl -- doctor",
           },
         ],
       },
@@ -618,19 +865,20 @@ export const HELP_CATEGORIES: HelpCategory[] = [
       {
         slug: "platform-operations",
         title: "Platform operations",
-        summary: "Monitor tenant state, worker readiness, queued work, and operational diagnostics across the installation.",
+        summary: "Tenant state, worker readiness, queued work, and dead-letter deliveries across the installation.",
         body: [
           {
-            heading: "Operational surfaces",
+            heading: "Screens",
             paragraphs: [
-              "Platform Overview summarizes installation health. Organizations and Global Users provide tenant and identity lookup, while Operations exposes worker and queue diagnostics needed for monitors, notifications, scheduled maintenance, and background jobs.",
-              "Use the ready and live health endpoints for infrastructure probes. Treat a stale worker heartbeat as a service degradation even when the web application still responds.",
+              "Platform administration has tabs for Overview, Organizations, Users, Operations, Audit, Configuration, and Identity, plus links to Security and Users and roles. Overview shows live counts straight from the installation database.",
+              "Operations lists platform jobs, dead-letter deliveries that exhausted their retries, worker heartbeats, platform retention defaults, and a migration-state warning when the schema needs attention. Only safe, idempotent retries are offered.",
             ],
           },
           {
-            heading: "Tenant lifecycle",
+            heading: "Organization lifecycle",
             paragraphs: [
-              "Suspension fences tenant mutations and automation. Deletion is a reauthenticated, queued, retryable purge that retains request, job, tombstone, and audit evidence instead of performing an untracked inline delete.",
+              "Organizations lets you provision, open, freeze (suspend), and queue the purge of tenants, and edit the settings of the organization you are signed in to. Suspension fences tenant mutations and automation immediately. Deletion is reauthenticated, queued, and retryable, and keeps request, job, tombstone, and audit evidence.",
+              "Users shows cross-organization membership and can apply emergency account freezes.",
             ],
           },
         ],
@@ -638,38 +886,40 @@ export const HELP_CATEGORIES: HelpCategory[] = [
       {
         slug: "platform-identity",
         title: "Platform identity and access",
-        summary: "Govern platform administrators, identity connections, organization switching, and support access.",
+        summary: "Organization OIDC and SAML connections with SCIM provisioning into fixed roles and page scopes.",
         body: [
           {
-            heading: "Administrative separation",
+            heading: "Connections",
             paragraphs: [
-              "Platform roles and organization roles are separate. Grant platform access only to operators who need cross-tenant administration, and use organization-scoped roles for normal status operations.",
-              "Identity configuration controls global SAML/OIDC connections and SCIM behavior. Test new connections before enforcing them and maintain a recoverable local Admin path.",
+              "Identity manages OIDC and SAML connections per organization. Provider credentials are encrypted. For SAML, configure the generated metadata URL at your identity provider. Test a connection before enforcing it and keep a recoverable local Admin path.",
             ],
           },
           {
-            heading: "Support sessions",
-            paragraphs: [
-              "Use support access only for an explicit customer support task. Actions remain attributed to the operator and support session in audit logs. End support access as soon as the task is complete.",
-            ],
+            heading: "SCIM",
+            paragraphs: ["SCIM provisioning maps users and groups into fixed roles and page scopes. SCIM tokens are shown once, can be rotated, and should be rotated after any exposure."],
+          },
+          {
+            heading: "Separation of duties",
+            paragraphs: ["Platform roles and organization roles are separate. Grant platform access only to operators who need cross-tenant administration, and use organization roles for everyday status work."],
           },
         ],
       },
       {
         slug: "platform-configuration",
         title: "Platform configuration and governance",
-        summary: "Configure providers, security defaults, and review platform-wide audit evidence.",
+        summary: "Runtime readiness, delivery providers, destination providers, and installation-wide audit.",
         body: [
           {
             heading: "Configuration",
             paragraphs: [
-              "Enable only notification and identity providers that are actually configured. Provider readiness in the organization console reflects these platform settings and the required runtime services.",
+              "Configuration reports readiness for the public application URL, the delivery worker, email, SMS, asset storage (local filesystem or S3), and telemetry export. Subscriber email and SMS providers and team destination providers are configured here; provider secrets are encrypted and write-only. Encryption keys and storage access stay deployment-managed.",
+              "Enable only providers that are actually configured; provider readiness in each organization reflects these settings and the worker's health.",
             ],
           },
           {
-            heading: "Audit and diagnostics",
+            heading: "Audit",
             paragraphs: [
-              "Use Platform Audit for cross-tenant administrative actions and exports. Diagnostics should help identify configuration or worker problems without exposing stored secrets.",
+              "Platform audit is an append-only record of operator, authentication, support, lifecycle, and worker job activity, exportable on demand. External SIEM sinks forward sealed audit entries to your security tooling with retries.",
             ],
           },
         ],
