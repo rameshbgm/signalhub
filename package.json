@@ -25,6 +25,7 @@
     "db:migrate": "tsx --env-file=.env scripts/migrate.ts",
     "db:seed": "tsx --env-file=.env scripts/seed.ts",
     "db:seed-roles": "tsx --env-file=.env scripts/seed-role-users.ts",
+    "db:seed-demo": "tsx --env-file=.env scripts/seed-demo.ts",
     "db:reset-dev": "tsx --env-file=.env scripts/reset-development.ts",
     "bootstrap": "tsx --env-file=.env scripts/bootstrap.ts",
     "signalhubctl": "tsx --env-file=.env scripts/signalhubctl.ts",
