@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef } from "react";
-import { Activity, Building2, KeyRound, Landmark, ScrollText, Settings2, SlidersHorizontal, UsersRound, type LucideIcon } from "lucide-react";
+import { Activity, Building2, KeyRound, Landmark, ScrollText, Settings2, ShieldCheck, SlidersHorizontal, UserCog, UsersRound, type LucideIcon } from "lucide-react";
 import type { Hue } from "@/components/ui/icon-tile";
 import { cn } from "@/lib/utils";
 
@@ -17,6 +17,9 @@ const TABS: Array<{ href: string; label: string; icon: LucideIcon; hue: Hue }> =
   { href: "/organization/platform/audit", label: "Audit", icon: ScrollText, hue: "rose" },
   { href: "/organization/platform/configuration", label: "Configuration", icon: SlidersHorizontal, hue: "teal" },
   { href: "/organization/platform/identity", label: "Identity", icon: KeyRound, hue: "indigo" },
+  // Tenant-scoped like Organization settings.
+  { href: "/organization/security", label: "Security", icon: ShieldCheck, hue: "rose" },
+  { href: "/organization/team", label: "Users & Roles", icon: UserCog, hue: "indigo" },
 ];
 
 function isActive(pathname: string, href: string) {

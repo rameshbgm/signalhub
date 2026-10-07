@@ -11,11 +11,9 @@ import {
   LayoutDashboard,
   MonitorDot,
   PanelsTopLeft,
-  ShieldCheck,
   Siren,
   Sparkles,
   UsersRound,
-  Building2,
   type LucideIcon,
 } from "lucide-react";
 import type { Hue } from "@/components/ui/icon-tile";
@@ -32,8 +30,6 @@ export type NavItem = {
 export type NavSection = {
   id: string;
   label: string;
-  /** Shorter name for the mobile tab bar, where each tab is about 65px wide. */
-  tabLabel?: string;
   icon: LucideIcon;
   hue: Hue;
   items: NavItem[];
@@ -84,17 +80,6 @@ export const NAV_SECTIONS: NavSection[] = [
     ],
   },
   {
-    id: "organization",
-    label: "Organization",
-    tabLabel: "Settings",
-    icon: Building2,
-    hue: "rose",
-    items: [
-      { href: "/organization/security", label: "Security", icon: ShieldCheck, hue: "rose" },
-      { href: "/organization/team", label: "Users & Roles", icon: UsersRound, hue: "indigo", capability: "team.manage" },
-    ],
-  },
-  {
     id: "platform",
     label: "Platform",
     icon: Landmark,
@@ -116,8 +101,8 @@ export function visibleSections(capabilities: Capability[]): NavSection[] {
 export function isActivePath(pathname: string, href: string) {
   // Incident and maintenance screens belong to the Events inbox.
   pathname = pathname.replace(/^\/organization\/(incidents|maintenance)(?=\/|$)/, "/organization/events");
-  // Organization settings is a tab inside Platform administration.
-  pathname = pathname.replace(/^\/organization\/settings(?=\/|$)/, "/organization/platform/settings");
+  // Organization settings, Security and Users & Roles are tabs inside Platform administration.
+  pathname = pathname.replace(/^\/organization\/(settings|security|team)(?=\/|$)/, "/organization/platform/$1");
   return href === "/organization" ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);
 }
 

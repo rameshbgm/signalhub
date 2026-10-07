@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { Activity, ChevronRight, Menu, PanelLeftClose, PanelLeftOpen, PanelsTopLeft, Search, Siren, Wrench, X } from "lucide-react";
+import { Activity, ChevronRight, Menu, PanelLeftClose, PanelLeftOpen, PanelsTopLeft, Search, ShieldCheck, Siren, Wrench, X } from "lucide-react";
 import { LogoutButton } from "@/components/admin/LogoutButton";
 import { activeNav, isActivePath, visibleSections, type NavSection } from "@/components/admin/AdminNav";
 import { CommandPalette, type PaletteEntry } from "@/components/admin/CommandPalette";
@@ -87,6 +87,10 @@ function UserFooter({ user, collapsed = false }: { user: ShellUser; collapsed?: 
           <p className="truncate text-xs text-ink-dim">{user.email}</p>
         </div>
       )}
+      {/* Security left the sidebar for Platform administration; every role still needs its MFA page. */}
+      <Link href="/organization/security" aria-label="Security" title="Security" className="inline-grid size-8 shrink-0 place-items-center rounded-control text-ink-dim outline-none transition-colors duration-150 hover:bg-sunken hover:text-ink focus-visible:ring-[3px] focus-visible:ring-primary/30">
+        <ShieldCheck aria-hidden size={16} />
+      </Link>
       <LogoutButton compact />
     </div>
   );

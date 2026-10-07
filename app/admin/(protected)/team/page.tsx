@@ -5,6 +5,7 @@ import {
   removeMember,
   updateMemberRole,
 } from "./actions";
+import { PlatformNav } from "@/components/platform/PlatformNav";
 import { TeamMemberCreateForm } from "@/components/admin/TeamMemberCreateForm";
 import { getOrganizationMembers } from "@/lib/memberships";
 import { database } from "@/lib/postgres/client";
@@ -41,6 +42,7 @@ export default async function TeamPage() {
 
   return (
     <div className="space-y-8">
+      <PlatformNav />
       <PageHeader
         title="Users and roles"
         description="Create active organization users, assign an operational role, and optionally limit access to selected pages."
