@@ -4,6 +4,7 @@ import type { MonitorRow } from "@/lib/postgres/schema";
 import { createIncident, addIncidentUpdate } from "@/lib/domain/incidents";
 import { dispatchNotifications } from "@/lib/notify";
 import { reconcileComponentStatus } from "@/lib/component-status";
+import { publicFailureMessage } from "@/lib/failure-kind";
 import { runCheck } from "@/worker/checks";
 import { startLeaseHeartbeat } from "@/worker/lease-heartbeat";
 
@@ -185,7 +186,7 @@ export async function processMonitor(monitor: MonitorRow, workerId: string) {
         name: `${monitor.name} is failing`,
         status: "INVESTIGATING",
         impact: monitor.downStatus === "MAJOR_OUTAGE" ? "CRITICAL" : "MAJOR",
-        body: result.error ?? `${monitor.name} failed its configured threshold`,
+        body: publicFailureMessage(result.error),
         notify: monitor.actionNotify,
         pageWide: false,
         components: [{
@@ -210,7 +211,7 @@ export async function processMonitor(monitor: MonitorRow, workerId: string) {
       await dispatchNotifications({
         pageId: monitor.pageId,
         subject: `[Monitor Down] ${monitor.name}`,
-        body: result.error ?? "The monitor crossed its failure threshold",
+        body: publicFailureMessage(result.error),
         eventType: "monitor.down",
         eventId: `${monitor.id}:${now.toISOString()}:down`,
         correlationId: `monitor:${monitor.id}`,
