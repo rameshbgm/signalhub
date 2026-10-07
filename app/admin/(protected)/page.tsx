@@ -140,6 +140,7 @@ export default async function AdminDashboard() {
   const HeroIcon = HERO_ICON[overallHealth ?? "UNKNOWN"];
   const canManageSubscribers = sessionHasCapability(session, "subscriber.manage");
   const canManageIncidents = sessionHasCapability(session, "incident.update");
+  const canReportIncidents = sessionHasCapability(session, "incident.manage");
 
   return (
     <div className="space-y-8">
@@ -171,7 +172,11 @@ export default async function AdminDashboard() {
         <Card>
           <CardHeader className="h-14 flex-row items-center justify-between py-0">
             <h2 className="text-[0.9375rem] font-semibold tracking-tight">Open incidents</h2>
-            {openIncidents.length > 0 && <StatusBadge tone="warn">{openIncidents.length} open</StatusBadge>}
+            <div className="flex items-center gap-2">
+              {openIncidents.length > 0 && <StatusBadge tone="warn">{openIncidents.length} open</StatusBadge>}
+              {canManageIncidents && <Link href="/organization/events" className={buttonVariants({ variant: "ghost", size: "sm" })}>All events</Link>}
+              {canReportIncidents && <Link href="/organization/incidents/new" className={buttonVariants({ variant: "soft", size: "sm" })}><Plus aria-hidden size={14} />Report</Link>}
+            </div>
           </CardHeader>
           <CardContent>
             {openIncidents.length === 0 ? (

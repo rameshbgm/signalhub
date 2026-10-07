@@ -4,11 +4,8 @@ import { requireSession } from "@/lib/require-session";
 import { database } from "@/lib/postgres/client";
 import { createIncident } from "../actions";
 import { IncidentForm } from "@/components/admin/IncidentForm";
-import { PageSelect } from "@/components/admin/PageSelect";
-import { NoPagesState } from "@/components/admin/operate-ui";
+import { NoPagesState, PostingTo } from "@/components/admin/operate-ui";
 import { buttonVariants } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Field } from "@/components/ui/field";
 import { PageHeader } from "@/components/ui/page-header";
 import { getScopedPages, requireCapability, sessionHasCapability } from "@/lib/admin-guard";
 
@@ -29,7 +26,7 @@ export default async function NewIncidentPage({ searchParams }: { searchParams: 
         title="Declare incident"
         icon={Siren}
         hue="amber"
-        description="Pick the page, describe what is wrong, and choose which components are affected."
+        description="Describe what is wrong and choose which components are affected."
         actions={
           <Link href={pageId ? `/organization/events?pageId=${pageId}` : "/organization/events"} className={buttonVariants({ variant: "secondary" })}>
             <ArrowLeft aria-hidden size={16} />
@@ -40,13 +37,7 @@ export default async function NewIncidentPage({ searchParams }: { searchParams: 
 
       {pageId ? (
         <>
-          <Card>
-            <CardContent>
-              <Field label="Page" hint="The incident is published to this status page.">
-                <PageSelect pages={pages.map((p) => ({ id: p.id, name: p.name }))} basePath="/organization/incidents/new" selected={pageId} />
-              </Field>
-            </CardContent>
-          </Card>
+          <PostingTo pages={pages.map((p) => ({ id: p.id, name: p.name }))} basePath="/organization/incidents/new" selected={pageId} />
           <IncidentForm action={createIncident} pageId={pageId} components={components} />
         </>
       ) : (

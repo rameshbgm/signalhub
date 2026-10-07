@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { InputHTMLAttributes, ReactNode } from "react";
 import { PanelsTopLeft, Plus } from "lucide-react";
+import { PageSelect } from "@/components/admin/PageSelect";
 import { buttonVariants } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -34,6 +35,29 @@ export function NoPagesState({ description, canCreate }: { description: ReactNod
       action={canCreate ? <Link href="/organization/pages/new" className={buttonVariants()}><Plus aria-hidden size={16} />Create page</Link> : undefined}
       className="py-20"
     />
+  );
+}
+
+/** Which page a new event posts to. The page usually comes from where the user started, so the picker stays folded behind "Change". */
+export function PostingTo({ pages, selected, basePath }: { pages: { id: string; name: string }[]; selected: string; basePath: string }) {
+  const name = pages.find((p) => p.id === selected)?.name;
+  const label = (
+    <span className="flex min-w-0 items-center gap-2">
+      <PanelsTopLeft aria-hidden size={16} className="shrink-0 text-ink-dim" />
+      <span className="truncate text-ink-soft">Posting to <span className="font-semibold text-ink">{name}</span></span>
+    </span>
+  );
+  if (pages.length < 2) return <div className="rounded-card border border-line bg-surface px-4 py-3 text-sm">{label}</div>;
+  return (
+    <details className="group rounded-card border border-line bg-surface px-4 py-3 text-sm">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-chip outline-none focus-visible:ring-4 focus-visible:ring-primary/25 [&::-webkit-details-marker]:hidden">
+        {label}
+        <span className="shrink-0 font-semibold text-primary-ink group-open:hidden">Change</span>
+      </summary>
+      <div className="mt-3 max-w-sm">
+        <PageSelect pages={pages} basePath={basePath} selected={selected} />
+      </div>
+    </details>
   );
 }
 
