@@ -2,6 +2,7 @@ import { sql } from "kysely";
 import { database } from "@/lib/postgres/client";
 import { pruneAuditBefore } from "@/lib/audit-integrity";
 import { dropMonitorCheckPartitionsBefore, ensureMonitorCheckPartitions } from "@/lib/monitor-checks";
+import { dropMetricPointPartitionsBefore, ensureMetricPointPartitions } from "@/lib/metric-points";
 
 export const RETENTION_BOUNDS = {
   monitorChecksDays: { min: 7, max: 3650 },
@@ -67,13 +68,17 @@ export async function runRetentionSweep(workerId: string, now = new Date()) {
   if (!(await acquireRetentionLease(workerId, now))) return false;
 
   await ensureMonitorCheckPartitions(now);
+  await ensureMetricPointPartitions(now);
   const organizations = await database.selectFrom("organizations").select("id")
     .where("status", "!=", "DELETING").execute();
   // Whole monthly check partitions can go once they are past every tenant's window.
-  let longestMonitorChecksDays = (await effectiveRetention(null)).monitorChecksDays;
+  const defaultRetention = await effectiveRetention(null);
+  let longestMonitorChecksDays = defaultRetention.monitorChecksDays;
+  let longestAnalyticsDays = defaultRetention.analyticsDays;
   for (const organization of organizations) {
     const policy = await effectiveRetention(organization.id);
     longestMonitorChecksDays = Math.max(longestMonitorChecksDays, policy.monitorChecksDays);
+    longestAnalyticsDays = Math.max(longestAnalyticsDays, policy.analyticsDays);
     const pages = await database.selectFrom("pages").select("id")
       .where("orgId", "=", organization.id).execute();
     const pageIds = pages.map((page) => page.id);
@@ -127,6 +132,8 @@ export async function runRetentionSweep(workerId: string, now = new Date()) {
   }
 
   await dropMonitorCheckPartitionsBefore(cutoff(now, longestMonitorChecksDays));
+  // Metric points follow the analytics window (see the per-tenant delete above).
+  await dropMetricPointPartitionsBefore(cutoff(now, longestAnalyticsDays));
   // Short-lived operational rows that are never read once expired.
   await Promise.all([
     database.deleteFrom("rateLimits").where("expiresAt", "<", now).execute(),
