@@ -1,13 +1,13 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { AlertTriangle, Pause, Play, RefreshCw, Search, Trash2 } from "lucide-react";
+import { AlertTriangle, ExternalLink, Pause, Play, RefreshCw, Search, Trash2 } from "lucide-react";
 import { MonitorDrawer, MonitorHistoryDrawer, type MonitorCheck } from "@/components/admin/MonitorDrawer";
 import type { MonitorFormValues } from "@/components/admin/MonitorForm";
 import { PageSubmitButton } from "@/components/admin/PageSubmitButton";
 import { ActionRow, InlineActionForm } from "@/components/InlineActionForm";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -29,6 +29,8 @@ export type MonitorListItem = {
   lastLatencyMs: number | null;
   /** Newest first, at most UPTIME_TICKS. */
   checks: MonitorCheck[];
+  /** Public status page this monitor reports to. */
+  pageHref: string;
   actions: { run: Action; toggle: Action; remove: Action; update: Action };
 };
 
@@ -111,6 +113,9 @@ function MonitorRowView({ monitor, components, canManage, now }: { monitor: Moni
             </InlineActionForm>
           </>
         )}
+        <a href={monitor.pageHref} target="_blank" rel="noopener noreferrer" className={buttonVariants({ variant: "ghost", size: "icon", className: "size-8 [&_svg]:!text-ok-fg" })} aria-label={`Open status page for ${m.name}`} title="Open status page">
+          <ExternalLink aria-hidden size={15} />
+        </a>
         <MonitorHistoryDrawer monitorId={m.id} name={m.name} latest={monitor.checks} />
         {canManage && monitor.edit && (
           <MonitorDrawer action={actions.update} components={components} monitor={monitor.edit} />

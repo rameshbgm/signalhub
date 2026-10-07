@@ -26,7 +26,7 @@ describe.skipIf(!enabled)("monitor check history", () => {
     // 60 checks one minute apart, plus two sharing the newest instant to exercise the id tie-break.
     const newest = new Date();
     await database.insertInto("monitorChecks").values([
-      ...Array.from({ length: 60 }, (_, index) => ({ monitorId, checkedAt: new Date(newest.getTime() - (index + 1) * 60_000), ok: index % 5 !== 0 })),
+      ...Array.from({ length: 60 }, (_, index) => ({ monitorId, checkedAt: new Date(newest.getTime() - (index + 1) * 60_000), ok: index % 5 !== 0, latencyMs: index * 10 })),
       { monitorId, checkedAt: newest, ok: true },
       { monitorId, checkedAt: newest, ok: false },
     ]).execute();
@@ -36,28 +36,40 @@ describe.skipIf(!enabled)("monitor check history", () => {
     await client?.postgresPool.end();
   });
 
-  it("walks every check exactly once with keyset pages, newest first", async () => {
+  it("walks every check exactly once with numbered pages, newest first", async () => {
     const seen: string[] = [];
     const times: number[] = [];
-    let cursor: import("../../lib/monitor-checks").MonitorCheckCursor | null = null;
-    let pages = 0;
-    do {
-      const page = await checks.listMonitorChecks(monitorId, cursor);
-      seen.push(...page.checks.map((check) => check.id));
-      times.push(...page.checks.map((check) => Date.parse(check.checkedAt)));
-      cursor = page.nextCursor;
-      pages += 1;
-    } while (cursor);
-    expect(pages).toBe(3);
+    const first = await checks.listMonitorChecks(monitorId, 1);
+    expect(first.pageCount).toBe(3);
+    expect(first.total).toBe(62);
+    for (let page = 1; page <= first.pageCount; page += 1) {
+      const result = await checks.listMonitorChecks(monitorId, page);
+      seen.push(...result.checks.map((check) => check.id));
+      times.push(...result.checks.map((check) => Date.parse(check.checkedAt)));
+    }
     expect(seen).toHaveLength(62);
     expect(new Set(seen).size).toBe(62);
     expect(times).toEqual([...times].sort((a, b) => b - a));
   });
 
+  it("filters by result and sorts oldest first", async () => {
+    const down = await checks.listMonitorChecks(monitorId, 1, 100, { result: "down" });
+    expect(down.checks.length).toBeGreaterThan(0);
+    expect(down.checks.every((check) => !check.ok)).toBe(true);
+    const oldest = (await checks.listMonitorChecks(monitorId, 1, 100, { sort: "oldest" })).checks.map((check) => Date.parse(check.checkedAt));
+    expect(oldest).toEqual([...oldest].sort((a, b) => a - b));
+  });
+
+  it("sorts by latency with missing latencies last", async () => {
+    const slowest = (await checks.listMonitorChecks(monitorId, 1, 100, { sort: "slowest" })).checks.map((check) => check.latencyMs);
+    expect(slowest.slice(0, 60)).toEqual(Array.from({ length: 60 }, (_, index) => (59 - index) * 10));
+    expect(slowest.slice(60)).toEqual([null, null]);
+  });
+
   it("returns the latest N per monitor", async () => {
     const latest = await checks.latestChecksByMonitor([monitorId], 30);
     expect(latest.get(monitorId)).toHaveLength(30);
-    const first = await checks.listMonitorChecks(monitorId, null, 30);
+    const first = await checks.listMonitorChecks(monitorId, 1, 30);
     expect(latest.get(monitorId)!.map((check) => check.id)).toEqual(first.checks.map((check) => check.id));
   });
 
@@ -71,6 +83,6 @@ describe.skipIf(!enabled)("monitor check history", () => {
     expect(await partitions()).toContain(`monitor_checks_${ahead.getUTCFullYear()}_${String(ahead.getUTCMonth() + 1).padStart(2, "0")}`);
     // Nothing dropped while the current month is inside the window.
     await checks.dropMonitorCheckPartitionsBefore(new Date(now.getTime() - 40 * 86_400_000));
-    expect((await checks.listMonitorChecks(monitorId, null, 100)).checks).toHaveLength(62);
+    expect((await checks.listMonitorChecks(monitorId, 1, 100)).checks).toHaveLength(62);
   });
 });

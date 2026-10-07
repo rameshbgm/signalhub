@@ -12,6 +12,7 @@ import { NoPagesState } from "@/components/admin/operate-ui";
 import { getScopedPages, sessionHasCapability } from "@/lib/admin-guard";
 import { Alert } from "@/components/ui/alert";
 import { EmptyState } from "@/components/ui/empty-state";
+import { publicPagePath } from "@/lib/public-path";
 import { PageHeader } from "@/components/ui/page-header";
 
 /** Only the fields the edit form needs; stored secrets and token hashes stay on the server. */
@@ -63,6 +64,7 @@ export default async function MonitorsPage({ searchParams }: { searchParams: Pro
   );
   const canManage = sessionHasCapability(session, "monitor.manage");
   const componentOptions = components.map((c) => ({ id: c.id, name: c.name }));
+  const pageHref = publicPagePath(pages.find((p) => p.id === pageId)!);
   const items: MonitorListItem[] = monitors.map((m) => ({
     values: { id: m.id, name: m.name, type: m.type, target: m.target, port: m.port, tags: m.tags ?? [], groupName: m.groupName },
     edit: canManage ? formValues(m) : null,
@@ -73,6 +75,7 @@ export default async function MonitorsPage({ searchParams }: { searchParams: Pro
     lastCheckedAt: m.lastCheckedAt?.toISOString() ?? null,
     lastLatencyMs: m.lastLatencyMs,
     checks: checksByMonitor.get(m.id) ?? [],
+    pageHref,
     actions: {
       run: runMonitorNow.bind(null, m.id),
       toggle: toggleMonitorEnabled.bind(null, m.id),

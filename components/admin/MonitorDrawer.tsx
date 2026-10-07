@@ -1,8 +1,8 @@
 "use client";
 
-import { useCallback, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { ArrowDownUp, ChevronLeft, ChevronRight, ChevronsLeft, Filter, History, Pencil, Plus, RefreshCw, X } from "lucide-react";
+import { ArrowDownUp, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Filter, History, Pencil, Plus, RefreshCw, X } from "lucide-react";
 import { HeartbeatTokenManager } from "@/components/admin/HeartbeatTokenManager";
 import { MonitorForm, type MonitorFormValues } from "@/components/admin/MonitorForm";
 import { Button } from "@/components/ui/button";
@@ -11,7 +11,7 @@ import { Select } from "@/components/ui/select";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { fetchWithTimeout } from "@/lib/client-fetch";
-import type { MonitorCheckCursor, MonitorCheckView } from "@/lib/monitor-checks";
+import type { MonitorCheckView } from "@/lib/monitor-checks";
 
 export type MonitorCheck = MonitorCheckView;
 
@@ -81,8 +81,6 @@ export function MonitorDrawer({
 /** Matches MONITOR_CHECK_PAGE_SIZE in lib/monitor-checks (a server module). */
 const PAGE_SIZE = 25;
 
-type HistoryPage = { checks: MonitorCheck[]; nextCursor: MonitorCheckCursor | null };
-
 /** Details of one check in a centered modal; rows with no value (no status code, no error) are left out. */
 function CheckDetail({ name, check, onClose }: { name: string; check: MonitorCheck; onClose: () => void }) {
   const rows = ([
@@ -114,44 +112,53 @@ function CheckDetail({ name, check, onClose }: { name: string; check: MonitorChe
   );
 }
 
-type HistoryFilter = { result: "all" | "up" | "down"; order: "desc" | "asc" };
-const DEFAULT_FILTER: HistoryFilter = { result: "all", order: "desc" };
+type HistoryPage = { checks: MonitorCheck[]; page: number; pageCount: number; total: number };
+type HistoryFilter = { result: "all" | "up" | "down"; sort: "newest" | "oldest" | "slowest" | "fastest" };
+const DEFAULT_FILTER: HistoryFilter = { result: "all", sort: "newest" };
 
-/** Check history, paged on the server by keyset cursor; filter and sort run in SQL. Visited pages are cached so Previous is instant. */
+/** Check history: numbered pages, filter and sort all run on the server. */
 function CheckHistory({ monitorId, name, firstPage }: { monitorId: string; name: string; firstPage: HistoryPage }) {
-  const [pages, setPages] = useState<HistoryPage[]>([firstPage]);
-  const [index, setIndex] = useState(0);
+  const [page, setPage] = useState<HistoryPage>(firstPage);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<MonitorCheck | null>(null);
   const [filter, setFilter] = useState<HistoryFilter>(DEFAULT_FILTER);
 
-  const load = useCallback(async (cursor: MonitorCheckCursor | null, target: number, active: HistoryFilter) => {
+  const fetchPage = useCallback(async (target: number, active: HistoryFilter) => {
+    const params = new URLSearchParams({ page: String(target), sort: active.sort });
+    if (active.result !== "all") params.set("result", active.result);
+    const response = await fetchWithTimeout(`/api/admin/monitors/${monitorId}/checks?${params}`);
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error?.message ?? "Could not load check history");
+    return data as HistoryPage;
+  }, [monitorId]);
+
+  const load = async (target: number, active: HistoryFilter) => {
     setLoading(true);
     setError(null);
     try {
-      const params = new URLSearchParams({ order: active.order });
-      if (active.result !== "all") params.set("result", active.result);
-      if (cursor) { params.set("beforeAt", cursor.checkedAt); params.set("beforeId", cursor.id); }
-      const response = await fetchWithTimeout(`/api/admin/monitors/${monitorId}/checks?${params}`);
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(data.error?.message ?? "Could not load check history");
-      setPages((current) => [...current.slice(0, target), data as HistoryPage]);
-      setIndex(target);
+      setPage(await fetchPage(target, active));
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not load check history");
     } finally {
       setLoading(false);
     }
-  }, [monitorId]);
+  };
 
-  const page = pages[index];
-  const next = () => (pages[index + 1] ? setIndex(index + 1) : page?.nextCursor && load(page.nextCursor, index + 1, filter));
+  // The list's newest checks render instantly; this fills in the real page count.
+  useEffect(() => {
+    fetchPage(1, DEFAULT_FILTER).then(setPage, () => undefined);
+  }, [fetchPage]);
+
   const apply = (change: Partial<HistoryFilter>) => {
     const active = { ...filter, ...change };
     setFilter(active);
-    void load(null, 0, active);
+    void load(1, active);
   };
+  const go = (target: number) => void load(target, filter);
+  const atStart = loading || page.page <= 1;
+  const atEnd = loading || page.page >= page.pageCount;
+  const iconClass = "text-primary-ink";
 
   return (
     <div className="space-y-3">
@@ -163,18 +170,18 @@ function CheckHistory({ monitorId, name, firstPage }: { monitorId: string; name:
           <option value="down">Down only</option>
         </Select>
         <ArrowDownUp aria-hidden size={14} className="ml-1 text-warn-fg" />
-        <Select aria-label="Sort order" value={filter.order} onChange={(event) => apply({ order: event.target.value as HistoryFilter["order"] })}>
-          <option value="desc">Newest first</option>
-          <option value="asc">Oldest first</option>
+        <Select aria-label="Sort order" value={filter.sort} onChange={(event) => apply({ sort: event.target.value as HistoryFilter["sort"] })}>
+          <option value="newest">Newest first</option>
+          <option value="oldest">Oldest first</option>
+          <option value="slowest">Slowest first</option>
+          <option value="fastest">Fastest first</option>
         </Select>
         <Button type="button" variant="ghost" size="sm" className="ml-auto" onClick={() => apply(DEFAULT_FILTER)} disabled={loading}>
-          <RefreshCw aria-hidden size={14} className="text-primary-ink" />
+          <RefreshCw aria-hidden size={14} className={iconClass} />
           Latest
         </Button>
       </div>
-      <p className="text-xs text-ink-dim" aria-live="polite">
-        {page ? `Page ${index + 1} · ${page.checks.length} checks` : loading ? "Loading…" : ""}
-      </p>
+      <p className="text-xs text-ink-dim" aria-live="polite">{loading ? "Loading…" : `${page.total} checks`}</p>
       {error && <p role="alert" className="rounded-control bg-danger-bg px-3 py-2 text-xs text-danger-fg">{error}</p>}
       <div>
         <Table aria-busy={loading}>
@@ -182,7 +189,7 @@ function CheckHistory({ monitorId, name, firstPage }: { monitorId: string; name:
             <TableRow><TableHead>Checked</TableHead><TableHead>Result</TableHead><TableHead>Latency</TableHead><TableHead>Response</TableHead></TableRow>
           </TableHeader>
           <TableBody className={loading ? "opacity-60" : undefined}>
-            {page?.checks.map((check) => (
+            {page.checks.map((check) => (
               <TableRow key={check.id} tabIndex={0} className="cursor-pointer" onClick={() => setSelected(check)} onKeyDown={(event) => { if (event.key === "Enter") setSelected(check); }}>
                 <TableCell className="whitespace-nowrap px-4 py-2.5 tabular-nums">{new Date(check.checkedAt).toLocaleString()}</TableCell>
                 <TableCell className="px-4 py-2.5"><StatusBadge tone={check.ok ? "ok" : "danger"}>{check.ok ? "Up" : "Down"}</StatusBadge></TableCell>
@@ -190,25 +197,30 @@ function CheckHistory({ monitorId, name, firstPage }: { monitorId: string; name:
                 <TableCell className="whitespace-normal break-words px-4 py-2.5">{check.error ?? (check.statusCode ? `HTTP ${check.statusCode}` : "OK")}</TableCell>
               </TableRow>
             ))}
-            {page && page.checks.length === 0 && (
+            {page.checks.length === 0 && (
               <TableRow><TableCell colSpan={4} className="px-4 py-6 text-center text-ink-dim">No checks match.</TableCell></TableRow>
             )}
           </TableBody>
         </Table>
       </div>
       <div className="flex items-center justify-between gap-2">
-        <Button type="button" variant="secondary" size="sm" onClick={() => setIndex(0)} disabled={loading || index === 0} aria-label="First page" title="First page">
-          <ChevronsLeft aria-hidden size={14} className="text-primary-ink" />
-        </Button>
-        <Button type="button" variant="secondary" size="sm" onClick={() => setIndex(index - 1)} disabled={loading || index === 0}>
-          <ChevronLeft aria-hidden size={14} className="text-primary-ink" />
-          Previous
-        </Button>
-        <span className="text-xs tabular-nums text-ink-soft">Page {index + 1}</span>
-        <Button type="button" variant="secondary" size="sm" onClick={next} disabled={loading || !page || (!page.nextCursor && !pages[index + 1])}>
-          Next
-          <ChevronRight aria-hidden size={14} className="text-primary-ink" />
-        </Button>
+        <div className="flex gap-2">
+          <Button type="button" variant="secondary" size="sm" onClick={() => go(1)} disabled={atStart} aria-label="First page" title="First page">
+            <ChevronsLeft aria-hidden size={16} className={iconClass} />
+          </Button>
+          <Button type="button" variant="secondary" size="sm" onClick={() => go(page.page - 1)} disabled={atStart} aria-label="Previous page" title="Previous page">
+            <ChevronLeft aria-hidden size={16} className={iconClass} />
+          </Button>
+        </div>
+        <span className="text-xs tabular-nums text-ink-soft">Page {page.page} of {page.pageCount}</span>
+        <div className="flex gap-2">
+          <Button type="button" variant="secondary" size="sm" onClick={() => go(page.page + 1)} disabled={atEnd} aria-label="Next page" title="Next page">
+            <ChevronRight aria-hidden size={16} className={iconClass} />
+          </Button>
+          <Button type="button" variant="secondary" size="sm" onClick={() => go(page.pageCount)} disabled={atEnd} aria-label="Last page" title="Last page">
+            <ChevronsRight aria-hidden size={16} className={iconClass} />
+          </Button>
+        </div>
       </div>
       {selected && <CheckDetail name={name} check={selected} onClose={() => setSelected(null)} />}
     </div>
@@ -218,11 +230,8 @@ function CheckHistory({ monitorId, name, firstPage }: { monitorId: string; name:
 /** History icon that opens the paginated check history; available to read-only members too. */
 export function MonitorHistoryDrawer({ monitorId, name, latest }: { monitorId: string; name: string; latest: MonitorCheck[] }) {
   const [open, setOpen] = useState(false);
-  // The list already holds the newest checks, so the first page needs no request.
-  const firstPage: HistoryPage = {
-    checks: latest.slice(0, PAGE_SIZE),
-    nextCursor: latest.length > PAGE_SIZE ? { checkedAt: latest[PAGE_SIZE - 1].checkedAt, id: latest[PAGE_SIZE - 1].id } : null,
-  };
+  // The list already holds the newest checks, so something renders before the first request returns.
+  const firstPage: HistoryPage = { checks: latest.slice(0, PAGE_SIZE), page: 1, pageCount: 1, total: latest.length };
   return (
     <>
       <Button type="button" data-button-guard="off" variant="ghost" size="icon" className="size-8 [&_svg]:!text-ink-soft" onClick={() => setOpen(true)} aria-label={`Check history for ${name}`} title="Check history">
