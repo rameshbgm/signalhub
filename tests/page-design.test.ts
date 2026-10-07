@@ -95,6 +95,26 @@ describe("status page design", () => {
     expect(applied.presentation.supportUrl).toBe("https://status.example.com/help");
   });
 
+  it("changes how the public page looks when a simple layout is chosen", () => {
+    const standard = templateDesign("CENTERED_SUMMARY");
+    const banner = applyPageTemplateLayout(standard, "ILLUSTRATED_HERO");
+    expect(banner.chrome.header.variant).toBe("HERO");
+    expect(banner.theme.density).toBe("SPACIOUS");
+    const compact = applyPageTemplateLayout(banner, "DENSE_OPERATIONS");
+    expect(compact.theme.density).toBe("COMPACT");
+    expect(compact.theme.contentWidth).toBe("WIDE");
+    const services = allSurfaceBlocks(compact, "status").find((block) => block.type === "COMPONENT_STATUS");
+    expect(services?.type === "COMPONENT_STATUS" && services.settings.view).toBe("CARDS");
+    expect(applyPageTemplateLayout(compact, "CENTERED_SUMMARY").chrome.header.variant).toBe("CENTERED");
+  });
+
+  it("keeps the layout's density and width when a style preset is chosen", () => {
+    const compact = applyPageTemplateLayout(templateDesign("CENTERED_SUMMARY"), "DENSE_OPERATIONS");
+    const themed = designWithThemePreset(compact, "OCEAN");
+    expect(themed.theme.density).toBe("COMPACT");
+    expect(themed.theme.contentWidth).toBe("WIDE");
+  });
+
   it("builds the uptime timeline composition used by the live public page", () => {
     const design = templateDesign("UPTIME_TIMELINE");
     const components = design.surfaces.status.primary.find((block) => block.type === "COMPONENT_STATUS");

@@ -780,7 +780,9 @@ export function pageThemePreset(key: PageThemePresetKey): StatusPageDesign["them
 
 export function designWithThemePreset(design: StatusPageDesign, key: PageThemePresetKey) {
   const next = structuredClone(design);
-  next.theme = pageThemePreset(key);
+  // Layout owns density and width; a style preset only changes colors, type, corners, and depth.
+  const { density, contentWidth } = next.theme;
+  next.theme = { ...pageThemePreset(key), density, contentWidth };
   return statusPageDesignSchema.parse(next);
 }
 
@@ -891,6 +893,20 @@ export function applyPageTemplateLayout(design: StatusPageDesign, templateKey: P
   const template = templateDesign(templateKey, design.theme.palette.brand);
   const next = structuredClone(design);
   next.templateKey = templateKey;
+  // Carry over what makes the layout look different on the public page. Palette, fonts, radius,
+  // presentation, and the other block settings stay as the owner configured them.
+  next.chrome.header.variant = template.chrome.header.variant;
+  next.theme.density = template.theme.density;
+  next.theme.contentWidth = template.theme.contentWidth;
+  const banner = next.surfaces.status.full.find((block) => block.type === "OVERALL_STATUS");
+  const templateBanner = template.surfaces.status.full.find((block) => block.type === "OVERALL_STATUS");
+  if (banner?.type === "OVERALL_STATUS" && templateBanner?.type === "OVERALL_STATUS") banner.settings = { ...templateBanner.settings };
+  const services = allSurfaceBlocks(next, "status").find((block) => block.type === "COMPONENT_STATUS");
+  const templateServices = allSurfaceBlocks(template, "status").find((block) => block.type === "COMPONENT_STATUS");
+  if (services?.type === "COMPONENT_STATUS" && templateServices?.type === "COMPONENT_STATUS") {
+    const { view, groupStyle, showUptime } = templateServices.settings;
+    Object.assign(services.settings, { view, groupStyle, showUptime });
+  }
   for (const surface of Object.keys(next.surfaces) as PageSurfaceKey[]) {
     const currentBlocks = allSurfaceBlocks(next, surface);
     const templatePlacements = template.surfaces[surface].grid.desktop;
