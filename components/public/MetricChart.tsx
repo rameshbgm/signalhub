@@ -1,14 +1,15 @@
 "use client";
 
-import { useCallback, useMemo, useSyncExternalStore } from "react";
+import { useCallback, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { formatMetricValue, metricDecimals } from "@/lib/status";
 import { formatPageDate } from "@/lib/page-locale";
-import { SERIES_RANGES } from "@/lib/metric-ranges";
-import type { MetricInsights } from "@/lib/metric-series";
+import { fetchWithTimeout } from "@/lib/client-fetch";
+import type { MetricInsights, RangeInsight } from "@/lib/metric-series";
 import type { MetricLens, MetricRange, MetricView } from "@/lib/page-design";
 import { COMPARABLE_VIEWS, TrendChart } from "@/components/public/metric/TrendChart";
 import { DistributionChart, PercentileChart, ResponsesPanel, UptimePanel } from "@/components/public/metric/InsightCharts";
+import { WindowPicker } from "@/components/public/metric/WindowPicker";
 import { CHART_HEIGHT, LENS_LABELS, RANGE_LABELS, VIEWS, type TrendRow } from "@/components/public/metric/shared";
 
 export type MetricChartOptions = {
@@ -17,7 +18,12 @@ export type MetricChartOptions = {
   lenses: MetricLens[];
   chartViews: MetricView[];
   showStats: boolean;
+  allowCustomRange: boolean;
 };
+
+/** A quick or custom window chosen by the visitor. These are fetched on demand, so they live in memory only. */
+type WindowState = { minutes: number; insight: RangeInsight | null; loading: boolean; error: string | null };
+const WINDOW_CACHE_MS = 30_000;
 
 type Prefs = { range: MetricRange; lens: MetricLens; view: MetricView; compare: boolean };
 
@@ -64,6 +70,7 @@ function percentChange(current: number, previous: number | undefined) {
 
 export function MetricChart({
   id,
+  pageSlug,
   name,
   suffix,
   color,
@@ -74,6 +81,7 @@ export function MetricChart({
   timeZone = "UTC",
 }: {
   id: string;
+  pageSlug: string;
   name: string;
   suffix: string;
   color: string;
@@ -101,22 +109,48 @@ export function MetricChart({
   const allowed = useMemo(() => ({ ranges, lenses, views: options.chartViews }), [ranges, lenses, options.chartViews]);
   const [prefs, setPrefs] = usePrefs(`signalhub:metric:${id}`, defaults, allowed);
 
-  const insight = insights[prefs.range];
+  const [windowState, setWindowState] = useState<WindowState | null>(null);
+  const windowCache = useRef(new Map<number, { at: number; insight: RangeInsight }>());
+  const insight = windowState?.insight ?? insights[prefs.range];
+  const windowMs = insight.windowMs;
+  const shortLabels = windowMs <= 2 * 86_400_000;
+
+  async function chooseWindow(minutes: number) {
+    const cached = windowCache.current.get(minutes);
+    if (cached && Date.now() - cached.at < WINDOW_CACHE_MS) {
+      setWindowState({ minutes, insight: cached.insight, loading: false, error: null });
+      return;
+    }
+    // Keep showing the previous window while the new one loads.
+    setWindowState((current) => ({ minutes, insight: current?.insight ?? null, loading: true, error: null }));
+    try {
+      const response = await fetchWithTimeout(`/api/v1/status/${encodeURIComponent(pageSlug)}/metrics/${id}?minutes=${minutes}`);
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error?.message ?? "Could not load this window");
+      windowCache.current.set(minutes, { at: Date.now(), insight: data as RangeInsight });
+      setWindowState((current) => (current?.minutes === minutes ? { minutes, insight: data as RangeInsight, loading: false, error: null } : current));
+    } catch (caught) {
+      const message = caught instanceof Error ? caught.message : "Could not load this window";
+      setWindowState((current) => (current?.minutes === minutes ? { ...current, loading: false, error: message } : current));
+    }
+  }
   const format = (value: number) => `${formatMetricValue(value, precision)}${suffix}`;
   const formatAxis = (value: number) => formatMetricValue(value, precision);
-  const formatDate = (iso: string) => formatPageDate(iso, { language: locale, timeZone, month: "short", day: "numeric", ...(prefs.range === "24h" ? { hour: "numeric", minute: "2-digit" } : {}) });
+  const formatDate = (iso: string) => formatPageDate(iso, { language: locale, timeZone, month: "short", day: "numeric", ...(shortLabels ? { hour: "numeric", minute: "2-digit" } : {}) });
 
   const rows = useMemo<TrendRow[]>(() => {
-    const windowMs = SERIES_RANGES[prefs.range].windowMs;
     const previous = new Map(insight.previous.buckets.map((bucket) => [Date.parse(bucket.t), bucket.avg]));
     const round = (value: number) => Number(formatMetricValue(value, precision));
-    const shortOptions = prefs.range === "24h" ? { hour: "numeric", minute: "2-digit" } as const : { month: "short", day: "numeric" } as const;
+    // Seconds only matter on windows short enough to hold sub-minute samples.
+    const shortOptions = windowMs <= 15 * 60_000
+      ? { hour: "numeric", minute: "2-digit", second: "2-digit" } as const
+      : shortLabels ? { hour: "numeric", minute: "2-digit" } as const : { month: "short", day: "numeric" } as const;
     return insight.buckets.map((bucket, index) => {
       const earlier = previous.get(Date.parse(bucket.t) - windowMs);
       return {
         index,
         t: formatPageDate(bucket.t, { language: locale, timeZone, ...shortOptions }),
-        full: formatPageDate(bucket.t, { language: locale, timeZone, month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }),
+        full: formatPageDate(bucket.t, { language: locale, timeZone, month: "short", day: "numeric", hour: "numeric", minute: "2-digit", ...(windowMs <= 15 * 60_000 ? { second: "2-digit" } : {}) }),
         value: round(bucket.avg),
         min: round(bucket.min),
         max: round(bucket.max),
@@ -126,7 +160,7 @@ export function MetricChart({
         prev: earlier === undefined ? undefined : round(earlier),
       };
     });
-  }, [insight, prefs.range, locale, timeZone, precision]);
+  }, [insight, windowMs, shortLabels, locale, timeZone, precision]);
 
   const summary = insight.summary;
   const lowerIsBetter = suffix.trim().toLowerCase() === "ms";
@@ -144,13 +178,13 @@ export function MetricChart({
 
   let body;
   if (noData) {
-    body = <div className="grid h-full place-items-center text-xs text-[var(--fg-dim)]">No data in this range yet.</div>;
+    body = <div className="grid h-full place-items-center text-xs text-[var(--fg-dim)]">No samples in this window yet. Try a longer one.</div>;
   } else if (prefs.lens === "percentiles") {
     body = <PercentileChart rows={rows} color={color} animate={animate} format={format} formatAxis={formatAxis} />;
   } else if (prefs.lens === "distribution") {
     body = <DistributionChart bins={insight.histogram} color={color} animate={animate} format={format} formatAxis={formatAxis} />;
   } else if (prefs.lens === "uptime") {
-    body = <UptimePanel insight={insight} range={prefs.range} animate={animate} formatDate={formatDate} />;
+    body = <UptimePanel insight={insight} animate={animate} formatDate={formatDate} />;
   } else if (prefs.lens === "responses") {
     body = <ResponsesPanel insight={insight} animate={animate} />;
   } else {
@@ -176,28 +210,35 @@ export function MetricChart({
         <h4 className="text-sm font-mono font-semibold text-[var(--fg)]">
           {name} <span className="text-[var(--fg-dim)] font-normal">({suffix || "value"})</span>
         </h4>
-        {ranges.length > 1 && (
-          <div role="radiogroup" aria-label={`${name} time range`} className="flex gap-0.5">
-            {ranges.map((range) => {
-              const active = prefs.range === range;
-              return (
-                <button
-                  key={range}
-                  type="button"
-                  role="radio"
-                  aria-checked={active}
-                  onClick={() => setPrefs({ range })}
-                  className="relative px-2 py-1 text-xs font-medium tabular-nums transition-colors hover:text-[var(--fg)]"
-                  style={{ color: active ? color : "var(--fg-dim)" }}
-                >
-                  {active && <motion.span layoutId={`metric-range-${id}`} className="absolute inset-0" style={{ background: `color-mix(in srgb, ${color} 14%, transparent)`, border: `1px solid color-mix(in srgb, ${color} 40%, transparent)` }} transition={animate ? { type: "spring", stiffness: 500, damping: 36 } : { duration: 0 }} />}
-                  <span className="relative">{RANGE_LABELS[range]}</span>
-                </button>
-              );
-            })}
-          </div>
-        )}
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          {ranges.length > 1 && (
+            <div role="radiogroup" aria-label={`${name} time range`} className="flex gap-0.5">
+              {ranges.map((range) => {
+                const active = !windowState && prefs.range === range;
+                return (
+                  <button
+                    key={range}
+                    type="button"
+                    role="radio"
+                    aria-checked={active}
+                    onClick={() => { setWindowState(null); setPrefs({ range }); }}
+                    className="relative px-2 py-1 text-xs font-medium tabular-nums transition-colors hover:text-[var(--fg)]"
+                    style={{ color: active ? color : "var(--fg-dim)" }}
+                  >
+                    {active && <motion.span layoutId={`metric-range-${id}`} className="absolute inset-0" style={{ background: `color-mix(in srgb, ${color} 14%, transparent)`, border: `1px solid color-mix(in srgb, ${color} 40%, transparent)` }} transition={animate ? { type: "spring", stiffness: 500, damping: 36 } : { duration: 0 }} />}
+                    <span className="relative">{RANGE_LABELS[range]}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+          {options.allowCustomRange && (
+            <WindowPicker name={name} color={color} active={windowState?.minutes ?? null} loading={Boolean(windowState?.loading)} onSelect={(minutes) => void chooseWindow(minutes)} />
+          )}
+        </div>
       </div>
+
+      {windowState?.error && <p role="alert" className="mb-2 text-xs text-[#dc2626]">{windowState.error}</p>}
 
       {options.showStats && stats.length > 0 && (
         <dl className="mb-3 grid grid-cols-3 gap-x-3 gap-y-2 sm:grid-cols-5">
@@ -243,10 +284,10 @@ export function MetricChart({
         </div>
       )}
 
-      <div className="relative" style={{ height: CHART_HEIGHT }}>
+      <div className="relative transition-opacity" style={{ height: CHART_HEIGHT, opacity: windowState?.loading ? 0.5 : 1 }} aria-busy={Boolean(windowState?.loading)}>
         <AnimatePresence mode="wait" initial={false}>
           <motion.div
-            key={`${prefs.lens}-${prefs.range}-${prefs.lens === "trend" ? prefs.view : ""}`}
+            key={`${prefs.lens}-${windowState?.minutes ?? prefs.range}-${prefs.lens === "trend" ? prefs.view : ""}`}
             className="absolute inset-0"
             initial={animate ? { opacity: 0, y: 8 } : false}
             animate={{ opacity: 1, y: 0 }}

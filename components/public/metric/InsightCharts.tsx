@@ -4,7 +4,6 @@ import { useMemo } from "react";
 import { motion } from "motion/react";
 import { Bar, BarChart, CartesianGrid, Cell, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import type { FailureKind, HistogramBin, RangeInsight } from "@/lib/metric-series";
-import { SERIES_RANGES, type SeriesRangeId } from "@/lib/metric-ranges";
 import { ANIMATION_MS, AXIS_TICK, OUTLIER_COLOR, P95_COLOR, P99_COLOR, TooltipBox, type TrendRow } from "@/components/public/metric/shared";
 
 type Formatters = { format: (value: number) => string; formatAxis: (value: number) => string };
@@ -86,16 +85,15 @@ function cellColor(total: number, ok: number) {
 }
 
 /** Uptime percentage with one colored cell per hour (24h) or day, including empty slots. */
-export function UptimePanel({ insight, range, animate, formatDate }: {
+export function UptimePanel({ insight, animate, formatDate }: {
   insight: RangeInsight;
-  range: SeriesRangeId;
   animate: boolean;
   formatDate: (iso: string) => string;
 }) {
   const checks = insight.checks;
   const slots = useMemo(() => {
     if (!checks) return [];
-    const stride = SERIES_RANGES[range].cellSec * 1000;
+    const stride = insight.cellSec * 1000;
     const byTime = new Map(checks.cells.map((cell) => [Date.parse(cell.t), cell]));
     const first = originMs + Math.floor((Date.parse(insight.start) - originMs) / stride) * stride;
     const last = Date.parse(insight.end);
@@ -105,7 +103,7 @@ export function UptimePanel({ insight, range, animate, formatDate }: {
       result.push({ time, iso: new Date(time).toISOString(), total: cell?.total ?? 0, ok: cell?.ok ?? 0 });
     }
     return result;
-  }, [checks, insight.start, insight.end, range]);
+  }, [checks, insight.start, insight.end, insight.cellSec]);
   if (!checks || checks.uptimePct === null) return <EmptyLens message="No checks have run in this range." />;
   const total = checks.cells.reduce((sum, cell) => sum + cell.total, 0);
   const ok = checks.cells.reduce((sum, cell) => sum + cell.ok, 0);

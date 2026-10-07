@@ -75,6 +75,7 @@ export function formatPageDate(
     weekday?: "long" | "short" | "narrow";
     hour?: "numeric" | "2-digit";
     minute?: "numeric" | "2-digit";
+    second?: "numeric" | "2-digit";
   } = {}
 ) {
   const {
@@ -88,6 +89,7 @@ export function formatPageDate(
     weekday,
     hour,
     minute,
+    second,
   } = options;
   return new Intl.DateTimeFormat(normalizedLocale(language), {
     timeZone: normalizedTimeZone(timeZone),
@@ -99,6 +101,7 @@ export function formatPageDate(
     weekday,
     hour,
     minute,
+    second,
   }).format(new Date(value));
 }
 

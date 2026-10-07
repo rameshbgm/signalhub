@@ -395,6 +395,10 @@ export function SimpleAppearanceEditor({
                 <OptionGroup legend="Information" options={METRIC_LENSES} labels={METRIC_LENS_LABELS} selected={metricSettings.lenses} onChange={(lenses) => updateMetrics({ lenses })} />
                 <OptionGroup legend="Chart styles" options={METRIC_VIEWS} labels={METRIC_VIEW_LABELS} selected={metricSettings.chartViews} onChange={(chartViews) => updateMetrics({ chartViews })} />
                 <label className="flex items-center gap-2 text-sm text-ink-soft">
+                  <Checkbox checked={metricSettings.allowCustomRange} onChange={(event) => updateMetrics({ allowCustomRange: event.target.checked })} />
+                  Let visitors pick a quick or custom time window (1 minute to 90 days)
+                </label>
+                <label className="flex items-center gap-2 text-sm text-ink-soft">
                   <Checkbox checked={metricSettings.showStats} onChange={(event) => updateMetrics({ showStats: event.target.checked })} />
                   Show the summary strip (latest, average, min, max, p95)
                 </label>

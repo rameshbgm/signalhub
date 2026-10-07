@@ -194,6 +194,8 @@ export const pageDesignBlockSchema = z.discriminatedUnion("type", [
       lenses: z.array(z.enum(METRIC_LENSES)).min(1).default([...METRIC_LENSES]),
       chartViews: z.array(z.enum(METRIC_VIEWS)).min(1).default([...METRIC_VIEWS]),
       showStats: z.boolean().default(true),
+      // Quick (1 minute to 12 hours) and custom windows, fetched on demand.
+      allowCustomRange: z.boolean().default(true),
     }),
   }),
   z.object({
@@ -602,7 +604,7 @@ function baseDesign(templateKey: PageTemplateKey, brand = "#0f8ca8"): StatusPage
         primary: [
           b({ id: "active-incidents", type: "ACTIVE_INCIDENTS", hidden: false, settings: { heading: "Active incidents" } }),
           components,
-          b({ id: "metrics", type: "METRICS", hidden: false, settings: { heading: "System metrics", columns: 2, ranges: [...METRIC_RANGES], defaultRange: "24h", lenses: [...METRIC_LENSES], chartViews: [...METRIC_VIEWS], showStats: true } }),
+          b({ id: "metrics", type: "METRICS", hidden: false, settings: { heading: "System metrics", columns: 2, ranges: [...METRIC_RANGES], defaultRange: "24h", lenses: [...METRIC_LENSES], chartViews: [...METRIC_VIEWS], showStats: true, allowCustomRange: true } }),
           b({ id: "history-preview", type: "HISTORY_PREVIEW", hidden: false, settings: { heading: "Past incidents", days: 14 } }),
         ],
         sidebar: [

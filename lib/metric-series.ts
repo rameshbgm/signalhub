@@ -4,7 +4,7 @@ import { classifyFailure, type FailureKind } from "@/lib/failure-kind";
 
 export { classifyFailure, type FailureKind };
 
-import { SERIES_RANGES, SERIES_RANGE_IDS, type SeriesRangeId } from "@/lib/metric-ranges";
+import { SERIES_RANGES, SERIES_RANGE_IDS, specForWindow, type RangeSpec, type SeriesRangeId } from "@/lib/metric-ranges";
 
 export { SERIES_RANGES, SERIES_RANGE_IDS, type SeriesRangeId };
 
@@ -21,6 +21,9 @@ export type RangeInsight = {
   /** ISO window bounds, so the client can lay out empty slots (calendar days with no checks). */
   start: string;
   end: string;
+  /** Window length and calendar-cell size in effect, so the client can align the previous period and lay out cells. */
+  windowMs: number;
+  cellSec: number;
   buckets: SeriesBucket[];
   summary: RangeSummary | null;
   previous: { summary: RangeSummary | null; buckets: { t: string; avg: number }[] };
@@ -45,8 +48,8 @@ const summaryOf = (row: SummaryRow | undefined): RangeSummary | null =>
     : null;
 
 /** Aggregates one range for every metric: buckets over the window plus the previous window, summary and histogram. */
-async function loadRange(metricIds: string[], range: SeriesRangeId, now: Date) {
-  const { windowMs, bucketSec } = SERIES_RANGES[range];
+async function loadRange(metricIds: string[], spec: RangeSpec, now: Date) {
+  const { windowMs, bucketSec } = spec;
   const start = new Date(now.getTime() - windowMs);
   const previousStart = new Date(now.getTime() - 2 * windowMs);
   const ids = sql`${sql.val(metricIds)}::uuid[]`;
@@ -103,8 +106,8 @@ type ChecksCellRow = { metricId: string; t: Date; total: string; ok: string };
 type ChecksGroupRow = { metricId: string; statusCode: number | null; ok: boolean; error: string | null; count: string };
 
 /** Uptime cells and response breakdown for metrics recorded by a monitor. Reads monitor_checks via monitors.metric_id. */
-async function loadChecks(metricIds: string[], range: SeriesRangeId, now: Date) {
-  const { windowMs, cellSec } = SERIES_RANGES[range];
+async function loadChecks(metricIds: string[], spec: RangeSpec, now: Date) {
+  const { windowMs, cellSec } = spec;
   const start = new Date(now.getTime() - windowMs);
   const ids = sql`${sql.val(metricIds)}::uuid[]`;
   const cells = await sql<ChecksCellRow>`
@@ -128,7 +131,7 @@ async function loadChecks(metricIds: string[], range: SeriesRangeId, now: Date) 
 }
 
 /** Folds the loaded rows of one range into a per-metric RangeInsight. */
-function assemble(metricId: string, loaded: Awaited<ReturnType<typeof loadRange>>, checks: Awaited<ReturnType<typeof loadChecks>>, linked: boolean, end: Date): RangeInsight {
+function assemble(metricId: string, loaded: Awaited<ReturnType<typeof loadRange>>, checks: Awaited<ReturnType<typeof loadChecks>>, linked: boolean, end: Date, spec: RangeSpec): RangeInsight {
   const own = loaded.buckets.filter((row) => row.metricId === metricId);
   const current = own.filter((row) => row.period === "current");
   const previous = own.filter((row) => row.period === "previous");
@@ -174,6 +177,8 @@ function assemble(metricId: string, loaded: Awaited<ReturnType<typeof loadRange>
   return {
     start: loaded.start.toISOString(),
     end: end.toISOString(),
+    windowMs: spec.windowMs,
+    cellSec: spec.cellSec,
     buckets: current.map((row) => ({ t: row.t.toISOString(), avg: row.avg, min: row.min, max: row.max, p50: row.p50, p95: row.p95, p99: row.p99, count: Number(row.count) })),
     summary: summaryOf(summaries.find((row) => row.period === "current")),
     previous: {
@@ -206,13 +211,36 @@ export async function getMetricInsights(metricIds: string[], now = new Date()): 
   const result = new Map<string, MetricInsights>(metricIds.map((id) => [id, {} as MetricInsights]));
   await Promise.all(SERIES_RANGE_IDS.map(async (range) => {
     const [loaded, checks] = await Promise.all([
-      loadRange(metricIds, range, now),
-      linkedIds.length ? loadChecks(linkedIds, range, now) : Promise.resolve({ cells: [], groups: [] }),
+      loadRange(metricIds, SERIES_RANGES[range], now),
+      linkedIds.length ? loadChecks(linkedIds, SERIES_RANGES[range], now) : Promise.resolve({ cells: [], groups: [] }),
     ]);
-    for (const id of metricIds) result.get(id)![range] = assemble(id, loaded, checks, linked.has(id), now);
+    for (const id of metricIds) result.get(id)![range] = assemble(id, loaded, checks, linked.has(id), now, SERIES_RANGES[range]);
   }));
 
   if (cache.size >= CACHE_MAX_ENTRIES) cache.clear();
   cache.set(key, { at: now.getTime(), value: result });
   return result;
+}
+
+const windowCache = new Map<string, { at: number; value: RangeInsight }>();
+const WINDOW_CACHE_TTL_MS = 30_000;
+
+/**
+ * Insight for one metric over the last `minutes` (1 minute to 90 days), for the visitor-chosen quick and
+ * custom windows that cannot be precomputed. Cached briefly per metric and window.
+ */
+export async function getMetricWindowInsight(metricId: string, minutes: number, now = new Date()): Promise<RangeInsight> {
+  const key = `${metricId}:${minutes}`;
+  const hit = windowCache.get(key);
+  if (hit && now.getTime() - hit.at < WINDOW_CACHE_TTL_MS) return hit.value;
+  const spec = specForWindow(minutes);
+  const linked = Boolean(await database.selectFrom("monitors").select("id").where("metricId", "=", metricId).limit(1).executeTakeFirst());
+  const [loaded, checks] = await Promise.all([
+    loadRange([metricId], spec, now),
+    linked ? loadChecks([metricId], spec, now) : Promise.resolve({ cells: [], groups: [] }),
+  ]);
+  const value = assemble(metricId, loaded, checks, linked, now, spec);
+  if (windowCache.size >= CACHE_MAX_ENTRIES) windowCache.clear();
+  windowCache.set(key, { at: now.getTime(), value });
+  return value;
 }
