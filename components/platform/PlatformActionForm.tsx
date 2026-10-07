@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState, useEffect, type ComponentPropsWithoutRef, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
+import { useActionState, useEffect, useRef, type ComponentPropsWithoutRef, type ReactNode } from "react";
 import { runPlatformActionWithFeedback } from "@/app/platform/(protected)/action-feedback";
 import { Alert } from "@/components/ui/alert";
 import { cn } from "@/lib/utils";
@@ -39,9 +40,17 @@ export function PlatformActionForm({
   );
   const feedback = pending ? INITIAL_STATE : state;
 
+  const router = useRouter();
+  const refreshed = useRef<ActionFeedbackState>(INITIAL_STATE);
+  // revalidatePath targets internal routes, which a proxy-rewritten public URL can miss, so refresh explicitly (once per result).
   useEffect(() => {
-    if (state.status === "success") onSuccess?.();
-  }, [onSuccess, state]);
+    if (state.status !== "success") return;
+    if (refreshed.current !== state) {
+      refreshed.current = state;
+      router.refresh();
+    }
+    onSuccess?.();
+  }, [onSuccess, router, state]);
 
   return (
     <form
