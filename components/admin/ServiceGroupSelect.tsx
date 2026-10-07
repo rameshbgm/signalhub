@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition, type FormEvent } from "react";
+import { useToast } from "@/components/ui/toast";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
@@ -39,6 +40,7 @@ export function ServiceGroupSelect({
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
+  useToast("danger", error);
   const [added, setAdded] = useState<ServiceGroupOption[]>([]);
   const [removed, setRemoved] = useState<string[]>([]);
   const [confirm, confirmDialog] = useConfirm();
@@ -142,7 +144,6 @@ export function ServiceGroupSelect({
               <Plus aria-hidden size={16} />Add group
             </Button>
           </form>
-          {error && <p id={`${id}-group-error`} role="alert" className="mt-2 text-xs text-danger-fg">{error}</p>}
 
           <div className="mt-5 border-t border-line pt-4">
             <p className="text-xs font-medium uppercase tracking-wide text-ink-dim">

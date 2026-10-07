@@ -53,7 +53,7 @@ export function ScimTokenManager({ connectionId }: { connectionId: string }) {
       {secret && (
         <Alert tone="warn" title="Copy this token now. It will not be shown again.">
           <code className="mt-1 block break-all rounded-control bg-surface px-3 py-2 font-mono text-xs text-ink">{secret}</code>
-          <CopyButton value={secret} label="Copy token" errorClassName="text-xs text-danger-fg" className="mt-2" />
+          <CopyButton value={secret} label="Copy token" className="mt-2" />
         </Alert>
       )}
       {confirmDialog}

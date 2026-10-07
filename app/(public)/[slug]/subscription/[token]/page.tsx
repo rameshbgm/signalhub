@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
-import { BellRing, CircleCheck, CircleAlert, MailX } from "lucide-react";
+import { BellRing, CircleAlert, MailX } from "lucide-react";
+import { FlashToast } from "@/components/ui/flash-toast";
 import { PageDesignShell, contentWidthClass } from "@/components/public/PageDesignShell";
 import { PublicFooter, PublicHeader } from "@/components/public/PublicChrome";
 import { SubscriptionPreferencesForm } from "@/components/public/SubscriptionPreferencesForm";
@@ -69,15 +70,8 @@ export default async function SubscriptionPreferencesPage({
         title="Subscription preferences"
         description={`Updates from ${page.name} are sent by ${channel} to ${maskContact(subscription.contact)}.`}
       >
-        {state.saved && (
-          <p role="status" className="mb-5 flex items-center gap-2 border border-[var(--line)] bg-[var(--bg)] px-3.5 py-2.5 text-sm text-[var(--fg)] page-panel">
-            <CircleCheck aria-hidden size={16} className="shrink-0 text-[#16a34a]" />
-            Your preferences are saved.
-          </p>
-        )}
-        {state.error && ERRORS[state.error] && (
-          <p role="alert" className="mb-5 border border-[#dc262640] bg-[#fef2f2] px-3.5 py-2.5 text-sm text-[#991b1b] page-panel">{ERRORS[state.error]}</p>
-        )}
+        {state.saved && <FlashToast tone="ok" message="Your preferences are saved." />}
+        {state.error && ERRORS[state.error] && <FlashToast tone="danger" message={ERRORS[state.error]} />}
         {subscription.quarantined && (
           <p className="mb-5 text-sm text-[var(--fg-soft)]">Deliveries to this address are paused because earlier messages could not be delivered. Contact the page owner to resume them.</p>
         )}

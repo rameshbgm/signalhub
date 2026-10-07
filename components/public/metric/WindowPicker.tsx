@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
+import { useToast } from "@/components/ui/toast";
 import { motion } from "motion/react";
 import { Check, ChevronDown } from "lucide-react";
 import { formatWindow, MAX_WINDOW_MINUTES, MIN_WINDOW_MINUTES, QUICK_WINDOWS } from "@/lib/metric-ranges";
@@ -36,6 +37,7 @@ export function RangeControl({ id, name, color, ranges, activeRange, activeMinut
   const [amount, setAmount] = useState("90");
   const [unit, setUnit] = useState<(typeof UNITS)[number]["minutes"]>(1);
   const [error, setError] = useState<string | null>(null);
+  useToast("danger", error);
   const rootRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const menuId = useId();
@@ -171,7 +173,6 @@ export function RangeControl({ id, name, color, ranges, activeRange, activeMinut
                 ))}
               </div>
             </div>
-            {error && <p role="alert" className="px-1 text-[11px] text-[var(--red)]">{error}</p>}
             <button type="submit" className="h-8 w-full text-xs font-medium text-white transition-opacity hover:opacity-90" style={{ background: color, borderRadius: `calc(${radius} - 2px)` }}>
               Show this window
             </button>

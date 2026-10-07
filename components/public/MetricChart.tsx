@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useToast } from "@/components/ui/toast";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { formatMetricValue, metricDecimals } from "@/lib/status";
 import { formatPageDate } from "@/lib/page-locale";
@@ -94,6 +95,7 @@ export function MetricChart({
   const [prefs, setPrefs] = usePrefs(`signalhub:metric:${id}`, DEFAULTS, ALLOWED);
 
   const [windowState, setWindowState] = useState<WindowState | null>(null);
+  useToast("danger", windowState?.error, windowState);
   const windowCache = useRef(new Map<number, { at: number; insight: RangeInsight }>());
   const insight = windowState?.insight ?? insights[prefs.range];
   const windowMs = insight.windowMs;
@@ -208,7 +210,6 @@ export function MetricChart({
         />
       </div>
 
-      {windowState?.error && <p role="alert" className="mb-2 text-xs text-[#dc2626]">{windowState.error}</p>}
 
       {stats.length > 0 && (
         <dl className="mb-3 flex flex-wrap gap-x-4 gap-y-1 text-xs">

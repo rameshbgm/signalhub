@@ -18,6 +18,7 @@ const INITIAL_STATE: CreateOrganizationState = { ok: false };
 export function CreateOrganizationForm() {
   const [state, action, pending] = useActionState(createOrganization, INITIAL_STATE);
   useToast("danger", state.error, state);
+  useToast("ok", state.ok ? `${state.organizationName} is ready` : null, state);
 
   if (state.ok) {
     return (
