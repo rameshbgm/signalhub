@@ -244,7 +244,7 @@ export function MetricChart({
                 role="tab"
                 aria-selected={active}
                 onClick={() => setPrefs({ lens })}
-                className="relative pb-1.5 text-xs font-medium transition-colors hover:text-[var(--fg)]"
+                className={`relative pb-1.5 text-xs transition-colors hover:text-[var(--fg)] ${active ? "font-bold" : "font-medium"}`}
                 style={{ color: active ? color : "var(--fg-dim)" }}
               >
                 {LENS_LABELS[lens]}
