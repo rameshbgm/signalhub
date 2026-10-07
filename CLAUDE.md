@@ -1,0 +1,33 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+@AGENTS.md
+
+## What this is
+
+SignalHub: self-hosted, Apache-2.0 status pages, monitoring and incident communication. Next.js (App Router, webpack) + PostgreSQL (Kysely) + a separate Graphile Worker process. See `.env.example` for config; `login-credentials.txt` holds local dev logins.
+
+## Commands
+
+- `npm run dev:all` — web (port 3301) + worker together. `npm run dev` web only; `npm run worker:dev` worker only (loads `.env`).
+- `npm run verify` — lint (zero warnings) + typecheck + tests + build. Run before committing.
+- `npm test` / `npx vitest run tests/status.test.ts` / `npx vitest run -t "name"` — unit tests (Vitest, `@` aliases repo root).
+- `INTEGRATION_DATABASE_URL=postgresql://.../signalhub_integration_test npm run test:integration` — needs a disposable DB whose name contains "test"; skipped otherwise.
+- `npm run test:e2e` — Playwright (`tests/e2e`).
+- `npm run db:migrate`, `db:seed`, `db:seed-roles`, `db:reset-dev`, `bootstrap`, `signalhubctl`, `statusctl` — tsx scripts in `scripts/`.
+- `npm run build` builds web (`build:web`) and bundles worker + CLI scripts into `dist-runtime/` (esbuild); `start:worker` runs `dist-runtime/worker.mjs`.
+
+## Architecture
+
+- **Two processes share one codebase and DB.** Web (`app/`) and worker (`worker/index.ts`) both import from `lib/`. The web side never runs background work itself: it enqueues via `enqueueJobSweep` (`lib/jobs.ts`, `JOB_TASKS`) inside its DB transaction, and `worker/tasks.ts` maps those tasks to handlers (`monitors`, `notifications`, `exports`, `audit-delivery`, `platform-jobs`, maintenance, retention, audit seal). Sweeps are idempotent and lease-based (`lease-heartbeat.ts`).
+- **URL rewriting in `proxy.ts`** (Next 16 middleware): public URLs `/organization/*` and `/organization/platform/*` are rewritten to the internal `app/admin/*` and `app/platform/*` routes; `/admin` and `/platform` redirect to the public forms. Auth is the `sp_session` JWT cookie (jose, rotating keyring from `lib/session-secret.ts`). New admin routes live under `app/admin/(protected)`.
+- **Route groups:** `app/(public)` status pages (`[slug]`, `hub`), `custom-domain`, `app/api/{v1,admin,platform,scim,internal,...}`. `/api/v1` is the scoped-API-key public API (`lib/api-auth.ts`, `lib/openapi.ts`).
+- **Data layer:** `lib/postgres/client.ts` (Kysely + pg pool, `DatabaseExecutor` accepts pool or transaction) and `schema.ts` types; plain SQL migrations in `db/migrations/NNN_*.sql` applied by `lib/migrations.ts`. Schema changes = new numbered migration + `schema.ts` update.
+- **Domain logic** in `lib/` (flat, one concern per file: auth, identity/OIDC/SAML/SCIM, RBAC in `access.ts`/`platform-roles.ts`, audit chain in `audit-integrity.ts`/`tenant-audit.ts`, SSRF guards in `guarded-fetch.ts`/`network-policy.ts`) and `lib/domain/` (incidents, maintenance, monitors, webhooks). Tenancy: organizations → pages → components; platform-level (installation) admin is separate from org admin.
+- **UI:** `components/ui/` primitives, `components/admin|public|platform|landing`. Design contract (tokens, shell, radii) is `DESIGN.md` (tracked in git history; currently deleted in the working tree — `git show HEAD:DESIGN.md`). Tokens live in `app/theme.css` (Tailwind v4).
+
+## Conventions
+
+- Deploy artifacts: `Dockerfile`, `docker-compose.yml`, `deploy/helm`.
+- Commit finished phases rather than leaving them pending.

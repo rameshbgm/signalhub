@@ -1,0 +1,26 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash",
+      "Edit",
+      "Write",
+      "Read",
+      "Read(/dev/stdin)",
+      "Read(/proc/self/fd/0)",
+      "Glob",
+      "Grep",
+      "NotebookEdit",
+      "WebFetch",
+      "WebSearch",
+      "mcp__plugin_playwright_playwright",
+      "mcp__plugin_chrome-devtools-mcp_chrome-devtools",
+      "mcp__claude-in-chrome"
+    ],
+    "additionalDirectories": [
+      "/private/tmp/*",
+      "/Users/laxmi/ramesh/code/status/*"
+    ],
+    "blockReadsOutsideWorkingDirectories": false,
+    "defaultMode": "acceptEdits"
+  }
+}
