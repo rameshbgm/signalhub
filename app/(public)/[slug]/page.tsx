@@ -133,6 +133,7 @@ export default async function PublicStatusPage({ params }: { params: Promise<{ s
               {metrics.map((metric) => (
                 <MetricChart
                   key={metric.id}
+                  id={metric.id}
                   name={metric.name}
                   suffix={metric.suffix}
                   decimals={metric.decimals ?? 0}
