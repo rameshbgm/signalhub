@@ -3,6 +3,7 @@ import { log } from "@/lib/logger";
 import { writePlatformAudit } from "@/lib/platform-policy";
 import type { Updateable } from "kysely";
 import { database, type DatabaseExecutor } from "@/lib/postgres/client";
+import { SMS_PROVIDERS } from "@/lib/delivery-providers";
 import type { PlatformConfigurationTable, SmsProvider } from "@/lib/postgres/schema";
 
 export type SmtpConfig = {
@@ -72,7 +73,7 @@ export async function getDeliveryConfig(): Promise<DeliveryConfig> {
       };
     }
   }
-  if (row?.smsFrom && (row.smsAccountId || row.smsProvider === "TELNYX")) {
+  if (row?.smsFrom && (row.smsAccountId || !SMS_PROVIDERS[row.smsProvider].accountLabel)) {
     const secret = decrypt(row.smsSecretCiphertext, "sms_secret");
     if (secret) {
       value.sms = { provider: row.smsProvider, accountId: row.smsAccountId, secret, fromNumber: row.smsFrom };

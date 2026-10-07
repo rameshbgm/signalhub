@@ -26,13 +26,6 @@ import { writePlatformAudit } from "@/lib/platform-policy";
 import { database, withDatabaseTransaction } from "@/lib/postgres/client";
 import { createSmtpTransport, smtpTransport } from "@/lib/smtp";
 
-function changeReason(formData: FormData) {
-  const reason = String(formData.get("reason") ?? "").trim();
-  if (reason.length < 10) throw new Error("Enter a specific change reason");
-  if (reason.length > 2_000) throw new Error("Reason must not exceed 2000 characters");
-  return reason;
-}
-
 const text = (max: number) => z.string().trim().max(max);
 
 const mailProviderSchema = z.object({
@@ -55,7 +48,7 @@ const smsProviderSchema = z.object({
   if (input.provider === "TWILIO" && !/^AC[0-9a-fA-F]{32}$/.test(input.accountId)) {
     context.addIssue({ code: "custom", path: ["accountId"], message: "Twilio account SID starts with AC followed by 32 hex characters" });
   }
-  if (input.provider !== "TELNYX" && !input.accountId) {
+  if (SMS_PROVIDERS[input.provider].accountLabel && !input.accountId) {
     context.addIssue({ code: "custom", path: ["accountId"], message: `${SMS_PROVIDERS[input.provider].accountLabel} is required` });
   }
   // Vonage also accepts an alphanumeric sender ID where the destination country allows it.
@@ -121,7 +114,7 @@ export async function updateMailProvider(formData: FormData) {
     throw new Error(`SMTP connection failed: ${error instanceof Error ? error.message.slice(0, 300) : "unknown error"}`);
   }
   if (testOnly(formData)) return `Connected to ${input.host}:${input.port}${input.username ? " and signed in" : ""}. Nothing was saved.`;
-  await saveProviders(actor, changeReason(formData), "MAIL_PROVIDER_UPDATED", {
+  await saveProviders(actor, `Email provider set to ${input.host}:${input.port}`, "MAIL_PROVIDER_UPDATED", {
     smtpHost: input.host,
     smtpPort: input.port,
     smtpSecure: input.secure,
@@ -131,11 +124,34 @@ export async function updateMailProvider(formData: FormData) {
   }, { host: input.host, port: input.port, secure: input.secure, username: input.username || null, from: input.from, passwordChanged: Boolean(input.password) });
 }
 
-export async function removeMailProvider(formData: FormData) {
+export async function removeMailProvider() {
   const actor = await requirePlatformCapability("configuration.manage");
-  await saveProviders(actor, changeReason(formData), "MAIL_PROVIDER_REMOVED", {
+  await saveProviders(actor, "Email provider removed", "MAIL_PROVIDER_REMOVED", {
     smtpHost: null, smtpPort: null, smtpSecure: false, smtpUsername: null, smtpPasswordCiphertext: null, smtpFrom: null,
   }, {});
+}
+
+/** "Test connection" on a saved email provider: connects and signs in with the stored settings, sends nothing. */
+export async function testMailProvider() {
+  await requirePlatformCapability("configuration.manage");
+  clearDeliveryConfigCache();
+  const smtp = await smtpTransport();
+  try {
+    await smtp.transporter.verify();
+  } catch (error) {
+    throw new Error(`SMTP connection failed: ${error instanceof Error ? error.message.slice(0, 300) : "unknown error"}`);
+  }
+  return "Connected to the SMTP server with the saved settings.";
+}
+
+/** "Test connection" on a saved SMS provider: checks the stored credentials, sends nothing. */
+export async function testSmsProvider() {
+  await requirePlatformCapability("configuration.manage");
+  clearDeliveryConfigCache();
+  const { sms } = await getDeliveryConfig();
+  if (!sms) throw new Error("Save the SMS provider first");
+  await verifySmsCredentials(sms);
+  return `${SMS_PROVIDERS[sms.provider].label} accepted the saved credentials.`;
 }
 
 export async function sendTestEmail() {
@@ -160,7 +176,7 @@ export async function updateSmsProvider(formData: FormData) {
     secret: formData.get("secret") ?? "",
     fromNumber: formData.get("fromNumber"),
   });
-  const accountId = input.provider === "TELNYX" ? null : input.accountId;
+  const accountId = SMS_PROVIDERS[input.provider].accountLabel ? input.accountId : null;
   // As with SMTP, a blank secret keeps the stored one only for the same provider and account.
   const row = await storedSecrets();
   const sameAccount = row?.smsProvider === input.provider && row.smsAccountId === accountId;
@@ -172,7 +188,7 @@ export async function updateSmsProvider(formData: FormData) {
   if (!secret) throw new Error(`${SMS_PROVIDERS[input.provider].secretLabel} is required`);
   await verifySmsCredentials({ provider: input.provider, accountId, secret });
   if (testOnly(formData)) return `${SMS_PROVIDERS[input.provider].label} accepted these credentials. Nothing was saved.`;
-  await saveProviders(actor, changeReason(formData), "SMS_PROVIDER_UPDATED", {
+  await saveProviders(actor, `SMS provider set to ${SMS_PROVIDERS[input.provider].label}`, "SMS_PROVIDER_UPDATED", {
     smsProvider: input.provider,
     smsAccountId: accountId,
     smsSecretCiphertext: encryptSecret(secret),
@@ -180,9 +196,9 @@ export async function updateSmsProvider(formData: FormData) {
   }, { provider: input.provider, accountId, fromNumber: input.fromNumber, secretChanged: Boolean(input.secret) });
 }
 
-export async function removeSmsProvider(formData: FormData) {
+export async function removeSmsProvider() {
   const actor = await requirePlatformCapability("configuration.manage");
-  await saveProviders(actor, changeReason(formData), "SMS_PROVIDER_REMOVED", {
+  await saveProviders(actor, "SMS provider removed", "SMS_PROVIDER_REMOVED", {
     smsAccountId: null, smsSecretCiphertext: null, smsFrom: null,
   }, {});
 }

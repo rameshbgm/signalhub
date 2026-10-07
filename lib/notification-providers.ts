@@ -332,6 +332,39 @@ export async function deliverSms(to: string, body: string, config?: SmsConfig) {
       );
     case "TELNYX":
       return post("https://api.telnyx.com/v2/messages", { from: sms.fromNumber, to, text: body }, { authorization: `Bearer ${sms.secret}` });
+    case "SINCH":
+      return post(
+        `https://us.sms.api.sinch.com/xms/v1/${encodeURIComponent(accountId())}/batches`,
+        { from: sms.fromNumber, to: [to], body },
+        { authorization: `Bearer ${sms.secret}` }
+      );
+    case "CLICKSEND": {
+      // ClickSend answers 200 per batch; each message carries its own status.
+      const response = await send("https://rest.clicksend.com/v3/sms/send", JSON.stringify({ messages: [{ source: "signalhub", from: sms.fromNumber, to, body }] }), {
+        "content-type": "application/json", authorization: basicAuth(accountId(), sms.secret),
+      });
+      const result = await response.json().catch(() => ({})) as { data?: { messages?: Array<{ status?: string }> } };
+      const status = result.data?.messages?.[0]?.status;
+      if (status !== "SUCCESS") throw new Error(`ClickSend rejected the message: ${status ?? "unknown error"}`);
+      return response.status;
+    }
+    case "TEXTMAGIC":
+      return post(
+        "https://rest.textmagic.com/api/v2/messages",
+        { text: body, phones: to.replace(/^\+/, ""), from: sms.fromNumber.replace(/^\+/, "") },
+        { "x-tm-username": accountId(), "x-tm-key": sms.secret }
+      );
+    case "AFRICASTALKING": {
+      const response = await postForm(
+        "https://api.africastalking.com/version1/messaging",
+        { username: accountId(), to, message: body, from: sms.fromNumber },
+        { apikey: sms.secret, accept: "application/json" }
+      );
+      const result = await response.json().catch(() => ({})) as { SMSMessageData?: { Recipients?: Array<{ status?: string }> } };
+      const status = result.SMSMessageData?.Recipients?.[0]?.status;
+      if (status !== "Success") throw new Error(`Africa's Talking rejected the message: ${status ?? "unknown error"}`);
+      return response.status;
+    }
   }
 }
 
@@ -367,6 +400,10 @@ export async function verifySmsCredentials(sms: Pick<SmsConfig, "provider" | "ac
     VONAGE: { url: `https://rest.nexmo.com/account/get-balance?${new URLSearchParams({ api_key: sms.accountId ?? "", api_secret: sms.secret })}`, headers: {} },
     PLIVO: { url: `https://api.plivo.com/v1/Account/${id}/`, headers: { authorization: basicAuth(sms.accountId ?? "", sms.secret) } },
     TELNYX: { url: "https://api.telnyx.com/v2/balance", headers: { authorization: `Bearer ${sms.secret}` } },
+    SINCH: { url: `https://us.sms.api.sinch.com/xms/v1/${id}/batches?page_size=1`, headers: { authorization: `Bearer ${sms.secret}` } },
+    CLICKSEND: { url: "https://rest.clicksend.com/v3/account", headers: { authorization: basicAuth(sms.accountId ?? "", sms.secret) } },
+    TEXTMAGIC: { url: "https://rest.textmagic.com/api/v2/user", headers: { "x-tm-username": sms.accountId ?? "", "x-tm-key": sms.secret } },
+    AFRICASTALKING: { url: `https://api.africastalking.com/version1/user?${new URLSearchParams({ username: sms.accountId ?? "" })}`, headers: { apikey: sms.secret, accept: "application/json" } },
   }[sms.provider];
   const response = await guardedFetch(request.url, {
     headers: request.headers,

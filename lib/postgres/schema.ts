@@ -519,7 +519,7 @@ export interface WorkerHeartbeatTable {
   lastError: string | null;
 }
 
-export type SmsProvider = "TWILIO" | "VONAGE" | "PLIVO" | "TELNYX";
+export type SmsProvider = "TWILIO" | "VONAGE" | "PLIVO" | "TELNYX" | "SINCH" | "CLICKSEND" | "TEXTMAGIC" | "AFRICASTALKING";
 
 export interface PlatformConfigurationTable {
   id: "global";

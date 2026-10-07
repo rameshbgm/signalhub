@@ -1,5 +1,4 @@
-import Link from "next/link";
-import { Activity, ArrowRight, Cpu, Globe, HardDrive, KeyRound, Mail, Smartphone, SlidersHorizontal, type LucideIcon } from "lucide-react";
+import { Activity, Cpu, Globe, HardDrive, Mail, Smartphone, SlidersHorizontal } from "lucide-react";
 import { DeliveryProvidersCard } from "@/components/platform/DeliveryProvidersCard";
 import { DestinationProvidersCard } from "@/components/platform/DestinationProvidersCard";
 import { sanitizeDestinationDefaults } from "@/lib/destination-catalog";
@@ -8,7 +7,6 @@ import { requirePlatformPageCapability } from "@/lib/platform-page-guard";
 import { hasPlatformCapability } from "@/lib/platform-policy";
 import { subscriptionCapabilities } from "@/lib/notification-capabilities";
 import { enabledDestinationChannels, parseDestinationConnections } from "@/lib/platform-configuration";
-import { IconTile, type Hue } from "@/components/ui/icon-tile";
 import { PageHeader } from "@/components/ui/page-header";
 import { PlatformHealth } from "@/components/platform/PlatformStat";
 
@@ -94,25 +92,6 @@ export default async function PlatformConfigurationPage() {
           smsSecretStored: Boolean(stored?.smsSecretCiphertext),
         }}
       />
-
-      <section aria-label="Related settings" className="grid gap-4 md:grid-cols-2">
-        <ManagementLink href="/organization/platform/identity" icon={KeyRound} hue="teal" title="Identity and provisioning" detail="Manage OIDC, SAML, SCIM, and enterprise authentication policy." />
-        <ManagementLink href="/organization/platform/operations" icon={Activity} hue="sky" title="Operations" detail="Inspect workers, delivery queues, migrations, and retention defaults." />
-      </section>
     </div>
-  );
-}
-
-function ManagementLink({ href, icon, hue, title, detail }: { href: string; icon: LucideIcon; hue: Hue; title: string; detail: string }) {
-  return (
-    <Link href={href} className="group block rounded-card border border-line bg-surface shadow-card p-5 outline-none transition-[border-color,box-shadow,transform] duration-200 ease-soft hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-raised focus-visible:ring-4 focus-visible:ring-primary/25">
-      <IconTile icon={icon} hue={hue} />
-      <h2 className="mt-4 text-base font-semibold tracking-tight text-ink">{title}</h2>
-      <p className="mt-1 text-sm leading-6 text-ink-soft">{detail}</p>
-      <span className="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-primary-ink">
-        Manage
-        <ArrowRight aria-hidden size={16} className="transition-transform duration-200 ease-soft group-hover:translate-x-0.5" />
-      </span>
-    </Link>
   );
 }
