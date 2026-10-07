@@ -92,8 +92,8 @@ export function OrgSwitcher({
         <div role="menu" className="absolute inset-x-0 top-full z-50 mt-1.5 flex max-h-[min(26rem,calc(100dvh-9rem))] animate-drop flex-col rounded-card border border-line bg-surface p-1.5 shadow-float">
           {organizations.length > 1 && (
             <>
-              <p className="px-2.5 py-1 text-2xs font-bold uppercase tracking-[0.08em] text-ink-dim">Organizations</p>
-              <div className="max-h-[7.5rem] overflow-y-auto overscroll-contain">
+              <p className="shrink-0 px-2.5 py-1 text-2xs font-bold uppercase tracking-[0.08em] text-ink-dim">Organizations</p>
+              <div className="max-h-[7.5rem] shrink-0 overflow-y-auto overscroll-contain">
               {organizations.map((organization) => (
                 <button
                   key={organization.id}
@@ -108,10 +108,10 @@ export function OrgSwitcher({
                 </button>
               ))}
               </div>
-              <div className="my-1 h-px bg-line" />
+              <div className="my-1 h-px shrink-0 bg-line" />
             </>
           )}
-          <p className="px-2.5 py-1 text-2xs font-bold uppercase tracking-[0.08em] text-ink-dim">Your pages</p>
+          <p className="shrink-0 px-2.5 py-1 text-2xs font-bold uppercase tracking-[0.08em] text-ink-dim">Your pages</p>
           <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
           {canConfigurePages &&
             pages.map((p) => (
