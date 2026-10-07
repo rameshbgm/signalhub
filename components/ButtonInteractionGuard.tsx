@@ -60,7 +60,6 @@ function restoreAttribute(element: HTMLElement, name: string, value: string | nu
 }
 
 export function ButtonInteractionGuard({ children }: { children: ReactNode }) {
-
   useEffect(() => {
     const locks = new Map<HTMLButtonElement, ButtonLock>();
     const formLocks = new Map<HTMLFormElement, ButtonLock | null>();

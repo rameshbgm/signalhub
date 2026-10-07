@@ -75,9 +75,10 @@ function Popover({ request, close }: { request: Request; close: (confirmed: bool
   }, [request.anchor]);
 
   useLayoutEffect(() => {
-    const onKey = (event: KeyboardEvent) => { if (event.key === "Escape") close(false); };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
+    // Capture phase + stopPropagation: Escape must close only this popover, not a dialog/drawer underneath it.
+    const onKey = (event: KeyboardEvent) => { if (event.key === "Escape") { event.stopPropagation(); close(false); } };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
   });
 
   return (
