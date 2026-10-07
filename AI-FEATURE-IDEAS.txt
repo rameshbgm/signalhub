@@ -1,0 +1,957 @@
+=====================================================================================
+SIGNALHUB - AI FEATURE IDEAS
+Research and idea list for adding AI capabilities to SignalHub
+Date: 2026-10-08
+=====================================================================================
+
+CONTENTS
+  1. Summary and top picks
+  2. What SignalHub is today (relevant to AI)
+  3. What competitors ship (market research)
+  4. AI capability types used in this list
+  5. Foundation (build once, every idea below depends on it)
+  6. Ideas, grouped by area
+       A. Incident communication
+       B. Monitoring intelligence
+       C. Public and subscriber facing
+       D. Operator productivity
+       E. Security and governance
+  7. Small add-ons (quick wins)
+  8. Prioritisation matrix
+  9. Suggested roadmap
+ 10. Risks, privacy and compliance
+ 11. Research notes, confidence and sources
+
+Legend used per idea:
+  WHAT       what the feature does
+  FITS       where it plugs into this codebase (file paths from a quick read, not a full audit)
+  BENEFITS   what the user / operator / end customer gets
+  ADVANTAGES why this is a good bet for SignalHub specifically
+  RISKS      what can go wrong, what to watch
+  AI TYPE    capability category (see section 4)
+  EFFORT     S = days, M = 1-3 weeks, L = 1+ month (rough, one developer)
+  VALUE      Low / Medium / High / Very high
+
+
+=====================================================================================
+1. SUMMARY AND TOP PICKS
+=====================================================================================
+
+SignalHub has no AI today (no LLM SDK in package.json, no AI code in lib/ or app/).
+That is a clean slate, and the product is well placed for AI because its core job is
+WRITING TO PEOPLE UNDER STRESS (incident updates, maintenance notices, postmortems)
+and WATCHING DATA (monitor checks, metric points). Both are things AI does well.
+
+The strongest differentiator for an Apache-2.0, self-hosted product:
+  "Bring your own model." Let each installation point at Anthropic, OpenAI, Azure
+  OpenAI, Bedrock, OR a local Ollama / vLLM server (OpenAI-compatible API). Customer
+  data never has to leave their network. The big incident platforms researched below
+  are hosted products, so their AI runs in the vendor's cloud. A privacy-first,
+  optional, off-by-default AI layer is a real selling point to self-hosters.
+
+Recommended first five (highest value for least effort, in order):
+  1. F1  AI gateway (provider-agnostic, BYO key / local model, per-org on/off, budgets)
+  2. A1  Draft incident updates (human edits, then publishes)
+  3. A2  AI-written messages for monitor-created incidents
+         (today worker/monitors.ts:188 publishes the raw error string as the public body)
+  4. B1  Plain-language failure explanation for monitor errors
+  5. D1  MCP server over the existing /api/v1 API (so Claude/Cursor/agents can use
+         SignalHub; competitors already ship this)
+
+Principles that keep it safe and cheap:
+  - AI DRAFTS, a human PUBLISHES (default). Auto-publish only as an explicit opt-in.
+  - Use plain statistics before LLMs wherever the problem is numeric (anomaly detection).
+  - Use Postgres full-text search before adding a vector database.
+  - Treat everything that flows into a prompt (monitor errors, subscriber input, vendor
+    status feeds) as UNTRUSTED. See section 10.
+
+
+=====================================================================================
+2. WHAT SIGNALHUB IS TODAY (RELEVANT TO AI)
+=====================================================================================
+
+Stack: Next.js (App Router) + PostgreSQL (Kysely) + separate Graphile Worker process.
+Self-hosted, multi-tenant: organizations -> pages -> components. Platform-level admin
+is separate from org admin.
+
+Data and features that AI can build on (from lib/postgres/schema.ts and the tree):
+  - Incidents: incidents, incident_updates, incident_components, postmortemBody column,
+    maintenance windows, component_status_events (full status timeline per component).
+  - Monitoring: monitors (HTTP, KEYWORD, TCP, TLS, DNS, HEARTBEAT types), monitor_checks
+    and metric_points (both partitioned time series), thresholds, auto-incident flag.
+  - Communication: subscribers (channel, componentIds, eventTypes, incidentIds,
+    quarantined flag), notification destinations (Slack, Teams, Discord, Telegram,
+    SMS via Twilio, PagerDuty, Opsgenie, generic webhook), email, notification jobs/logs,
+    page announcements.
+  - Public surface: status pages, custom domains, embed + badge + feeds, analytics_daily.
+  - Admin surface: RBAC, SSO (OIDC/SAML), SCIM, API keys with scopes, hash-chained
+    audit log (audit-integrity.ts, tenant-audit.ts), exports, retention policies.
+  - Public API: /api/v1/{status,manage,subscribe,embed,feeds,analytics,...} with an
+    OpenAPI spec (lib/openapi.ts) and scoped keys (lib/api-auth.ts).
+  - Reusable building blocks that AI features should reuse, not reinvent:
+      lib/guarded-fetch.ts         SSRF-safe outbound HTTP (use for any LLM endpoint)
+      lib/encryption.ts            encryptSecret/decryptSecret (store provider API keys)
+      lib/platform-configuration   pattern for encrypted platform-wide settings
+      lib/rate-limit.ts            consumeRateLimit (protect public AI endpoints)
+      lib/tenant-audit.ts          recordTenantAudit (log every AI action)
+      lib/jobs.ts + worker/tasks.ts  idempotent, lease-based background sweeps
+      lib/help-content.ts          935 lines of help articles (ready-made knowledge base)
+      zod (already a dependency)   validate structured LLM output
+
+Observation worth knowing: when a monitor goes down with "auto incident" on, the worker
+creates a PUBLIC incident whose name is "<monitor name> is failing" and whose body is the
+raw error text (worker/monitors.ts:183-193). That is both the lowest-hanging AI win
+(write a customer-safe message) and a small information-leak risk today (internal
+hostnames or stack fragments in a public update).
+
+
+=====================================================================================
+3. WHAT COMPETITORS SHIP (MARKET RESEARCH)
+=====================================================================================
+
+(From web search summaries, October 2026. Vendor marketing claims, not independently
+verified. See section 11.)
+
+incident.io
+  AI drafts updates, summaries and follow-ups from incident activity; generates a full
+  post-mortem from timeline, chat, PRs and custom fields; triages alerts, names the
+  incident and suggests a first diagnosis; markets an always-on "AI SRE".
+
+FireHydrant
+  AI incident summaries, AI-drafted retrospectives, AI-drafted status page updates
+  ("audience-appropriate"), meeting-transcript context from Zoom.
+
+Rootly
+  Related-incident detection from past incidents; writes status page updates with
+  adjustable tone (public vs executive); AI agents produce first drafts of summaries,
+  timelines, root cause analysis and follow-ups.
+
+PagerDuty
+  AIOps noise reduction (vendor claims up to ~87-91% alert noise reduction), automated
+  triage, AI incident summaries; Spring 2026 agents: Scribe (captures incident calls and
+  feeds status-update drafts and reviews), Shift (on-call conflicts), Insights.
+
+Atlassian (Jira Service Management + Statuspage)
+  Rovo AI drafts "external-safe" titles and messages for status page updates;
+  automation creates and updates Statuspage incidents from the incident workflow.
+
+Datadog (Bits AI SRE)
+  Agent investigates alerts, reads runbooks and telemetry, forms and validates
+  hypotheses, delivers a root-cause conclusion into chat tools.
+
+Better Stack
+  AI SRE agent reads logs, metrics, traces and recent deploys, pinpoints root cause, can
+  open a fix PR (with approval).
+
+Grafana
+  Assistant (natural-language queries, dashboards) and Assistant Investigations
+  (root-cause assistance). Described as assistive, not autonomous.
+
+StatusGator, OneUptime, Pulsetic, Instatus
+  Ship MCP servers so AI agents can read status data and manage incidents
+  (StatusGator: 38 tools; OneUptime: very broad API coverage).
+
+Multilingual status pages
+  incident.io, Statuspal and Hyperping offer multi-language status pages; third-party
+  tools (Localize, Swiftask) auto-translate incident updates.
+
+Takeaways:
+  - Table stakes now: AI-drafted updates, summaries, post-mortem drafts.
+  - Differentiators still open for a self-hosted tool: BYO / local model, an AI "ask the
+    status page" for end customers, strict guardrails on what is published, and MCP.
+  - Heavy "AI SRE" agents (root cause across logs/traces/code) need telemetry that
+    SignalHub does not own. Do a SMALL, read-only version limited to SignalHub's own data.
+  - Trust matters: reports in the sources emphasise human approval and warn about
+    accuracy (one cited study put zero-shot LLM root-cause accuracy at 44-58% vs 62% for
+    human SREs; treat as indicative, not verified).
+
+
+=====================================================================================
+4. AI CAPABILITY TYPES USED IN THIS LIST
+=====================================================================================
+
+GEN     Text generation / rewriting (drafts, tone, summaries)
+EXT     Structured extraction (pull fields from free text into a zod-validated JSON)
+CLS     Classification / scoring (severity, spam, topic) - small, cheap models suffice
+TRN     Translation
+RAG     Retrieval-augmented answers (search your own data, answer with citations)
+EMB     Embeddings / semantic similarity
+STAT    Classical statistics / ML (z-score, EWMA, seasonality) - NOT an LLM
+AGT     Agents / tool use (model calls your API functions in a loop)
+MCP     Exposing your API to external AI clients via Model Context Protocol
+MM      Multimodal (image/vision), e.g. logo -> theme, alt text
+
+Model-size guidance: classification and short rewrites run well on small/cheap models
+(e.g. Claude Haiku 4.5 or a local 7-8B model). Post-mortems, investigation and
+multi-step agents benefit from larger models (e.g. Claude Sonnet 5.5 / Opus 5.5 class).
+Make the model a per-feature setting, not a global one.
+
+
+=====================================================================================
+5. FOUNDATION (BUILD ONCE)
+=====================================================================================
+
+-------------------------------------------------------------------------------------
+F1. AI GATEWAY  (provider-agnostic, bring-your-own-model, budgets, kill switch)
+-------------------------------------------------------------------------------------
+WHAT      One internal module (e.g. lib/ai/) that every feature calls:
+            complete({ feature, orgId, system, input, schema }) -> validated result.
+          Providers behind it: Anthropic, OpenAI, Azure OpenAI, AWS Bedrock, and any
+          OpenAI-compatible endpoint (Ollama, vLLM, LM Studio, LiteLLM).
+          Settings at two levels: platform (installation owner sets default provider,
+          allowed providers, global kill switch) and organization (own key / endpoint,
+          per-feature toggles, monthly token or spend cap).
+FITS      - Config + encrypted key: follow lib/platform-configuration.ts and
+            lib/encryption.ts (smtpPasswordCiphertext is the exact pattern).
+          - Outbound calls: lib/guarded-fetch.ts so a BYO endpoint cannot be used for SSRF
+            (but allow explicit private/localhost endpoints only when the platform admin
+            opts in, since Ollama usually lives on the private network).
+          - Async work: new task in lib/jobs.ts JOB_TASKS + worker/tasks.ts for slow
+            jobs (post-mortems, translations). Web requests stay fast.
+          - Tables (migration 016): ai_usage (org, feature, model, tokens in/out, cost,
+            latency, status), optionally ai_drafts (generated text awaiting approval).
+          - Audit: recordTenantAudit for every generation that is accepted/published.
+          - Tests: a fake provider implementing the same interface (Vitest, no network).
+BENEFITS  Operators get AI without lock-in; privacy-sensitive customers can run fully
+          local; finance gets cost control; nothing breaks if the provider is down.
+ADVANTAGES  Build once, every feature below is a thin prompt + schema on top. Provider
+          swap is a config change. Matches the self-hosted ethos (data stays home).
+          Ollama/vLLM expose OpenAI-compatible /v1/chat/completions, so one adapter covers
+          the local case.
+RISKS     Key storage (use existing encryption), runaway cost (hard caps), provider
+          outage (every feature must degrade to "write it yourself", never block the
+          core incident flow), SSRF on custom endpoints, tenant data mixing in prompts.
+AI TYPE   Infrastructure
+EFFORT    M
+VALUE     Very high (enabler)
+MONETISATION NOTE  The empty app/admin/(protected)/billing folder suggests a place for
+          metered AI usage if you ever offer a hosted edition. (Folder exists but is
+          empty; nothing confirms plans.)
+
+-------------------------------------------------------------------------------------
+F2. GUARDRAILS AND GOVERNANCE LAYER
+-------------------------------------------------------------------------------------
+WHAT      Shared rules applied by the gateway to every feature:
+            - Draft-first: output lands in a "pending" state, never auto-published unless
+              the org explicitly enables auto-mode for that feature.
+            - Structured output: every response validated with zod; reject and retry once.
+            - Redaction before sending: strip secrets, auth headers, tokens, internal
+              IPs/hostnames, emails/phones of subscribers (monitor config has authSecret,
+              requestHeaders - never include them).
+            - Prompt-injection hygiene: untrusted text wrapped and labelled as data.
+            - "AI-assisted" marker stored on each generated item (needed for audit and
+              possible regulatory labelling, see section 10).
+            - Per-feature enable switches + org/platform kill switch.
+BENEFITS  Trust. One place to fix a safety issue. Auditors can see what AI did.
+ADVANTAGES  Competitor reports stress human approval and trust; making it the default
+          is both safer and a selling point. Cheap to build once, painful to retrofit.
+RISKS     Over-restrictive redaction can degrade output quality; tune with real examples.
+AI TYPE   Infrastructure
+EFFORT    S-M (alongside F1)
+VALUE     Very high (enabler)
+
+
+=====================================================================================
+6. IDEAS, GROUPED BY AREA
+=====================================================================================
+
+#####################################################################################
+A. INCIDENT COMMUNICATION  (the core job of a status page)
+#####################################################################################
+
+-------------------------------------------------------------------------------------
+A1. DRAFT INCIDENT UPDATES
+-------------------------------------------------------------------------------------
+WHAT      In the incident editor, a "Draft update" button. Inputs: incident name, impact,
+          affected components and their statuses, previous updates, new status
+          (Investigating / Identified / Monitoring / Resolved), optional operator notes
+          ("DB failover, ETA 20 min"). Output: a short, plain, customer-safe update the
+          operator edits and posts. Tone presets (calm, formal, friendly) and length
+          presets.
+FITS      app/admin/(protected)/incidents/[incidentId] + new/ and actions.ts;
+          lib/domain/incidents.ts for context; lib/incident-update-validation.ts to
+          validate the result like any human-written update.
+BENEFITS  Faster, calmer first update (minutes matter in an outage); consistent tone;
+          less stress; fewer typos; newer on-call staff write like veterans.
+ADVANTAGES  The single most requested AI feature in this category (incident.io,
+          FireHydrant, Rootly, Atlassian all ship it). Low risk because a human reviews.
+RISKS     Invented ETAs or causes. Mitigate: prompt forbids ETAs/causes unless in operator
+          notes; linter A3 catches leftovers.
+AI TYPE   GEN
+EFFORT    S (after F1)
+VALUE     Very high
+
+-------------------------------------------------------------------------------------
+A2. AI-WRITTEN MESSAGES FOR MONITOR-CREATED INCIDENTS
+-------------------------------------------------------------------------------------
+WHAT      When a monitor trips and "auto incident" fires, generate the public title and
+          body from check data (type, target class, failing status code, latency, which
+          component, how many regions/checks failed) instead of publishing the raw error.
+          Example: "We are investigating elevated errors on the Payments API" instead of
+          "connect ECONNREFUSED 10.0.4.12:5432".
+FITS      worker/monitors.ts:182-193 (name and body are set there today); fall back to the
+          current text if the AI call fails or times out (must never delay incident
+          creation - consider create-then-edit: create immediately with safe generic
+          text, then enrich asynchronously).
+          NO-AI FIRST STEP: lib/failure-kind.ts classifyFailure() already maps raw errors to
+          public-safe categories (timeout / dns / tls / refused / other) and its header says
+          raw error text must never be shown publicly. Using it for the auto-incident body
+          fixes the leak today with zero LLM; AI then only improves the wording.
+BENEFITS  Customers see a human message immediately; internal details stop leaking;
+          operators have less cleanup.
+ADVANTAGES  Fixes a real current weakness, not just a nicety. Very small code surface.
+RISKS     Latency in the monitor loop (do it async), wrong severity wording. Keep the
+          impact field rule-based, let AI only write prose.
+AI TYPE   GEN (+ rule-based impact)
+EFFORT    S
+VALUE     High
+
+-------------------------------------------------------------------------------------
+A3. PRE-PUBLISH "UPDATE LINTER"  (safety and quality check)
+-------------------------------------------------------------------------------------
+WHAT      Before an update is posted, run a fast check and show warnings (not blockers):
+            - leaked internals: IPs, hostnames, stack traces, secrets, customer names
+            - blame/speculation words ("we think the intern...", unconfirmed root cause)
+            - missing info: no next-update time, status says Resolved but text says
+              "still investigating", impact mismatched with component statuses
+            - tone and jargon, reading level, length for SMS
+          Most checks can be regex/rules; AI handles the fuzzy ones (tone, speculation).
+FITS      lib/incident-update-validation.ts is the natural home for rules; AI check runs
+          on the same hook; also usable for maintenance and announcements.
+BENEFITS  Prevents embarrassing or unsafe public posts; protects brand and security.
+ADVANTAGES  Works even when the operator writes everything by hand, so it is useful to
+          teams that distrust AI drafting. Mostly cheap rule-based pieces.
+RISKS     Warning fatigue; keep it to few, high-precision checks.
+AI TYPE   CLS + rules
+EFFORT    S-M
+VALUE     High
+
+-------------------------------------------------------------------------------------
+A4. POST-MORTEM DRAFTER
+-------------------------------------------------------------------------------------
+WHAT      One click on a resolved incident builds a first-draft post-mortem: summary,
+          customer impact (duration, components, affected %), timeline (from
+          incident_updates and component_status_events), what went well / badly prompts,
+          suggested follow-ups left as "to confirm". Operator edits and publishes.
+FITS      incidents.postmortemBody and postmortemPublishedAt already exist; timeline data
+          is already in the DB; run as a worker job (can take 10-60s).
+BENEFITS  Post-mortems actually get written (the hardest part is the blank page);
+          consistent format; faster customer trust recovery after major incidents.
+ADVANTAGES  Competitors market it heavily; the data model already supports it, so the
+          feature is mostly a prompt plus a button.
+RISKS     Hallucinated root cause or facts. Mitigate: only restate facts present in data,
+          mark every inferred line "needs confirmation", never auto-publish.
+AI TYPE   GEN + EXT
+EFFORT    M
+VALUE     High
+
+-------------------------------------------------------------------------------------
+A5. MULTILINGUAL UPDATES AND NOTIFICATIONS
+-------------------------------------------------------------------------------------
+WHAT      Translate incident updates, maintenance notices and notifications into the
+          languages a page supports, and optionally send each subscriber their language.
+          Keep a per-page glossary (product names, "do not translate" terms). Show an
+          "automatically translated" note; allow human override per language.
+FITS      lib/page-locale.ts today handles locale and time zone formatting (no content
+          translation seen); subscribers table needs a language field (migration);
+          lib/notify.ts and the email/SMS senders render per-language bodies; cache
+          translations per update id + language.
+BENEFITS  Global customers get timely info in their language; fewer support tickets;
+          no waiting for a translator in a crisis.
+ADVANTAGES  Several competitors sell multi-language pages; translation is the strongest
+          LLM task (quality is high even on small models). Enables enterprise/EU use.
+RISKS     Wrong nuance in a legal/SLA-sensitive sentence; mark machine-translated; allow
+          review for major incidents. Cost scales with languages x subscribers - translate
+          once per language, not per subscriber.
+AI TYPE   TRN
+EFFORT    M
+VALUE     High
+
+-------------------------------------------------------------------------------------
+A6. CHANNEL- AND AUDIENCE-ADAPTIVE REWRITING
+-------------------------------------------------------------------------------------
+WHAT      From one canonical update, produce channel-correct variants: 160-char SMS,
+          Slack/Teams message with formatting, email with subject line, Telegram,
+          webhook summary, plus an "executive summary" version for leadership.
+FITS      lib/notify.ts, lib/notification-providers.ts, lib/destination-catalog.ts,
+          notification_jobs. Generate variants when the update is posted, store per
+          channel, fall back to a truncated original if AI fails.
+BENEFITS  Short channels no longer cut messages mid-sentence; exec stakeholders get the
+          business view; better open/read rates.
+ADVANTAGES  SignalHub already supports many channels, so the value multiplies. Rootly
+          markets tone adaptation for public vs executive audiences.
+RISKS     Meaning drift between variants; keep the canonical text as source of truth and
+          show variants in the preview.
+AI TYPE   GEN
+EFFORT    S-M
+VALUE     Medium-High
+
+-------------------------------------------------------------------------------------
+A7. MAINTENANCE ANNOUNCEMENT WRITER
+-------------------------------------------------------------------------------------
+WHAT      From a few fields (what, when, expected impact, rollback window) produce the
+          scheduled-maintenance notice, the "starting soon" reminder and the "completed"
+          message, localized to the page time zone.
+FITS      lib/domain/maintenance.ts (reminders and auto-transition already exist),
+          tests/maintenance-communications.test.ts shows the existing message shape.
+BENEFITS  Better advance notice with less effort; consistent wording.
+ADVANTAGES  Very predictable text, so quality is high and risk is low. Shares the same
+          prompt machinery as A1.
+RISKS     Time-zone mistakes. Do NOT let the model compute times; pass pre-formatted
+          times from existing helpers.
+AI TYPE   GEN
+EFFORT    S
+VALUE     Medium
+
+-------------------------------------------------------------------------------------
+A8. PERIODIC RELIABILITY DIGEST
+-------------------------------------------------------------------------------------
+WHAT      Weekly/monthly narrative: uptime per component, incidents, MTTR trend, what
+          changed, notable slow periods. Sent to admins; optionally published as a
+          public "state of reliability" post.
+FITS      analytics_daily, component_status_events, metric series (lib/metric-series.ts
+          already computes insights per range); worker scheduled job; email sender.
+BENEFITS  Management visibility without dashboards; builds customer trust when public.
+ADVANTAGES  The numbers are computed by existing code; the model only narrates, so
+          hallucination risk is small if numbers are passed in, not re-derived.
+RISKS     Model must not invent numbers; pass a fixed JSON of figures and require quotes.
+AI TYPE   GEN
+EFFORT    S-M
+VALUE     Medium
+
+
+#####################################################################################
+B. MONITORING INTELLIGENCE
+#####################################################################################
+
+-------------------------------------------------------------------------------------
+B1. PLAIN-LANGUAGE FAILURE EXPLANATION
+-------------------------------------------------------------------------------------
+WHAT      Next to a failing monitor, show "What this means": translates ECONNREFUSED,
+          certificate has expired, ENOTFOUND, 502 vs 504, DNS record mismatch, keyword
+          missing, heartbeat late - into a likely cause and a suggested first check.
+          Rule-based lookup for the common 80%, LLM for odd cases.
+FITS      monitor_checks.error / monitors.lastError; app/admin/(protected)/monitors;
+          lib/failure-kind.ts already exists (classifies failures) - extend it first.
+BENEFITS  Faster triage for non-experts; fewer "what does this error mean" questions.
+ADVANTAGES  Cheap; partly doable without any LLM; improves the product even when AI is
+          off.
+RISKS     Confident wrong diagnosis. Phrase as "likely", show raw error beside it.
+AI TYPE   CLS + GEN
+EFFORT    S
+VALUE     Medium-High
+
+-------------------------------------------------------------------------------------
+B2. ADAPTIVE BASELINES AND ANOMALY DETECTION  (statistics, not an LLM)
+-------------------------------------------------------------------------------------
+WHAT      Learn each monitor's normal latency by hour-of-day / day-of-week and flag
+          deviations ("responses 3x slower than usual for a Tuesday morning") BEFORE a
+          hard failure. Also forecasts: certificate expiry, slowly rising latency,
+          heartbeat jobs drifting later each day.
+FITS      monitor_checks and metric_points (partitioned time series); a worker sweep job
+          computing EWMA / median-and-MAD z-scores per monitor; surface as "degraded
+          early warning" or a new soft alert channel. Static thresholds (failThreshold,
+          timeoutMs) stay as they are.
+BENEFITS  Earlier warning, fewer false alarms from fixed thresholds, discovery of
+          creeping problems.
+ADVANTAGES  Pure math: no tokens, no privacy issue, runs fully offline, deterministic and
+          testable. Research summaries report adaptive thresholds cutting false positives
+          well below static ones.
+RISKS     Noisy at launch; needs a warm-up period and a sensitivity knob per monitor.
+          Do not auto-open public incidents from anomalies; keep them internal.
+AI TYPE   STAT
+EFFORT    M
+VALUE     High
+
+-------------------------------------------------------------------------------------
+B3. ALERT GROUPING, CORRELATION AND FLAP SUPPRESSION
+-------------------------------------------------------------------------------------
+WHAT      When many monitors on a page fail within minutes, group them into ONE incident
+          and name the likely shared cause ("5 checks failing, all behind api.example.com
+          / same component group / same TLS issuer"). Suppress flapping (up/down/up).
+FITS      worker/monitors.ts (currently one auto-incident per monitor), monitors.groupName
+          and tags, component groups; correlate by time window + component group + shared
+          target host first (rules), use an LLM only to phrase the group summary.
+BENEFITS  Less incident spam and subscriber notification fatigue; one clear story.
+ADVANTAGES  PagerDuty reports large noise-reduction gains from grouping. Mostly rules.
+RISKS     Over-grouping hides a separate real problem; keep group membership visible and
+          let operators split.
+AI TYPE   STAT/rules + GEN
+EFFORT    M
+VALUE     High
+
+-------------------------------------------------------------------------------------
+B4. MONITOR SETUP ASSISTANT
+-------------------------------------------------------------------------------------
+WHAT      Operator pastes a URL. The assistant fetches it (guarded), then proposes a set
+          of monitors: HTTP check with expected status, KEYWORD check for a stable string
+          on the page, TLS expiry check, DNS check, sensible interval/timeout/threshold,
+          names and tags, and which component to attach to. One click creates them.
+FITS      lib/guarded-fetch.ts for the fetch; lib/monitor-validation.ts and
+          lib/domain/monitors.ts to validate proposals; zod schema = output contract.
+BENEFITS  Setup in seconds instead of filling a long form; better coverage for new users.
+ADVANTAGES  Great onboarding hook; excellent demo. Output is validated by existing code,
+          so a bad suggestion cannot create an invalid monitor.
+RISKS     Fetching arbitrary URLs: must use guardedFetch and respect network policy
+          (lib/network-policy.ts). Page text is untrusted input (prompt injection).
+AI TYPE   EXT + GEN
+EFFORT    S-M
+VALUE     Medium-High
+
+-------------------------------------------------------------------------------------
+B5. READ-ONLY INVESTIGATION ASSISTANT  (small "AI SRE")
+-------------------------------------------------------------------------------------
+WHAT      On a failing monitor or open incident, an assistant gathers evidence using only
+          SignalHub's own data and safe probes: recent checks, latency trend, other
+          monitors that changed at the same time, past similar incidents (D3), DNS/TLS/HTTP
+          re-probe through guardedFetch. Produces a short hypothesis list with the
+          evidence for each, and what to check next. It cannot change anything.
+FITS      Tool-calling loop (AGT) over a handful of internal read functions; worker job
+          or streamed admin endpoint; shows citations to the rows it used.
+BENEFITS  Faster time to a plausible cause for small teams without a full observability
+          stack.
+ADVANTAGES  Datadog, Better Stack and incident.io all market AI SRE; a deliberately scoped
+          read-only version captures part of the value without needing logs/traces access.
+RISKS     Accuracy: cited research suggests LLM root-cause guesses are often wrong, so
+          present hypotheses, not conclusions. Cost per investigation. Keep it opt-in.
+AI TYPE   AGT
+EFFORT    L
+VALUE     Medium-High (grows over time)
+
+
+#####################################################################################
+C. PUBLIC AND SUBSCRIBER FACING
+#####################################################################################
+
+-------------------------------------------------------------------------------------
+C1. "ASK THE STATUS PAGE" ASSISTANT
+-------------------------------------------------------------------------------------
+WHAT      A small chat box on the public page and in the embed widget. Visitors ask "Is
+          login down?", "Why was I logged out yesterday?", "Is this fixed?". Answers are
+          generated ONLY from that page's live component statuses, active incidents and
+          recent incident history, with links to the incidents. If the answer is not in
+          the data it says so and links to support. Optional extension: a macro/API that
+          lets a helpdesk auto-reply "known incident" tickets.
+FITS      app/(public)/[slug], app/api/v1/{status,embed}; strictly page-scoped data
+          (never cross-tenant); lib/rate-limit.ts consumeRateLimit per IP/page; per-page
+          toggle plus a hard monthly cap; tokens cached for identical questions when
+          no incident state changed.
+BENEFITS  Fewer support tickets during outages (everyone asks the same question);
+          customers get an instant, accurate answer at 3am; deflection saves money.
+ADVANTAGES  Few status tools offer this; it turns a passive page into an interactive one.
+          Auralis-style "status and outage agents" show demand for it.
+RISKS     Public attack surface (cost abuse, prompt injection from visitors). Mitigate:
+          rate limits, small model, answer only from supplied facts, no ETAs unless the
+          incident text states one, no free-form external links. Do NOT enable by default.
+AI TYPE   RAG (tiny, no vector DB needed: the whole page state fits in the prompt)
+EFFORT    M
+VALUE     High
+
+-------------------------------------------------------------------------------------
+C2. NATURAL-LANGUAGE SUBSCRIPTION PREFERENCES
+-------------------------------------------------------------------------------------
+WHAT      Subscriber types "only tell me when payments or checkout break, by email, not at
+          night" and the system maps it to the existing fields: componentIds, eventTypes,
+          channel (and a future quiet-hours field). Shows the parsed result for
+          confirmation.
+FITS      subscribers table (componentIds, eventTypes, incidentIds), lib/subscriptions.ts,
+          the subscribe API at app/api/v1/subscribe; EXT with zod enum of the page's
+          real components.
+BENEFITS  Easier targeted subscriptions -> less noise -> fewer unsubscribes.
+ADVANTAGES  Uses data model that already exists; nice differentiator.
+RISKS     Mis-mapping; always confirm before saving. Public endpoint: rate limit.
+AI TYPE   EXT
+EFFORT    S-M
+VALUE     Medium
+
+-------------------------------------------------------------------------------------
+C3. THIRD-PARTY DEPENDENCY IMPACT EXPLAINER
+-------------------------------------------------------------------------------------
+WHAT      When an upstream vendor (cloud, payment provider, auth provider) has an incident,
+          summarise the vendor's status text and draft a customer-safe message ("Some
+          payments may be delayed due to an issue at our payment provider"), separating
+          confirmed provider facts from possible impact on your users. Operator reviews
+          and posts.
+FITS      Needs an ingestion path for vendor status feeds (SignalHub already has feeds and
+          webhook-component ingestion routes under /api/v1; an app/admin/(protected)/
+          third-party folder exists but is empty - check intent before building).
+BENEFITS  Faster, accurate communication for the most common cause of outages: other
+          people's outages.
+ADVANTAGES  StatusGator shows the pattern (aggregated vendor status + AI summary through
+          MCP). Opens a path to a "dependencies" section on pages.
+RISKS     Vendor text is untrusted (prompt injection) and sometimes wrong or vague.
+          Never auto-publish.
+AI TYPE   GEN + EXT
+EFFORT    M (mostly ingestion)
+VALUE     Medium-High
+
+
+#####################################################################################
+D. OPERATOR PRODUCTIVITY
+#####################################################################################
+
+-------------------------------------------------------------------------------------
+D1. MCP SERVER OVER THE EXISTING /api/v1
+-------------------------------------------------------------------------------------
+WHAT      A Model Context Protocol server exposing SignalHub as tools to AI clients
+          (Claude, Cursor, internal agents): list components and statuses, list/get
+          incidents, create/update/resolve an incident, schedule maintenance, read metrics,
+          list monitors. Authenticated with the SAME scoped API keys, so a key without
+          write scope can only read.
+FITS      lib/openapi.ts already describes the API; lib/api-auth.ts enforces scopes;
+          app/api/v1/manage/{incidents,components,metrics}. Can be a thin separate
+          package or a route that maps tool calls to existing handlers.
+BENEFITS  Operators can say "post an investigating update for checkout, impact major" in
+          their AI client; other automations get a standard integration point.
+ADVANTAGES  StatusGator, OneUptime and Pulsetic already ship MCP servers, so users will
+          start to expect it. Very cheap because the API, scopes and OpenAPI exist, and it
+          needs NO LLM inside SignalHub (the client brings the model).
+RISKS     An AI client can take write actions; keep writes behind explicit scopes, add a
+          read-only default, audit-log every call (recordTenantAudit), rate limit.
+AI TYPE   MCP
+EFFORT    S-M
+VALUE     High
+
+-------------------------------------------------------------------------------------
+D2. ADMIN COPILOT  (natural language -> proposed actions)
+-------------------------------------------------------------------------------------
+WHAT      A command bar in the admin UI: "Schedule maintenance Saturday 02:00-03:00 UTC for
+          the API component" or "resolve the checkout incident and say it was a config
+          rollback". The assistant converts it into a pre-filled form/action that the user
+          confirms. Runs as the logged-in user, with that user's RBAC.
+FITS      Tool-calling (AGT) over existing server actions in app/admin/(protected)/*/
+          actions.ts; permissions from lib/access.ts; confirmation step before any write.
+          Slack/Teams ChatOps (two-way) would be a later extension and needs a proper
+          bot app, not just the current outgoing webhooks.
+BENEFITS  Faster operations under pressure, shallower learning curve, good accessibility.
+ADVANTAGES  Showcases the product; reuses all validation already written for forms.
+RISKS     Wrong action. Mitigate: never execute directly, always show a diff and a
+          Confirm button; limit tool set; audit.
+AI TYPE   AGT + EXT
+EFFORT    M-L
+VALUE     Medium (high wow factor)
+
+-------------------------------------------------------------------------------------
+D3. INCIDENT SIMILARITY SEARCH  (institutional memory)
+-------------------------------------------------------------------------------------
+WHAT      On a new incident show "similar past incidents" with what was said and how long
+          they took, plus the resolution notes and post-mortem links.
+FITS      Step 1 (no AI): Postgres full-text search (tsvector) over incident names,
+          updates and post-mortems, filtered by component. Step 2 (optional): embeddings
+          stored with the pgvector extension and hybrid FTS + vector ranking; this needs
+          pgvector in the Postgres image used by docker-compose.yml and deploy/helm, so
+          check that before committing. Always scope by organization.
+BENEFITS  Faster diagnosis and consistent wording; new on-call staff inherit team
+          history.
+ADVANTAGES  Rootly markets related-incident detection. The FTS step is nearly free and
+          already useful; avoids a separate vector database.
+RISKS     Cross-tenant leakage (strict org filter, test it); stale or poor-quality history.
+AI TYPE   EMB / RAG (start with FTS)
+EFFORT    S (FTS) / M (vectors)
+VALUE     Medium-High
+
+-------------------------------------------------------------------------------------
+D4. HELP AND DOCS ASSISTANT
+-------------------------------------------------------------------------------------
+WHAT      Ask questions about using SignalHub ("how do I add a custom domain?", "what is
+          the difference between a monitor and a heartbeat?") and get an answer with links
+          to the right help article.
+FITS      lib/help-content.ts (935 lines, structured in categories/sections) is a ready
+          knowledge base; app/admin/(protected)/help already renders it. Start with
+          keyword/FTS search, add LLM answering later. Whole corpus is small enough to
+          fit in a prompt on large-context models or via simple retrieval.
+BENEFITS  Self-service onboarding and fewer support requests for the project.
+ADVANTAGES  Cheapest RAG use case: static content, no tenant data, no write actions.
+          Good first "safe" AI feature to build confidence in the gateway.
+RISKS     Out-of-date answers when help changes (re-index on build).
+AI TYPE   RAG
+EFFORT    S
+VALUE     Medium
+
+-------------------------------------------------------------------------------------
+D5. NATURAL-LANGUAGE ANALYTICS AND SLA/EXECUTIVE REPORTS
+-------------------------------------------------------------------------------------
+WHAT      "Which component had the most downtime last quarter?", "Generate our Q3 SLA
+          report for Acme". The model does NOT write SQL against production; it picks from
+          a fixed set of parameterised query tools (uptime by component/range, incident
+          count and MTTR, top monitors by failures) and narrates the result. Reports can be
+          exported.
+FITS      lib/metric-series.ts, lib/metric-ranges.ts, analytics_daily,
+          component_status_events; existing exports pipeline (data_export_jobs,
+          worker/exports.ts) for PDF/CSV.
+BENEFITS  Non-technical stakeholders self-serve; SLA reporting for contracts becomes a
+          click; fewer ad-hoc data requests.
+ADVANTAGES  Fixed query tools make it safe and accurate; AI is only the router and the
+          narrator.
+RISKS     Wrong period interpretation; echo back the resolved date range and parameters.
+AI TYPE   AGT (tool routing) + GEN
+EFFORT    M
+VALUE     Medium-High
+
+-------------------------------------------------------------------------------------
+D6. PAGE DESIGN ASSISTANT
+-------------------------------------------------------------------------------------
+WHAT      Upload a logo or paste a website URL; get a proposed status page theme (colors,
+          accessible contrast, fonts), cover image suggestion and optional custom CSS.
+          Result lands in the existing design DRAFT, so the designer previews and
+          publishes as usual.
+FITS      page_design_drafts/versions tables, lib/page-design.ts, lib/custom-css.ts (the
+          sanitiser for CSS must stay the gatekeeper for AI-generated CSS), lib/cover-image.ts.
+BENEFITS  Branded page in a minute; accessible contrast by default.
+ADVANTAGES  Drafts + versions already exist, so undo is free. Visually impressive for
+          demos and onboarding.
+RISKS     AI-generated CSS: always pass through the existing sanitiser; contrast checks in
+          code, not by the model.
+AI TYPE   MM + GEN
+EFFORT    M
+VALUE     Medium
+
+
+#####################################################################################
+E. SECURITY AND GOVERNANCE
+#####################################################################################
+
+-------------------------------------------------------------------------------------
+E1. AUDIT-LOG ANOMALY DETECTION AND NATURAL-LANGUAGE AUDIT SEARCH
+-------------------------------------------------------------------------------------
+WHAT      (a) Flag unusual admin behaviour: bulk deletions, new API key then mass export,
+          logins from new countries/ASNs, off-hours permission changes. Mostly baseline
+          statistics per user/org. (b) "Show everything user X changed last week" turned
+          into a safe, parameterised audit query. (c) Plain-language summary of a period
+          of audit events for compliance reviews.
+FITS      lib/tenant-audit.ts, lib/audit-integrity.ts (hash chain stays untouched; AI only
+          READS), audit sinks and delivery jobs, platform audit (lib/support-audit.ts,
+          app/api/platform/audit).
+BENEFITS  Faster detection of insider/credential abuse; easier compliance evidence.
+ADVANTAGES  Enterprise features (SSO/SAML/SCIM) show the target customer cares about
+          this. Statistical part needs no LLM.
+RISKS     Audit data is sensitive: prefer local/BYO model, redact PII, never write to the
+          chain from AI. False positives need tuning.
+AI TYPE   STAT + EXT + GEN
+EFFORT    M
+VALUE     Medium (high for enterprise buyers)
+
+-------------------------------------------------------------------------------------
+E2. SUBSCRIBER SIGNUP ABUSE / SPAM CLASSIFIER
+-------------------------------------------------------------------------------------
+WHAT      Score signups for abuse (disposable domains, bot patterns, address-bombing of a
+          victim's email, SMS pumping) and route suspicious ones to the existing
+          quarantine state.
+FITS      subscribers.quarantined, subscription OTP table, app/api/v1/subscribe, rate
+          limits already exist. Start with rules and velocity heuristics; add a small
+          classifier only if rules prove insufficient.
+BENEFITS  Protects sender reputation and SMS cost (SMS abuse is real money), protects
+          third parties from being spammed through your page.
+ADVANTAGES  Complements existing OTP verification and rate limiting.
+RISKS     Blocking real subscribers; keep a review queue.
+AI TYPE   CLS / STAT
+EFFORT    S-M
+VALUE     Medium
+
+
+=====================================================================================
+7. SMALL ADD-ONS (QUICK WINS, MOSTLY S EFFORT)
+=====================================================================================
+
+  - Suggest impact level and affected components from the update text (fills
+    incident_components; operator confirms). EXT.
+  - Suggest an incident title from the first description. GEN.
+  - Draft page announcements (page_announcements) and "what's new" notes. GEN.
+  - Auto-tag monitors and propose groupName from target/hostname (tags, groupName
+    columns exist). CLS.
+  - Component description writer ("Checkout: payment processing and cart"). GEN.
+  - Alt text for uploaded images (assets table) for accessibility. MM.
+  - Readability score and plain-language rewrite suggestion for any public text. GEN.
+  - Root-cause category tag per resolved incident (deploy, vendor, capacity, config, ...)
+    for analytics and trend charts. CLS.
+  - Public page SEO title/description suggestions. GEN.
+  - "Explain this metric chart" button using the computed insights from
+    lib/metric-series.ts. GEN.
+
+
+=====================================================================================
+8. PRIORITISATION MATRIX
+=====================================================================================
+
+  ID   Idea                                   Effort   Value        Needs LLM?   Risk
+  ---  -------------------------------------  -------  -----------  -----------  ------
+  F1   AI gateway (BYO model, budgets)        M        Very high    enabler      Low
+  F2   Guardrails / governance                S-M      Very high    enabler      Low
+  A1   Draft incident updates                 S        Very high    yes          Low
+  A2   Messages for auto-incidents            S        High         yes          Low
+  A3   Pre-publish linter                     S-M      High         partly       Low
+  A4   Post-mortem drafter                    M        High         yes          Med
+  A5   Multilingual updates                   M        High         yes          Med
+  A6   Channel/audience rewriting             S-M      Med-High     yes          Low
+  A7   Maintenance writer                     S        Medium       yes          Low
+  A8   Reliability digest                     S-M      Medium       yes          Low
+  B1   Failure explanation                    S        Med-High     partly       Low
+  B2   Adaptive baselines / anomalies         M        High         NO (stats)   Med
+  B3   Alert grouping / flap suppression      M        High         partly       Med
+  B4   Monitor setup assistant                S-M      Med-High     yes          Med
+  B5   Read-only investigation assistant      L        Med-High     yes          High
+  C1   Ask the status page                    M        High         yes          High
+  C2   NL subscription preferences            S-M      Medium       yes          Med
+  C3   Third-party impact explainer           M        Med-High     yes          Med
+  D1   MCP server                             S-M      High         NO           Med
+  D2   Admin copilot                          M-L      Medium       yes          Med
+  D3   Similar incident search                S / M    Med-High     optional     Low
+  D4   Help/docs assistant                    S        Medium       yes          Low
+  D5   NL analytics and SLA reports           M        Med-High     yes          Med
+  D6   Page design assistant                  M        Medium       yes          Low
+  E1   Audit anomaly + NL audit search        M        Medium       partly       Med
+  E2   Signup abuse classifier                S-M      Medium       optional     Low
+
+Best value per effort ("do first"): F1, F2, A1, A2, B1, D1, D4, D3 (FTS version).
+Highest long-term payoff ("do next"): A3, A4, A5, B2, B3, C1.
+Moonshots ("do when the base is trusted"): B5, D2, E1.
+
+
+=====================================================================================
+9. SUGGESTED ROADMAP
+=====================================================================================
+
+PHASE 0 - Foundation (F1, F2)
+  Gateway, provider adapters (Anthropic, OpenAI-compatible incl. Ollama), encrypted keys,
+  per-org/platform switches, usage table, audit, fake provider for tests.
+  Ship with ZERO user-facing features, behind a flag. Add D4 (help assistant) as the
+  safe first consumer to prove the plumbing.
+
+PHASE 1 - Quick wins (about 2-4 weeks)
+  A1 draft updates, A2 auto-incident messages, B1 failure explanation, A7 maintenance
+  writer, D1 MCP server, D3 FTS-based similar incidents, small add-ons from section 7.
+
+PHASE 2 - Trust and reach
+  A3 linter, A4 post-mortem drafter, A5 multilingual, A6 channel rewriting, A8 digest,
+  C2 NL subscriptions.
+
+PHASE 3 - Intelligence
+  B2 anomaly detection, B3 alert grouping, B4 monitor setup assistant, D5 NL analytics,
+  C3 vendor impact explainer, E2 abuse classifier.
+
+PHASE 4 - Interactive and agentic
+  C1 Ask the status page, D2 admin copilot, B5 investigation assistant, E1 audit anomaly
+  detection, D6 design assistant, D3 vector upgrade if FTS proves insufficient.
+
+Each phase: ship behind a per-feature switch, measure acceptance rate (how often the
+operator publishes the draft unchanged / edited / discarded), and keep or kill features
+by that number.
+
+Metrics worth tracking from day one (ai_usage table):
+  draft accepted unchanged / edited / rejected, time from detection to first public
+  update (before vs after), tokens and cost per org per feature, latency, provider error
+  rate, linter warnings that operators fixed, support-ticket volume during incidents (for C1).
+
+
+=====================================================================================
+10. RISKS, PRIVACY AND COMPLIANCE
+=====================================================================================
+
+Prompt injection (OWASP LLM Top 10, #1)
+  Untrusted text that will reach a model: monitor error strings and fetched page bodies
+  (B1, B4, B5), vendor status feeds (C3), public visitor questions (C1), subscriber input
+  (C2), incident text read back for post-mortems. Defences from the OWASP guidance:
+  label and delimit untrusted data, instruction hierarchy, schema-constrained output (zod),
+  least privilege (read-only tools by default), human approval for anything that
+  publishes or writes, adversarial tests in the repo.
+
+Data exposure
+  Never send secrets: monitors hold authSecret, requestHeaders, requestBody; SMTP/SMS keys
+  live in platform configuration. Build the prompt context from an allowlist of fields,
+  not by dumping rows. Subscriber contact data should never be needed in a prompt.
+  Tenant isolation: one organization's data must never be in another's prompt or cache.
+  Local/BYO models remove the third-party processor issue entirely.
+
+Reliability of the core product
+  AI must never sit on the critical path. Incident creation, notifications and the public
+  page must work if the provider is slow, down, or the key is missing. Use timeouts,
+  async enrichment, and clear "write it yourself" fallbacks.
+
+Cost control
+  Per-feature model choice, per-org monthly caps, caching of identical requests (C1, A5),
+  small models for classification, and an admin-visible usage view.
+
+Accuracy
+  Reports in the research (cited as indicative, unverified) show LLMs are far from
+  reliable on open-ended root-cause analysis. Prefer features where the model rewrites or
+  summarises facts you supply (A1, A4, A6, A7, A8) over features where it must discover
+  facts (B5). Show evidence next to every AI claim.
+
+EU AI Act, Article 50 transparency (applies from 2 August 2026 per the sources found)
+  Covers AI that interacts with people (C1 chatbot must tell users they are talking to
+  AI) and AI-generated text published on matters of public interest (machine-readable
+  marking and disclosure duties, with a carve-out where there is substantive human
+  editorial review and clear editorial responsibility, and for purely assistive edits).
+  Practical stance: store an "AI-assisted" flag on each generated item, disclose clearly
+  in the C1 chat UI, keep human review as default for published updates, and consider an
+  optional "AI-assisted" label on public posts. Fines for breaches can reach 15M EUR or 3%
+  of worldwide turnover. NOT LEGAL ADVICE: confirm scope and any later amendments with a
+  lawyer before targeting EU customers. (Whether routine status updates count as "public
+  interest" text is a legal question I did not resolve.)
+
+Open-source and licensing
+  SignalHub is Apache-2.0. Keep provider SDKs optional or use plain fetch against
+  documented HTTP APIs to avoid dependency weight; document that AI is off by default and
+  which data each feature sends.
+
+
+=====================================================================================
+11. RESEARCH NOTES, CONFIDENCE AND SOURCES
+=====================================================================================
+
+Method: read the repository layout, schema (lib/postgres/schema.ts), worker/monitors.ts,
+package.json and key lib/ files; ran web searches on competitor AI features, MCP servers
+for status tools, self-hosted LLM options, anomaly detection, pgvector, OWASP LLM risks,
+EU AI Act Article 50, and AI adoption/trust in incident management.
+
+Confidence and limits (please read):
+  - Competitor facts come from search-result summaries of vendor pages and blogs. I did
+    not open and verify each page. Treat feature claims and percentages (for example
+    PagerDuty's 87-91% noise reduction, the 44-58% vs 62% accuracy figure) as marketing or
+    secondary-source numbers.
+  - Code references are from a targeted read, not a full audit. Confirm file contents
+    before designing against them (for example how page-locale.ts is used, and whether
+    the empty billing/ third-party/ templates admin folders are planned features).
+  - Model names reflect what was current at time of writing; the gateway should keep
+    model IDs configurable.
+  - The EU AI Act summary is not legal advice and amendments after the sources' dates were
+    not checked.
+  - Effort estimates are rough single-developer guesses.
+
+Sources (from search results):
+  incident.io AI platform .......... https://incident.io/ai-platform
+  incident.io post-mortem AI ....... https://docs.incident.io/post-incident/postmortem-ai
+  incident.io AI suggestions ....... https://docs.incident.io/ai/suggestions
+  incident.io multi-language pages . https://docs.incident.io/status-pages/multiple-languages
+  FireHydrant AI ................... https://firehydrant.com/blog/ai-for-incident-management-is-here
+  FireHydrant AI docs .............. https://firehydrant.com/docs/ai-powered-incident-management
+  Rootly AI retrospectives ......... https://rootly.com/sre/accelerate-incident-retrospectives-aidriven-automation
+  Rootly AI adoption pitfalls ...... https://rootly.com/sre/avoid-ai-sre-adoption-pitfalls-7-proven-strategies
+  PagerDuty AIOps announcement ..... https://www.pagerduty.com/newsroom/pagerduty-aiops-harnesses-the-power-of-ai-built-in-automation-and-the-companys-foundational-data-model-to-transform-modern-operations-for-the-enterprise/
+  PagerDuty AI vs incident.io ...... https://www.pagerduty.com/resources/ai/learn/pagerduty-ai-advantages-over-incident-io/
+  Datadog Bits AI SRE .............. https://www.helpnetsecurity.com/2025/12/03/datadog-bits-ai-sre-agent/
+  Datadog building Bits AI SRE ..... https://www.datadoghq.com/blog/building-bits-ai-sre/
+  Atlassian Rovo / JSM updates ..... https://community.atlassian.com/forums/Atlassian-AI-Rovo-articles/
+  StatusGator MCP server ........... https://statusgator.com/blog/introducing-the-statusgator-mcp-server/
+  StatusGator MCP with Claude ...... https://statusgator.com/blog/monitor-outages-with-statusgator-mcp-and-claude/
+  OneUptime MCP server ............. https://oneuptime.com/docs/ai/mcp-server
+  Pulsetic MCP server .............. https://mcpservers.org/servers/designmodo/pulsetic-mcp
+  Statuspal multi-language ......... https://statuspal.io/features/multi-language/
+  Hyperping multi-language ......... https://hyperping.com/docs/status-page/languages
+  Auralis status/outage agent ...... https://auralis.ai/ai-agents/status-outage-agent/
+  Self-hosted LLM / Ollama guide ... https://noqta.tn/blog/self-hosted-llm-ollama-local-ai-complete-guide-2026
+  Ollama vs OpenAI-compatible APIs . https://tkmxai.it.com/ollama-vs-openai-compatible-apis
+  Ollama vs vLLM comparison ........ https://www.glukhov.org/post/2025/11/hosting-llms-ollama-localai-jan-lmstudio-vllm-comparison/
+  Adaptive monitoring (arXiv) ...... https://arxiv.org/pdf/2509.00115
+  AI-powered monitoring overview ... https://odown.com/blog/ai-powered-monitoring-predictive-analytics-anomaly-detection-proactive-operations/
+  pgvector in production ........... https://www.gocodeo.com/post/using-pgvector-for-ai-and-semantic-search-in-production
+  OWASP LLM Top 10 2025 guide ...... https://www.wiz.io/academy/ai-security/owasp-llm-top-10
+  OWASP LLM01 prompt injection ..... https://docs.bytehide.com/products/radar/sast/owasp/llm01-2025
+  EU AI Act Article 50 guide ....... https://artificialintelligenceact.eu/transparency-rules-article-50/
+  EU AI Act Art. 50 for business ... https://gdprlocal.com/eu-ai-act-article-50/
+  ClickHouse LLM SRE report (InfoQ)  https://infoq.com/news/2025/09/clickhouse-llm-sre-report
+  Action1 2026 sysadmin AI survey .. https://www.action1.com/2026-ai-impact-on-sysadmins-survey-report/
+
+=====================================================================================
+END
+=====================================================================================
