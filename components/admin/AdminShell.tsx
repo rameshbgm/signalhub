@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { Activity, ChevronRight, Menu, PanelLeftClose, PanelLeftOpen, PanelsTopLeft, Search, X } from "lucide-react";
+import { Activity, ChevronRight, Menu, PanelLeftClose, PanelLeftOpen, PanelsTopLeft, Search, Siren, Wrench, X } from "lucide-react";
 import { LogoutButton } from "@/components/admin/LogoutButton";
 import { activeNav, isActivePath, visibleSections, type NavSection } from "@/components/admin/AdminNav";
 import { CommandPalette, type PaletteEntry } from "@/components/admin/CommandPalette";
@@ -117,6 +117,10 @@ export function AdminShell({
 
   const entries = useMemo<PaletteEntry[]>(() => [
     ...sections.flatMap((section) => section.items.map((item) => ({ href: item.href, label: item.label, group: section.label, icon: item.icon, hue: item.hue }))),
+    ...(capabilities.includes("incident.manage") ? [
+      { href: "/organization/incidents/new", label: "Report incident", group: "Action", icon: Siren, hue: "amber" as const },
+      { href: "/organization/maintenance/new", label: "Schedule maintenance", group: "Action", icon: Wrench, hue: "amber" as const },
+    ] : []),
     ...(capabilities.includes("page.configure") ? pages.map((page) => ({ href: `/organization/pages/${page.id}`, label: page.name, group: "Page", icon: PanelsTopLeft, hue: "violet" as const })) : []),
   ], [sections, pages, capabilities]);
 

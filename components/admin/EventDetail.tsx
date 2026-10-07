@@ -20,7 +20,7 @@ import {
 import { assertPageInOrg } from "@/lib/admin-guard";
 import { sessionHasCapability } from "@/lib/admin-guard";
 import { IncidentTimelineEditor } from "@/components/admin/IncidentTimelineEditor";
-import { eventHref } from "@/lib/page-events";
+import { eventHref, groupPageEvents } from "@/lib/page-events";
 import { TimelineItem, TimelineList, componentTone, incidentStatusTone, maintenanceStatusTone, updateStatusLabel, updateStatusTone } from "@/components/admin/operate-ui";
 
 /** Detail screen for an incident or maintenance window, served from both sections' routes. */
@@ -38,10 +38,15 @@ export async function EventDetail({ incidentId, kind }: { incidentId: string; ki
   const pageBase = sessionHasCapability(session, "page.configure") ? `/organization/pages/${pageRow.id}` : null;
   const backHref = `/organization/events?pageId=${pageRow.id}`;
 
-  const [updates, links] = await Promise.all([
+  const [updates, links, pageEvents] = await Promise.all([
     database.selectFrom("incidentUpdates").selectAll().where("incidentId", "=", incidentRow.id).orderBy("createdAt").execute(),
     database.selectFrom("incidentComponents").selectAll().where("incidentId", "=", incidentRow.id).execute(),
+    // ponytail: open events sit among the page's newest 50; widen if a page keeps more open at once.
+    database.selectFrom("incidents").select(["id", "name", "isMaintenance", "status", "maintenanceStatus", "scheduledStart", "createdAt"])
+      .where("pageId", "=", pageRow.id).where("id", "!=", incidentRow.id).orderBy("createdAt", "desc").limit(50).execute(),
   ]);
+  const { active: otherActive, upcoming: otherUpcoming } = groupPageEvents(pageEvents);
+  const related = [...otherActive, ...otherUpcoming];
   const components = links.length
     ? await database.selectFrom("components").selectAll()
         .where("id", "in", links.map((link) => link.componentId)).execute()
@@ -223,6 +228,35 @@ export async function EventDetail({ incidentId, kind }: { incidentId: string; ki
               {incident.pageWide && <Badge className="mt-3">Affects the whole page</Badge>}
             </CardContent>
           </Card>
+
+          {related.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Also on {incident.page.name}</CardTitle>
+                <CardDescription>Other open incidents and upcoming maintenance.</CardDescription>
+              </CardHeader>
+              <CardContent className="py-2">
+                <ul className="divide-y divide-line">
+                  {related.map((event) => {
+                    const status = event.isMaintenance ? (event.maintenanceStatus ?? "SCHEDULED") : event.status;
+                    return (
+                      <li key={event.id}>
+                        <Link href={eventHref(event)} className="-mx-2 flex items-center justify-between gap-3 rounded-control px-2 py-2.5 text-sm outline-none transition-colors duration-150 hover:bg-sunken/60 focus-visible:ring-4 focus-visible:ring-primary/25">
+                          <span className="flex min-w-0 items-center gap-2">
+                            {event.isMaintenance ? <Wrench aria-hidden size={14} className="shrink-0 text-ink-dim" /> : <Siren aria-hidden size={14} className="shrink-0 text-ink-dim" />}
+                            <span className="truncate font-medium text-ink">{event.name}</span>
+                          </span>
+                          <StatusBadge tone={event.isMaintenance ? maintenanceStatusTone(status) : incidentStatusTone(status)} className="shrink-0">
+                            {event.isMaintenance ? MAINTENANCE_STATUS_LABEL[status as MaintenanceStatus] : INCIDENT_STATUS_LABEL[status as IncidentStatus]}
+                          </StatusBadge>
+                        </Link>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </CardContent>
+            </Card>
+          )}
 
           {canManage && (
             <Card className="border-danger/25">
