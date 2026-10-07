@@ -70,7 +70,7 @@ function UptimeTicks({ checks, now }: { checks: MonitorCheck[]; now: number }) {
   );
 }
 
-function MonitorRowView({ monitor, components, canManage, now }: { monitor: MonitorListItem; components: { id: string; name: string }[]; canManage: boolean; now: number }) {
+function MonitorRowView({ monitor, components, groupNames, canManage, now }: { monitor: MonitorListItem; components: { id: string; name: string }[]; groupNames: string[]; canManage: boolean; now: number }) {
   const { values: m, actions } = monitor;
   const state = STATE_LABEL[monitor.state];
   return (
@@ -118,7 +118,7 @@ function MonitorRowView({ monitor, components, canManage, now }: { monitor: Moni
         </a>
         <MonitorHistoryDrawer monitorId={m.id} name={m.name} latest={monitor.checks} />
         {canManage && monitor.edit && (
-          <MonitorDrawer action={actions.update} components={components} monitor={monitor.edit} />
+          <MonitorDrawer action={actions.update} components={components} groups={groupNames} monitor={monitor.edit} />
         )}
         {canManage && (
           <InlineActionForm action={actions.remove}>
@@ -139,6 +139,7 @@ export function MonitorList({ monitors, components, canManage, now }: { monitors
   const [filter, setFilter] = useState<(typeof FILTERS)[number]>("all");
   const [tags, setTags] = useState<string[]>([]);
 
+  const groupNames = useMemo(() => [...new Set(monitors.flatMap((m) => (m.values.groupName ? [m.values.groupName] : [])))].sort(), [monitors]);
   const allTags = useMemo(() => [...new Set(monitors.flatMap((m) => m.values.tags))].sort(), [monitors]);
   const counts = useMemo(() => {
     const result: Record<(typeof FILTERS)[number], number> = { all: monitors.length, down: 0, up: 0, pending: 0, paused: 0 };
@@ -212,7 +213,7 @@ export function MonitorList({ monitors, components, canManage, now }: { monitors
               </h2>
             )}
             <ul className="divide-y divide-line">
-              {items.map((monitor) => <MonitorRowView key={monitor.values.id} monitor={monitor} components={components} canManage={canManage} now={now} />)}
+              {items.map((monitor) => <MonitorRowView key={monitor.values.id} monitor={monitor} components={components} groupNames={groupNames} canManage={canManage} now={now} />)}
             </ul>
           </div>
         ))

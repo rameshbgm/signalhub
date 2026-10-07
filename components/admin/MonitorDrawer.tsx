@@ -43,10 +43,12 @@ function Drawer({ title, subtitle, onClose, children }: { title: string; subtitl
 export function MonitorDrawer({
   action,
   components,
+  groups,
   monitor,
 }: {
   action: (formData: FormData) => Promise<void>;
   components: { id: string; name: string }[];
+  groups?: string[];
   monitor?: MonitorFormValues;
 }) {
   const [open, setOpen] = useState(false);
@@ -70,7 +72,7 @@ export function MonitorDrawer({
         <Drawer title={monitor ? `Edit ${monitor.name}` : "Add a monitor"} subtitle={monitor ? undefined : "Fill in the basics; open a section only when you need it."} onClose={() => setOpen(false)}>
           <div className="space-y-4">
             {monitor?.type === "HEARTBEAT" && <HeartbeatTokenManager monitorId={monitor.id} />}
-            <MonitorForm key={session} action={action} components={components} monitor={monitor} onSuccess={() => setOpen(false)} />
+            <MonitorForm key={session} action={action} components={components} groups={groups} monitor={monitor} onSuccess={() => setOpen(false)} />
           </div>
         </Drawer>
       )}

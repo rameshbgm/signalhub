@@ -96,7 +96,7 @@ export default async function MonitorsPage({ searchParams }: { searchParams: Pro
             <div className="w-full sm:w-60">
               <PageSelect pages={pages.map((p) => ({ id: p.id, name: p.name }))} basePath="/organization/monitors" selected={pageId} />
             </div>
-            {canManage && <MonitorDrawer action={createMonitor.bind(null, pageId)} components={componentOptions} />}
+            {canManage && <MonitorDrawer action={createMonitor.bind(null, pageId)} components={componentOptions} groups={[...new Set(monitors.flatMap((m) => (m.groupName ? [m.groupName] : [])))].sort()} />}
           </div>
         }
       />

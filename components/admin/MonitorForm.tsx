@@ -40,11 +40,14 @@ function Section({ title, open, children }: { title: string; open?: boolean; chi
 export function MonitorForm({
   action,
   components,
+  groups = [],
   monitor,
   onSuccess,
 }: {
   action: (formData: FormData) => void;
   components: { id: string; name: string }[];
+  /** Existing monitor group names, offered as suggestions; any new name can still be typed. */
+  groups?: string[];
   /** When set, the form edits this monitor: its type is fixed and fields start from its values. */
   monitor?: MonitorFormValues;
   onSuccess?: () => void;
@@ -106,7 +109,8 @@ export function MonitorForm({
           <Input id={`${idp}monitor-interval`} name="intervalSec" type="number" min={10} max={86400} defaultValue={monitor?.intervalSec ?? 300} placeholder="Interval (sec)" />
         </Field>
         <Field label="Monitor group" htmlFor={`${idp}monitor-group`}>
-          <Input id={`${idp}monitor-group`} name="groupName" defaultValue={monitor?.groupName ?? ""} maxLength={INPUT_LIMITS.monitorGroup} placeholder="Monitor group (optional)" />
+          <Input id={`${idp}monitor-group`} name="groupName" defaultValue={monitor?.groupName ?? ""} maxLength={INPUT_LIMITS.monitorGroup} list={`${idp}monitor-group-list`} autoComplete="off" placeholder="Select or type a group (optional)" />
+          <datalist id={`${idp}monitor-group-list`}>{groups.map((g) => <option key={g} value={g} />)}</datalist>
         </Field>
         <Field label="Tags" htmlFor={`${idp}monitor-tags`}>
           <Input id={`${idp}monitor-tags`} name="tags" defaultValue={monitor?.tags?.join(", ") ?? ""} maxLength={INPUT_LIMITS.monitorTags * (INPUT_LIMITS.monitorTag + 2)} pattern={MONITOR_TAGS_PATTERN} title={MONITOR_TAGS_HINT} placeholder="Tags, comma separated" />
