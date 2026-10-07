@@ -50,7 +50,7 @@ export type TrendRow = {
 
 export function TooltipBox({ heading, lines }: { heading?: string; lines: [string, string][] }) {
   return (
-    <div className="border border-[var(--line-bright)] bg-[var(--surface-raised)] px-3 py-2 text-xs text-[var(--fg)]">
+    <div className="border border-[var(--line)] bg-[var(--surface)] px-3 py-2 text-xs text-[var(--fg)] shadow-lg" style={{ borderRadius: "var(--page-radius, 8px)" }}>
       {heading && <div className="mb-1 text-[var(--fg-soft)]">{heading}</div>}
       {lines.map(([label, value]) => <div key={label}>{label}: <span className="font-semibold tabular-nums">{value}</span></div>)}
     </div>

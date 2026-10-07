@@ -211,14 +211,14 @@ export function MetricChart({
       {windowState?.error && <p role="alert" className="mb-2 text-xs text-[#dc2626]">{windowState.error}</p>}
 
       {stats.length > 0 && (
-        <dl className="mb-3 grid grid-cols-3 gap-x-3 gap-y-2 sm:grid-cols-5">
+        <dl className="mb-4 grid grid-cols-3 gap-y-2 border border-[var(--line)] bg-[var(--bg)] px-1 py-2.5 sm:grid-cols-5 sm:divide-x sm:divide-[var(--line)]" style={{ borderRadius: "var(--page-radius, 8px)" }}>
           {stats.map((stat) => {
             const worse = stat.delta !== null && lowerIsBetter && stat.delta > 0;
             const better = stat.delta !== null && lowerIsBetter && stat.delta < 0;
             return (
-              <div key={stat.label} className="min-w-0">
+              <div key={stat.label} className="min-w-0 px-3">
                 <dt className="text-[10px] uppercase tracking-wide text-[var(--fg-dim)]">{stat.label}</dt>
-                <dd className="text-sm font-semibold tabular-nums text-[var(--fg)]">
+                <dd className="mt-0.5 text-sm font-semibold tabular-nums text-[var(--fg)]">
                   {format(stat.value)}
                   {stat.delta !== null && Math.abs(stat.delta) >= 0.1 && (
                     <span className="ml-1 text-[10px] font-medium" style={{ color: worse ? "#d97706" : better ? "#059669" : "var(--fg-dim)" }} title="Compared with the previous period">
@@ -269,7 +269,7 @@ export function MetricChart({
         </AnimatePresence>
       </div>
 
-      <div className="mt-3 flex min-h-8 flex-wrap items-center justify-center gap-x-4 gap-y-1">
+      <div className="mt-3 flex min-h-8 border-t border-[var(--line)] pt-3 flex-wrap items-center justify-center gap-x-4 gap-y-1">
         {prefs.lens === "trend" && (
           <div role="radiogroup" aria-label={`${name} chart style`} className="flex flex-wrap items-center justify-center gap-1">
             {VIEWS.map(({ id: viewId, label, icon: Icon, tone }) => {
@@ -283,14 +283,14 @@ export function MetricChart({
                   aria-label={label}
                   title={label}
                   onClick={() => setPrefs({ view: viewId })}
-                  className="relative grid size-8 place-items-center border border-transparent transition-opacity hover:opacity-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1"
+                  className="relative grid size-8 place-items-center transition-opacity hover:opacity-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1"
                   style={{ color: tone, opacity: active ? 1 : 0.7 }}
                 >
                   {active && (
                     <motion.span
                       layoutId={`metric-view-pill-${id}`}
                       className="absolute inset-0"
-                      style={{ background: `color-mix(in srgb, ${tone} 16%, transparent)`, border: `1px solid color-mix(in srgb, ${tone} 45%, transparent)` }}
+                      style={{ background: `color-mix(in srgb, ${tone} 16%, transparent)`, borderRadius: "calc(var(--page-radius, 8px) - 2px)" }}
                       transition={animate ? { type: "spring", stiffness: 500, damping: 36 } : { duration: 0 }}
                     />
                   )}
