@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { isDatabaseId } from "@/lib/database-id";
+import { INPUT_LIMITS } from "@/lib/input-limits";
 import { withDatabaseTransaction, type DatabaseTransaction } from "@/lib/postgres/client";
 import { encryptSecret } from "@/lib/encryption";
 import { generateAutomationToken } from "@/lib/tokens";
@@ -10,22 +12,22 @@ import { enqueueJobSweep, JOB_TASKS } from "@/lib/jobs";
 const MONITOR_DOWN_STATUSES = ["DEGRADED_PERFORMANCE", "PARTIAL_OUTAGE", "MAJOR_OUTAGE"] as const;
 
 const monitorInputSchema = z.object({
-  name: z.string().trim().min(1).max(200),
+  name: z.string().trim().min(1).max(INPUT_LIMITS.title),
   type: z.enum(MONITOR_TYPES),
-  componentId: z.string().nullable(),
-  target: z.string().trim().max(2_048),
+  componentId: z.string().refine(isDatabaseId, "Component not found on this page").nullable(),
+  target: z.string().trim().max(INPUT_LIMITS.url),
   port: z.number().int().min(1).max(65_535).nullable(),
   method: z.enum(["GET", "POST", "HEAD", "PUT", "PATCH"]),
-  requestBody: z.string().max(100_000).nullable(),
-  requestHeaders: z.string().max(20_000),
-  expectedStatusRange: z.string().trim().max(7),
-  keywordMatch: z.string().max(10_000).nullable(),
-  keywordAbsent: z.string().max(10_000).nullable(),
+  requestBody: z.string().max(INPUT_LIMITS.monitorRequestBody).nullable(),
+  requestHeaders: z.string().max(INPUT_LIMITS.monitorRequestHeaders),
+  expectedStatusRange: z.string().trim().max(INPUT_LIMITS.monitorStatusRange),
+  keywordMatch: z.string().max(INPUT_LIMITS.monitorKeyword).nullable(),
+  keywordAbsent: z.string().max(INPUT_LIMITS.monitorKeyword).nullable(),
   sslWarnDays: z.number().int().min(1).max(365).nullable(),
   authType: z.enum(["NONE", "BASIC", "BEARER", "HEADER"]),
-  authUsername: z.string().max(1_000).nullable(),
-  authSecret: z.string().max(10_000).nullable(),
-  authHeaderName: z.string().max(200).nullable(),
+  authUsername: z.string().max(INPUT_LIMITS.monitorAuthUsername).nullable(),
+  authSecret: z.string().max(INPUT_LIMITS.monitorAuthSecret).nullable(),
+  authHeaderName: z.string().max(INPUT_LIMITS.monitorAuthHeaderName).nullable(),
   verifyTls: z.boolean(),
   intervalSec: z.number().int().min(10).max(86_400),
   timeoutMs: z.number().int().min(100).max(60_000),
@@ -37,10 +39,10 @@ const monitorInputSchema = z.object({
   actionAutoIncident: z.boolean(),
   actionNotify: z.boolean(),
   tags: z.array(z.string().trim().min(1).max(50)).max(20).optional(),
-  groupName: z.string().trim().max(100).nullable().optional(),
+  groupName: z.string().trim().max(INPUT_LIMITS.monitorGroup).nullable().optional(),
   heartbeatGraceSec: z.number().int().min(0).max(86_400).nullable().optional(),
   dnsRecordType: z.enum(["A", "AAAA", "CNAME", "MX", "TXT", "NS"]).nullable().optional(),
-  dnsExpectedValue: z.string().max(2_048).nullable().optional(),
+  dnsExpectedValue: z.string().max(INPUT_LIMITS.url).nullable().optional(),
 });
 
 export type MonitorInput = z.infer<typeof monitorInputSchema>;

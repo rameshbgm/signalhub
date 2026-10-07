@@ -2,7 +2,9 @@
 
 import { revalidatePath } from "next/cache";
 import { requirePlatformCapability } from "@/lib/admin-guard";
+import { isDatabaseId } from "@/lib/database-id";
 import { encryptSecret } from "@/lib/encryption";
+import { INPUT_LIMITS } from "@/lib/input-limits";
 import { database, withDatabaseTransaction } from "@/lib/postgres/client";
 import { writePlatformAudit } from "@/lib/platform-policy";
 
@@ -13,11 +15,14 @@ export async function createAuditSink(formData: FormData) {
   const secret = String(formData.get("secret") ?? "");
   const orgId = String(formData.get("orgId") ?? "").trim() || null;
   if (!name || name.length > 120) throw new Error("Enter a sink name");
+  if (!URL.canParse(urlValue) || urlValue.length > INPUT_LIMITS.url) throw new Error(`Enter a full HTTPS URL of at most ${INPUT_LIMITS.url} characters`);
   const url = new URL(urlValue);
   if (url.protocol !== "https:" && process.env.ALLOW_INSECURE_AUDIT_SINKS !== "true") {
     throw new Error("Audit sinks must use HTTPS");
   }
   if (secret.length < 32) throw new Error("Webhook signing secret must contain at least 32 characters");
+  if (secret.length > INPUT_LIMITS.secret) throw new Error(`Webhook signing secret must be ${INPUT_LIMITS.secret} characters or fewer`);
+  if (orgId && !isDatabaseId(orgId)) throw new Error("Organization not found");
   if (orgId) {
     const organization = await database.selectFrom("organizations").select("id")
       .where("id", "=", orgId).executeTakeFirst();

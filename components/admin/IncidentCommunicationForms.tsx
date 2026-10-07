@@ -13,6 +13,7 @@ import {
   MAINTENANCE_STATUSES,
   MAINTENANCE_STATUS_LABEL,
 } from "@/lib/status";
+import { INPUT_LIMITS } from "@/lib/input-limits";
 
 const UPDATE_PLACEHOLDER = "What changed, who is affected, and when is the next update?";
 
@@ -35,7 +36,7 @@ export function IncidentUpdateComposer({
         </Select>
       </Field>
       <Field label="Message" htmlFor="incident-update-body" required>
-        <Textarea id="incident-update-body" name="body" value={body} onChange={(event) => setBody(event.target.value)} rows={4} placeholder={UPDATE_PLACEHOLDER} required />
+        <Textarea id="incident-update-body" name="body" maxLength={INPUT_LIMITS.body} value={body} onChange={(event) => setBody(event.target.value)} rows={4} placeholder={UPDATE_PLACEHOLDER} required />
       </Field>
       <CheckRow name="notify" checked={notify} onChange={(event) => setNotify(event.target.checked)} label="Notify subscribers" />
       <div className="flex justify-end">
@@ -86,6 +87,7 @@ export function MaintenanceUpdateComposer({
         <Textarea
           id="maintenance-update-body"
           name="body"
+          maxLength={INPUT_LIMITS.body}
           value={body}
           onChange={(event) => setBody(event.target.value)}
           rows={4}
@@ -122,7 +124,7 @@ export function PostmortemComposer({
   return (
     <form action={action} className="space-y-4">
       <Field label="Postmortem" htmlFor="postmortem-body" hint="Shown as plain text on the public incident page, with line breaks kept.">
-        <Textarea id="postmortem-body" name="postmortemBody" rows={10} value={body} onChange={(event) => setBody(event.target.value)} placeholder={"## Summary\n## Timeline\n## Root cause\n## Remediation"} className="font-mono" />
+        <Textarea id="postmortem-body" name="postmortemBody" maxLength={INPUT_LIMITS.postmortem} rows={10} value={body} onChange={(event) => setBody(event.target.value)} placeholder={"## Summary\n## Timeline\n## Root cause\n## Remediation"} className="font-mono" />
       </Field>
       <div className="grid gap-3 sm:grid-cols-2">
         <CheckRow

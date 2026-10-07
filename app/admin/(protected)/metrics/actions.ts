@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { assertComponentInPage, assertPageInOrg, requireCapability } from "@/lib/admin-guard";
+import { INPUT_LIMITS } from "@/lib/input-limits";
 import { fenceActiveOrganizationMutation } from "@/lib/organization-mutation";
 import { database, withDatabaseTransaction } from "@/lib/postgres/client";
 
@@ -17,7 +18,11 @@ export async function createMetric(pageId: string, formData: FormData) {
   const componentId = String(formData.get("componentId") ?? "");
   if (componentId) await assertComponentInPage(componentId, pageId);
   const name = String(formData.get("name") ?? "").trim();
-  if (!name) throw new Error("Metric name is required");
+  if (!name || name.length > INPUT_LIMITS.title) throw new Error(`Metric name is required and must be ${INPUT_LIMITS.title} characters or fewer`);
+  const suffix = String(formData.get("suffix") ?? "").trim();
+  if (suffix.length > INPUT_LIMITS.metricSuffix) throw new Error(`Unit suffix must be ${INPUT_LIMITS.metricSuffix} characters or fewer`);
+  const description = String(formData.get("description") ?? "").trim();
+  if (description.length > INPUT_LIMITS.description) throw new Error(`Description must be ${INPUT_LIMITS.description} characters or fewer`);
   const decimals = validatedDecimals(formData);
   await withDatabaseTransaction(async (transaction) => {
     await fenceActiveOrganizationMutation(session.orgId, transaction);
@@ -31,7 +36,7 @@ export async function createMetric(pageId: string, formData: FormData) {
     }
     await transaction.insertInto("metrics").values({
       pageId, componentId: componentId || null, name,
-      suffix: String(formData.get("suffix") ?? ""), description: String(formData.get("description") ?? ""),
+      suffix, description,
       visible: true, decimals,
     }).execute();
   });

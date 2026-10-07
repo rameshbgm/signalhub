@@ -22,6 +22,7 @@ import { Input } from "@/components/ui/input";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { INPUT_LIMITS } from "@/lib/input-limits";
 
 function relativeTime(date: Date | null): string {
   if (!date) return "never";
@@ -249,10 +250,10 @@ export default async function MonitorsPage({ searchParams }: { searchParams: Pro
                     <Disclosure icon={Pencil} title="Edit monitor">
                       <PlatformActionForm successMessage="Monitor saved" action={updateMonitor.bind(null, m.id)} className="grid gap-4 p-4 sm:grid-cols-2">
                         <Field label="Monitor name" htmlFor={`monitor-name-${m.id}`} required>
-                          <Input id={`monitor-name-${m.id}`} name="name" defaultValue={m.name} required />
+                          <Input id={`monitor-name-${m.id}`} name="name" maxLength={INPUT_LIMITS.title} defaultValue={m.name} required />
                         </Field>
                         <Field label="Monitor target" htmlFor={`monitor-target-${m.id}`} required>
-                          <Input id={`monitor-target-${m.id}`} name="target" defaultValue={m.target} className="font-mono" required />
+                          <Input id={`monitor-target-${m.id}`} name="target" maxLength={INPUT_LIMITS.url} defaultValue={m.target} className="font-mono" required />
                         </Field>
                         <Field label="Linked component" htmlFor={`monitor-component-${m.id}`}>
                           <Select id={`monitor-component-${m.id}`} name="componentId" defaultValue={m.componentId ?? ""}>
@@ -261,7 +262,7 @@ export default async function MonitorsPage({ searchParams }: { searchParams: Pro
                           </Select>
                         </Field>
                         <Field label="Group" htmlFor={`monitor-group-${m.id}`}>
-                          <Input id={`monitor-group-${m.id}`} name="groupName" defaultValue={m.groupName ?? ""} placeholder="Group" />
+                          <Input id={`monitor-group-${m.id}`} name="groupName" maxLength={INPUT_LIMITS.monitorGroup} defaultValue={m.groupName ?? ""} placeholder="Group" />
                         </Field>
                         <Field label="Interval seconds" htmlFor={`monitor-interval-${m.id}`} hint="How often the monitor polls, from 10 seconds to 24 hours.">
                           <Input id={`monitor-interval-${m.id}`} name="intervalSec" type="number" min={10} max={86400} defaultValue={m.intervalSec} />

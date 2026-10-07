@@ -10,6 +10,7 @@ import {
   createOrganization,
   type CreateOrganizationState,
 } from "@/app/platform/(protected)/orgs/actions";
+import { INPUT_LIMITS } from "@/lib/input-limits";
 
 const INITIAL_STATE: CreateOrganizationState = { ok: false };
 
@@ -49,8 +50,8 @@ export function CreateOrganizationForm() {
           id="organization-reason"
           name="reason"
           required
-          minLength={10}
-          maxLength={500}
+          minLength={INPUT_LIMITS.reasonMin}
+          maxLength={INPUT_LIMITS.reason}
           placeholder="Customer request or internal ticket"
         />
       </Field>

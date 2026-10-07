@@ -13,6 +13,7 @@ import { Field } from "@/components/ui/field";
 import { IconTile } from "@/components/ui/icon-tile";
 import { Input } from "@/components/ui/input";
 import { StatusBadge, type StatusTone } from "@/components/ui/status-badge";
+import { INPUT_LIMITS } from "@/lib/input-limits";
 
 const RETENTION_LABELS: Record<string, string> = {
   monitorChecksDays: "Monitor check history",
@@ -64,13 +65,13 @@ export async function OrganizationSettingsSection() {
           <PlatformActionForm successMessage="Organization settings saved" action={updateOrgSettings}>
             <CardContent className="space-y-4">
               <Field label="Organization name" htmlFor="org-name">
-                <Input id="org-name" name="name" defaultValue={org.name} required />
+                <Input id="org-name" name="name" maxLength={INPUT_LIMITS.name} defaultValue={org.name} required />
               </Field>
               <Field label="Organization slug" htmlFor="org-slug" hint="The organization slug is a stable internal identifier and is not changed here.">
                 <Input id="org-slug" defaultValue={org.slug} className="font-mono" disabled />
               </Field>
               <Field label="Organization contact email" htmlFor="org-contact-email">
-                <Input id="org-contact-email" name="contactEmail" type="email" defaultValue={org.contactEmail ?? ""} />
+                <Input id="org-contact-email" name="contactEmail" maxLength={INPUT_LIMITS.email} type="email" defaultValue={org.contactEmail ?? ""} />
               </Field>
               <div className="flex justify-end border-t border-line pt-4">
                 <Button type="submit">Save changes</Button>

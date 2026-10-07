@@ -14,6 +14,7 @@ import {
   type PlatformCapability,
 } from "@/lib/platform-policy";
 import { AdminAuthError } from "@/lib/admin-auth-error";
+import { isDatabaseId } from "@/lib/database-id";
 
 export { AdminAuthError } from "@/lib/admin-auth-error";
 
@@ -117,6 +118,10 @@ export async function requireCapability(capability: Capability, pageId?: string)
   if (!sessionHasCapability(session, capability)) {
     throw new AdminAuthError(`This action requires ${capability.replace(".", " ")} permission`);
   }
+  // Ids arrive from URLs, forms and bound action args; reject malformed ones before Postgres does.
+  if (pageId && !isDatabaseId(pageId)) {
+    throw new AdminAuthError("Page not found in your organization", 404, "PAGE_NOT_FOUND");
+  }
   if (
     pageId &&
     session.pageIds !== null &&
@@ -204,6 +209,7 @@ export async function requirePlatformCapability(capability: PlatformCapability) 
 }
 
 export async function assertPageInOrg(pageId: string, orgId: string) {
+  if (!isDatabaseId(pageId)) throw new AdminAuthError("Page not found in your organization", 404, "PAGE_NOT_FOUND");
   const pageDoc = await database
     .selectFrom("pages")
     .selectAll()
@@ -234,6 +240,7 @@ export async function assertPageInOrg(pageId: string, orgId: string) {
 }
 
 export async function assertComponentInPage(componentId: string, pageId: string) {
+  if (!isDatabaseId(componentId)) throw new AdminAuthError("Component not found on this page", 404, "COMPONENT_NOT_FOUND");
   const doc = await database
     .selectFrom("components")
     .selectAll()
@@ -245,6 +252,7 @@ export async function assertComponentInPage(componentId: string, pageId: string)
 }
 
 export async function assertGroupInPage(groupId: string, pageId: string) {
+  if (!isDatabaseId(groupId)) throw new AdminAuthError("Component group not found on this page", 404, "GROUP_NOT_FOUND");
   const doc = await database
     .selectFrom("componentGroups")
     .selectAll()

@@ -14,6 +14,7 @@ import {
   INCIDENT_STATUS_LABEL,
   type IncidentStatus,
 } from "@/lib/status";
+import { INPUT_LIMITS } from "@/lib/input-limits";
 
 type TimelineUpdate = {
   id: string;
@@ -89,6 +90,7 @@ export function IncidentTimelineEditor({
                     id={`timeline-body-${update.id}`}
                     aria-label="Timeline message"
                     name="body"
+                    maxLength={INPUT_LIMITS.body}
                     defaultValue={update.body}
                     rows={4}
                     required

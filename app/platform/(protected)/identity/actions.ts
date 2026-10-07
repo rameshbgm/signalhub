@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requirePlatformCapability } from "@/lib/admin-guard";
 import { isDatabaseId } from "@/lib/database-id";
+import { INPUT_LIMITS } from "@/lib/input-limits";
 import { encryptSecret } from "@/lib/encryption";
 import { oidcConnectionConfig, samlConnectionConfig } from "@/lib/identity-connections";
 import { getOidcDiscovery } from "@/lib/oidc";
@@ -27,13 +28,19 @@ export async function createIdentityConnection(formData: FormData) {
   const connectionSlug = slug(String(formData.get("slug") ?? name));
   const type = String(formData.get("type") ?? "");
   const orgId = String(formData.get("orgId") ?? "").trim();
-  if (!name || name.length > 120 || !connectionSlug) throw new Error("Enter a valid connection name and slug");
+  if (!name || name.length > INPUT_LIMITS.name || !connectionSlug || connectionSlug.length > 80) throw new Error("Enter a valid connection name and slug");
   if (type !== "OIDC" && type !== "SAML") throw new Error("Choose OIDC or SAML");
   if (!isDatabaseId(orgId)) throw new Error("Choose an organization");
   const organization = await database.selectFrom("organizations").select("id")
     .where("id", "=", orgId).where("status", "=", "ACTIVE").executeTakeFirst();
   if (!organization) throw new Error("Organization not found");
-  const parsedMappings = mappingSchema.parse(JSON.parse(String(formData.get("roleMappings") ?? "[]")));
+  let rawMappings: unknown;
+  try {
+    rawMappings = JSON.parse(String(formData.get("roleMappings") ?? "[]"));
+  } catch {
+    throw new Error("Role mappings must be valid JSON");
+  }
+  const parsedMappings = mappingSchema.parse(rawMappings);
   const pageIds = [...new Set(parsedMappings.flatMap((mapping) => mapping.pageIds ?? []))];
   if (pageIds.length) {
     const pages = await database.selectFrom("pages").select("id").where("id", "in", pageIds)
@@ -56,6 +63,12 @@ export async function createIdentityConnection(formData: FormData) {
     signatureAlgorithm: "sha256" as const,
   };
   if (Object.values(config).some((value) => value === "")) throw new Error("Complete all required provider fields");
+  // Certificates and keys are PEM blocks; 20,000 characters fits a 4096-bit key with chain headroom.
+  if (Object.values(config).some((value) => typeof value === "string" && value.length > 20_000)) throw new Error("A provider field is too long");
+  const providerUrl = ("entryPoint" in config ? config.entryPoint : config.issuer) ?? "";
+  if (providerUrl.length > INPUT_LIMITS.url || !URL.canParse(providerUrl) || !["https:", "http:"].includes(new URL(providerUrl).protocol)) {
+    throw new Error(type === "OIDC" ? "Issuer must be a full URL such as https://idp.example.com" : "Entry point must be a full URL such as https://idp.example.com/sso");
+  }
   const acceptedAcrValues = String(formData.get("acceptedAcrValues") ?? "").split(",").map((value) => value.trim()).filter(Boolean);
   const acceptedAmrValues = String(formData.get("acceptedAmrValues") ?? "").split(",").map((value) => value.trim()).filter(Boolean);
   const now = new Date();

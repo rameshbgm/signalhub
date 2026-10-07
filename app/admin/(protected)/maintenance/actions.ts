@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { assertPageInOrg, requireCapability } from "@/lib/admin-guard";
+import { INPUT_LIMITS } from "@/lib/input-limits";
 import { database } from "@/lib/postgres/client";
 import {
   createMaintenance as createMaintenanceDomain,
@@ -66,6 +67,7 @@ export async function setMaintenanceStatus(incidentId: string, formData: FormDat
   if (!MAINTENANCE_STATUSES.includes(status)) throw new Error("Invalid maintenance status");
   const body = String(formData.get("body") ?? "").trim();
   if (!body) throw new Error("A maintenance update message is required");
+  if (body.length > INPUT_LIMITS.body) throw new Error(`Update messages must be ${INPUT_LIMITS.body.toLocaleString("en-US")} characters or fewer`);
   await transitionMaintenance({
     incidentId,
     status,

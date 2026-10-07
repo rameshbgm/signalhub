@@ -7,6 +7,7 @@ import { requireCapability, assertPageInOrg } from "@/lib/admin-guard";
 import { hashPassword } from "@/lib/auth";
 import { deletePageCascade, withTransaction } from "@/lib/cascade";
 import { isDatabaseId } from "@/lib/database-id";
+import { INPUT_LIMITS, isValidSmsCountryCode } from "@/lib/input-limits";
 import { fenceActiveOrganizationMutation } from "@/lib/organization-mutation";
 import { BULK_PAGE_LIMIT, bulkDeletePhrase, isBulkPageIntent, matchesBulkDeletePhrase, pageCountLabel } from "@/lib/page-bulk";
 import { templateDesign } from "@/lib/page-design";
@@ -49,8 +50,10 @@ export async function createPage(formData: FormData) {
   if (!["PUBLIC", "PRIVATE", "AUDIENCE"].includes(type)) throw new Error("Invalid page type");
   if (!["STATUS", "HUB"].includes(kind)) throw new Error("Invalid page kind");
   if (isHub && hubParentId) throw new Error("A hub cannot belong to another hub");
+  if (hubParentId && !isDatabaseId(hubParentId)) throw new Error("Hub not found in your organization");
   if (password && password.length < 12) throw new Error("Page passwords must contain at least 12 characters");
   if (type === "PRIVATE" && password.length < 12) throw new Error("Private pages require a password of at least 12 characters");
+  if (password.length > INPUT_LIMITS.password) throw new Error(`Page passwords must be ${INPUT_LIMITS.password} characters or fewer`);
   const passwordHash = type === "PRIVATE" ? await hashPassword(password) : null;
   const initialDesign = templateDesign("CENTERED_SUMMARY", "#0052CC");
   const pageId = await withTransaction(async (transaction) => {
@@ -250,11 +253,15 @@ export async function updatePageInfo(pageId: string, formData: FormData) {
   if (headline.length > 180) throw new Error("Headline must be 180 characters or fewer");
   const aboutText = String(formData.get("aboutText") ?? page.aboutText ?? "").trim();
   if (aboutText.length > 4_000) throw new Error("About text must be 4,000 characters or fewer");
+  const organizationName = String(formData.get("organizationName") ?? "").trim();
+  if (organizationName.length > INPUT_LIMITS.name) throw new Error(`Organization name must be ${INPUT_LIMITS.name} characters or fewer`);
+  const defaultSmsCountryCode = String(formData.get("defaultSmsCountryCode") ?? "+1").trim();
+  if (!isValidSmsCountryCode(defaultSmsCountryCode)) throw new Error("Default SMS country code must look like +1 or +353");
   const values = {
     name,
-    organizationName: String(formData.get("organizationName") ?? "").trim(),
+    organizationName,
     companyUrl: optionalUrl(formData.get("companyUrl")),
-    defaultSmsCountryCode: String(formData.get("defaultSmsCountryCode") ?? "+1").trim(),
+    defaultSmsCountryCode,
     timezone,
     headline,
     aboutText,
@@ -400,6 +407,7 @@ export async function updatePrivatePagePassword(pageId: string, formData: FormDa
   const session = await requireCapability("page.configure", pageId);
   const password = String(formData.get("password") ?? "");
   if (password.length < 12) throw new Error("Page passwords must contain at least 12 characters");
+  if (password.length > INPUT_LIMITS.password) throw new Error(`Page passwords must be ${INPUT_LIMITS.password} characters or fewer`);
   const passwordHash = await hashPassword(password);
   await withTransaction(async (transaction) => {
     await fenceActiveOrganizationMutation(session.orgId, transaction);
@@ -420,7 +428,13 @@ function optionalText(value: FormDataEntryValue | null) {
 function optionalUrl(value: FormDataEntryValue | null) {
   const result = optionalText(value);
   if (!result) return null;
-  const url = new URL(result);
+  if (result.length > INPUT_LIMITS.url) throw new Error(`URLs must be ${INPUT_LIMITS.url} characters or fewer`);
+  let url: URL;
+  try {
+    url = new URL(result);
+  } catch {
+    throw new Error(`Enter a full URL such as https://example.com (got "${result.slice(0, 80)}")`);
+  }
   if (!['http:', 'https:'].includes(url.protocol)) throw new Error("Only HTTP and HTTPS URLs are allowed");
   return url.toString();
 }

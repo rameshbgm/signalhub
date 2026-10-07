@@ -13,6 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { CheckRow } from "@/components/admin/operate-ui";
 import { utcToZonedDateTime } from "@/lib/page-locale";
 import { cn } from "@/lib/utils";
+import { INPUT_LIMITS } from "@/lib/input-limits";
 
 type Component = { id: string; name: string };
 
@@ -50,10 +51,10 @@ export function MaintenanceForm({
           </CardHeader>
           <CardContent className="space-y-4">
             <Field label="Title" htmlFor="maintenance-name" required>
-              <Input id="maintenance-name" name="name" value={name} onChange={(event) => setName(event.target.value)} required />
+              <Input id="maintenance-name" name="name" maxLength={INPUT_LIMITS.title} value={name} onChange={(event) => setName(event.target.value)} required />
             </Field>
             <Field label="Message" htmlFor="maintenance-body" hint="What is changing, what to expect, and who is affected." required>
-              <Textarea id="maintenance-body" name="body" value={body} onChange={(event) => setBody(event.target.value)} rows={4} required />
+              <Textarea id="maintenance-body" name="body" maxLength={INPUT_LIMITS.body} value={body} onChange={(event) => setBody(event.target.value)} rows={4} required />
             </Field>
           </CardContent>
         </Card>

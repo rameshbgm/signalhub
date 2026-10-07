@@ -7,12 +7,13 @@ import { withDatabaseTransaction } from "@/lib/postgres/client";
 import { writePlatformAudit } from "@/lib/platform-policy";
 import { RETENTION_BOUNDS, type EffectiveRetention } from "@/lib/retention";
 import { enqueueJobSweep, JOB_TASKS } from "@/lib/jobs";
+import { INPUT_LIMITS } from "@/lib/input-limits";
 
 export async function retryNotificationDelivery(jobId: string, formData: FormData) {
   const actor = await requirePlatformCapability("operations.retry");
   const reason = String(formData.get("reason") ?? "").trim();
   if (reason.length < 10) throw new Error("Enter a specific retry reason");
-  if (reason.length > 2_000) throw new Error("Reason must not exceed 2000 characters");
+  if (reason.length > INPUT_LIMITS.reason) throw new Error(`Reason must not exceed ${INPUT_LIMITS.reason} characters`);
   await withDatabaseTransaction(async (transaction) => {
     const now = new Date();
     const job = await transaction.updateTable("notificationJobs").set({

@@ -20,6 +20,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+import { INPUT_LIMITS } from "@/lib/input-limits";
 
 const CHANNELS = [
   { value: "EMAIL", label: "Email" },
@@ -167,7 +168,7 @@ export default async function SubscribersPage({ searchParams }: { searchParams: 
                 </Select>
               </Field>
               <Field label="Contact" htmlFor="add-contact">
-                <Input id="add-contact" name="contact" placeholder={CONTACT_PLACEHOLDER[channel]} required />
+                <Input id="add-contact" name="contact" maxLength={INPUT_LIMITS.email} placeholder={CONTACT_PLACEHOLDER[channel]} required />
               </Field>
               <CheckRow name="consent" required label="This person agreed to receive status updates" hint="Admin-added contacts skip email or SMS verification." />
               <div className="flex justify-end border-t border-line pt-4">

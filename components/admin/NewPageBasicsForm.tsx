@@ -9,6 +9,7 @@ import { IconTile } from "@/components/ui/icon-tile";
 import { Input } from "@/components/ui/input";
 import { PlatformActionForm } from "@/components/platform/PlatformActionForm";
 import { formMessage } from "@/components/admin/page-management-styles";
+import { INPUT_LIMITS } from "@/lib/input-limits";
 
 type HubOption = { id: string; name: string };
 
@@ -57,7 +58,7 @@ export function NewPageBasicsForm({
           </Field>
           {visibility === "PRIVATE" && (
             <Field label="Private page password" htmlFor="page-password" required>
-              <Input id="page-password" name="password" type="password" minLength={12} placeholder="At least 12 characters" required />
+              <Input id="page-password" name="password" maxLength={INPUT_LIMITS.password} type="password" minLength={12} placeholder="At least 12 characters" required />
             </Field>
           )}
           {kind === "STATUS" && hubs.length > 0 && (

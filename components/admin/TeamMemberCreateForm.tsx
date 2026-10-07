@@ -14,6 +14,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Checkbox } from "@/components/ui/checkbox";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { INPUT_LIMITS } from "@/lib/input-limits";
 
 const INITIAL_STATE: TeamMemberCreateState = { ok: false };
 
@@ -65,6 +66,7 @@ export function TeamMemberCreateForm({
             <Input
               id="member-email"
               name="email"
+              maxLength={INPUT_LIMITS.email}
               type="email"
               placeholder="name@company.com"
               required
@@ -89,6 +91,7 @@ export function TeamMemberCreateForm({
             <Input
               id="member-password"
               name="password"
+              maxLength={INPUT_LIMITS.password}
               type="password"
               autoComplete="new-password"
               placeholder="Required for a new local identity"

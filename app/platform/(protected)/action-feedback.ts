@@ -1,6 +1,7 @@
 "use server";
 
 import { unstable_rethrow } from "next/navigation";
+import { databaseInputErrorMessage } from "@/lib/database-errors";
 
 /** An action may return a message that replaces the default success text. */
 type PlatformAction = (formData: FormData) => void | string | Promise<void | string>;
@@ -34,9 +35,12 @@ export async function runPlatformActionWithFeedback(
       typeof error.issues[0]?.message === "string"
         ? error.issues[0].message
         : null;
+    const databaseMessage = databaseInputErrorMessage(error);
     const message =
       validationMessage && validationMessage.length <= 500
         ? `Check the form values: ${validationMessage}`
+        : databaseMessage
+          ? databaseMessage
         : error instanceof Error &&
             error.name === "Error" &&
             error.message.length <= 500

@@ -7,6 +7,7 @@ import { requireCapability, assertPageInOrg } from "@/lib/admin-guard";
 import { canonicalizeEmail } from "@/lib/identity";
 import { database, withDatabaseTransaction } from "@/lib/postgres/client";
 import { fenceActiveOrganizationMutation } from "@/lib/organization-mutation";
+import { INPUT_LIMITS, isValidEmail } from "@/lib/input-limits";
 
 const ADMIN_CHANNELS = ["EMAIL", "SMS"] as const;
 
@@ -16,7 +17,7 @@ async function validatedContact(channel: string, raw: string) {
   }
   if (channel === "EMAIL") {
     const email = canonicalizeEmail(raw);
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error("Invalid email address");
+    if (!isValidEmail(email)) throw new Error("Invalid email address");
     return email;
   }
   const phone = raw.replace(/[()\s.-]/g, "");
@@ -78,6 +79,9 @@ export async function importSubscribersCsv(pageId: string, formData: FormData) {
   const channel = String(formData.get("channel") ?? "EMAIL");
   if (channel !== "EMAIL") throw new Error("CSV import currently supports email subscribers only");
   const rawContacts = [...new Set(csv.split(/[\n,]/).map((value) => value.trim()).filter(Boolean))];
+  if (rawContacts.length > INPUT_LIMITS.csvContacts) {
+    throw new Error(`Import at most ${INPUT_LIMITS.csvContacts.toLocaleString("en-US")} addresses at a time`);
+  }
   const results = await Promise.allSettled(rawContacts.map((contact) => validatedContact("EMAIL", contact)));
   const invalid = rawContacts.filter((_, index) => results[index].status === "rejected");
   if (invalid.length) {

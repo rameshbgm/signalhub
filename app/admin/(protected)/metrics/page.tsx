@@ -22,6 +22,7 @@ import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { INPUT_LIMITS } from "@/lib/input-limits";
 
 export default async function MetricsPage({ searchParams }: { searchParams: Promise<{ pageId?: string }> }) {
   const { session, org } = await requireSession();
@@ -77,13 +78,13 @@ export default async function MetricsPage({ searchParams }: { searchParams: Prom
           <CardContent>
             <PlatformActionForm successMessage="Metric added" action={boundCreate} className="grid gap-4 sm:grid-cols-2">
               <Field label="Metric name" htmlFor="metric-name" required>
-                <Input id="metric-name" name="name" placeholder="Metric name (e.g. API Response Time)" required />
+                <Input id="metric-name" name="name" maxLength={INPUT_LIMITS.title} placeholder="Metric name (e.g. API Response Time)" required />
               </Field>
               <Field label="Unit suffix" htmlFor="metric-suffix" hint="Shown after the value, such as ms or %.">
-                <Input id="metric-suffix" name="suffix" placeholder="Unit suffix (e.g. ms, %)" />
+                <Input id="metric-suffix" name="suffix" maxLength={INPUT_LIMITS.metricSuffix} placeholder="Unit suffix (e.g. ms, %)" />
               </Field>
               <Field label="Description" htmlFor="metric-description" className="sm:col-span-2">
-                <Input id="metric-description" name="description" placeholder="Description (optional)" />
+                <Input id="metric-description" name="description" maxLength={INPUT_LIMITS.description} placeholder="Description (optional)" />
               </Field>
               <Field label="Component" htmlFor="metric-component">
                 <Select id="metric-component" name="componentId">

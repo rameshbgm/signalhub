@@ -20,6 +20,7 @@ import {
   setIdentityConnectionEnabled,
   testIdentityConnection,
 } from "./actions";
+import { INPUT_LIMITS } from "@/lib/input-limits";
 
 export default async function IdentityPage() {
   const session = await requirePlatformPageCapability("identity.read");
@@ -43,8 +44,8 @@ export default async function IdentityPage() {
             successMessage="Identity connection created"
             className="grid gap-4 sm:grid-cols-2"
           >
-            <Field label="Connection name" htmlFor="identity-name" required><Input id="identity-name" name="name" required /></Field>
-            <Field label="Stable slug" htmlFor="identity-slug" required><Input id="identity-slug" name="slug" required pattern="[a-z0-9-]+" /></Field>
+            <Field label="Connection name" htmlFor="identity-name" required><Input id="identity-name" name="name" maxLength={INPUT_LIMITS.name} required /></Field>
+            <Field label="Stable slug" htmlFor="identity-slug" required><Input id="identity-slug" name="slug" maxLength={INPUT_LIMITS.slug} required pattern="[a-z0-9-]+" /></Field>
             <Field label="Connection type" htmlFor="identity-type"><Select id="identity-type" name="type">
               <option value="OIDC">OpenID Connect</option>
               <option value="SAML">SAML 2.0</option>

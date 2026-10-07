@@ -6,6 +6,7 @@ import { hashPassword } from "@/lib/auth";
 import { canonicalizeEmail } from "@/lib/identity";
 import { fenceActiveOrganizationMutation } from "@/lib/organization-mutation";
 import { withDatabaseTransaction, type DatabaseTransaction } from "@/lib/postgres/client";
+import { INPUT_LIMITS, isValidEmail } from "@/lib/input-limits";
 
 async function validateComponents(pageId: string, componentIds: string[]) {
   if (new Set(componentIds).size !== componentIds.length) throw new Error("Components must be unique");
@@ -31,7 +32,7 @@ export async function createAccessGroup(pageId: string, formData: FormData) {
   const componentIds = formData.getAll("componentIds").map(String);
   await validateComponents(pageId, componentIds);
   const name = String(formData.get("name") ?? "").trim();
-  if (!name) throw new Error("Group name is required");
+  if (!name || name.length > INPUT_LIMITS.name) throw new Error(`Group name is required and must be ${INPUT_LIMITS.name} characters or fewer`);
   await withDatabaseTransaction(async (transaction) => {
     await fenceActiveOrganizationMutation(session.orgId, transaction);
     await validateComponentsInTransaction(transaction, pageId, componentIds);
@@ -62,8 +63,9 @@ export async function createAccessUser(pageId: string, formData: FormData) {
   const password = String(formData.get("password") ?? "");
   const groupId = String(formData.get("groupId") ?? "") || null;
   const componentIds = formData.getAll("componentIds").map(String);
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error("Enter a valid email address");
+  if (!isValidEmail(email)) throw new Error("Enter a valid email address");
   if (password.length < 12) throw new Error("Audience passwords must contain at least 12 characters");
+  if (password.length > INPUT_LIMITS.password) throw new Error(`Passwords must be ${INPUT_LIMITS.password} characters or fewer`);
   await validateComponents(pageId, componentIds);
   const passwordHash = await hashPassword(password);
   await withDatabaseTransaction(async (transaction) => {

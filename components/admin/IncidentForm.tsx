@@ -14,6 +14,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { CheckRow } from "@/components/admin/operate-ui";
 import { COMPONENT_STATUSES, COMPONENT_STATUS_LABEL, INCIDENT_STATUSES, INCIDENT_STATUS_LABEL, IMPACTS, IMPACT_LABEL } from "@/lib/status";
 import { cn } from "@/lib/utils";
+import { INPUT_LIMITS } from "@/lib/input-limits";
 
 type Component = { id: string; name: string };
 
@@ -45,10 +46,10 @@ export function IncidentForm({
           </CardHeader>
           <CardContent className="space-y-4">
             <Field label="Incident name" htmlFor="incident-name" required>
-              <Input id="incident-name" name="name" value={name} onChange={(e) => setName(e.target.value)} required />
+              <Input id="incident-name" name="name" maxLength={INPUT_LIMITS.title} value={name} onChange={(e) => setName(e.target.value)} required />
             </Field>
             <Field label="Message" htmlFor="incident-body" hint="What is happening, who is affected, and when you will post the next update." required>
-              <Textarea id="incident-body" name="body" value={body} onChange={(e) => setBody(e.target.value)} rows={4} required />
+              <Textarea id="incident-body" name="body" maxLength={INPUT_LIMITS.body} value={body} onChange={(e) => setBody(e.target.value)} rows={4} required />
             </Field>
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label="Status" htmlFor="incident-status">

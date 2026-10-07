@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { INPUT_LIMITS } from "@/lib/input-limits";
 
 export default async function PlatformUsersPage({
   searchParams,
@@ -156,7 +157,7 @@ export default async function PlatformUsersPage({
                             >
                               <Input
                                 id={`user-reason-${user.id}`}
-                                name="reason"
+                                name="reason" maxLength={INPUT_LIMITS.reason}
                                 minLength={10}
                                 required
                                 placeholder="Emergency reason / ticket"

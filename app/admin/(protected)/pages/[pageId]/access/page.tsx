@@ -13,6 +13,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { INPUT_LIMITS } from "@/lib/input-limits";
 
 export default async function PageAccess({ params }: { params: Promise<{ pageId: string }> }) {
   const { pageId } = await params;
@@ -28,7 +29,7 @@ export default async function PageAccess({ params }: { params: Promise<{ pageId:
       <Card>
         <CardHeader><CardTitle>Replace page password</CardTitle><CardDescription>Visitors will use the new password the next time they open this page.</CardDescription></CardHeader>
         <CardContent><PlatformActionForm action={updatePrivatePagePassword.bind(null, pageId)} successMessage="Page password updated" className="max-w-lg space-y-4">
-          <Field label="New password" htmlFor="new-page-password" required><Input id="new-page-password" name="password" type="password" required minLength={12} /></Field>
+          <Field label="New password" htmlFor="new-page-password" required><Input id="new-page-password" name="password" maxLength={INPUT_LIMITS.password} type="password" required minLength={12} /></Field>
           <PlatformSubmitButton pendingLabel="Updating password…">Update password</PlatformSubmitButton>
         </PlatformActionForm></CardContent>
       </Card>
@@ -63,8 +64,8 @@ export default async function PageAccess({ params }: { params: Promise<{ pageId:
           <CardContent className="space-y-5">
             <PlatformActionForm action={createAccessUser.bind(null, pageId)} successMessage="Access user added" className="space-y-4 rounded-control bg-sunken/60 p-4">
               <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="Email address" htmlFor="access-user-email" required><Input id="access-user-email" name="email" type="email" required /></Field>
-                <Field label="Temporary password" htmlFor="access-user-password" required><Input id="access-user-password" name="password" type="password" required minLength={12} /></Field>
+                <Field label="Email address" htmlFor="access-user-email" required><Input id="access-user-email" name="email" maxLength={INPUT_LIMITS.email} type="email" required /></Field>
+                <Field label="Temporary password" htmlFor="access-user-password" required><Input id="access-user-password" name="password" maxLength={INPUT_LIMITS.password} type="password" required minLength={12} /></Field>
               </div>
               <Field label="Access group" htmlFor="access-user-group"><Select id="access-user-group" name="groupId"><option value="">No group</option>{groupDocs.map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}</Select></Field>
               {!page.isHub && <ComponentChoices components={components} />}

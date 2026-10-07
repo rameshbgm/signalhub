@@ -4,11 +4,12 @@ import { revalidatePath } from "next/cache";
 import { requirePlatformCapability } from "@/lib/admin-guard";
 import { writePlatformAudit } from "@/lib/platform-policy";
 import { withOrganizationAdminInvariantTransaction } from "@/lib/team-owner-safety";
+import { INPUT_LIMITS } from "@/lib/input-limits";
 
 function reasonFrom(formData: FormData) {
   const reason = String(formData.get("reason") ?? "").trim();
   if (reason.length < 10) throw new Error("Enter a specific reason containing at least 10 characters");
-  if (reason.length > 2_000) throw new Error("Reason must not exceed 2000 characters");
+  if (reason.length > INPUT_LIMITS.reason) throw new Error(`Reason must not exceed ${INPUT_LIMITS.reason} characters`);
   return reason;
 }
 

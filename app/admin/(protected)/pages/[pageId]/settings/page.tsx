@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field } from "@/components/ui/field";
+import { INPUT_LIMITS, SMS_COUNTRY_CODE_PATTERN } from "@/lib/input-limits";
 
 export default async function PageSettings({ params }: { params: Promise<{ pageId: string }> }) {
   const { pageId } = await params;
@@ -33,12 +34,12 @@ export default async function PageSettings({ params }: { params: Promise<{ pageI
               <Field label="Headline" htmlFor="page-headline" hint="The large title on the public page."><Input id="page-headline" name="headline" defaultValue={page.headline ?? ""} maxLength={180} placeholder="Service status" /></Field>
               <Field label="About this page" htmlFor="page-about" hint="Optional. Shown under the headline and used as the default search description." className="sm:col-span-2"><Textarea id="page-about" name="aboutText" defaultValue={page.aboutText ?? ""} maxLength={4000} rows={3} /></Field>
               <Field label="Organization name" htmlFor="organization-name"><Input id="organization-name" name="organizationName" defaultValue={page.organizationName} maxLength={120} /></Field>
-              <Field label="Company website" htmlFor="company-website"><Input id="company-website" name="companyUrl" defaultValue={page.companyUrl ?? ""} inputMode="url" /></Field>
+              <Field label="Company website" htmlFor="company-website"><Input id="company-website" name="companyUrl" maxLength={INPUT_LIMITS.url} defaultValue={page.companyUrl ?? ""} inputMode="url" /></Field>
               <Field label="Timezone" htmlFor="page-timezone" hint="IANA name such as Europe/Berlin. Used for public dates and maintenance windows.">
                 <Input id="page-timezone" name="timezone" defaultValue={page.timezone} list="page-timezones" required />
                 <datalist id="page-timezones">{Intl.supportedValuesOf("timeZone").map((zone) => <option key={zone} value={zone} />)}</datalist>
               </Field>
-              <Field label="Default SMS country code" htmlFor="sms-country-code"><Input id="sms-country-code" name="defaultSmsCountryCode" defaultValue={page.defaultSmsCountryCode} /></Field>
+              <Field label="Default SMS country code" htmlFor="sms-country-code"><Input id="sms-country-code" name="defaultSmsCountryCode" maxLength={5} pattern={SMS_COUNTRY_CODE_PATTERN} title="A plus sign and country code, such as +1 or +353" defaultValue={page.defaultSmsCountryCode} /></Field>
             </div>
             <label className="flex items-center gap-2 text-sm text-ink-soft"><Checkbox name="noindex" defaultChecked={page.noindex} /> Ask search engines not to index this page</label>
             <div className="flex flex-col-reverse gap-3 border-t border-line pt-5 sm:flex-row sm:items-center sm:justify-between"><p className="text-xs text-ink-dim">Changes are saved to this page only.</p><PlatformSubmitButton pendingLabel="Saving…" className="w-full sm:w-auto">Save changes</PlatformSubmitButton></div>

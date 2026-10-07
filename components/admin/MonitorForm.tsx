@@ -9,6 +9,7 @@ import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { CheckRow } from "@/components/admin/operate-ui";
 import { COMPONENT_STATUSES, COMPONENT_STATUS_LABEL, type ComponentStatus } from "@/lib/status";
+import { INPUT_LIMITS } from "@/lib/input-limits";
 
 const MONITOR_TYPES = ["HTTP", "KEYWORD", "TCP", "TLS", "ICMP", "DNS", "HEARTBEAT"] as const;
 
@@ -37,7 +38,7 @@ export function MonitorForm({
     <PlatformActionForm action={action} successMessage="Monitor added" className="space-y-5 text-sm">
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Monitor name" htmlFor="monitor-name" required>
-          <Input id="monitor-name" name="name" placeholder="Monitor name" required />
+          <Input id="monitor-name" name="name" maxLength={INPUT_LIMITS.title} placeholder="Monitor name" required />
         </Field>
         <Field label="Monitor type" htmlFor="monitor-type">
           <Select id="monitor-type" aria-label="Monitor type" name="type" value={type} onChange={(e) => setType(e.target.value as typeof type)}>
@@ -53,14 +54,14 @@ export function MonitorForm({
           <Field label="Target" htmlFor="monitor-target" className="sm:col-span-2" required>
             <Input
               id="monitor-target"
-              name="target"
+              name="target" maxLength={INPUT_LIMITS.url}
               placeholder={isUrlBased ? "https://example.com/health" : "host.example.com"}
               className="font-mono"
               required
             />
           </Field>
         )}
-        {type === "HEARTBEAT" && <Input type="hidden" name="target" value="inbound-heartbeat" />}
+        {type === "HEARTBEAT" && <Input type="hidden" name="target" maxLength={INPUT_LIMITS.url} value="inbound-heartbeat" />}
 
         {type === "TCP" && (
           <Field label="Port" htmlFor="monitor-port" required>
@@ -91,24 +92,24 @@ export function MonitorForm({
               </Select>
             </Field>
             <Field label="Expected status" htmlFor="monitor-status-range">
-              <Input id="monitor-status-range" name="expectedStatusRange" defaultValue="200-299" placeholder="Expected status (e.g. 200-299)" />
+              <Input id="monitor-status-range" name="expectedStatusRange" maxLength={INPUT_LIMITS.monitorStatusRange} defaultValue="200-299" placeholder="Expected status (e.g. 200-299)" />
             </Field>
             <Field label="Timeout (ms)" htmlFor="monitor-timeout-http">
               <Input id="monitor-timeout-http" name="timeoutMs" type="number" defaultValue={10000} placeholder="Timeout (ms)" />
             </Field>
           </div>
           <Field label="Custom headers" htmlFor="monitor-headers" hint="A JSON object.">
-            <Textarea id="monitor-headers" name="requestHeaders" placeholder='Custom headers JSON, e.g. {"X-Api-Key":"abc"}' className="font-mono" rows={2} />
+            <Textarea id="monitor-headers" name="requestHeaders" maxLength={INPUT_LIMITS.monitorRequestHeaders} placeholder='Custom headers JSON, e.g. {"X-Api-Key":"abc"}' className="font-mono" rows={2} />
           </Field>
           <Field label="Request body" htmlFor="monitor-body">
-            <Textarea id="monitor-body" name="requestBody" placeholder="POST body (optional)" className="font-mono" rows={2} />
+            <Textarea id="monitor-body" name="requestBody" maxLength={INPUT_LIMITS.monitorRequestBody} placeholder="POST body (optional)" className="font-mono" rows={2} />
           </Field>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Body must contain" htmlFor="monitor-keyword" hint="Monitor is marked down if the response body does not contain this text.">
-              <Input id="monitor-keyword" name="keywordMatch" placeholder="Body must contain (optional)" />
+              <Input id="monitor-keyword" name="keywordMatch" maxLength={INPUT_LIMITS.monitorKeyword} placeholder="Body must contain (optional)" />
             </Field>
             <Field label="Body must not contain" htmlFor="monitor-keyword-absent" hint="Monitor is marked down if the response body contains this text.">
-              <Input id="monitor-keyword-absent" name="keywordAbsent" placeholder="Body must NOT contain (optional)" />
+              <Input id="monitor-keyword-absent" name="keywordAbsent" maxLength={INPUT_LIMITS.monitorKeyword} placeholder="Body must NOT contain (optional)" />
             </Field>
           </div>
         </Section>
@@ -130,7 +131,7 @@ export function MonitorForm({
               </Select>
             </Field>
             <Field label="Expected value" htmlFor="monitor-dns-value">
-              <Input id="monitor-dns-value" name="dnsExpectedValue" placeholder="Expected value (optional)" />
+              <Input id="monitor-dns-value" name="dnsExpectedValue" maxLength={INPUT_LIMITS.url} placeholder="Expected value (optional)" />
             </Field>
           </div>
         </Section>
@@ -161,25 +162,25 @@ export function MonitorForm({
           {authType === "BASIC" && (
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label="Username" htmlFor="monitor-auth-user">
-                <Input id="monitor-auth-user" name="authUsername" placeholder="Username" />
+                <Input id="monitor-auth-user" name="authUsername" maxLength={INPUT_LIMITS.monitorAuthUsername} placeholder="Username" />
               </Field>
               <Field label="Password" htmlFor="monitor-auth-secret">
-                <Input id="monitor-auth-secret" name="authSecret" type="password" placeholder="Password" />
+                <Input id="monitor-auth-secret" name="authSecret" maxLength={INPUT_LIMITS.monitorAuthSecret} type="password" placeholder="Password" />
               </Field>
             </div>
           )}
           {authType === "BEARER" && (
             <Field label="Bearer token" htmlFor="monitor-auth-secret">
-              <Input id="monitor-auth-secret" name="authSecret" type="password" placeholder="Bearer token" />
+              <Input id="monitor-auth-secret" name="authSecret" maxLength={INPUT_LIMITS.monitorAuthSecret} type="password" placeholder="Bearer token" />
             </Field>
           )}
           {authType === "HEADER" && (
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label="Header name" htmlFor="monitor-auth-header">
-                <Input id="monitor-auth-header" name="authHeaderName" placeholder="Header name (e.g. X-Api-Key)" />
+                <Input id="monitor-auth-header" name="authHeaderName" maxLength={INPUT_LIMITS.monitorAuthHeaderName} placeholder="Header name (e.g. X-Api-Key)" />
               </Field>
               <Field label="Header value" htmlFor="monitor-auth-secret">
-                <Input id="monitor-auth-secret" name="authSecret" type="password" placeholder="Header value" />
+                <Input id="monitor-auth-secret" name="authSecret" maxLength={INPUT_LIMITS.monitorAuthSecret} type="password" placeholder="Header value" />
               </Field>
             </div>
           )}
@@ -216,7 +217,7 @@ export function MonitorForm({
 
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Monitor group" htmlFor="monitor-group">
-          <Input id="monitor-group" name="groupName" placeholder="Monitor group (optional)" />
+          <Input id="monitor-group" name="groupName" maxLength={INPUT_LIMITS.monitorGroup} placeholder="Monitor group (optional)" />
         </Field>
         <Field label="Tags" htmlFor="monitor-tags">
           <Input id="monitor-tags" name="tags" placeholder="Tags, comma separated" />

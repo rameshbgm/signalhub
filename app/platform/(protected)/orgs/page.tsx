@@ -33,6 +33,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { StatusBadge, type StatusTone } from "@/components/ui/status-badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { PlatformHealth } from "@/components/platform/PlatformStat";
+import { INPUT_LIMITS } from "@/lib/input-limits";
 
 export default async function PlatformOrgsPage({
   searchParams,
@@ -272,7 +273,7 @@ export default async function PlatformOrgsPage({
                               <Field label="Suspension reason" htmlFor={`suspend-reason-${id}`} className="min-w-56 flex-1">
                                 <Input
                                   id={`suspend-reason-${id}`}
-                                  name="reason"
+                                  name="reason" maxLength={INPUT_LIMITS.reason}
                                   minLength={10}
                                   required
                                   placeholder="Suspension reason"
@@ -296,7 +297,7 @@ export default async function PlatformOrgsPage({
                               <Field label="Reactivation reason" htmlFor={`reactivate-reason-${id}`} className="min-w-56 flex-1">
                                 <Input
                                   id={`reactivate-reason-${id}`}
-                                  name="reason"
+                                  name="reason" maxLength={INPUT_LIMITS.reason}
                                   minLength={10}
                                   required
                                   placeholder="Reactivation reason"
@@ -325,7 +326,7 @@ export default async function PlatformOrgsPage({
                                 <Field label="Purge reason or ticket" htmlFor={`purge-reason-${id}`}>
                                   <Input
                                     id={`purge-reason-${id}`}
-                                    name="reason"
+                                    name="reason" maxLength={INPUT_LIMITS.reason}
                                     minLength={10}
                                     required
                                     placeholder="Purge reason / ticket"
@@ -369,7 +370,7 @@ export default async function PlatformOrgsPage({
                                   <Field label="Cancellation reason" htmlFor={`cancel-reason-${id}`} className="min-w-56 flex-1">
                                     <Input
                                       id={`cancel-reason-${id}`}
-                                      name="reason"
+                                      name="reason" maxLength={INPUT_LIMITS.reason}
                                       minLength={10}
                                       required
                                       placeholder="Cancellation reason"

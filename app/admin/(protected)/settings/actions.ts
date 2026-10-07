@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requireCapability } from "@/lib/admin-guard";
+import { INPUT_LIMITS, isValidEmail } from "@/lib/input-limits";
 import { writeActiveTenantAudit } from "@/lib/tenant-audit";
 import { RETENTION_BOUNDS, type EffectiveRetention } from "@/lib/retention";
 import { enqueueJobSweep, JOB_TASKS } from "@/lib/jobs";
@@ -10,7 +11,8 @@ export async function updateOrgSettings(formData: FormData) {
   const session = await requireCapability("organization.manage");
   const name = String(formData.get("name") ?? "").trim();
   const contactEmail = String(formData.get("contactEmail") ?? "").trim();
-  if (!name) throw new Error("Organization name is required");
+  if (!name || name.length > INPUT_LIMITS.name) throw new Error(`Organization name is required and must be ${INPUT_LIMITS.name} characters or fewer`);
+  if (contactEmail && !isValidEmail(contactEmail)) throw new Error("Enter a valid contact email address");
   await writeActiveTenantAudit(session.orgId, {
     actor: session.email,
     action: "UPDATE_ORG_SETTINGS",

@@ -6,6 +6,7 @@ import { withDatabaseTransaction } from "@/lib/postgres/client";
 import { organizationPurgeCanBeCancelled } from "@/lib/platform-job-policy";
 import { writePlatformAudit } from "@/lib/platform-policy";
 import { enqueueJobSweep, JOB_TASKS } from "@/lib/jobs";
+import { INPUT_LIMITS } from "@/lib/input-limits";
 
 function slugify(input: string) {
   return input.toLowerCase().normalize("NFKD")
@@ -15,7 +16,7 @@ function slugify(input: string) {
 function requiredReason(formData: FormData, minimum = 10) {
   const reason = String(formData.get("reason") ?? "").trim();
   if (reason.length < minimum) throw new Error(`Enter a specific reason (${minimum}+ characters)`);
-  if (reason.length > 2_000) throw new Error("Reason must not exceed 2000 characters");
+  if (reason.length > INPUT_LIMITS.reason) throw new Error(`Reason must not exceed ${INPUT_LIMITS.reason} characters`);
   return reason;
 }
 

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { assertPageInOrg, requireCapability } from "@/lib/admin-guard";
+import { INPUT_LIMITS } from "@/lib/input-limits";
 import { reconcileComponents } from "@/lib/component-status";
 import {
   addIncidentUpdate,
@@ -186,6 +187,7 @@ export async function savePostmortem(incidentId: string, formData: FormData) {
   const body = String(formData.get("postmortemBody") ?? "").trim();
   const publish = formData.get("publish") === "on";
   const notify = formData.get("notify") === "on";
+  if (body.length > INPUT_LIMITS.postmortem) throw new Error(`Postmortems must be ${INPUT_LIMITS.postmortem.toLocaleString("en-US")} characters or fewer`);
   if (publish && !body) throw new Error("A postmortem body is required before publishing");
   if (publish && incident.status !== "RESOLVED") throw new Error("Resolve the incident before publishing its postmortem");
   let firstPublish = false;

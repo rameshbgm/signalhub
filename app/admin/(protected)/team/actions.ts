@@ -21,6 +21,7 @@ import {
 } from "@/lib/team-owner-safety";
 import { recordTenantAudit } from "@/lib/tenant-audit";
 import { publicAppUrl } from "@/lib/url";
+import { isValidEmail } from "@/lib/input-limits";
 
 const INVITATION_LIFETIME_MS = 48 * 60 * 60_000;
 
@@ -109,7 +110,7 @@ export async function createMember(
     const password = String(formData.get("password") ?? "");
     const role = String(formData.get("role") ?? "RESPONDER") as MembershipRole;
     const pageIds = [...new Set(formData.getAll("pageIds").map(String).filter(Boolean))];
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(canonicalEmail)) throw new Error("Enter a valid email address");
+    if (!isValidEmail(canonicalEmail)) throw new Error("Enter a valid email address");
     const invalidUsername = usernameError(username);
     if (invalidUsername) throw new Error(invalidUsername);
     if (!name || name.length > 120) throw new Error("Enter a name containing at most 120 characters");
@@ -204,7 +205,7 @@ export async function inviteMember(
     const name = String(formData.get("name") ?? "").trim();
     const role = String(formData.get("role") ?? "RESPONDER") as MembershipRole;
     const pageIds = [...new Set(formData.getAll("pageIds").map(String).filter(Boolean))];
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(canonicalEmail)) throw new Error("Enter a valid email address");
+    if (!isValidEmail(canonicalEmail)) throw new Error("Enter a valid email address");
     if (!name || name.length > 120) throw new Error("Enter a name containing at most 120 characters");
     if (!MEMBERSHIP_ROLES.includes(role)) throw new Error("Invalid role");
     if (role === "ADMIN" && session.role !== "ADMIN") throw new Error("Only an Admin can grant administration");

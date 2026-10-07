@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 import { AdminAuthError } from "@/lib/admin-guard";
 import { OrganizationMutationBlockedError } from "@/lib/organization-mutation";
+import { databaseInputErrorMessage } from "@/lib/database-errors";
 import { errorFields, logger } from "@/lib/logger";
 
 export type ApiErrorBody = {
@@ -45,6 +46,11 @@ export function routeError(
       "ORGANIZATION_INACTIVE",
       "This organization is not active"
     );
+  }
+  const databaseMessage = databaseInputErrorMessage(error);
+  if (databaseMessage) {
+    logger.warn({ ...context, ...errorFields(error) }, "API request rejected by database constraint");
+    return apiError(400, "INVALID_INPUT", databaseMessage);
   }
   logger.error({ ...context, ...errorFields(error) }, "Unhandled API route error");
   return apiError(500, "INTERNAL_ERROR", "An unexpected server error occurred");

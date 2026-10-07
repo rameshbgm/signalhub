@@ -23,6 +23,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { StatusBadge, type StatusTone } from "@/components/ui/status-badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { PlatformStat } from "@/components/platform/PlatformStat";
+import { INPUT_LIMITS } from "@/lib/input-limits";
 
 export default async function PlatformOperationsPage() {
   const actor = await requirePlatformPageCapability("operations.read");
@@ -124,7 +125,7 @@ export default async function PlatformOperationsPage() {
                         <Field label="Retry reason" htmlFor={`job-retry-${job.id}`} className="min-w-48 flex-1 sm:w-56 sm:flex-none">
                           <Input
                             id={`job-retry-${job.id}`}
-                            name="reason"
+                            name="reason" maxLength={INPUT_LIMITS.reason}
                             minLength={10}
                             required
                             placeholder="Retry reason"
@@ -174,7 +175,7 @@ export default async function PlatformOperationsPage() {
                         <Field label="Retry reason" htmlFor={`delivery-retry-${job.id}`} className="min-w-48 flex-1 sm:w-56 sm:flex-none">
                           <Input
                             id={`delivery-retry-${job.id}`}
-                            name="reason"
+                            name="reason" maxLength={INPUT_LIMITS.reason}
                             minLength={10}
                             required
                             placeholder="Retry reason"

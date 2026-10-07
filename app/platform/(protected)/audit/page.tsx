@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { INPUT_LIMITS } from "@/lib/input-limits";
 
 export default async function PlatformAuditPage({
   searchParams,
@@ -116,13 +117,13 @@ export default async function PlatformAuditPage({
           {canManage && (
             <PlatformActionForm action={createAuditSink} successMessage="Audit sink created" className="grid gap-4 sm:grid-cols-2" messageClassName="sm:col-span-2">
               <Field label="Sink name" htmlFor="sink-name" required>
-                <Input id="sink-name" name="name" placeholder="Sink name" required />
+                <Input id="sink-name" name="name" maxLength={INPUT_LIMITS.name} placeholder="Sink name" required />
               </Field>
               <Field label="Endpoint URL" htmlFor="sink-url" required>
-                <Input id="sink-url" name="url" type="url" placeholder="https://siem.example/events" required />
+                <Input id="sink-url" name="url" maxLength={INPUT_LIMITS.url} type="url" placeholder="https://siem.example/events" required />
               </Field>
               <Field label="HMAC signing secret" htmlFor="sink-secret" required hint="At least 32 characters.">
-                <Input id="sink-secret" name="secret" type="password" minLength={32} placeholder="HMAC signing secret (32+ characters)" required />
+                <Input id="sink-secret" name="secret" maxLength={INPUT_LIMITS.secret} type="password" minLength={32} placeholder="HMAC signing secret (32+ characters)" required />
               </Field>
               <Field label="Audit sink organization" htmlFor="sink-org">
                 <Select id="sink-org" name="orgId">
