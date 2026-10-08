@@ -129,7 +129,11 @@ describe("safeReturnTo", () => {
     expect(safeReturnTo("/hub/cloud?x=1", "/f")).toBe("/hub/cloud?x=1");
   });
 
-  it.each(["//evil.com", "/\\evil.com", "https://evil.com", "evil.com", "/\t/evil.com", "", undefined])(
+  it.each([
+    "//evil.com", "/\\evil.com", "https://evil.com", "evil.com", "/\t/evil.com", "", undefined,
+    // dot segments collapse to a protocol-relative "//evil.com" once parsed
+    "/.//evil.com", "/a/..//evil.com", "/%2e//evil.com", "/%2E/%2e//evil.com",
+  ])(
     "falls back for %j",
     (value) => expect(safeReturnTo(value, "/f")).toBe("/f")
   );

@@ -4,6 +4,7 @@ import { findEnabledConnection } from "@/lib/identity-connections";
 import { createOidcTransactionValues, signOidcTransaction } from "@/lib/oidc";
 import { consumeRateLimit, RateLimitError, requestIp } from "@/lib/rate-limit";
 import { createSamlClient } from "@/lib/saml";
+import { safeReturnTo } from "@/lib/public-path";
 
 export async function GET(
   request: NextRequest,
@@ -14,11 +15,7 @@ export async function GET(
     const connection = await findEnabledConnection(slug, "SAML");
     if (!connection || connection.audience !== "ORGANIZATION") return apiError(404, "IDENTITY_CONNECTION_NOT_FOUND", "Identity connection not found");
     await consumeRateLimit("saml-start", requestIp(request), { limit: 20, windowMs: 15 * 60_000 });
-    const returnToParam = request.nextUrl.searchParams.get("returnTo");
-    const returnTo =
-      returnToParam?.startsWith("/") && !returnToParam.startsWith("//")
-        ? returnToParam
-        : "/organization";
+    const returnTo = safeReturnTo(request.nextUrl.searchParams.get("returnTo"), "/organization");
     const transaction = createOidcTransactionValues();
     const relayState = await signOidcTransaction({
       ...transaction,

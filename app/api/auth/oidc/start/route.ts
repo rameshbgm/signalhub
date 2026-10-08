@@ -9,6 +9,7 @@ import {
 } from "@/lib/oidc";
 import { apiError, routeError } from "@/lib/api-response";
 import { consumeRateLimit, RateLimitError, requestIp } from "@/lib/rate-limit";
+import { safeReturnTo } from "@/lib/public-path";
 
 export async function GET(request: NextRequest) {
   try {
@@ -17,10 +18,7 @@ export async function GET(request: NextRequest) {
 
     const discovery = await getOidcDiscovery();
     const transaction = createOidcTransactionValues();
-    const requestedReturnTo = request.nextUrl.searchParams.get("returnTo") ?? "/organization";
-    const returnTo = requestedReturnTo.startsWith("/") && !requestedReturnTo.startsWith("//")
-      ? requestedReturnTo
-      : "/organization";
+    const returnTo = safeReturnTo(request.nextUrl.searchParams.get("returnTo"), "/organization");
     const signedTransaction = await signOidcTransaction({ ...transaction, returnTo });
     const authorizationUrl = new URL(discovery.authorization_endpoint);
     authorizationUrl.search = new URLSearchParams({

@@ -1,9 +1,9 @@
 import { UnifiedLogin } from "@/components/auth/UnifiedLogin";
+import { safeReturnTo as sameOriginPath } from "@/lib/public-path";
 
 function safeReturnTo(value: string | undefined) {
-  if (!value?.startsWith("/") || value.startsWith("//")) return null;
-  if (value.startsWith("/api/")) return null;
-  return value;
+  const path = sameOriginPath(value, "");
+  return path && !path.startsWith("/api/") ? path : null;
 }
 
 export default async function LoginPage({

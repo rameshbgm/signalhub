@@ -9,6 +9,7 @@ import {
   signOidcTransaction,
 } from "@/lib/oidc";
 import { consumeRateLimit, RateLimitError, requestIp } from "@/lib/rate-limit";
+import { safeReturnTo } from "@/lib/public-path";
 
 export async function GET(
   request: NextRequest,
@@ -25,10 +26,7 @@ export async function GET(
     const config = oidcConnectionConfig(connection);
     const discovery = await getOidcDiscovery(config);
     const transaction = createOidcTransactionValues();
-    const requestedReturnTo = request.nextUrl.searchParams.get("returnTo") ?? "/organization";
-    const returnTo = requestedReturnTo.startsWith("/") && !requestedReturnTo.startsWith("//")
-      ? requestedReturnTo
-      : "/organization";
+    const returnTo = safeReturnTo(request.nextUrl.searchParams.get("returnTo"), "/organization");
     const signedTransaction = await signOidcTransaction({
       ...transaction,
       returnTo,
