@@ -4,6 +4,17 @@
   "private": true,
   "description": "Reliable Apache-2.0 self-hosted status pages, monitoring, and incident communication",
   "license": "Apache-2.0",
+  "homepage": "https://github.com/rameshbgm/signalhub#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rameshbgm/signalhub.git"
+  },
+  "bugs": {
+    "url": "https://github.com/rameshbgm/signalhub/issues"
+  },
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "dev": "next dev --webpack -p 3301",
     "dev:all": "trap 'kill 0' EXIT; npm run worker:dev & npm run dev",
