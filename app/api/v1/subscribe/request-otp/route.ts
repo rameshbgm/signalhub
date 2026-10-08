@@ -10,6 +10,7 @@ import { fenceActiveOrganizationMutation } from "@/lib/organization-mutation";
 import { getPublicPageBySlug } from "@/lib/pages";
 import { database, withDatabaseTransaction } from "@/lib/postgres/client";
 import { consumeRateLimit, RateLimitError, requestIp } from "@/lib/rate-limit";
+import { resolveSubscriptionScope } from "@/lib/public-surface-policy";
 import { hashSecret } from "@/lib/secrets";
 
 const schema = z.object({
@@ -51,12 +52,14 @@ export async function POST(request: NextRequest) {
     if (componentIds.length) {
       const components = await database.selectFrom("components").select("id")
         .where("id", "in", componentIds).where("pageId", "=", page.id).where("visible", "=", true).execute();
-      if (components.length !== componentIds.length ||
-        (pageAccess.visibleComponentIds && componentIds.some((id) => !pageAccess.visibleComponentIds!.includes(id)))) {
+      if (components.length !== componentIds.length) {
         return apiError(400, "INVALID_COMPONENT_SCOPE", "One or more components are unavailable");
       }
     }
-    const effectiveComponentIds = componentIds.length ? componentIds : pageAccess.visibleComponentIds ?? [];
+    // An empty scope means "all services" to the notifier; never let a scoped visitor end up there.
+    const scope = resolveSubscriptionScope(pageAccess.visibleComponentIds, componentIds, page.isHub);
+    if (!scope.ok) return apiError(400, "INVALID_COMPONENT_SCOPE", "One or more components are unavailable");
+    const effectiveComponentIds = scope.componentIds;
     const code = generateOtpCode();
     await withDatabaseTransaction(async (transaction) => {
       await fenceActiveOrganizationMutation(page.orgId, transaction);

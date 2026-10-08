@@ -36,3 +36,30 @@ export function canNotifyHubSubscribersFromChild(child: {
 }) {
   return !child.isHub && child.type === "PUBLIC";
 }
+
+/**
+ * Services a visitor's new subscription may cover. An empty list means "all
+ * services" to the notifier, so a scoped visitor with nothing visible must be
+ * refused instead of silently subscribed to everything. Hubs have no services.
+ */
+export function resolveSubscriptionScope(
+  visibleComponentIds: string[] | null,
+  requestedComponentIds: string[],
+  isHub = false
+): { ok: true; componentIds: string[] } | { ok: false } {
+  if (visibleComponentIds === null) return { ok: true, componentIds: requestedComponentIds };
+  if (!isHub && visibleComponentIds.length === 0) return { ok: false };
+  if (requestedComponentIds.some((id) => !visibleComponentIds.includes(id))) return { ok: false };
+  return { ok: true, componentIds: requestedComponentIds.length ? requestedComponentIds : visibleComponentIds };
+}
+
+/**
+ * Clamps an existing subscription to what a visitor may still see. Returns
+ * null when nothing is left, meaning the subscription should be removed.
+ */
+export function narrowSubscriberScope(subscriberComponentIds: string[], allowedComponentIds: string[]): string[] | null {
+  if (allowedComponentIds.length === 0) return null;
+  if (subscriberComponentIds.length === 0) return allowedComponentIds;
+  const kept = subscriberComponentIds.filter((id) => allowedComponentIds.includes(id));
+  return kept.length ? kept : null;
+}

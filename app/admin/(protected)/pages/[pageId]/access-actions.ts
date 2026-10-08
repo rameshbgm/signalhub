@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requireCapability, assertPageInOrg, assertComponentInPage } from "@/lib/admin-guard";
+import { reconcileAudienceSubscribers } from "@/lib/audience-subscribers";
 import { hashPassword } from "@/lib/auth";
 import { canonicalizeEmail } from "@/lib/identity";
 import { fenceActiveOrganizationMutation } from "@/lib/organization-mutation";
@@ -47,10 +48,14 @@ export async function deleteAccessGroup(pageId: string, groupId: string) {
   if (page.type !== "AUDIENCE") throw new Error("Audience groups require an audience page");
   await withDatabaseTransaction(async (transaction) => {
     await fenceActiveOrganizationMutation(session.orgId, transaction);
+    const members = await transaction.selectFrom("pageAccessUsers").select("email")
+      .where("groupId", "=", groupId).where("pageId", "=", pageId).execute();
     const removed = await transaction.deleteFrom("pageAccessGroups")
       .where("id", "=", groupId).where("pageId", "=", pageId)
       .returning("id").executeTakeFirst();
     if (!removed) throw new Error("Audience group not found or changed");
+    // Members lose the group's services; their subscriptions must not outlive that.
+    await reconcileAudienceSubscribers(transaction, page, members.map((member) => member.email));
   });
   revalidatePath(`/organization/pages/${pageId}`);
 }
@@ -100,8 +105,40 @@ export async function deleteAccessUser(pageId: string, userId: string) {
     await fenceActiveOrganizationMutation(session.orgId, transaction);
     const removed = await transaction.deleteFrom("pageAccessUsers")
       .where("id", "=", userId).where("pageId", "=", pageId)
-      .returning("id").executeTakeFirst();
+      .returning("email").executeTakeFirst();
     if (!removed) throw new Error("Audience user not found");
+    // Revoking sign-in also ends the email updates this person subscribed to.
+    await reconcileAudienceSubscribers(transaction, page, [removed.email]);
   });
   revalidatePath(`/organization/pages/${pageId}`);
+}
+
+export async function updateAccessUser(pageId: string, userId: string, formData: FormData) {
+  const session = await requireCapability("page.configure", pageId);
+  const page = await assertPageInOrg(pageId, session.orgId);
+  if (page.type !== "AUDIENCE") throw new Error("Audience users require an audience page");
+  // A blank password keeps the current one; a new one signs the visitor out everywhere.
+  const password = String(formData.get("password") ?? "");
+  const groupId = String(formData.get("groupId") ?? "") || null;
+  const componentIds = formData.getAll("componentIds").map(String);
+  if (password && password.length < 12) throw new Error("Audience passwords must contain at least 12 characters");
+  if (password.length > INPUT_LIMITS.password) throw new Error(`Passwords must be ${INPUT_LIMITS.password} characters or fewer`);
+  await validateComponents(pageId, componentIds);
+  const passwordHash = password ? await hashPassword(password) : null;
+  await withDatabaseTransaction(async (transaction) => {
+    await fenceActiveOrganizationMutation(session.orgId, transaction);
+    if (groupId) {
+      const group = await transaction.selectFrom("pageAccessGroups").select("id")
+        .where("id", "=", groupId).where("pageId", "=", pageId).executeTakeFirst();
+      if (!group) throw new Error("Audience group not found");
+    }
+    await validateComponentsInTransaction(transaction, pageId, componentIds);
+    const updated = await transaction.updateTable("pageAccessUsers")
+      .set({ groupId, componentIds, ...(passwordHash ? { passwordHash } : {}) })
+      .where("id", "=", userId).where("pageId", "=", pageId)
+      .returning("email").executeTakeFirst();
+    if (!updated) throw new Error("Audience user not found");
+    await reconcileAudienceSubscribers(transaction, page, [updated.email]);
+  });
+  revalidatePath(`/organization/pages/${pageId}/access`);
 }

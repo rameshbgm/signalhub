@@ -5,7 +5,7 @@ import { PlatformActionForm } from "@/components/platform/PlatformActionForm";
 import { PlatformSubmitButton } from "@/components/platform/PlatformSubmitButton";
 import { assertPageInOrg, requireCapability } from "@/lib/admin-guard";
 import { database } from "@/lib/postgres/client";
-import { createAccessGroup, createAccessUser, deleteAccessGroup, deleteAccessUser } from "../access-actions";
+import { createAccessGroup, createAccessUser, deleteAccessGroup, deleteAccessUser, updateAccessUser } from "../access-actions";
 import { updatePrivatePagePassword } from "../../actions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -31,6 +31,7 @@ export default async function PageAccess({ params }: { params: Promise<{ pageId:
         <CardHeader><CardTitle>Replace page password</CardTitle><CardDescription>Visitors will use the new password the next time they open this page.</CardDescription></CardHeader>
         <CardContent><PlatformActionForm action={updatePrivatePagePassword.bind(null, pageId)} successMessage="Page password updated" className="max-w-lg space-y-4">
           <Field label="New password" htmlFor="new-page-password" required><Input id="new-page-password" name="password" maxLength={INPUT_LIMITS.password} type="password" required minLength={12} /></Field>
+          <label className="flex items-start gap-2 text-sm text-ink-soft"><Checkbox name="removeSubscribers" className="mt-0.5" /><span>Also remove existing subscribers. Use this when the old password should no longer receive updates; they can subscribe again with the new one.</span></label>
           <PlatformSubmitButton pendingLabel="Updating password…">Update password</PlatformSubmitButton>
         </PlatformActionForm></CardContent>
       </Card>
@@ -66,13 +67,21 @@ export default async function PageAccess({ params }: { params: Promise<{ pageId:
             <PlatformActionForm action={createAccessUser.bind(null, pageId)} successMessage="Access user added" className="space-y-4 rounded-control bg-sunken/60 p-4">
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field label="Email address" htmlFor="access-user-email" required><Input id="access-user-email" name="email" maxLength={INPUT_LIMITS.email} type="email" required /></Field>
-                <Field label="Temporary password" htmlFor="access-user-password" required><Input id="access-user-password" name="password" maxLength={INPUT_LIMITS.password} type="password" required minLength={12} /></Field>
+                <Field label="Password" htmlFor="access-user-password" required><Input id="access-user-password" name="password" maxLength={INPUT_LIMITS.password} type="password" required minLength={12} /></Field>
               </div>
               <Field label="Access group" htmlFor="access-user-group"><Select id="access-user-group" name="groupId"><option value="">No group</option>{groupDocs.map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}</Select></Field>
               {!page.isHub && <ComponentChoices components={components} />}
               <Button type="submit">Add user</Button>
             </PlatformActionForm>
-            {users.length > 0 ? <ul className="space-y-2">{users.map((user) => <li key={user.id} className="flex flex-wrap items-center justify-between gap-3 rounded-control border border-line px-3.5 py-3 text-sm"><div className="min-w-0"><p className="break-all font-medium text-ink">{user.email}</p>{user.groupName && <p className="mt-0.5 text-xs text-ink-dim">{user.groupName}</p>}</div><InlineActionForm action={deleteAccessUser.bind(null, pageId, user.id)} messageClassName="justify-end"><Button type="submit" variant="destructive" size="sm">Delete</Button></InlineActionForm></li>)}</ul> : <EmptyState icon={UsersRound} hue="rose" title="No access users yet" description="Add a visitor above to grant access to this page." />}
+            {users.length > 0 ? <ul className="space-y-2">{users.map((user) => <li key={user.id} className="rounded-control border border-line px-3.5 py-3 text-sm"><div className="flex flex-wrap items-center justify-between gap-3"><div className="min-w-0"><p className="break-all font-medium text-ink">{user.email}</p>{user.groupName && <p className="mt-0.5 text-xs text-ink-dim">{user.groupName}</p>}</div><InlineActionForm action={deleteAccessUser.bind(null, pageId, user.id)} messageClassName="justify-end"><Button type="submit" variant="destructive" size="sm">Delete</Button></InlineActionForm></div>
+              <details className="mt-3"><summary className="cursor-pointer text-xs font-medium text-ink-soft">Edit access</summary>
+                <PlatformActionForm action={updateAccessUser.bind(null, pageId, user.id)} successMessage="Access user updated" className="mt-3 space-y-4">
+                  <Field label="New password" htmlFor={`access-user-password-${user.id}`}><Input id={`access-user-password-${user.id}`} name="password" maxLength={INPUT_LIMITS.password} type="password" minLength={12} placeholder="Leave blank to keep the current password" autoComplete="new-password" /></Field>
+                  <Field label="Access group" htmlFor={`access-user-group-${user.id}`}><Select id={`access-user-group-${user.id}`} name="groupId" defaultValue={user.groupId ?? ""}><option value="">No group</option>{groupDocs.map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}</Select></Field>
+                  {!page.isHub && <ComponentChoices components={components} selectedIds={user.componentIds} />}
+                  <p className="text-xs text-ink-dim">Removing services also trims this person&apos;s email subscriptions. A new password signs them out.</p>
+                  <Button type="submit" variant="secondary" size="sm">Save changes</Button>
+                </PlatformActionForm></details></li>)}</ul> : <EmptyState icon={UsersRound} hue="rose" title="No access users yet" description="Add a visitor above to grant access to this page." />}
           </CardContent>
         </Card>
       </div>
@@ -84,6 +93,6 @@ function AccessSummary({ title, description }: { title: string; description: str
   return <Card><CardContent className="flex items-start gap-4"><div className="rounded-control bg-danger-bg p-2.5 text-danger-fg"><LockKeyhole aria-hidden size={20} /></div><div><h2 className="text-lg font-semibold tracking-tight text-ink">{title}</h2><p className="mt-1 max-w-2xl text-sm leading-6 text-ink-soft">{description}</p></div></CardContent></Card>;
 }
 
-function ComponentChoices({ components }: { components: Array<{ id: string; name: string }> }) {
-  return <fieldset className="space-y-2"><legend className="text-sm font-medium text-ink">Service access</legend><div className="flex flex-wrap gap-3 rounded-control border border-line bg-surface p-3">{components.map((component) => <label key={component.id} className="flex items-center gap-2 text-sm text-ink-soft"><Checkbox name="componentIds" value={component.id} />{component.name}</label>)}</div></fieldset>;
+function ComponentChoices({ components, selectedIds = [] }: { components: Array<{ id: string; name: string }>; selectedIds?: string[] }) {
+  return <fieldset className="space-y-2"><legend className="text-sm font-medium text-ink">Service access</legend><div className="flex flex-wrap gap-3 rounded-control border border-line bg-surface p-3">{components.map((component) => <label key={component.id} className="flex items-center gap-2 text-sm text-ink-soft"><Checkbox name="componentIds" value={component.id} defaultChecked={selectedIds.includes(component.id)} />{component.name}</label>)}</div></fieldset>;
 }

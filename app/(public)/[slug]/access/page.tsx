@@ -8,6 +8,7 @@ import { PublicFooter, PublicHeader } from "@/components/public/PublicChrome";
 import type { PageDesignBlock } from "@/lib/page-design";
 import { scopeCustomCss } from "@/lib/custom-css";
 import { getPublicPageBySlug } from "@/lib/pages";
+import { safeReturnTo } from "@/lib/public-path";
 
 export default async function AccessPage({
   params,
@@ -18,9 +19,7 @@ export default async function AccessPage({
 }) {
   const { slug } = await params;
   const requestedReturnTo = (await searchParams).returnTo;
-  const returnTo = requestedReturnTo?.startsWith("/") && !requestedReturnTo.startsWith("//")
-    ? requestedReturnTo
-    : `/${slug}`;
+  const returnTo = safeReturnTo(requestedReturnTo, `/${slug}`);
   const pageDoc = await getPublicPageBySlug(slug);
   if (!pageDoc) notFound();
   const page = pageDoc!;

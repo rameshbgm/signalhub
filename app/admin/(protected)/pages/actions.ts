@@ -416,6 +416,8 @@ export async function updatePrivatePagePassword(pageId: string, formData: FormDa
   if (password.length < 12) throw new Error("Page passwords must contain at least 12 characters");
   if (password.length > INPUT_LIMITS.password) throw new Error(`Page passwords must be ${INPUT_LIMITS.password} characters or fewer`);
   const passwordHash = await hashPassword(password);
+  // The shared password has no per-person identity, so ending existing subscriptions is an explicit choice.
+  const removeSubscribers = formData.get("removeSubscribers") === "on";
   await withTransaction(async (transaction) => {
     await fenceActiveOrganizationMutation(session.orgId, transaction);
     const changed = await transaction.updateTable("pages").set({ passwordHash })
@@ -423,6 +425,10 @@ export async function updatePrivatePagePassword(pageId: string, formData: FormDa
       .where("type", "=", "PRIVATE").where("deletedAt", "is", null)
       .returning("id").executeTakeFirst();
     if (!changed) throw new Error("Private page not found in your organization");
+    if (removeSubscribers) {
+      await transaction.deleteFrom("subscribers").where("pageId", "=", pageId).execute();
+      await transaction.deleteFrom("subscriptionOtps").where("pageId", "=", pageId).execute();
+    }
   });
   revalidatePath(`/organization/pages/${pageId}/access`);
 }
