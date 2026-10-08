@@ -162,8 +162,8 @@ export default async function PagesListPage() {
                 hubId={hub.id}
                 action={bulkPageAction.bind(null, hub.id)}
                 attach={{ action: attachChildPage.bind(null, hub.id), options: standalone.filter((page) => !page.hubParentId).map((page) => ({ id: page.id, name: page.name })) }}
-                // Collapsed unless something inside needs attention, so many hubs stay scannable.
-                defaultOpen={!children.length || children.some((child) => activeCount(child) > 0)}
+                // Collapsed by default so many hubs stay scannable.
+                defaultOpen={false}
                 canConfigure={canConfigure}
                 empty={canConfigure ? (
                   <Link href={`/organization/pages/new?hubParentId=${hub.id}`} className="flex items-center justify-center gap-2 rounded-card border border-dashed border-line-strong p-4 text-sm font-semibold text-ink-soft outline-none transition-colors hover:border-primary/50 hover:bg-primary-soft/50 hover:text-primary-ink focus-visible:ring-4 focus-visible:ring-primary/25">
@@ -190,7 +190,7 @@ export default async function PagesListPage() {
               hubId={null}
               action={bulkPageAction.bind(null, null)}
               moveToHub={{ action: moveToHub, hubs: hubs.map((hub) => ({ id: hub.id, name: hub.name })) }}
-              defaultOpen
+              defaultOpen={false}
               canConfigure={canConfigure}
             />
           )}

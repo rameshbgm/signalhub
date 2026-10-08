@@ -5,7 +5,7 @@ import { CopyPhrase } from "@/components/ui/copy-phrase";
 import { useCallback, useId, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { createPortal, useFormStatus } from "react-dom";
-import { ArrowUpRight, ChevronDown, Eye, FolderInput, EyeOff, Globe, Lock, Pencil, Rocket, Trash2, Unlink, Users, X } from "lucide-react";
+import { ArrowUpRight, CircleMinus, CirclePlus, Eye, FolderInput, EyeOff, Globe, Lock, Pencil, Rocket, Trash2, Unlink, Users, X } from "lucide-react";
 import { PlatformActionForm } from "@/components/platform/PlatformActionForm";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -145,6 +145,7 @@ export function PageGroup({ header, rows, hubId, action, attach, moveToHub, defa
   return (
     <section aria-label={label} className={bare ? undefined : "overflow-hidden rounded-card border border-line bg-surface shadow-card"}>
       {!bare && <div className="flex items-center gap-1 py-3 pl-2 pr-4">
+        <div className="min-w-0 flex-1">{header}</div>
         <button
           type="button"
           onClick={() => setOpen(!open)}
@@ -154,9 +155,8 @@ export function PageGroup({ header, rows, hubId, action, attach, moveToHub, defa
           data-button-guard="off"
           className={iconAction("shrink-0")}
         >
-          <ChevronDown aria-hidden size={18} className={cn("text-ink-dim transition-transform duration-200 ease-soft", !open && "-rotate-90")} />
+          {open ? <CircleMinus aria-hidden size={20} className="text-ink-dim" /> : <CirclePlus aria-hidden size={20} className="text-ink-dim" />}
         </button>
-        <div className="min-w-0 flex-1">{header}</div>
       </div>}
 
       {open && (
