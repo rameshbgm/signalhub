@@ -34,6 +34,15 @@ jobs:
       - uses: actions/checkout@v4
       - run: docker build --tag signalhub:ci .
 
+  kubernetes:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # kubectl ships on GitHub runners; rendering catches broken manifests.
+      - run: cp deploy/kubernetes/base/secrets.env.example deploy/kubernetes/base/secrets.env
+      - run: kubectl kustomize deploy/kubernetes/base > /dev/null
+      - run: kubectl kustomize deploy/kubernetes/with-postgres > /dev/null
+
   e2e:
     runs-on: ubuntu-latest
     env:

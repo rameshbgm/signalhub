@@ -1,0 +1,13 @@
+# SignalHub plus a single PostgreSQL StatefulSet, for clusters without a
+# managed database. In ../base/secrets.env set POSTGRES_PASSWORD and
+#   DATABASE_URL=postgresql://signalhub:<POSTGRES_PASSWORD>@signalhub-postgres:5432/signalhub?sslmode=disable
+#
+#   kubectl apply -k deploy/kubernetes/with-postgres
+#
+# Back up the PVC (or switch to a managed database) before relying on it.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: signalhub
+resources:
+  - ../base
+  - postgres.yaml

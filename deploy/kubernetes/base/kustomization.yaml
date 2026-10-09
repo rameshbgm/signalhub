@@ -1,0 +1,29 @@
+# SignalHub on Kubernetes with an external PostgreSQL (managed or your own).
+#
+#   cp deploy/kubernetes/base/secrets.env.example deploy/kubernetes/base/secrets.env   # then fill it in
+#   edit config.env and ingress.yaml (public URL and host name)
+#   kubectl apply -k deploy/kubernetes/base
+#
+# No database yet? Use the overlay instead: kubectl apply -k deploy/kubernetes/with-postgres
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: signalhub
+labels:
+  - pairs: { app.kubernetes.io/name: signalhub }
+    includeSelectors: false
+resources:
+  - namespace.yaml
+  - web.yaml
+  - worker.yaml
+  - ingress.yaml
+  - networkpolicy.yaml
+images:
+  - name: signalhub
+    newName: ghcr.io/rameshbgm/signalhub
+    newTag: latest # pin a release (for example 1.2.0) in production
+secretGenerator:
+  - name: signalhub-secrets
+    envs: [secrets.env]
+configMapGenerator:
+  - name: signalhub-config
+    envs: [config.env]

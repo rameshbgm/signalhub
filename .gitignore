@@ -27,3 +27,4 @@ tsconfig.tsbuildinfo
 minimal-layout-live.png
 nav-regrouped.png
 page-settings-layout.png
+deploy/kubernetes/base/secrets.env

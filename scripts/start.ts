@@ -94,6 +94,7 @@ async function prepare() {
       }, { onlyIfNoUsers: false, mustChangePassword: true });
       users = await countUsers();
       bootstrapped = true;
+      log("Created the first administrator from STATUS_BOOTSTRAP_* variables.");
     }
     process.send?.({ users, bootstrapped } satisfies PrepareResult);
   } finally {
@@ -153,8 +154,7 @@ async function supervise(role: Role) {
       if (role === "worker") throw new Error("The worker needs DATABASE_URL. Finish setup on a web instance first.");
       setupMode = "db";
     } else {
-      const { users, bootstrapped } = await prepareDatabase(env);
-      if (bootstrapped) log("Created the first administrator from STATUS_BOOTSTRAP_* variables.");
+      const { users } = await prepareDatabase(env);
       if (users === 0 && role !== "worker") setupMode = "admin";
     }
 
