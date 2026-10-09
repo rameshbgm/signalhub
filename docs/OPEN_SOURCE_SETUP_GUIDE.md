@@ -1,15 +1,15 @@
 # Setup and deployment guide
 
-Everything you need to take SignalHub from `git clone` to a production status page: Docker Compose, TLS, first admin, email/SMS, upgrades.
+Everything you need to take SignalHub from `git clone` to a production status page on a single host: installer, setup wizard, TLS, email/SMS, upgrades. For Kubernetes and cloud platforms see the [deployment overview](deploy/README.md).
 
 > Related docs: [Configuration reference](configuration.md) · [Security and data protection](security.md) · [Operations](operations.md)
 
 **Contents**
 
 1. [Architecture and requirements](#1-architecture-and-requirements)
-2. [Generate secrets](#2-generate-secrets)
-3. [Docker Compose install](#3-docker-compose-install)
-4. [Create the first administrator](#4-create-the-first-administrator)
+2. [Prepare a database](#2-prepare-a-database)
+3. [Install](#3-install)
+4. [The setup wizard](#4-the-setup-wizard)
 5. [Verify the install](#5-verify-the-install)
 6. [Reverse proxy and TLS](#6-reverse-proxy-and-tls)
 7. [First-run configuration](#7-first-run-configuration)
@@ -23,13 +23,13 @@ Everything you need to take SignalHub from `git clone` to a production status pa
 
 ## 1. Architecture and requirements
 
-SignalHub is two processes sharing one PostgreSQL database:
+SignalHub is two processes sharing one PostgreSQL database. In the default image a small supervisor, `dist-runtime/start.mjs`, runs migrations and then both processes in one container (Kubernetes runs them as separate pods):
 
 | Process | What it does | Entry point |
 |---|---|---|
 | **web** | Next.js app: public status pages, admin UI, platform console, REST API | `node server.js` (port 3000 in the container) |
 | **worker** | Graphile Worker: monitor checks, notification delivery, exports, audit delivery, maintenance transitions, retention | `node dist-runtime/worker.mjs` (health on port 8081) |
-| **migrate** | One-shot job that applies SQL migrations before web/worker start | `node dist-runtime/migrate.mjs` |
+| **start** | Supervisor: applies migrations, generates first-boot secrets, runs the setup wizard until a database and administrator exist, then starts web and worker | `node dist-runtime/start.mjs` (the image's default command) |
 
 The web process never runs background work itself; it enqueues jobs in the database and the worker picks them up. **If the worker is down, monitors stop running and no notifications are sent**, which is why web readiness depends on a recent worker heartbeat (`REQUIRE_WORKER=true`).
 
@@ -37,8 +37,8 @@ The web process never runs background work itself; it enqueues jobs in the datab
 
 | | Minimum | Notes |
 |---|---|---|
-| Docker | Engine 24+ with Compose v2 | for the Compose path |
-| PostgreSQL | 18 | bundled in Compose (`postgres:18.4-alpine`); external if you prefer |
+| Docker | Engine 24+ with Compose v2.24+ | for the installer and Compose |
+| PostgreSQL | 14 (tested with 18) | your own or managed; an optional bundled container exists for trials |
 | Node.js | 22 | only for local development or building outside Docker |
 | CPU / RAM | 2 vCPU / 2 GB | comfortable for dozens of pages and a few hundred monitors; scale the worker for more |
 | Public DNS name + TLS | required for production | see [section 6](#6-reverse-proxy-and-tls) |
@@ -47,90 +47,67 @@ Outbound network access is needed from the **worker** for monitors, email/SMS pr
 
 ---
 
-## 2. Generate secrets
+## 2. Prepare a database
 
-Two independent secrets are required. Never reuse one for the other.
+SignalHub keeps everything (pages, incidents, subscribers, uploaded images, exports) in **one PostgreSQL database**, which you choose. Create an empty database and a user that owns it:
+
+```sql
+CREATE USER signalhub WITH PASSWORD 'a-long-random-password';
+CREATE DATABASE signalhub OWNER signalhub;
+```
+
+Managed databases (RDS, Cloud SQL, Azure, DigitalOcean, Neon, Supabase…) work as long as you use the **direct** connection, not a transaction pooler. Have the host, port, database, user, password and, if your provider uses a private CA, its CA certificate ready. The [database rules](deploy/README.md#database-rules-that-apply-everywhere) cover TLS and poolers.
+
+Just trying SignalHub? Skip this: the installer can start a PostgreSQL container for you.
+
+---
+
+## 3. Install
 
 ```bash
 git clone https://github.com/rameshbgm/signalhub.git
 cd signalhub
-cp .env.example .env
-
-# paste the output of each into .env
-openssl rand -base64 48   # SESSION_SECRET   (signs session JWTs)
-openssl rand -base64 48   # ENCRYPTION_KEY   (AES-256-GCM key material for stored credentials and contacts)
-openssl rand -base64 24   # POSTGRES_PASSWORD
+./install.sh
 ```
 
-Edit `.env`:
+The installer checks Docker, then asks:
 
-```ini
-SESSION_SECRET=...
-ENCRYPTION_KEY=...
-POSTGRES_PASSWORD=...
-# The public URL users will type. Use https:// in production.
-NEXT_PUBLIC_APP_URL=https://status.example.com
-```
+| Question | Effect |
+|---|---|
+| Domain for HTTPS | Adds Caddy with automatic Let's Encrypt certificates (`deploy/compose/https.yml`). DNS must point at the host and ports 80/443 must be open. Leave empty to listen on `127.0.0.1:3301` only. |
+| Bundled PostgreSQL? | Adds a PostgreSQL container (`deploy/compose/postgres.yml`) and offers it in the wizard. Default **no**: you enter your own database. |
+| Browser or terminal setup | Where you enter the database and administrator (both use the same checks). |
 
-> **Back up `ENCRYPTION_KEY`.** It protects subscriber contacts, SMTP/SMS credentials, TOTP secrets and monitor auth secrets. Losing it makes that data unrecoverable. For key rotation without downtime, see [Operations: rotating keys](operations.md#rotating-keys).
+It writes a small `.env` (which compose files to use, the domain, the image), pulls `ghcr.io/rameshbgm/signalhub:latest` (or builds locally if that is unavailable), starts the stack and prints the setup link and token. Re-running it is safe; flags make it non-interactive, for example `./install.sh --yes --domain status.example.com`. See `./install.sh --help`.
 
-Docker Compose refuses to start if `POSTGRES_PASSWORD`, `SESSION_SECRET` or `ENCRYPTION_KEY` is missing.
+**Without the installer:** `docker compose up -d` works with no `.env` at all. Add overrides with `COMPOSE_FILE`, for example `COMPOSE_FILE=docker-compose.yml:deploy/compose/https.yml` and `DOMAIN=status.example.com` in `.env`.
 
----
+Notes on the Compose setup:
 
-## 3. Docker Compose install
-
-```bash
-docker compose up -d --build
-docker compose ps
-```
-
-What happens, in order:
-
-1. `postgres` starts and becomes healthy.
-2. `migrate` builds the image and applies migrations, then exits.
-3. `worker` starts and publishes a heartbeat (healthcheck `http://127.0.0.1:8081/ready`).
-4. `web` starts once the worker is healthy and listens on **`127.0.0.1:3301`**.
-
-Notes on the default Compose file:
-
-- Web and Postgres are bound to `127.0.0.1` on purpose. Put a reverse proxy in front for public access ([section 6](#6-reverse-proxy-and-tls)).
-- The `database` network is internal (no internet). Only web and worker join the `egress` network.
-- Containers run as a non-root user with `cap_drop: ALL` and `no-new-privileges`.
-- Branding uploads and exports are stored in PostgreSQL so the database backup covers them.
+- One `signalhub` service runs web, worker and migrations. Its `signalhub_data` volume holds `/app/data/signalhub.json`: the database connection you enter and the **session and encryption secrets generated on first start**. Back up this volume, or copy the values into environment variables (they always take precedence).
+- The web port is bound to `127.0.0.1` unless the HTTPS override is used. Containers run as a non-root user with `cap_drop: ALL` and `no-new-privileges`.
 - ICMP (ping) monitors are **off** by default. See [ICMP monitors](configuration.md#monitoring-and-worker).
 
-Change the host port with `STATUS_PORT` in `.env`.
-
 ---
 
-## 4. Create the first administrator
+## 4. The setup wizard
 
-There is no public sign-up. An administrator creates the first organization and user from the command line. Pipe the password so it never lands in shell history or the process list:
+Until a database and an administrator exist, SignalHub serves only the setup wizard at `/setup`; every other page redirects there and the API answers `503 SETUP_REQUIRED`.
 
-```bash
-printf '%s' 'a-long-unique-initial-password' | docker compose exec -T web \
-  node dist-runtime/bootstrap.mjs \
-    --username admin \
-    --name "Your Name" \
-    --email you@example.com \
-    --org-name "Your Company" \
-    --org-slug your-company \
-    --password-stdin
-```
+1. **Unlock.** Paste the one-time setup token. It proves you operate the server: the installer prints it, and it is in the logs and on the volume:
+   ```bash
+   docker compose logs signalhub | grep -A1 "SETUP TOKEN"
+   docker compose exec signalhub cat /app/data/setup-token
+   ```
+2. **Database.** Enter host, port, database, user, password and the encryption mode (verify certificate, encrypt only, or off), or paste a connection URL. A custom CA can be pasted for RDS, Azure and Cloud SQL. **Test connection** reports, in plain language, whether it can connect and sign in, the PostgreSQL version, whether the user may create tables, and whether the database is empty, an existing SignalHub database (it will be upgraded) or holds other tables (you must confirm). Also confirm the **public URL**. Saving installs the schema; the page continues on its own.
+3. **Administrator.** Organization name and ID, your name, email, User ID and password (at least `PASSWORD_MIN_LENGTH` characters, not containing your name or email). This account administers your organization and the installation. Download the **configuration backup** offered here.
+4. **Done.** Sign in at `/login`.
 
-| Flag | Default | Meaning |
-|---|---|---|
-| `--username` | `admin` | Login User ID |
-| `--name` | `Instance Administrator` | Display name |
-| `--email` | (empty) | Contact email |
-| `--org-name` | `Default Organization` | First organization |
-| `--org-slug` | `default` | Lowercase letters, numbers, single hyphens |
-| `--password-stdin` | n/a | Read password from stdin (preferred) |
+**Terminal instead of browser:** `docker compose exec signalhub node dist-runtime/signalhubctl.mjs setup` asks the same questions (passwords are not echoed), then `docker compose restart signalhub`. For automation pass `--database-url`, `--admin-username`, `--admin-name`, `--admin-email`, `--org-name` and `--password-stdin`.
 
-The same values can come from `STATUS_BOOTSTRAP_EMAIL`, `STATUS_BOOTSTRAP_NAME`, `STATUS_BOOTSTRAP_ORG_NAME`, `STATUS_BOOTSTRAP_ORG_SLUG`. Bootstrap is idempotent on the org slug.
+**No wizard at all:** set `DATABASE_URL`, `SESSION_SECRET`, `ENCRYPTION_KEY` and `STATUS_BOOTSTRAP_PASSWORD` (plus optional `STATUS_BOOTSTRAP_USERNAME`, `_EMAIL`, `_NAME`, `_ORG_NAME`, `_ORG_SLUG`). On an empty database the administrator is created on start and must change the password at first sign-in. In `.env` for Compose, use `SIGNALHUB_DATABASE_URL` and `SIGNALHUB_PUBLIC_URL` (so a development `DATABASE_URL` in the same file never leaks into the container).
 
-Sign in at `https://status.example.com/organization/login`. You must change the password and complete your profile at first login. Installation-level (platform) administration lives at `/organization/platform`.
+**Lost access later?** `dist-runtime/bootstrap.mjs --password-stdin` resets (or creates) an administrator; see `--help` in [`scripts/bootstrap.ts`](../scripts/bootstrap.ts).
 
 ---
 
@@ -140,8 +117,8 @@ Sign in at `https://status.example.com/organization/login`. You must change the 
 curl -fsS http://127.0.0.1:3301/api/health/live    # process is up
 curl -fsS http://127.0.0.1:3301/api/health/ready   # DB reachable, migrations current, worker heartbeat fresh
 
-docker compose exec web node dist-runtime/signalhubctl.mjs preflight   # config sanity (secrets, URL, proxy)
-docker compose exec web node dist-runtime/signalhubctl.mjs doctor      # runtime checks
+docker compose exec signalhub node dist-runtime/signalhubctl.mjs preflight   # config sanity (secrets, URL, proxy)
+docker compose exec signalhub node dist-runtime/signalhubctl.mjs doctor      # runtime checks
 ```
 
 `preflight` flags problems such as `SESSION_SECRET` shorter than 32 characters, a non-HTTPS `NEXT_PUBLIC_APP_URL` in production, or `TRUST_PROXY_HEADERS=true` without an explicit `TRUSTED_PROXY_HOPS`.
@@ -242,17 +219,17 @@ To run Compose from the prebuilt image instead of building locally:
 # .env
 STATUS_IMAGE=ghcr.io/rameshbgm/signalhub:<version>
 
-docker compose pull migrate        # the migrate service owns the image reference
+docker compose pull signalhub
 docker compose up -d --no-build
 ```
 
-> No tagged release exists yet in a fresh fork. Push a `v*` tag to your repository to produce the first image, or build locally as in section 3.
+> No tagged release exists yet in a fresh fork. Push a `v*` tag to your repository to produce the first image, or let `install.sh` build locally.
 
 ---
 
 ## 9. Scaling
 
-Web and worker replicas can be scaled freely: they share one PostgreSQL database (including uploaded images and exports), and jobs and sweeps are lease-based and idempotent.
+Web and worker replicas can be scaled freely: they share one PostgreSQL database (including uploaded images and exports), and jobs and sweeps are lease-based and idempotent. On one host, run more `signalhub` containers against the same database with environment variables (not the wizard's file); across hosts use the [Kubernetes manifests](deploy/kubernetes.md) or a [cloud platform](deploy/README.md).
 
 Scaling knobs live in [`configuration.md`](configuration.md#monitoring-and-worker): `WORKER_MONITOR_CONCURRENCY`, `WORKER_NOTIFICATION_BATCH`, `DATABASE_POOL_SIZE`.
 
@@ -264,11 +241,11 @@ Scaling knobs live in [`configuration.md`](configuration.md#monitoring-and-worke
 # 0. back up first (section 11)
 git pull
 docker compose build
-docker compose up -d          # migrate runs first, then worker, then web
-docker compose exec web node dist-runtime/signalhubctl.mjs migrate --check
+docker compose up -d          # start.mjs migrates before starting web and worker
+docker compose exec signalhub node dist-runtime/signalhubctl.mjs migrate --check
 ```
 
-- Migrations are plain, forward-only SQL files in `db/migrations/` applied by the `migrate` service. Treat a failed migration as a failed release; fix it before retrying.
+- Migrations are plain, forward-only SQL files in `db/migrations/` applied on every start by `start.mjs` (serialized with an advisory lock, so several replicas are safe). Treat a failed migration as a failed release; fix it before retrying.
 - **Rollback** = restore the pre-upgrade database backup and redeploy the previous image. Do not run an older image against a newer schema.
 - Pin images by tag or digest in production; do not track `latest`.
 
@@ -279,8 +256,11 @@ docker compose exec web node dist-runtime/signalhubctl.mjs migrate --check
 Back up PostgreSQL (it holds uploaded images and exports too), and keep a copy of `ENCRYPTION_KEY` (or your keyring) stored separately. Details, restore drills and automation: [Operations: backup and restore](operations.md#backup-and-restore).
 
 ```bash
-# quick logical backup from the bundled Postgres container
-docker compose exec -T postgres pg_dump -U signalhub -Fc signalhub > signalhub-$(date +%F).dump
+# logical backup (works from any host with PostgreSQL client tools)
+pg_dump -Fc "$DATABASE_URL" > signalhub-$(date +%F).dump
+
+# configuration and generated secrets (wizard installs)
+docker compose cp signalhub:/app/data/signalhub.json ./signalhub-config-$(date +%F).json
 ```
 
 ---
@@ -289,10 +269,14 @@ docker compose exec -T postgres pg_dump -U signalhub -Fc signalhub > signalhub-$
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
-| `docker compose up` stops with "Set SESSION_SECRET in .env" | Required variable missing | Fill `SESSION_SECRET`, `ENCRYPTION_KEY`, `POSTGRES_PASSWORD` |
+| Every page redirects to `/setup` | No database or no administrator yet | Finish the wizard; the token is in `docker compose logs signalhub` |
+| Wizard: "does not accept TLS" | Database without TLS on a private network | Choose encryption **Disabled** (only on a private network) |
+| Wizard: "certificate is not trusted" | Provider uses a private CA | Paste the provider's CA certificate in the wizard (`DATABASE_SSL_CA`) |
+| Wizard: "looks like a transaction pooler" | Pooled connection string | Use the direct connection (often port 5432) |
+| Bundled database: "Set POSTGRES_PASSWORD in .env" | `deploy/compose/postgres.yml` without a password | Re-run `./install.sh` or set `POSTGRES_PASSWORD` |
 | Login loops or redirects to the wrong host | `NEXT_PUBLIC_APP_URL` doesn't match the URL in the browser | Set it to the exact public `https://` URL and restart |
 | Everyone shares one IP / rate limits too aggressive | Proxy headers not trusted | `TRUST_PROXY_HEADERS=true` and correct `TRUSTED_PROXY_HOPS` |
-| `/api/health/ready` returns not ready | Worker not running or migrations pending | `docker compose ps`, `docker compose logs worker migrate` |
+| `/api/health/ready` returns not ready | Worker not running or migrations pending | `docker compose ps`, `docker compose logs signalhub` |
 | Monitors never run, subscribers get nothing | Worker down (platform console shows Worker: Stale) | Restart the worker; check logs |
 | Emails not arriving | No SMTP configured | Platform console → Configuration; check Notification logs |
 | ICMP monitors fail | Disabled or missing capability | `MONITOR_ENABLE_ICMP=true`; image includes `ping` |

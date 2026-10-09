@@ -1,0 +1,35 @@
+# Render Blueprint: one-click deploy with a managed PostgreSQL.
+# https://render.com/docs/blueprint-spec
+#
+# Render generates the session and encryption secrets and wires DATABASE_URL.
+# You are asked for the administrator password and public URL on first deploy.
+services:
+  - type: web
+    name: signalhub
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: starter # the worker runs in the same service and must stay awake; free plans sleep
+    healthCheckPath: /api/health/live
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: signalhub-db
+          property: connectionString
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: ENCRYPTION_KEY
+        generateValue: true
+      - key: NEXT_PUBLIC_APP_URL
+        sync: false # e.g. https://signalhub.onrender.com or your custom domain
+      - key: STATUS_BOOTSTRAP_PASSWORD
+        sync: false # first administrator; changed at first sign-in
+      - key: STATUS_BOOTSTRAP_EMAIL
+        sync: false
+      - key: TRUST_PROXY_HEADERS
+        value: "true"
+
+databases:
+  - name: signalhub-db
+    databaseName: signalhub
+    user: signalhub
+    plan: basic-256mb

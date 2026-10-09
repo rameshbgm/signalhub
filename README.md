@@ -32,32 +32,36 @@ Hosted status-page products charge by the page, the seat and the subscriber, and
 - **No per-subscriber, per-page or per-seat pricing.** The software is free (Apache-2.0). You pay for the server and the email/SMS provider you pick.
 - **Enterprise identity included.** SAML, OIDC, SCIM, MFA, role-based access and audience-restricted pages are not locked behind a top tier.
 - **Monitoring wired to communication.** A failing check can flip a component, open an incident and notify subscribers automatically.
-- **Small to run.** One PostgreSQL database, one web process, one worker. Docker Compose is included.
+- **Small to run.** One container (web, worker and migrations) and one PostgreSQL database. Installer, Docker Compose, Kubernetes manifests and cloud guides are included.
 
 ## 🚀 Quick start
 
-You need Docker with Compose v2. Five minutes, no build tools.
+You need Docker with Compose v2.24+ and a PostgreSQL 14+ database (or let the installer start one for a trial).
 
 ```bash
 git clone https://github.com/rameshbgm/signalhub.git && cd signalhub
-cp .env.example .env
-
-# generate secrets and paste them into .env
-openssl rand -base64 48   # SESSION_SECRET
-openssl rand -base64 48   # ENCRYPTION_KEY
-openssl rand -base64 24   # POSTGRES_PASSWORD
-
-docker compose up -d --build
-
-# create your first organization and administrator (password via stdin, never in history)
-printf '%s' 'a-long-unique-password' | docker compose exec -T web \
-  node dist-runtime/bootstrap.mjs --username admin --email you@example.com \
-  --org-name "Your Company" --org-slug your-company --password-stdin
+./install.sh
 ```
 
-Open <http://localhost:3301/organization/login>, sign in as `admin`, set a new password, and create your first status page.
+The installer asks three questions (domain for automatic HTTPS, bundled PostgreSQL or your own, browser or terminal setup), starts SignalHub and prints a setup link with a one-time token. The **setup wizard** then:
 
-> For production add a reverse proxy with TLS, set `NEXT_PUBLIC_APP_URL` to your `https://` URL and configure email. The [setup guide](docs/OPEN_SOURCE_SETUP_GUIDE.md) covers Caddy and nginx, backups and upgrades step by step.
+1. checks your database connection (host, credentials, TLS, version, permissions) in plain language,
+2. installs the schema,
+3. creates your administrator account.
+
+No `.env` editing, no hand-made secrets: they are generated on first start and kept in the `signalhub_data` volume (back it up). Prefer plain Compose? `docker compose up -d` and open <http://localhost:3301/setup>.
+
+### Deploy anywhere
+
+| Target | Command or guide |
+|---|---|
+| VPS / VM | `./install.sh` ([setup guide](docs/OPEN_SOURCE_SETUP_GUIDE.md)) |
+| Kubernetes | `kubectl apply -k deploy/kubernetes/base` ([guide](docs/deploy/kubernetes.md)) |
+| Render | one-click Blueprint, [`render.yaml`](render.yaml) ([guide](docs/deploy/paas.md#render-one-click)) |
+| Railway, Fly.io, DigitalOcean | [PaaS guide](docs/deploy/paas.md) |
+| AWS, Google Cloud, Azure | [AWS](docs/deploy/aws.md) · [GCP](docs/deploy/gcp.md) · [Azure](docs/deploy/azure.md) |
+
+On stateless platforms, set `DATABASE_URL`, `SESSION_SECRET`, `ENCRYPTION_KEY` and `STATUS_BOOTSTRAP_PASSWORD` as environment variables instead and the wizard is skipped. See [deployment overview](docs/deploy/README.md).
 
 ## ✨ Features
 
@@ -261,7 +265,7 @@ There is also an inbound **component webhook** per component for tools that can 
 ## 🧰 CLI
 
 ```bash
-docker compose exec web node dist-runtime/signalhubctl.mjs <command>
+docker compose exec signalhub node dist-runtime/signalhubctl.mjs <command>
 ```
 
 | Command | What it does |

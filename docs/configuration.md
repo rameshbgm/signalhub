@@ -1,17 +1,28 @@
 # Configuration reference
 
-All runtime configuration is environment variables (see [`.env.example`](../.env.example)), plus a few settings managed in the **platform console** (`/organization/platform`). Docker Compose passes the documented variables to `web`, `worker` and `migrate`.
+All runtime configuration is environment variables (see [`.env.example`](../.env.example)), plus a few settings managed in the **platform console** (`/organization/platform`). On a single host the [setup wizard](OPEN_SOURCE_SETUP_GUIDE.md#4-the-setup-wizard) can supply the first group below instead, saving them to `SIGNALHUB_DATA_DIR/signalhub.json`; environment variables always take precedence over that file.
 
 > Setup walkthrough: [Setup and deployment guide](OPEN_SOURCE_SETUP_GUIDE.md)
 
-## Required
+## Core (set by the setup wizard, or as variables)
 
 | Variable | Description |
 |---|---|
-| `SESSION_SECRET` | Signs session JWTs. At least 32 characters. Generate with `openssl rand -base64 48`. |
-| `ENCRYPTION_KEY` | Key material for AES-256-GCM encryption of stored credentials, TOTP secrets and subscriber contacts. Independent from `SESSION_SECRET`. **Back it up.** |
-| `DATABASE_URL` | PostgreSQL connection string. Compose builds its own from the `POSTGRES_*` values. |
-| `NEXT_PUBLIC_APP_URL` | Canonical public URL, e.g. `https://status.example.com`. Used for links in emails, OIDC/SAML callbacks and cookies. |
+| `DATABASE_URL` | PostgreSQL 14+ connection string. Use the direct connection, not a transaction pooler. TLS via `?sslmode=verify-full` (`no-verify` encrypts without checking, `disable` turns TLS off). In Compose `.env`, set `SIGNALHUB_DATABASE_URL` instead. |
+| `DATABASE_SSL_CA` | Optional PEM text of the database server's CA (RDS, Azure, Cloud SQL). Enables certificate verification against it and overrides `sslmode`. `NODE_EXTRA_CA_CERTS=/path/ca.pem` is the file-based alternative. |
+| `SESSION_SECRET` | Signs session JWTs. At least 32 characters. Generated on first start if missing and a data volume is writable; otherwise required. |
+| `ENCRYPTION_KEY` | Key material for AES-256-GCM encryption of stored credentials, TOTP secrets and subscriber contacts. Independent from `SESSION_SECRET`. Generated like `SESSION_SECRET`. **Back it up.** |
+| `NEXT_PUBLIC_APP_URL` | Canonical public URL, e.g. `https://status.example.com`. Used for links in emails, OIDC/SAML callbacks and cookies. In Compose `.env`, set `SIGNALHUB_PUBLIC_URL`. |
+
+## Setup and first administrator
+
+| Variable | Default | Description |
+|---|---|---|
+| `SIGNALHUB_DATA_DIR` | `/app/data` (image), `./data` | Where the wizard stores `signalhub.json` (mode 0600) and the one-time `setup-token`. Mount a persistent volume here, or provide the core variables instead. |
+| `STATUS_BOOTSTRAP_PASSWORD` | (unset) | Creates the first administrator on start when the database has **no users**, then is ignored. The password must be changed at first sign-in. |
+| `STATUS_BOOTSTRAP_USERNAME` / `_EMAIL` / `_NAME` / `_ORG_NAME` / `_ORG_SLUG` | `admin` / empty / `Instance Administrator` / `Default Organization` / `default` | Details for that administrator and its organization (also defaults for `bootstrap.mjs`). |
+
+Without a database or administrator, the container serves only the setup wizard (`/setup`) and `/api/health/live`; other API calls return `503 SETUP_REQUIRED` and readiness stays false.
 
 ## Key rotation keyrings (optional)
 
@@ -30,7 +41,7 @@ Procedure: [Operations: rotating keys](operations.md#rotating-keys).
 |---|---|---|
 | `STATUS_PORT` | `3301` | Host port the web container is published on (`127.0.0.1` only). |
 | `STATUS_IMAGE` | `signalhub:local` | Image tag Compose builds or runs. Set to a GHCR tag to use a prebuilt image. |
-| `POSTGRES_DB` / `POSTGRES_USER` / `POSTGRES_PASSWORD` | `signalhub` / `signalhub` / required | Bundled Postgres credentials (Compose only). |
+| `POSTGRES_DB` / `POSTGRES_USER` / `POSTGRES_PASSWORD` | `signalhub` / `signalhub` / required | Credentials of the optional bundled PostgreSQL (`deploy/compose/postgres.yml`). |
 | `POSTGRES_PORT` | `5432` | Host port for the bundled Postgres (`127.0.0.1` only). |
 | `DATABASE_POOL_SIZE` | `20` | Max connections per process. Total = pool × (web + worker replicas). |
 | `DATABASE_IDLE_TIMEOUT_MS` | `30000` | Idle connection timeout. |
@@ -107,9 +118,9 @@ Monitor interval is configurable per monitor from 10 seconds to 24 hours. Check 
 | `OTEL_EXPORTER_OTLP_HEADERS` | empty | OTLP headers (e.g. auth). |
 | `ALLOW_INSECURE_AUDIT_SINKS` | `false` | Allow plain-HTTP SIEM sinks. Not recommended outside isolated networks. |
 
-## First-admin bootstrap (one-time)
+## Administrator recovery
 
-`STATUS_BOOTSTRAP_EMAIL`, `STATUS_BOOTSTRAP_NAME`, `STATUS_BOOTSTRAP_ORG_NAME`, `STATUS_BOOTSTRAP_ORG_SLUG` provide defaults for `bootstrap.mjs`. Pass the password with `--password-stdin`; never put it in `.env`. See [guide section 4](OPEN_SOURCE_SETUP_GUIDE.md#4-create-the-first-administrator).
+`bootstrap.mjs` creates or resets an administrator (break-glass recovery); pass the password with `--password-stdin`. First-time setup normally uses the [setup wizard](OPEN_SOURCE_SETUP_GUIDE.md#4-the-setup-wizard) or `STATUS_BOOTSTRAP_PASSWORD`.
 
 ## Development and test only
 

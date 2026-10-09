@@ -9,7 +9,7 @@ Day-2 runbook: health checks, metrics, backups, key rotation, retention, audit v
 Bundled in the image at `dist-runtime/signalhubctl.mjs` (`statusctl` is a compatibility alias). In a checkout use `npm run signalhubctl -- <command>`.
 
 ```bash
-docker compose exec web node dist-runtime/signalhubctl.mjs <command>
+docker compose exec signalhub node dist-runtime/signalhubctl.mjs <command>
 ```
 
 | Command | Purpose |
@@ -98,7 +98,7 @@ Organization exports: **Settings** in the UI or `signalhubctl export --org <id>`
 ## Audit verification and SIEM
 
 ```bash
-docker compose exec web node dist-runtime/signalhubctl.mjs audit --seal   # seal pending entries, then verify
+docker compose exec signalhub node dist-runtime/signalhubctl.mjs audit --seal   # seal pending entries, then verify
 ```
 
 Run it from a scheduled job and alert on a non-zero exit. Configure SIEM sinks in the platform console (**Audit**): HTTPS endpoint, 32+ character HMAC secret; verify the `x-status-signature` header on your receiver.
@@ -108,7 +108,7 @@ Run it from a scheduled job and alert on a non-zero exit. Configure SIEM sinks i
 ## Upgrades
 
 1. Read the release notes; back up (database + keys).
-2. Pull the new image or sources and `docker compose up -d`. The `migrate` service runs first.
+2. Pull the new image or sources and `docker compose up -d`. Migrations run first on start.
 3. `signalhubctl migrate --check`, `preflight`, and watch `/api/health/ready`.
 4. Roll back by restoring the backup and redeploying the previous image. Migrations are forward-only.
 
@@ -123,7 +123,7 @@ Run it from a scheduled job and alert on a non-zero exit. Configure SIEM sinks i
 
 | Symptom | Check |
 |---|---|
-| Readiness fails | `curl /api/health/ready` body; `docker compose logs worker migrate` |
+| Readiness fails | `curl /api/health/ready` body; `docker compose logs signalhub` |
 | Dead-letter count rising | Platform console → Operations; usually SMTP/SMS credentials or a destination URL |
 | Worker shows Stale | Worker container down or can't reach Postgres; heartbeat must be < 30 s old |
 | Audit chain verification fails | Stop, snapshot the database, investigate before anything else; compare with your SIEM copy |

@@ -20,6 +20,7 @@ SignalHub: self-hosted, Apache-2.0 status pages, monitoring and incident communi
 
 ## Architecture
 
+- **First-run setup:** `scripts/start.ts` (image entrypoint) merges `SIGNALHUB_DATA_DIR/signalhub.json` under env (env wins), generates secrets, migrates, and runs web + worker. With no `DATABASE_URL` or no users it runs web only with `SIGNALHUB_SETUP_MODE`; `proxy.ts` then serves only `/setup` (`app/setup`, `app/api/setup/*`, logic in `lib/setup/`). Setup-mode code must not import `lib/postgres/client.ts` (it binds `DATABASE_URL` at import).
 - **Two processes share one codebase and DB.** Web (`app/`) and worker (`worker/index.ts`) both import from `lib/`. The web side never runs background work itself: it enqueues via `enqueueJobSweep` (`lib/jobs.ts`, `JOB_TASKS`) inside its DB transaction, and `worker/tasks.ts` maps those tasks to handlers (`monitors`, `notifications`, `exports`, `audit-delivery`, `platform-jobs`, maintenance, retention, audit seal). Sweeps are idempotent and lease-based (`lease-heartbeat.ts`).
 - **URL rewriting in `proxy.ts`** (Next 16 middleware): public URLs `/organization/*` and `/organization/platform/*` are rewritten to the internal `app/admin/*` and `app/platform/*` routes; `/admin` and `/platform` redirect to the public forms. Auth is the `sp_session` JWT cookie (jose, rotating keyring from `lib/session-secret.ts`). New admin routes live under `app/admin/(protected)`.
 - **Route groups:** `app/(public)` status pages (`[slug]`, `hub`), `custom-domain`, `app/api/{v1,admin,platform,scim,internal,...}`. `/api/v1` is the scoped-API-key public API (`lib/api-auth.ts`, `lib/openapi.ts`).
@@ -29,5 +30,5 @@ SignalHub: self-hosted, Apache-2.0 status pages, monitoring and incident communi
 
 ## Conventions
 
-- Deploy artifacts: `Dockerfile`, `docker-compose.yml`.
+- Deploy artifacts: `Dockerfile` (CMD `dist-runtime/start.mjs`), `docker-compose.yml` + `deploy/compose/*` overrides, `install.sh`, `deploy/kubernetes` (kustomize), `render.yaml`, `fly.toml`; guides in `docs/deploy/`.
 - Commit finished phases rather than leaving them pending.

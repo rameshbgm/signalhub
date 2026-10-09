@@ -35,7 +35,7 @@ import styles from "./landing.module.css";
 
 const REPOSITORY_URL = "https://github.com/rameshbgm/signalhub";
 const DEPLOYMENT_GUIDE_URL =
-  "https://github.com/rameshbgm/signalhub/blob/main/docs/OPEN_SOURCE_SETUP_GUIDE.md";
+  "https://github.com/rameshbgm/signalhub/blob/main/docs/deploy/README.md";
 const SECURITY_URL =
   "https://github.com/rameshbgm/signalhub/blob/main/SECURITY.md";
 const USER_MANUAL_PATH = "/docs/user-manual.html";
@@ -127,15 +127,22 @@ const DEPLOYMENTS = [
   {
     icon: Container,
     eyebrow: "Straightforward start",
-    title: "Docker Compose",
-    body: "Run the web app, worker, migrations, and PostgreSQL from the production stack included in the repository.",
-    detail: "Ideal for a controlled host or evaluation environment.",
+    title: "One-line install",
+    body: "Run ./install.sh on any Docker host, then connect your PostgreSQL and create the administrator in a guided setup wizard.",
+    detail: "Automatic HTTPS, generated secrets, no config files to edit.",
+  },
+  {
+    icon: Blocks,
+    eyebrow: "Cluster native",
+    title: "Kubernetes",
+    body: "Apply the included kustomize manifests for separate web and worker deployments, probes, migrations, ingress, and network policies.",
+    detail: "No Helm required; works on GKE, EKS, AKS, and k3s.",
   },
   {
     icon: ServerCog,
     eyebrow: "Any infrastructure",
-    title: "AWS, Azure, GCP, or VPS",
-    body: "Follow provider blueprints while keeping the same PostgreSQL, web, worker, migration, storage, and recovery contract.",
+    title: "Any cloud platform",
+    body: "One container and your managed PostgreSQL on Render, Railway, Fly.io, AWS, Google Cloud, or Azure, with step-by-step guides.",
     detail: "Public cloud, private cloud, sovereign cloud, or isolated network.",
   },
 ] as const;
@@ -531,8 +538,8 @@ export function LandingPage() {
               <p className={styles.sectionKicker}>Choose your environment</p>
               <h2 id="deploy-title">Deployment that fits your operating model.</h2>
               <p>
-                Start with Docker on one host, or follow the AWS, Azure, GCP, and
-                generic VPS blueprints.
+                Install on one host in minutes, apply the Kubernetes manifests, or
+                follow the guides for Render, Fly.io, AWS, Google Cloud, and Azure.
               </p>
             </Reveal>
             <Reveal delay={0.08}>
