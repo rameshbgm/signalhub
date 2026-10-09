@@ -639,7 +639,7 @@ WHAT      On a new incident show "similar past incidents" with what was said and
 FITS      Step 1 (no AI): Postgres full-text search (tsvector) over incident names,
           updates and post-mortems, filtered by component. Step 2 (optional): embeddings
           stored with the pgvector extension and hybrid FTS + vector ranking; this needs
-          pgvector in the Postgres image used by docker-compose.yml and deploy/helm, so
+          pgvector in the Postgres image used by docker-compose.yml, so
           check that before committing. Always scope by organization.
 BENEFITS  Faster diagnosis and consistent wording; new on-call staff inherit team
           history.

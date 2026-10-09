@@ -48,7 +48,7 @@ async function doctor() {
     migrations: migration?.current ?? false,
     migrationSummary: migration ? migrationIssueSummary(migration) : "Database connection failed",
     worker: Boolean(worker),
-    storage: process.env.ASSET_STORAGE_DRIVER ?? "db",
+    storage: "db",
     trustedProxyHeaders: process.env.TRUST_PROXY_HEADERS === "true",
     signingKeyring: Boolean(process.env.SESSION_SIGNING_KEYS),
     encryptionKeyring: Boolean(process.env.ENCRYPTION_KEYS),
@@ -63,7 +63,6 @@ function preflight() {
   if (!process.env.DATABASE_URL?.startsWith("postgres")) errors.push("A PostgreSQL DATABASE_URL is required");
   if (!process.env.SESSION_SECRET || process.env.SESSION_SECRET.length < 32) errors.push("SESSION_SECRET must be at least 32 characters");
   if (!process.env.ENCRYPTION_KEY && !process.env.ENCRYPTION_KEYS) errors.push("ENCRYPTION_KEY or ENCRYPTION_KEYS is required");
-  if (process.env.ASSET_STORAGE_DRIVER?.toLowerCase() === "s3" && !process.env.S3_BUCKET) errors.push("S3_BUCKET is required for S3 storage");
   if (process.env.NODE_ENV === "production" && !process.env.NEXT_PUBLIC_APP_URL?.startsWith("https://")) warnings.push("NEXT_PUBLIC_APP_URL should use HTTPS in production");
   if (process.env.TRUST_PROXY_HEADERS === "true" && !process.env.TRUSTED_PROXY_HOPS) warnings.push("Set TRUSTED_PROXY_HOPS explicitly when proxy headers are trusted");
   console.log(JSON.stringify({ ok: errors.length === 0, errors, warnings }, null, 2));
@@ -80,8 +79,6 @@ async function backup() {
     createdAt: new Date().toISOString(),
     archive: path.basename(output),
     sha256: createHash("sha256").update(bytes).digest("hex"),
-    assetStorageDriver: process.env.ASSET_STORAGE_DRIVER ?? "db",
-    assetsIncluded: (process.env.ASSET_STORAGE_DRIVER ?? "db").toLowerCase() !== "s3",
   };
   await writeFile(`${output}.manifest.json`, JSON.stringify(manifest, null, 2), { flag: "wx" });
   console.log(JSON.stringify(manifest, null, 2));

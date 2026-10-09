@@ -12,9 +12,9 @@ networks, restrict installation administration with
 `PLATFORM_ADMIN_ALLOWED_CIDRS`, configure forwarded headers only for a known
 proxy hop count, and use TLS for all public traffic.
 
-Enterprise deployments should use a highly available PostgreSQL cluster, S3-compatible object
-storage, authenticated metrics, external secret management, and the restricted
-Helm security defaults. Retain a local Admin as a break-glass account,
+Enterprise deployments should use a highly available PostgreSQL cluster, authenticated
+metrics, external secret management, and the restricted container defaults.
+Retain a local Admin as a break-glass account,
 test backup restoration, and periodically verify the audit hash chains.
 
 We support the latest released version and the preceding minor release.

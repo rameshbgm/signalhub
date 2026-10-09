@@ -29,5 +29,5 @@ SignalHub: self-hosted, Apache-2.0 status pages, monitoring and incident communi
 
 ## Conventions
 
-- Deploy artifacts: `Dockerfile`, `docker-compose.yml`, `deploy/helm`.
+- Deploy artifacts: `Dockerfile`, `docker-compose.yml`.
 - Commit finished phases rather than leaving them pending.

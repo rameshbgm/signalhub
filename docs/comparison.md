@@ -82,6 +82,6 @@ Third-party comparisons used where official pages were not retrievable:
 - **Enterprise identity included**: SAML, OIDC, SCIM, MFA, RBAC and audience-restricted pages are not locked behind a top tier.
 - **One product for page, monitors and communication**: monitors flip component status, open incidents and notify subscribers automatically.
 - **Auditability**: hash-chained audit log, SIEM delivery, org export and retention controls.
-- **Simple to run**: one PostgreSQL database plus a web and a worker process; Docker Compose and Helm included.
+- **Simple to run**: one PostgreSQL database plus a web and a worker process; Docker Compose included.
 
 See the [feature list in the README](../README.md#-features) and [security and data protection](security.md).

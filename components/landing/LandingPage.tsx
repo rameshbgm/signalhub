@@ -38,8 +38,6 @@ const DEPLOYMENT_GUIDE_URL =
   "https://github.com/rameshbgm/signalhub/blob/main/docs/OPEN_SOURCE_SETUP_GUIDE.md";
 const SECURITY_URL =
   "https://github.com/rameshbgm/signalhub/blob/main/SECURITY.md";
-const HELM_GUIDE_URL =
-  "https://github.com/rameshbgm/signalhub/tree/main/deploy/helm/status";
 const USER_MANUAL_PATH = "/docs/user-manual.html";
 
 const CAPABILITIES = [
@@ -114,7 +112,7 @@ const OWNERSHIP_STEPS = [
     icon: LockKeyhole,
     kicker: "Own the data",
     title: "Keep operational records and subscriber data inside your security boundary.",
-    body: "Your PostgreSQL database, object storage, identity connections, encryption keys, domains, backups, and retention policies remain yours.",
+    body: "Your PostgreSQL database, identity connections, encryption keys, domains, backups, and retention policies remain yours.",
   },
   {
     number: "03",
@@ -132,13 +130,6 @@ const DEPLOYMENTS = [
     title: "Docker Compose",
     body: "Run the web app, worker, migrations, and PostgreSQL from the production stack included in the repository.",
     detail: "Ideal for a controlled host or evaluation environment.",
-  },
-  {
-    icon: Blocks,
-    eyebrow: "Cluster native",
-    title: "Kubernetes + Helm",
-    body: "Use the maintained chart for separate web and worker deployments, probes, migration jobs, ingress, and secrets.",
-    detail: "Designed for an existing Kubernetes operating model.",
   },
   {
     icon: ServerCog,
@@ -540,8 +531,8 @@ export function LandingPage() {
               <p className={styles.sectionKicker}>Choose your environment</p>
               <h2 id="deploy-title">Deployment that fits your operating model.</h2>
               <p>
-                Start with Docker on one host, deploy with Helm on Kubernetes,
-                or follow the AWS, Azure, GCP, and generic VPS blueprints.
+                Start with Docker on one host, or follow the AWS, Azure, GCP, and
+                generic VPS blueprints.
               </p>
             </Reveal>
             <Reveal delay={0.08}>
@@ -637,7 +628,6 @@ export function LandingPage() {
               <ExternalAnchor href={DEPLOYMENT_GUIDE_URL}>
                 Setup guide
               </ExternalAnchor>
-              <ExternalAnchor href={HELM_GUIDE_URL}>Helm chart</ExternalAnchor>
               <Link href={USER_MANUAL_PATH}>User manual</Link>
               <ExternalAnchor href={SECURITY_URL}>
                 Security policy

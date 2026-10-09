@@ -39,7 +39,6 @@ Sign in at <http://localhost:3301/organization/login>. For sample data on a **di
 | `db/migrations/` | Numbered plain-SQL migrations |
 | `components/` | `ui/` primitives, plus `admin`, `public`, `platform`, `landing` |
 | `scripts/` | CLI and seed scripts (bundled to `dist-runtime/` by `npm run build`) |
-| `deploy/helm/` | Helm chart |
 | `tests/` | Vitest unit/integration tests and Playwright e2e |
 
 Web and worker share one codebase and one database. The web side never runs background work: it enqueues jobs inside its DB transaction (`lib/jobs.ts`) and `worker/tasks.ts` handles them.

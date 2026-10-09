@@ -1,8 +1,8 @@
 # Setup and deployment guide
 
-Everything you need to take SignalHub from `git clone` to a production status page: Docker Compose, TLS, first admin, email/SMS, Kubernetes, upgrades.
+Everything you need to take SignalHub from `git clone` to a production status page: Docker Compose, TLS, first admin, email/SMS, upgrades.
 
-> Related docs: [Configuration reference](configuration.md) · [Security and data protection](security.md) · [Operations](operations.md) · [Helm chart](../deploy/helm/status/README.md)
+> Related docs: [Configuration reference](configuration.md) · [Security and data protection](security.md) · [Operations](operations.md)
 
 **Contents**
 
@@ -14,11 +14,10 @@ Everything you need to take SignalHub from `git clone` to a production status pa
 6. [Reverse proxy and TLS](#6-reverse-proxy-and-tls)
 7. [First-run configuration](#7-first-run-configuration)
 8. [Prebuilt container image](#8-prebuilt-container-image)
-9. [Kubernetes and Helm installation](#9-kubernetes-and-helm-installation)
-10. [Object storage and scaling](#10-object-storage-and-scaling)
-11. [Upgrades and rollback](#11-upgrades-and-rollback)
-12. [Backups](#12-backups)
-13. [Troubleshooting](#13-troubleshooting)
+9. [Scaling](#9-scaling)
+10. [Upgrades and rollback](#10-upgrades-and-rollback)
+11. [Backups](#11-backups)
+12. [Troubleshooting](#12-troubleshooting)
 
 ---
 
@@ -39,7 +38,7 @@ The web process never runs background work itself; it enqueues jobs in the datab
 | | Minimum | Notes |
 |---|---|---|
 | Docker | Engine 24+ with Compose v2 | for the Compose path |
-| PostgreSQL | 18 | bundled in Compose (`postgres:18.4-alpine`); external for Kubernetes |
+| PostgreSQL | 18 | bundled in Compose (`postgres:18.4-alpine`); external if you prefer |
 | Node.js | 22 | only for local development or building outside Docker |
 | CPU / RAM | 2 vCPU / 2 GB | comfortable for dozens of pages and a few hundred monitors; scale the worker for more |
 | Public DNS name + TLS | required for production | see [section 6](#6-reverse-proxy-and-tls) |
@@ -98,7 +97,7 @@ Notes on the default Compose file:
 - Web and Postgres are bound to `127.0.0.1` on purpose. Put a reverse proxy in front for public access ([section 6](#6-reverse-proxy-and-tls)).
 - The `database` network is internal (no internet). Only web and worker join the `egress` network.
 - Containers run as a non-root user with `cap_drop: ALL` and `no-new-privileges`.
-- Branding uploads and exports are stored in PostgreSQL (`ASSET_STORAGE_DRIVER=db`), so the database backup covers them. Use S3 if you prefer an object store ([section 10](#10-object-storage-and-scaling)).
+- Branding uploads and exports are stored in PostgreSQL so the database backup covers them.
 - ICMP (ping) monitors are **off** by default. See [ICMP monitors](configuration.md#monitoring-and-worker).
 
 Change the host port with `STATUS_PORT` in `.env`.
@@ -141,7 +140,7 @@ Sign in at `https://status.example.com/organization/login`. You must change the 
 curl -fsS http://127.0.0.1:3301/api/health/live    # process is up
 curl -fsS http://127.0.0.1:3301/api/health/ready   # DB reachable, migrations current, worker heartbeat fresh
 
-docker compose exec web node dist-runtime/signalhubctl.mjs preflight   # config sanity (secrets, URL, S3, proxy)
+docker compose exec web node dist-runtime/signalhubctl.mjs preflight   # config sanity (secrets, URL, proxy)
 docker compose exec web node dist-runtime/signalhubctl.mjs doctor      # runtime checks
 ```
 
@@ -251,104 +250,33 @@ docker compose up -d --no-build
 
 ---
 
-## 9. Kubernetes and Helm installation
+## 9. Scaling
 
-The chart in [`deploy/helm/status`](../deploy/helm/status/README.md) deploys separate **web** and **worker** Deployments plus a pre-install/pre-upgrade **migration Job**. It does **not** bundle PostgreSQL or object storage.
-
-Prerequisites: Kubernetes 1.27+, Helm 3, an ingress controller with TLS, PostgreSQL 18+ with TLS and backups, S3-compatible storage if you run more than one replica, and an image reachable from every node.
-
-```bash
-# 1. runtime secret (use your secret manager in production)
-kubectl create namespace signalhub
-kubectl -n signalhub create secret generic signalhub-production \
-  --from-literal=DATABASE_URL='postgresql://signalhub:<password>@postgres.example:5432/signalhub?sslmode=require' \
-  --from-literal=SESSION_SECRET="$(openssl rand -base64 48)" \
-  --from-literal=ENCRYPTION_KEY="$(openssl rand -base64 48)" \
-  --from-literal=S3_BUCKET=signalhub-assets \
-  --from-literal=S3_REGION=us-east-1
-
-# 2. values-production.yaml
-cat > values-production.yaml <<'YAML'
-image:
-  repository: ghcr.io/rameshbgm/signalhub
-  tag: "<version>"
-replicaCount: 2
-workerReplicaCount: 2
-config:
-  appUrl: https://status.example.com
-  assetStorageDriver: s3
-  trustProxyHeaders: "true"
-  trustedProxyHops: "1"
-secrets:
-  existingSecret: signalhub-production
-ingress:
-  enabled: true
-  className: nginx
-  hosts:
-    - host: status.example.com
-      paths: [{ path: /, pathType: Prefix }]
-  tls:
-    - secretName: signalhub-tls
-      hosts: [status.example.com]
-YAML
-
-# 3. validate and install
-helm lint deploy/helm/status -f values-production.yaml
-helm upgrade --install signalhub deploy/helm/status -n signalhub -f values-production.yaml
-kubectl -n signalhub rollout status deployment/signalhub-signalhub-web
-kubectl -n signalhub rollout status deployment/signalhub-signalhub-worker
-
-# 4. bootstrap the first administrator
-printf '%s' '<initial-password>' | kubectl -n signalhub exec -i deploy/signalhub-signalhub-web -- \
-  node dist-runtime/bootstrap.mjs --username admin --email you@example.com \
-  --org-name "Your Company" --org-slug your-company --password-stdin
-```
-
-What the chart gives you: pod disruption budgets, optional HPA (70% CPU), zone topology spread, a default-on NetworkPolicy, non-root containers, and optional `worker.enableIcmp` (adds only `NET_RAW`). Full value reference, ingress options and upgrade notes are in the [chart README](../deploy/helm/status/README.md).
-
----
-
-## 10. Object storage and scaling
-
-| Setting | Single host (Compose) | Multiple replicas / hosts |
-|---|---|---|
-| `ASSET_STORAGE_DRIVER` | `db` (default) | `db` or `s3` |
-| Web replicas | 1 | any |
-| Worker replicas | 1 | any (jobs and sweeps are lease-based and idempotent) |
-
-```ini
-ASSET_STORAGE_DRIVER=s3
-S3_ENDPOINT=https://s3.us-east-1.amazonaws.com   # or MinIO / R2 / Spaces endpoint
-S3_REGION=us-east-1
-S3_BUCKET=signalhub-assets
-S3_ACCESS_KEY_ID=...
-S3_SECRET_ACCESS_KEY=...
-S3_FORCE_PATH_STYLE=false                         # true for MinIO
-```
+Web and worker replicas can be scaled freely: they share one PostgreSQL database (including uploaded images and exports), and jobs and sweeps are lease-based and idempotent.
 
 Scaling knobs live in [`configuration.md`](configuration.md#monitoring-and-worker): `WORKER_MONITOR_CONCURRENCY`, `WORKER_NOTIFICATION_BATCH`, `DATABASE_POOL_SIZE`.
 
 ---
 
-## 11. Upgrades and rollback
+## 10. Upgrades and rollback
 
 ```bash
-# 0. back up first (section 12)
+# 0. back up first (section 11)
 git pull
 docker compose build
 docker compose up -d          # migrate runs first, then worker, then web
 docker compose exec web node dist-runtime/signalhubctl.mjs migrate --check
 ```
 
-- Migrations are plain, forward-only SQL files in `db/migrations/` applied by the `migrate` service (Helm: pre-upgrade hook). Treat a failed migration as a failed release; fix it before retrying.
+- Migrations are plain, forward-only SQL files in `db/migrations/` applied by the `migrate` service. Treat a failed migration as a failed release; fix it before retrying.
 - **Rollback** = restore the pre-upgrade database backup and redeploy the previous image. Do not run an older image against a newer schema.
 - Pin images by tag or digest in production; do not track `latest`.
 
 ---
 
-## 12. Backups
+## 11. Backups
 
-Back up PostgreSQL (and your S3 bucket if you use `s3`), and keep a copy of `ENCRYPTION_KEY` (or your keyring) stored separately. Details, restore drills and automation: [Operations: backup and restore](operations.md#backup-and-restore).
+Back up PostgreSQL (it holds uploaded images and exports too), and keep a copy of `ENCRYPTION_KEY` (or your keyring) stored separately. Details, restore drills and automation: [Operations: backup and restore](operations.md#backup-and-restore).
 
 ```bash
 # quick logical backup from the bundled Postgres container
@@ -357,7 +285,7 @@ docker compose exec -T postgres pg_dump -U signalhub -Fc signalhub > signalhub-$
 
 ---
 
-## 13. Troubleshooting
+## 12. Troubleshooting
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
@@ -367,7 +295,7 @@ docker compose exec -T postgres pg_dump -U signalhub -Fc signalhub > signalhub-$
 | `/api/health/ready` returns not ready | Worker not running or migrations pending | `docker compose ps`, `docker compose logs worker migrate` |
 | Monitors never run, subscribers get nothing | Worker down (platform console shows Worker: Stale) | Restart the worker; check logs |
 | Emails not arriving | No SMTP configured | Platform console → Configuration; check Notification logs |
-| ICMP monitors fail | Disabled or missing capability | `MONITOR_ENABLE_ICMP=true`; image includes `ping`; Helm: `worker.enableIcmp` |
+| ICMP monitors fail | Disabled or missing capability | `MONITOR_ENABLE_ICMP=true`; image includes `ping` |
 | Monitor target rejected | SSRF guard blocks private/loopback ranges | Intended. Opt out only for trusted networks with `MONITOR_ALLOW_PRIVATE_TARGETS=true` |
 | `preflight` warns about HTTPS | Production URL is `http://` | Terminate TLS and use `https://` |
 

@@ -13,7 +13,6 @@ Open-source, self-hosted status pages, monitoring and incident communication, on
 [![Node 22](https://img.shields.io/badge/node-22-5fa04e.svg)](Dockerfile)
 [![PostgreSQL 18](https://img.shields.io/badge/postgresql-18-336791.svg)](docker-compose.yml)
 [![Docker](https://img.shields.io/badge/docker%20compose-ready-2496ed.svg)](#-quick-start)
-[![Helm](https://img.shields.io/badge/helm-chart-0f1689.svg)](deploy/helm/status/README.md)
 
 [Quick start](#-quick-start) · [Features](#-features) · [Compare](#-how-it-compares) · [Security](#-security-and-data-protection) · [Deploy](docs/OPEN_SOURCE_SETUP_GUIDE.md) · [Docs](#-documentation) · [API](#-rest-api) · [Contribute](CONTRIBUTING.md)
 
@@ -33,7 +32,7 @@ Hosted status-page products charge by the page, the seat and the subscriber, and
 - **No per-subscriber, per-page or per-seat pricing.** The software is free (Apache-2.0). You pay for the server and the email/SMS provider you pick.
 - **Enterprise identity included.** SAML, OIDC, SCIM, MFA, role-based access and audience-restricted pages are not locked behind a top tier.
 - **Monitoring wired to communication.** A failing check can flip a component, open an incident and notify subscribers automatically.
-- **Small to run.** One PostgreSQL database, one web process, one worker. Docker Compose and a Helm chart are included.
+- **Small to run.** One PostgreSQL database, one web process, one worker. Docker Compose is included.
 
 ## 🚀 Quick start
 
@@ -58,9 +57,7 @@ printf '%s' 'a-long-unique-password' | docker compose exec -T web \
 
 Open <http://localhost:3301/organization/login>, sign in as `admin`, set a new password, and create your first status page.
 
-> For production add a reverse proxy with TLS, set `NEXT_PUBLIC_APP_URL` to your `https://` URL and configure email. The [setup guide](docs/OPEN_SOURCE_SETUP_GUIDE.md) covers Caddy and nginx, Kubernetes, backups and upgrades step by step.
-
-Prefer Kubernetes? `helm upgrade --install signalhub deploy/helm/status -n signalhub -f values-production.yaml`. See the [Helm guide](docs/OPEN_SOURCE_SETUP_GUIDE.md#9-kubernetes-and-helm-installation).
+> For production add a reverse proxy with TLS, set `NEXT_PUBLIC_APP_URL` to your `https://` URL and configure email. The [setup guide](docs/OPEN_SOURCE_SETUP_GUIDE.md) covers Caddy and nginx, backups and upgrades step by step.
 
 ## ✨ Features
 
@@ -225,13 +222,12 @@ flowchart LR
   WK[worker: Graphile Worker] <--> DB
   WK --> M[Monitored services]
   WK --> N[SMTP / SMS / webhooks / chat]
-  W & WK --> S[(Assets: local volume or S3)]
-  A[Your automation / CI] -->|REST API, heartbeats| P
+    A[Your automation / CI] -->|REST API, heartbeats| P
 ```
 
 - **web** serves public pages, the admin UI, the platform console and `/api/v1`. It never runs background work: it enqueues jobs in its database transaction.
 - **worker** runs monitors, delivers notifications, exports and audit events, performs maintenance transitions and retention. Sweeps are lease-based and idempotent, so you can run several workers.
-- **PostgreSQL** is the only stateful dependency (plus optional S3 for assets). Schema changes ship as numbered plain-SQL migrations.
+- **PostgreSQL** is the only stateful dependency, including uploaded images and exports. Schema changes ship as numbered plain-SQL migrations.
 
 Stack: Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS 4, PostgreSQL 18 with Kysely, Graphile Worker, Node 22.
 
@@ -281,12 +277,11 @@ docker compose exec web node dist-runtime/signalhubctl.mjs <command>
 
 | Guide | Covers |
 |---|---|
-| [Setup and deployment](docs/OPEN_SOURCE_SETUP_GUIDE.md) | Docker Compose, first admin, TLS with Caddy/nginx, email/SMS, prebuilt image, Kubernetes and Helm, S3, upgrades, troubleshooting |
+| [Setup and deployment](docs/OPEN_SOURCE_SETUP_GUIDE.md) | Docker Compose, first admin, TLS with Caddy/nginx, email/SMS, prebuilt image, upgrades, troubleshooting |
 | [Configuration reference](docs/configuration.md) | Every environment variable, defaults and when to change them |
 | [Security and data protection](docs/security.md) | Encryption, identity, audit, hardening checklist, privacy tooling |
 | [Operations](docs/operations.md) | Health and metrics, backup and restore drills, key rotation, retention, scaling |
 | [Comparison](docs/comparison.md) | Detailed comparison with sources and caveats |
-| [Helm chart](deploy/helm/status/README.md) | Kubernetes values, secrets, upgrades |
 | [User manual](public/docs/user-manual.html) | Operator manual served with the app |
 | [Contributing](CONTRIBUTING.md) | Dev setup, project layout, tests, conventions |
 

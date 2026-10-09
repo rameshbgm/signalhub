@@ -6,7 +6,7 @@ What SignalHub does to protect your data, what it leaves to you, and how to repo
 
 ## Where your data lives
 
-Everything is stored in **your PostgreSQL database** and **your asset storage** (local volume or your S3 bucket). SignalHub has no built-in phone-home or usage telemetry and no cloud dependency; fonts are self-hosted and the production CSP limits browser scripts, fonts and connections to your own origin. The only outbound server traffic is what you configure: monitor checks, your email/SMS providers, webhooks and destinations, SSO providers and an optional OTLP endpoint.
+Everything is stored in **your PostgreSQL database** (including uploaded images and exports). SignalHub has no built-in phone-home or usage telemetry and no cloud dependency; fonts are self-hosted and the production CSP limits browser scripts, fonts and connections to your own origin. The only outbound server traffic is what you configure: monitor checks, your email/SMS providers, webhooks and destinations, SSO providers and an optional OTLP endpoint.
 
 ## Encryption
 
@@ -45,7 +45,7 @@ Rotate keys without downtime: [Operations: rotating keys](operations.md#rotating
 - **Headers**: Content-Security-Policy, `frame-ancestors 'self'`, `form-action 'self'`, X-Content-Type-Options, Referrer-Policy, Permissions-Policy, COOP; `X-Powered-By` disabled. Custom page CSS is sanitized (no `@import`, `url()`, `expression()`; 20 KB cap).
 - **CSV import/export** neutralizes spreadsheet formula injection.
 - **Public messages** from monitors use sanitized failure categories, never raw error text.
-- **Containers** run as a non-root user with all capabilities dropped (`cap_drop: ALL`) and `no-new-privileges`; the database network is internal. Helm adds a NetworkPolicy and pod disruption budgets.
+- **Containers** run as a non-root user with all capabilities dropped (`cap_drop: ALL`) and `no-new-privileges`; the database network is internal.
 - **Supply chain**: CI runs lint, typecheck, tests, `npm audit` (high) and an end-to-end Compose test; releases are multi-arch images published with an SBOM, provenance, and a cosign signature.
 
 Known limits, stated plainly: the production CSP allows inline scripts (a Next.js constraint), IPv6 special-use range blocking is prefix based, and REST management API writes made with API keys are not yet recorded in the tenant audit log.
@@ -68,7 +68,6 @@ Self-hosting makes it easier to meet data-residency and processor-agreement requ
 - [ ] Strong, independent `SESSION_SECRET` and `ENCRYPTION_KEY`, stored in a secret manager, backed up separately from the database
 - [ ] MFA required for admins; SSO with SCIM where available
 - [ ] PostgreSQL with TLS, backups and **tested restores**
-- [ ] S3 bucket private, with versioning and encryption
 - [ ] `METRICS_TOKEN` set and the metrics endpoint not publicly routed
 - [ ] SIEM sink configured; periodic `signalhubctl audit`
 - [ ] Image pinned by tag/digest and signature verified

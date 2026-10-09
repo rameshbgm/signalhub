@@ -1,13 +1,7 @@
 import { randomUUID } from "node:crypto";
-import {
-  DeleteObjectCommand,
-  GetObjectCommand,
-  PutObjectCommand,
-  S3Client,
-} from "@aws-sdk/client-s3";
 import { database } from "@/lib/postgres/client";
 
-export type AssetStorageDriver = "DB" | "S3";
+export type AssetStorageDriver = "DB";
 
 interface AssetStorage {
   readonly driver: AssetStorageDriver;
@@ -37,71 +31,10 @@ class DbAssetStorage implements AssetStorage {
   }
 }
 
-class S3AssetStorage implements AssetStorage {
-  readonly driver = "S3" as const;
-  private readonly bucket: string;
-  private readonly client: S3Client;
+const dbStorage = new DbAssetStorage();
 
-  constructor() {
-    const bucket = process.env.S3_BUCKET;
-    if (!bucket) throw new Error("S3_BUCKET is required when ASSET_STORAGE_DRIVER=s3");
-    this.bucket = bucket;
-    this.client = new S3Client({
-      region: process.env.S3_REGION ?? "us-east-1",
-      endpoint: process.env.S3_ENDPOINT || undefined,
-      forcePathStyle: process.env.S3_FORCE_PATH_STYLE === "true",
-      credentials:
-        process.env.S3_ACCESS_KEY_ID && process.env.S3_SECRET_ACCESS_KEY
-          ? {
-              accessKeyId: process.env.S3_ACCESS_KEY_ID,
-              secretAccessKey: process.env.S3_SECRET_ACCESS_KEY,
-            }
-          : undefined,
-    });
-  }
-
-  async put(key: string, bytes: Buffer, contentType: string) {
-    await this.client.send(
-      new PutObjectCommand({
-        Bucket: this.bucket,
-        Key: key,
-        Body: bytes,
-        ContentType: contentType,
-        CacheControl: "public, max-age=31536000, immutable",
-      })
-    );
-  }
-
-  async get(key: string) {
-    const result = await this.client.send(
-      new GetObjectCommand({ Bucket: this.bucket, Key: key })
-    );
-    if (!result.Body) throw new Error("Asset body is unavailable");
-    return Buffer.from(await result.Body.transformToByteArray());
-  }
-
-  async delete(key: string) {
-    flushAssetCache(key);
-    await this.client.send(new DeleteObjectCommand({ Bucket: this.bucket, Key: key }));
-  }
-}
-
-const cachedStorages = new Map<AssetStorageDriver, AssetStorage>();
-
-export function assetStorage(driver?: AssetStorageDriver) {
-  const resolvedDriver =
-    driver ??
-    ((process.env.ASSET_STORAGE_DRIVER ?? "db").toLowerCase() === "s3"
-      ? "S3"
-      : "DB");
-  const cached = cachedStorages.get(resolvedDriver);
-  if (cached) return cached;
-  const storage =
-    resolvedDriver === "S3"
-      ? new S3AssetStorage()
-      : new DbAssetStorage();
-  cachedStorages.set(resolvedDriver, storage);
-  return storage;
+export function assetStorage() {
+  return dbStorage;
 }
 
 /**
@@ -111,10 +44,10 @@ export function assetStorage(driver?: AssetStorageDriver) {
  * backend after a storage migration.
  */
 export function assetStorageForDriver(driver: unknown) {
-  if (driver !== "DB" && driver !== "S3") {
+  if (driver !== "DB") {
     throw new Error("Asset storage driver is missing or unsupported");
   }
-  return assetStorage(driver);
+  return assetStorage();
 }
 
 // In-process byte cache for served images (never exports). Entries are keyed by

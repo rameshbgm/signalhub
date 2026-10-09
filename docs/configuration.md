@@ -1,6 +1,6 @@
 # Configuration reference
 
-All runtime configuration is environment variables (see [`.env.example`](../.env.example)), plus a few settings managed in the **platform console** (`/organization/platform`). Docker Compose passes the documented variables to `web`, `worker` and `migrate`; for Kubernetes see the [Helm chart](../deploy/helm/status/README.md).
+All runtime configuration is environment variables (see [`.env.example`](../.env.example)), plus a few settings managed in the **platform console** (`/organization/platform`). Docker Compose passes the documented variables to `web`, `worker` and `migrate`.
 
 > Setup walkthrough: [Setup and deployment guide](OPEN_SOURCE_SETUP_GUIDE.md)
 
@@ -69,23 +69,16 @@ Older `SMTP_*` / `TWILIO_*` variables are imported once by `db:migrate` when upg
 
 ## Asset storage
 
-| Variable | Default | Description |
-|---|---|---|
-| `ASSET_STORAGE_DRIVER` | `db` | `db` (PostgreSQL, works with any number of replicas) or `s3`. |
-| `S3_ENDPOINT` | empty | Custom endpoint for MinIO, R2, Spaces, etc. |
-| `S3_REGION` | `us-east-1` | Region. |
-| `S3_BUCKET` | empty | Bucket name (required for `s3`). |
-| `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` | empty | Credentials (or use the instance role of your platform). |
-| `S3_FORCE_PATH_STYLE` | `false` | `true` for MinIO and some S3-compatible stores. |
+Branding images and organization exports are stored in PostgreSQL (the `asset_blobs` table), so there is nothing to configure.
 
-Uploaded images are re-encoded server-side and served with `Cache-Control: public, max-age=31536000, immutable` plus an `ETag` (asset URLs change on every upload, so they are safe to cache for a year); org data exports are also written to the configured storage.
+Uploaded images are re-encoded server-side and served with `Cache-Control: public, max-age=31536000, immutable` plus an `ETag` (asset URLs change on every upload, so they are safe to cache for a year); org data exports are stored the same way.
 
 ## Monitoring and worker
 
 | Variable | Default | Description |
 |---|---|---|
 | `MONITOR_ALLOW_PRIVATE_TARGETS` | `false` | Allow monitors, webhooks and destinations to reach private/loopback ranges. The SSRF guard blocks them by default. |
-| `MONITOR_ENABLE_ICMP` | `false` | Enable ICMP (ping) monitors. The image includes `ping`; Helm: `worker.enableIcmp: true` adds `NET_RAW`. |
+| `MONITOR_ENABLE_ICMP` | `false` | Enable ICMP (ping) monitors. The image includes `ping`. |
 | `MONITOR_MAX_RESPONSE_BYTES` | `1048576` | Max response body read per HTTP check. |
 | `WEBHOOK_TIMEOUT_MS` | `10000` | Outbound webhook timeout. |
 | `REQUIRE_WORKER` | `true` | Make web readiness depend on a fresh worker heartbeat. |

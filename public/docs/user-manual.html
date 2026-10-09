@@ -489,7 +489,7 @@
             <tr><td>Worker offline/stale</td><td>Worker <code>/ready</code> and logs.</td><td>Database, migrations, lease errors, egress, health port, shutdown state.</td></tr>
             <tr><td>Monitor has no results</td><td>Enabled state and worker health.</td><td>Target DNS/network, private-target policy, timeout, check history, response limit.</td></tr>
             <tr><td>Notification not sent</td><td>Provider readiness and worker.</td><td>Destination verification, recipient state, retry/dead-letter detail.</td></tr>
-            <tr><td>Assets differ by replica</td><td><code>ASSET_STORAGE_DRIVER</code>.</td><td>Use <code>db</code> (default) or shared S3-compatible storage so every replica sees the same files.</td></tr>
+            <tr><td>Assets differ by replica</td><td>Assets are stored in PostgreSQL.</td><td>Every replica reads the same database, so no extra setup is needed.</td></tr>
             <tr><td>API returns 401/403</td><td>Bearer token, expiry, revocation.</td><td>Scope, page boundary, source CIDR, organization/page lifecycle.</td></tr>
             <tr><td>Component stays degraded</td><td>All effective-status sources.</td><td>Active incident, maintenance, manual state, and every linked monitor.</td></tr>
           </tbody>
@@ -514,7 +514,7 @@
           <dt><strong>Worker</strong></dt><dd>The background runtime for checks, notifications, exports, audit delivery, retention, maintenance transitions, and lifecycle jobs.</dd>
           <dt><strong>Installation administration</strong></dt><dd>Admin-only cross-organization controls under <code>/organization/platform</code>.</dd>
         </dl>
-        <div class="callout"><strong>More documentation:</strong> deployment operators should read the repository's Open-Source Enterprise Setup Guide, Helm chart guide, environment template, security policy, and live OpenAPI contract in addition to this product manual.</div>
+        <div class="callout"><strong>More documentation:</strong> deployment operators should read the repository's Open-Source Enterprise Setup Guide, environment template, security policy, and live OpenAPI contract in addition to this product manual.</div>
       </article>
     </main>
   </div>

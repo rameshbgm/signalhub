@@ -741,7 +741,7 @@ export interface AssetTable {
   orgId: string;
   pageId: string;
   kind: "LOGO" | "FAVICON" | "COVER";
-  storageDriver: "DB" | "S3";
+  storageDriver: "DB";
   storageKey: string;
   publicUrl: string;
   mimeType: string;
@@ -766,7 +766,7 @@ export interface DataExportJobTable {
   status: "QUEUED" | "PROCESSING" | "SUCCEEDED" | "FAILED";
   requestedBy: string;
   storageKey: string | null;
-  storageDriver: "DB" | "S3" | null;
+  storageDriver: "DB" | null;
   checksum: string | null;
   attempts: Generated<number>;
   leaseOwner: string | null;
@@ -780,7 +780,7 @@ export interface DataExportJobTable {
 export interface AssetDeletionJobTable {
   id: Generated<string>;
   orgId: string | null;
-  storageDriver: "DB" | "S3";
+  storageDriver: "DB";
   storageKey: string;
   sourceType: "PAGE_ASSET" | "DATA_EXPORT";
   sourceId: string | null;

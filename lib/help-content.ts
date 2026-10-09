@@ -912,7 +912,7 @@ export const HELP_CATEGORIES: HelpCategory[] = [
           {
             heading: "Configuration",
             paragraphs: [
-              "Configuration reports readiness for the public application URL, the delivery worker, email, SMS, asset storage (local filesystem or S3), and telemetry export. Subscriber email and SMS providers and team destination providers are configured here; provider secrets are encrypted and write-only. Encryption keys and storage access stay deployment-managed.",
+              "Configuration reports readiness for the public application URL, the delivery worker, email, SMS, asset storage, and telemetry export. Subscriber email and SMS providers and team destination providers are configured here; provider secrets are encrypted and write-only. Encryption keys and storage access stay deployment-managed.",
               "Enable only providers that are actually configured; provider readiness in each organization reflects these settings and the worker's health.",
             ],
           },
