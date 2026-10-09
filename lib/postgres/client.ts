@@ -2,6 +2,7 @@ import { CamelCasePlugin, Kysely, PostgresDialect, type Transaction } from "kyse
 import { Pool, types } from "pg";
 import type { SignalHubDatabase } from "@/lib/postgres/schema";
 import { logger } from "@/lib/logger";
+import { postgresPoolOptions } from "@/lib/postgres/pool-options";
 
 // DATE columns are calendar days, typed as "YYYY-MM-DD" strings in the schema.
 // The pg default turns them into local-midnight Date objects, which React
@@ -15,23 +16,8 @@ type PostgresGlobal = {
 
 const globalForPostgres = globalThis as typeof globalThis & PostgresGlobal;
 
-function connectionString() {
-  const value = process.env.DATABASE_URL;
-  if (!value) throw new Error("DATABASE_URL is not set");
-  if (!/^postgres(?:ql)?:\/\//.test(value)) {
-    throw new Error("DATABASE_URL must be a PostgreSQL connection string");
-  }
-  return value;
-}
-
 function createPool() {
-  return new Pool({
-    connectionString: connectionString(),
-    max: Number(process.env.DATABASE_POOL_SIZE ?? 20),
-    idleTimeoutMillis: Number(process.env.DATABASE_IDLE_TIMEOUT_MS ?? 30_000),
-    connectionTimeoutMillis: Number(process.env.DATABASE_CONNECT_TIMEOUT_MS ?? 5_000),
-    application_name: process.env.SERVICE_NAME ?? "signalhub",
-  });
+  return new Pool(postgresPoolOptions(process.env));
 }
 
 export const postgresPool = globalForPostgres.signalHubPool ?? createPool();
