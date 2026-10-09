@@ -198,7 +198,7 @@ async function main() {
   else if (command === "export") await queueExport();
   else if (command === "rotate-encryption-key") await rotateEncryption();
   else {
-    console.log("Usage: signalhubctl <doctor|preflight|migrate [--check]|backup|restore|audit|export --org ID [--requested-by USER_ID]|rotate-encryption-key>");
+    console.log("Usage: signalhubctl <setup|doctor|preflight|migrate [--check]|backup|restore|audit|export --org ID [--requested-by USER_ID]|rotate-encryption-key>");
     process.exitCode = 2;
   }
 }

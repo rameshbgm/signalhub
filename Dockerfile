@@ -28,6 +28,8 @@ ENV NODE_ENV=production \
 RUN apk add --no-cache ca-certificates iputils tini \
     && addgroup --system --gid 1001 signalhub \
     && adduser --system --uid 1001 --ingroup signalhub signalhub \
+    && mkdir -p /app/data \
+    && chown signalhub:signalhub /app/data
 
 COPY --from=build --chown=signalhub:signalhub /app/.next/standalone ./
 COPY --from=build --chown=signalhub:signalhub /app/.next/static ./.next/static
@@ -35,6 +37,12 @@ COPY --from=build --chown=signalhub:signalhub /app/public ./public
 COPY --from=build --chown=signalhub:signalhub /app/dist-runtime ./dist-runtime
 COPY --from=production-dependencies --chown=signalhub:signalhub /app/node_modules ./node_modules
 USER signalhub
+# Setup state (database connection, generated secrets). Unused when everything
+# comes from environment variables, as on Kubernetes.
+ENV SIGNALHUB_DATA_DIR=/app/data
+VOLUME ["/app/data"]
 EXPOSE 3000 8081
 ENTRYPOINT ["/sbin/tini", "--"]
-CMD ["node", "server.js"]
+# Supervisor: migrations, web and worker in one container (see scripts/start.ts).
+# Kubernetes runs split pods with `--role web` / `--role worker`.
+CMD ["node", "dist-runtime/start.mjs"]

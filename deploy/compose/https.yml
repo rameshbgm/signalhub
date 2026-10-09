@@ -1,0 +1,28 @@
+# Automatic HTTPS (Let's Encrypt) in front of SignalHub with Caddy.
+#
+#   COMPOSE_FILE=docker-compose.yml:deploy/compose/https.yml
+#   DOMAIN=status.example.com   (DNS must point at this host; ports 80/443 open)
+services:
+  caddy:
+    image: caddy:2.10-alpine
+    restart: unless-stopped
+    command: caddy reverse-proxy --from ${DOMAIN:?Set DOMAIN in .env} --to signalhub:3000
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on: [signalhub]
+    security_opt: ["no-new-privileges:true"]
+
+  signalhub:
+    environment:
+      NEXT_PUBLIC_APP_URL: https://${DOMAIN}
+      TRUST_PROXY_HEADERS: "true"
+      TRUSTED_PROXY_HOPS: "1"
+
+volumes:
+  caddy_data:
+  caddy_config:
