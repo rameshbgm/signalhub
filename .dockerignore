@@ -11,3 +11,4 @@ test-results
 *.log
 *.png
 .DS_Store
+data

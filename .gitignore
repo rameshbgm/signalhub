@@ -18,7 +18,7 @@ npm-debug.log*
 .idea/
 next-env.d.ts
 .playwright-mcp
-data/uploads/
+/data/
 docs/dev-credentials.txt
 docs/assets/status-enterprise-social.png
 monitor-service/__pycache__/
