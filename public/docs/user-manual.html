@@ -128,6 +128,7 @@
       </label>
       <nav>
         <ol class="toc">
+          <li><a href="#setup">0. Install and setup</a></li>
           <li><a href="#start">1. Start here</a></li>
           <li><a href="#roles">2. Roles and access</a></li>
           <li><a href="#menus">3. Menu reference</a></li>
@@ -149,6 +150,50 @@
     </aside>
 
     <main id="manual">
+      <article id="setup" data-search="install setup wizard database token docker compose node npm start:all dev kubernetes restart reset new-token forgot password reset-password recovery administrator first run">
+        <p class="kicker">00 · Install and setup</p>
+        <h2>Install SignalHub and finish setup in the browser</h2>
+        <p>SignalHub needs one thing from outside: a <strong>PostgreSQL 14+ database</strong>. On first start it has no database and no administrator, so it serves only the <strong>setup wizard</strong> at <code>/setup</code>. Every other page redirects there until setup is finished.</p>
+
+        <h3>Choose how to run it</h3>
+        <table>
+          <thead><tr><th>Where</th><th>Command</th><th>Setup link</th></tr></thead>
+          <tbody>
+            <tr><td>Any Docker host or VPS</td><td><code>./install.sh</code> (or <code>docker compose up -d</code>)</td><td><code>http://localhost:3301/setup</code>, or <code>https://DOMAIN/setup</code></td></tr>
+            <tr><td>Node.js, no Docker (production)</td><td><code>npm ci &amp;&amp; npm run build &amp;&amp; npm run start:all</code></td><td><code>http://localhost:3301/setup</code></td></tr>
+            <tr><td>Node.js (development)</td><td><code>npm run dev</code> (web) or <code>npm run dev:all</code> (web + worker)</td><td><code>http://localhost:3301/setup</code></td></tr>
+            <tr><td>Kubernetes, PaaS, cloud</td><td>Set <code>DATABASE_URL</code>, <code>SESSION_SECRET</code>, <code>ENCRYPTION_KEY</code>, <code>STATUS_BOOTSTRAP_PASSWORD</code></td><td>No wizard: the administrator is created on start</td></tr>
+          </tbody>
+        </table>
+        <p>With Node.js, <code>start:all</code> runs migrations, the web server and the background worker under one supervisor. It listens on <code>127.0.0.1:3301</code> by default (change with <code>PORT</code> and <code>SIGNALHUB_HOST</code>) and keeps its setup file in <code>./data</code> (<code>SIGNALHUB_DATA_DIR</code>). In development, <code>npm run dev</code> and <code>npm run dev:all</code> open the wizard when <code>.env</code> has no <code>DATABASE_URL</code>; with one, they migrate and start as before. <code>npm run dev:web</code> is the bare Next.js dev server.</p>
+
+        <h3>Setup wizard</h3>
+        <ol class="steps">
+          <li><strong>Unlock.</strong> Paste the one-time setup token printed in the server log at start-up. It is also saved in the data directory: <code>docker compose exec signalhub cat /app/data/setup-token</code>, or <code>cat data/setup-token</code> with Node.js.</li>
+          <li><strong>Database.</strong> Enter host, port, database, user, password and encryption mode, or paste a connection URL (a custom CA can be pasted for RDS, Azure or Cloud SQL). <strong>Test connection</strong> explains problems in plain language. If the server is reachable but the database does not exist, <strong>Create database</strong> creates it. Confirm the public URL and save; the schema is installed and the page continues on its own.</li>
+          <li><strong>Administrator.</strong> Organization name and ID, your name, email, User ID and password. This account administers the organization and the whole installation. Download the configuration backup offered here: it holds the encryption key.</li>
+          <li><strong>Done.</strong> Sign in at <code>/login</code>.</li>
+        </ol>
+        <div class="callout"><strong>Terminal instead of browser:</strong> <code>signalhubctl setup</code> asks the same questions and runs the same checks (Docker: <code>docker compose exec signalhub node dist-runtime/signalhubctl.mjs setup</code>; Node.js: <code>npm run signalhubctl -- setup</code>).</div>
+
+        <h3>Restart setup</h3>
+        <ul>
+          <li><strong>In the wizard:</strong> before the administrator exists, <strong>Wrong database? Start over with a different one</strong> returns to the database step. Nothing in that database is deleted.</li>
+          <li><strong>From the command line:</strong> <code>signalhubctl setup --reset</code> forgets the saved connection and keeps the secrets. The next start runs the wizard again.</li>
+        </ul>
+
+        <h3>Forgotten passwords and tokens</h3>
+        <table>
+          <thead><tr><th>Situation</th><th>What to do</th></tr></thead>
+          <tbody>
+            <tr><td>Setup token lost or seen by someone else</td><td><code>signalhubctl setup --new-token</code> prints a new one; the old one stops working at once. The unlock screen explains where to find the token or how to replace it.</td></tr>
+            <tr><td>A user forgot their password</td><td><strong>Forgot password?</strong> on the sign-in page emails a one-time link valid for 30 minutes. The answer is the same for unknown accounts and requests are rate-limited. Resetting signs the account out everywhere; two-factor sign-in still applies. Needs email configured in the platform console and a configured public URL; otherwise the page explains who can help.</td></tr>
+            <tr><td>No email, or the only administrator is locked out</td><td>The server operator runs <code>signalhubctl reset-password --username USER_ID</code>. It prints a temporary password that must be changed at sign-in. Add <code>--clear-mfa</code> when the authenticator app is lost.</td></tr>
+          </tbody>
+        </table>
+        <div class="callout warning"><strong>Back up the configuration.</strong> On Docker and Node.js installs the wizard stores the database connection and the generated encryption key in <code>signalhub.json</code> in the data directory. Without that key, stored credentials and subscriber contacts cannot be decrypted.</div>
+      </article>
+
       <article id="start" data-search="start first login bootstrap dashboard setup checklist onboarding">
         <p class="kicker">01 · Start here</p>
         <h2>From first login to a working status page</h2>

@@ -88,6 +88,11 @@ Notes on the Compose setup:
 - The web port is bound to `127.0.0.1` unless the HTTPS override is used. Containers run as a non-root user with `cap_drop: ALL` and `no-new-privileges`.
 - ICMP (ping) monitors are **off** by default. See [ICMP monitors](configuration.md#monitoring-and-worker).
 
+### Running on Node.js without Docker
+
+- **Production:** `npm ci && npm run build && npm run start:all` runs migrations, the web server and the worker, and the setup wizard on first start. It listens on `127.0.0.1:3301` by default (`PORT`, `SIGNALHUB_HOST`) and keeps its setup file in `./data` (`SIGNALHUB_DATA_DIR`). [Node.js guide](deploy/node.md) covers this, a systemd example and upgrades.
+- **Development:** with no `DATABASE_URL` in `.env`, `npm run dev` and `npm run dev:all` open the setup wizard. With one, they migrate and start as before. `npm run dev:web` is the bare Next.js dev server.
+
 ---
 
 ## 4. The setup wizard
@@ -109,11 +114,21 @@ Until a database and an administrator exist, SignalHub serves only the setup wiz
 
 **Database does not exist yet?** If the server is reachable but the database is missing, the wizard (and `signalhubctl setup`) offers **Create database**, which works when the user has the `CREATEDB` privilege.
 
-**Start over.** Saved the wrong database? On the administrator step choose **Wrong database? Start over with a different one**; nothing in that database is deleted. From the command line, `signalhubctl setup --reset` forgets the saved connection (secrets are kept) and the next start runs the wizard again.
+### Restart setup
 
-**Lost the setup token** (or someone else saw it)? `docker compose exec signalhub node dist-runtime/signalhubctl.mjs setup --new-token` prints a new one; the old one stops working immediately.
+- **In the wizard:** before the administrator account exists, **Wrong database? Start over with a different one** takes you back to the database step. Nothing in that database is deleted.
+- **From the command line:** `signalhubctl setup --reset` forgets the saved connection and keeps the secrets. The next start runs the wizard again (`docker compose restart signalhub`, or restart the Node process).
 
-**Forgot a password later?** The sign-in page has **Forgot password?**: with email configured (Platform console → Configuration) and `NEXT_PUBLIC_APP_URL` set, users get a one-time link valid for 30 minutes. Without email, or for a locked-out administrator, the operator runs `signalhubctl reset-password --username USER_ID` (prints a temporary password that must be changed at sign-in; add `--clear-mfa` for a lost authenticator).
+### Forgotten passwords and tokens
+
+- **Lost setup token:** `signalhubctl setup --new-token` prints a new one, and the old one stops working at once. The unlock screen explains where to find the token or how to replace it.
+- **User forgot their password:** **Forgot password?** on the sign-in page emails a one-time link valid for 30 minutes.
+  - The response is the same for unknown accounts, and requests are rate-limited.
+  - Resetting signs the account out everywhere; two-factor sign-in still applies.
+  - It needs email set up in the platform console (Configuration) and a configured public URL (`NEXT_PUBLIC_APP_URL`). Otherwise the page explains who can help.
+- **Operator recovery:** `signalhubctl reset-password --username USER_ID` sets a temporary password that must be changed at sign-in. Add `--clear-mfa` for a lost authenticator app.
+
+How to run `signalhubctl`: with Docker, `docker compose exec signalhub node dist-runtime/signalhubctl.mjs <command>`; with Node.js, `npm run signalhubctl -- <command>` in the SignalHub directory.
 
 ---
 
