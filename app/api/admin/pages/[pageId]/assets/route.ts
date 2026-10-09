@@ -61,7 +61,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     await storage.put(storageKey, normalized.bytes, normalized.mimeType);
     const assetId = randomUUID();
     const publicUrl = `/api/assets/${assetId}`;
-    let previousAsset: { storageKey: string; storageDriver: "LOCAL" | "S3" } | undefined;
+    let previousAsset: { storageKey: string; storageDriver: "DB" | "S3" } | undefined;
     try {
       previousAsset = await withDatabaseTransaction(async (transaction) => {
         await fenceActiveOrganizationMutation(session.orgId, transaction);

@@ -1,7 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import sharp from "sharp";
 import { normalizeAsset } from "../lib/assets";
-import { assetStorageForDriver } from "../lib/asset-storage";
+import { assetStorageForDriver, flushAssetCache, readImageCached } from "../lib/asset-storage";
+
+vi.mock("@/lib/postgres/client", () => ({ database: {} }));
 
 describe("managed image assets", () => {
   it("preserves a wide logo aspect ratio while normalizing it", async () => {
@@ -35,5 +37,18 @@ describe("managed image assets", () => {
     expect(() => assetStorageForDriver("filesystem")).toThrow(
       "Asset storage driver is missing or unsupported"
     );
+  });
+
+  it("serves repeat image reads from memory until the key is flushed", async () => {
+    const storage = assetStorageForDriver("DB");
+    let reads = 0;
+    storage.get = async () => (reads++, Buffer.from("img"));
+    await readImageCached("DB", "k/1.webp");
+    await readImageCached("DB", "k/1.webp");
+    expect(reads).toBe(1);
+    flushAssetCache("k/1.webp");
+    await readImageCached("DB", "k/1.webp");
+    expect(reads).toBe(2);
+    flushAssetCache();
   });
 });

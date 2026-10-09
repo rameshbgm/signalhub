@@ -71,15 +71,14 @@ Older `SMTP_*` / `TWILIO_*` variables are imported once by `db:migrate` when upg
 
 | Variable | Default | Description |
 |---|---|---|
-| `ASSET_STORAGE_DRIVER` | `local` | `local` or `s3`. S3 is required for more than one web/worker replica. |
-| `ASSET_LOCAL_DIR` | `/app/data/uploads` | Local upload directory (mount a volume). |
+| `ASSET_STORAGE_DRIVER` | `db` | `db` (PostgreSQL, works with any number of replicas) or `s3`. |
 | `S3_ENDPOINT` | empty | Custom endpoint for MinIO, R2, Spaces, etc. |
 | `S3_REGION` | `us-east-1` | Region. |
 | `S3_BUCKET` | empty | Bucket name (required for `s3`). |
 | `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` | empty | Credentials (or use the instance role of your platform). |
 | `S3_FORCE_PATH_STYLE` | `false` | `true` for MinIO and some S3-compatible stores. |
 
-Uploaded images are re-encoded server-side; org data exports are also written to the configured storage.
+Uploaded images are re-encoded server-side and served with `Cache-Control: public, max-age=31536000, immutable` plus an `ETag` (asset URLs change on every upload, so they are safe to cache for a year); org data exports are also written to the configured storage.
 
 ## Monitoring and worker
 

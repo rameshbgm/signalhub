@@ -98,7 +98,7 @@ Notes on the default Compose file:
 - Web and Postgres are bound to `127.0.0.1` on purpose. Put a reverse proxy in front for public access ([section 6](#6-reverse-proxy-and-tls)).
 - The `database` network is internal (no internet). Only web and worker join the `egress` network.
 - Containers run as a non-root user with `cap_drop: ALL` and `no-new-privileges`.
-- Branding uploads live in the `asset_data` volume (shared by web and worker). Use S3 for multi-host setups ([section 10](#10-object-storage-and-scaling)).
+- Branding uploads and exports are stored in PostgreSQL (`ASSET_STORAGE_DRIVER=db`), so the database backup covers them. Use S3 if you prefer an object store ([section 10](#10-object-storage-and-scaling)).
 - ICMP (ping) monitors are **off** by default. See [ICMP monitors](configuration.md#monitoring-and-worker).
 
 Change the host port with `STATUS_PORT` in `.env`.
@@ -312,7 +312,7 @@ What the chart gives you: pod disruption budgets, optional HPA (70% CPU), zone t
 
 | Setting | Single host (Compose) | Multiple replicas / hosts |
 |---|---|---|
-| `ASSET_STORAGE_DRIVER` | `local` (`asset_data` volume) | `s3` (**required**) |
+| `ASSET_STORAGE_DRIVER` | `db` (default) | `db` or `s3` |
 | Web replicas | 1 | any |
 | Worker replicas | 1 | any (jobs and sweeps are lease-based and idempotent) |
 
@@ -348,7 +348,7 @@ docker compose exec web node dist-runtime/signalhubctl.mjs migrate --check
 
 ## 12. Backups
 
-Back up **both** PostgreSQL and branding assets (the `asset_data` volume, or your S3 bucket), and keep a copy of `ENCRYPTION_KEY` (or your keyring) stored separately. Details, restore drills and automation: [Operations: backup and restore](operations.md#backup-and-restore).
+Back up PostgreSQL (and your S3 bucket if you use `s3`), and keep a copy of `ENCRYPTION_KEY` (or your keyring) stored separately. Details, restore drills and automation: [Operations: backup and restore](operations.md#backup-and-restore).
 
 ```bash
 # quick logical backup from the bundled Postgres container
@@ -369,7 +369,6 @@ docker compose exec -T postgres pg_dump -U signalhub -Fc signalhub > signalhub-$
 | Emails not arriving | No SMTP configured | Platform console → Configuration; check Notification logs |
 | ICMP monitors fail | Disabled or missing capability | `MONITOR_ENABLE_ICMP=true`; image includes `ping`; Helm: `worker.enableIcmp` |
 | Monitor target rejected | SSRF guard blocks private/loopback ranges | Intended. Opt out only for trusted networks with `MONITOR_ALLOW_PRIVATE_TARGETS=true` |
-| Uploads vanish after redeploy | Local storage without a persistent volume | Keep `asset_data` volume, or switch to S3 |
 | `preflight` warns about HTTPS | Production URL is `http://` | Terminate TLS and use `https://` |
 
 Still stuck? Open an issue with the output of `docker compose logs --tail=200 web worker migrate` (redact secrets).

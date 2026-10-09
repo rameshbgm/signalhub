@@ -741,7 +741,7 @@ export interface AssetTable {
   orgId: string;
   pageId: string;
   kind: "LOGO" | "FAVICON" | "COVER";
-  storageDriver: "LOCAL" | "S3";
+  storageDriver: "DB" | "S3";
   storageKey: string;
   publicUrl: string;
   mimeType: string;
@@ -753,13 +753,20 @@ export interface AssetTable {
   deletedAt: NullableTimestamp;
 }
 
+export interface AssetBlobTable {
+  storageKey: string;
+  contentType: string;
+  bytes: Buffer;
+  createdAt: GeneratedTimestamp;
+}
+
 export interface DataExportJobTable {
   id: Generated<string>;
   orgId: string;
   status: "QUEUED" | "PROCESSING" | "SUCCEEDED" | "FAILED";
   requestedBy: string;
   storageKey: string | null;
-  storageDriver: "LOCAL" | "S3" | null;
+  storageDriver: "DB" | "S3" | null;
   checksum: string | null;
   attempts: Generated<number>;
   leaseOwner: string | null;
@@ -773,7 +780,7 @@ export interface DataExportJobTable {
 export interface AssetDeletionJobTable {
   id: Generated<string>;
   orgId: string | null;
-  storageDriver: "LOCAL" | "S3";
+  storageDriver: "DB" | "S3";
   storageKey: string;
   sourceType: "PAGE_ASSET" | "DATA_EXPORT";
   sourceId: string | null;
@@ -853,6 +860,7 @@ export interface SignalHubDatabase {
   samlRequests: SamlRequestTable;
   retentionPolicies: RetentionPolicyTable;
   dataExportJobs: DataExportJobTable;
+  assetBlobs: AssetBlobTable;
   assetDeletionJobs: AssetDeletionJobTable;
   auditChainStates: AuditChainStateTable;
   auditSinks: AuditSinkTable;

@@ -55,7 +55,7 @@ export async function GET() {
       queues: { deadLetters, platformJobs, exports },
       identityConnections,
       configuration: {
-        storageDriver: process.env.ASSET_STORAGE_DRIVER ?? "local",
+        storageDriver: process.env.ASSET_STORAGE_DRIVER ?? "db",
         signingKeyring: Boolean(process.env.SESSION_SIGNING_KEYS),
         encryptionKeyring: Boolean(process.env.ENCRYPTION_KEYS),
         trustedProxyHeaders: process.env.TRUST_PROXY_HEADERS === "true",

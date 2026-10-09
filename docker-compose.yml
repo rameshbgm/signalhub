@@ -41,8 +41,7 @@ x-signalhub-environment: &signalhub-environment
   OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-}
   OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:-}
   NEXT_PUBLIC_OIDC_ENABLED: ${NEXT_PUBLIC_OIDC_ENABLED:-false}
-  ASSET_STORAGE_DRIVER: ${ASSET_STORAGE_DRIVER:-local}
-  ASSET_LOCAL_DIR: ${ASSET_LOCAL_DIR:-/app/data/uploads}
+  ASSET_STORAGE_DRIVER: ${ASSET_STORAGE_DRIVER:-db}
   S3_ENDPOINT: ${S3_ENDPOINT:-}
   S3_REGION: ${S3_REGION:-us-east-1}
   S3_BUCKET: ${S3_BUCKET:-}
@@ -120,8 +119,6 @@ services:
       timeout: 5s
       retries: 10
       start_period: 10s
-    volumes:
-      - asset_data:/app/data/uploads
     networks: [database, egress]
     security_opt: ["no-new-privileges:true"]
     cap_drop: ["ALL"]
@@ -154,8 +151,6 @@ services:
       timeout: 5s
       retries: 10
       start_period: 10s
-    volumes:
-      - asset_data:/app/data/uploads
     networks: [database, egress]
     security_opt: ["no-new-privileges:true"]
     cap_drop: ["ALL"]
@@ -163,7 +158,6 @@ services:
 
 volumes:
   postgres_data:
-  asset_data:
 
 networks:
   database:

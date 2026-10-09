@@ -36,7 +36,7 @@ function mergeIds(existing: string[], rows: Array<{ id: string }>) {
   return [...new Set([...existing, ...rows.map((row) => row.id)])];
 }
 
-async function deleteRecordedAssets(rows: Array<{ storageDriver: "LOCAL" | "S3"; storageKey: string }>) {
+async function deleteRecordedAssets(rows: Array<{ storageDriver: "DB" | "S3"; storageKey: string }>) {
   for (const asset of rows) {
     await assetStorageForDriver(asset.storageDriver).delete(asset.storageKey);
   }

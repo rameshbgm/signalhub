@@ -10,7 +10,7 @@ export async function GET() {
     worker: false,
     smtpConfigured: false,
     smsConfigured: false,
-    assetStorage: (process.env.ASSET_STORAGE_DRIVER ?? "local").toLowerCase(),
+    assetStorage: (process.env.ASSET_STORAGE_DRIVER ?? "db").toLowerCase(),
     oidcConfigured: Boolean(
       process.env.OIDC_ISSUER && process.env.OIDC_CLIENT_ID && process.env.OIDC_CLIENT_SECRET
     ),

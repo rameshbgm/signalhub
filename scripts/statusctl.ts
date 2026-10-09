@@ -48,7 +48,7 @@ async function doctor() {
     migrations: migration?.current ?? false,
     migrationSummary: migration ? migrationIssueSummary(migration) : "Database connection failed",
     worker: Boolean(worker),
-    storage: process.env.ASSET_STORAGE_DRIVER ?? "local",
+    storage: process.env.ASSET_STORAGE_DRIVER ?? "db",
     trustedProxyHeaders: process.env.TRUST_PROXY_HEADERS === "true",
     signingKeyring: Boolean(process.env.SESSION_SIGNING_KEYS),
     encryptionKeyring: Boolean(process.env.ENCRYPTION_KEYS),
@@ -80,8 +80,8 @@ async function backup() {
     createdAt: new Date().toISOString(),
     archive: path.basename(output),
     sha256: createHash("sha256").update(bytes).digest("hex"),
-    assetStorageDriver: process.env.ASSET_STORAGE_DRIVER ?? "local",
-    localAssetsIncluded: false,
+    assetStorageDriver: process.env.ASSET_STORAGE_DRIVER ?? "db",
+    assetsIncluded: (process.env.ASSET_STORAGE_DRIVER ?? "db").toLowerCase() !== "s3",
   };
   await writeFile(`${output}.manifest.json`, JSON.stringify(manifest, null, 2), { flag: "wx" });
   console.log(JSON.stringify(manifest, null, 2));

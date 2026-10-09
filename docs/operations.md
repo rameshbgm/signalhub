@@ -47,7 +47,7 @@ The platform console overview shows the same signals (organizations, queued jobs
 Back up three things:
 
 1. **PostgreSQL**: all pages, incidents, subscribers (encrypted), audit chain, users.
-2. **Assets**: the `asset_data` volume or your S3 bucket (logos, covers, exports). `signalhubctl backup` does **not** include local assets (`localAssetsIncluded: false` in the manifest).
+2. **Assets** (only with `ASSET_STORAGE_DRIVER=s3`): your S3 bucket. With the default `db` driver, logos, covers and exports live in PostgreSQL and are included in the dump (`assetsIncluded: true` in the manifest).
 3. **Secrets**: `ENCRYPTION_KEY`/`ENCRYPTION_KEYS` and `SESSION_SECRET`/keyring, stored separately from the database backup. Without the encryption key, restored credentials and subscriber contacts cannot be decrypted.
 
 ### Docker Compose
@@ -55,13 +55,9 @@ Back up three things:
 ```bash
 # database (custom format, restorable with pg_restore)
 docker compose exec -T postgres pg_dump -U signalhub -Fc signalhub > backups/signalhub-$(date +%F).dump
-
-# local assets volume
-docker run --rm -v signalhub_asset_data:/data -v "$PWD/backups":/out alpine \
-  tar czf /out/assets-$(date +%F).tgz -C /data .
 ```
 
-Schedule with cron or a systemd timer, ship offsite, and keep several generations. Compose prefixes volumes with the project name (`signalhub_`); confirm with `docker volume ls`.
+Schedule with cron or a systemd timer, ship offsite, and keep several generations. 
 
 ### Using `signalhubctl` (host with PostgreSQL client tools)
 

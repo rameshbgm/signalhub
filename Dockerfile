@@ -28,8 +28,7 @@ ENV NODE_ENV=production \
 RUN apk add --no-cache ca-certificates iputils tini \
     && addgroup --system --gid 1001 signalhub \
     && adduser --system --uid 1001 --ingroup signalhub signalhub \
-    && mkdir -p /app/data/uploads \
-    && chown -R signalhub:signalhub /app/data
+
 COPY --from=build --chown=signalhub:signalhub /app/.next/standalone ./
 COPY --from=build --chown=signalhub:signalhub /app/.next/static ./.next/static
 COPY --from=build --chown=signalhub:signalhub /app/public ./public

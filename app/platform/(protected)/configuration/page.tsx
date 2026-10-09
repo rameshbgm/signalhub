@@ -22,7 +22,7 @@ export default async function PlatformConfigurationPage() {
   const defaults = sanitizeDestinationDefaults(stored?.destinationDefaults);
   const connections = parseDestinationConnections(stored?.destinationConnectionsCiphertext);
   const appUrlConfigured = Boolean(process.env.NEXT_PUBLIC_APP_URL);
-  const storageDriver = (process.env.ASSET_STORAGE_DRIVER ?? "local").toLowerCase();
+  const storageDriver = (process.env.ASSET_STORAGE_DRIVER ?? "db").toLowerCase();
   const telemetryConfigured = Boolean(process.env.OTEL_EXPORTER_OTLP_ENDPOINT);
 
   return (
@@ -62,7 +62,7 @@ export default async function PlatformConfigurationPage() {
           status={capabilities.sms.enabled ? "Available" : "Unavailable"}
           detail={capabilities.sms.reason ?? undefined}
         />
-        <PlatformHealth label="Asset storage" icon={HardDrive} tone="ok" status={storageDriver === "s3" ? "S3" : "Local filesystem"} />
+        <PlatformHealth label="Asset storage" icon={HardDrive} tone="ok" status={storageDriver === "s3" ? "S3" : "PostgreSQL"} />
         <PlatformHealth
           label="Telemetry export"
           icon={Activity}
