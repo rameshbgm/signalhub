@@ -31,6 +31,12 @@ describe("runtime config precedence", () => {
     expect(merged.DATABASE_URL).toBe("postgresql://env");
     expect(merged.SESSION_SECRET).toBe("s");
   });
+
+  it("drops empty values so Compose's ${VAR:-} never masks a setting", () => {
+    const merged = mergeIntoEnv({ NEXT_PUBLIC_APP_URL: "", DATABASE_URL: "" }, { DATABASE_URL: "postgresql://file" });
+    expect("NEXT_PUBLIC_APP_URL" in merged).toBe(false);
+    expect(merged.DATABASE_URL).toBe("postgresql://file");
+  });
 });
 
 describe("database connection input", () => {
@@ -85,6 +91,7 @@ describe("first admin validation", () => {
   it("enforces the password policy and email in the wizard", () => {
     expect(adminInputErrors(valid, { strict: true })).toEqual({});
     expect(adminInputErrors({ ...valid, password: "short" }, { strict: true }).password).toMatch(/at least/);
+    expect(adminInputErrors({ ...valid, password: "lovelace-short-x" }, { strict: true }).password).toMatch(/name/);
     expect(adminInputErrors({ ...valid, email: "nope" }, { strict: true }).email).toBeDefined();
     expect(adminInputErrors({ ...valid, organizationSlug: "Bad Slug" }, { strict: true }).organizationSlug).toBeDefined();
   });

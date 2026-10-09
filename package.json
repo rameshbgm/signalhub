@@ -21,7 +21,7 @@
     "build": "npm run build:web && npm run build:runtime",
     "build:web": "next build --webpack",
     "build:worker": "esbuild worker/index.ts --bundle --platform=node --format=esm --packages=external --outfile=dist-runtime/worker.mjs",
-    "build:cli": "esbuild scripts/migrate.ts scripts/bootstrap.ts scripts/statusctl.ts scripts/signalhubctl.ts --bundle --platform=node --format=esm --packages=external --outdir=dist-runtime --out-extension:.js=.mjs",
+    "build:cli": "esbuild scripts/start.ts scripts/migrate.ts scripts/bootstrap.ts scripts/statusctl.ts scripts/signalhubctl.ts --bundle --platform=node --format=esm --packages=external --outdir=dist-runtime --out-extension:.js=.mjs",
     "build:runtime": "npm run build:worker && npm run build:cli",
     "start": "next start -p 3301",
     "start:worker": "node dist-runtime/worker.mjs",

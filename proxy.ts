@@ -23,8 +23,38 @@ function nextWithRequestId(req: NextRequest) {
   return NextResponse.next({ request: { headers } });
 }
 
+/**
+ * First-run setup mode (set by dist-runtime/start.mjs): no database yet, or no
+ * administrator. Only the wizard, its API, liveness and static files are
+ * served; everything else would need a database the process does not have.
+ */
+function setupGate(req: NextRequest) {
+  const { pathname } = req.nextUrl;
+  // No icon is configured yet and /favicon.ico would otherwise reach the
+  // database-backed public page route.
+  if (pathname === "/favicon.ico") return new NextResponse(null, { status: 404 });
+  if (
+    pathname === "/setup" ||
+    pathname.startsWith("/api/setup/") ||
+    pathname === "/api/health/live" ||
+    pathname.startsWith("/_next/") ||
+    /\/[^/]+\.[a-z0-9]+$/i.test(pathname)
+  ) {
+    return nextWithRequestId(req);
+  }
+  if (pathname.startsWith("/api/")) {
+    return NextResponse.json(
+      { error: { code: "SETUP_REQUIRED", message: "SignalHub is not set up yet. Open /setup to finish installation." } },
+      { status: 503, headers: { "retry-after": "10" } }
+    );
+  }
+  return NextResponse.redirect(new URL("/setup", req.url));
+}
+
 export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
+
+  if (process.env.SIGNALHUB_SETUP_MODE) return setupGate(req);
 
   if (pathname === "/login") return nextWithRequestId(req);
 
@@ -73,5 +103,5 @@ export async function proxy(req: NextRequest) {
 
 export const config = {
   // Development's Webpack HMR WebSocket is served directly by Next.
-  matcher: ["/((?!_next/static|_next/image|_next/webpack-hmr|favicon.ico).*)"],
+  matcher: ["/((?!_next/static|_next/image|_next/webpack-hmr).*)"],
 };

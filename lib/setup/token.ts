@@ -1,5 +1,5 @@
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
-import { mkdir, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { dataDir } from "@/lib/setup/config-file";
 
@@ -16,7 +16,13 @@ export function setupTokenPath(env: NodeJS.ProcessEnv = process.env) {
   return path.join(dataDir(env), "setup-token");
 }
 
+/**
+ * Reuses the pending token so the browser stays unlocked across the in-place
+ * reload between the database and administrator steps.
+ */
 export async function issueSetupToken(env: NodeJS.ProcessEnv = process.env) {
+  const existing = (await readFile(setupTokenPath(env), "utf8").catch(() => "")).trim();
+  if (existing.length >= 32) return existing;
   const token = randomBytes(24).toString("base64url");
   await mkdir(dataDir(env), { recursive: true });
   await writeFile(setupTokenPath(env), `${token}\n`, { mode: 0o600 });

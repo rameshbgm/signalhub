@@ -55,7 +55,7 @@ export function adminInputErrors(input: AdminInput, { strict }: { strict: boolea
   }
   if (strict) {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input.email)) errors.email = "Enter a valid email address";
-    const password = newPasswordError(input.password, [input.username, input.name, input.email.split("@")[0] ?? ""]);
+    const password = newPasswordError(input.password, [input.username, input.name, ...input.name.split(/\s+/), input.email.split("@")[0] ?? ""]);
     if (password) errors.password = password;
   } else if (!input.password) {
     errors.password = "Provide the initial password";
