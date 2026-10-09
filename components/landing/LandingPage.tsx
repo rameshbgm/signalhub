@@ -13,12 +13,14 @@ import {
   CircleUserRound,
   CodeXml,
   Container,
+  DatabaseBackup,
   ExternalLink,
   FileCheck2,
   GitFork,
   KeyRound,
   LockKeyhole,
   RadioTower,
+  RotateCcw,
   ServerCog,
   ShieldCheck,
   Siren,
@@ -120,6 +122,27 @@ const OWNERSHIP_STEPS = [
     kicker: "Own the response",
     title: "Automate the response without waiting on a vendor tier or roadmap.",
     body: "Every capability ships in the same Apache-2.0 codebase, ready to inspect, change, integrate, and operate on your terms.",
+  },
+] as const;
+
+const LIFECYCLE = [
+  {
+    icon: KeyRound,
+    title: "Guided first run",
+    body: "The first start opens a setup wizard at /setup, unlocked with a one-time token from the server log. Test and connect your PostgreSQL (SignalHub can create the database), then create the administrator. Session and encryption keys are generated for you.",
+    detail: "Saved once in the data volume: restarts and upgrades go straight to sign-in.",
+  },
+  {
+    icon: RotateCcw,
+    title: "Reset and recovery",
+    body: "Picked the wrong database? Start over in the wizard or run signalhubctl setup --reset. Lost the setup token? setup --new-token replaces it. Forgotten passwords use an emailed one-time link, or signalhubctl reset-password for the operator.",
+    detail: "Nothing in your database is deleted by a reset.",
+  },
+  {
+    icon: DatabaseBackup,
+    title: "Two things to back up",
+    body: "Your PostgreSQL database, and the configuration file signalhub.json that holds the database connection and the encryption key. Without that key, stored credentials and subscriber contacts cannot be decrypted.",
+    detail: "The wizard offers a backup download; on Kubernetes and PaaS keep the keys in your secret store.",
   },
 ] as const;
 
@@ -572,6 +595,28 @@ export function LandingPage() {
                 </Reveal>
               );
             })}
+          </div>
+
+          <div className={styles.lifecycle} aria-labelledby="lifecycle-title" role="region">
+            <Reveal>
+              <p className={styles.sectionKicker}>Setup, reset and backup</p>
+              <h3 id="lifecycle-title" className={styles.lifecycleTitle}>From first start to recovery, without editing config files.</h3>
+            </Reveal>
+            <div className={styles.lifecycleGrid}>
+              {LIFECYCLE.map((item, index) => {
+                const Icon = item.icon;
+                return (
+                  <Reveal className={styles.lifecycleCard} delay={index * 0.08} key={item.title}>
+                    <span className={styles.lifecycleIcon}>
+                      <Icon size={20} strokeWidth={1.8} aria-hidden="true" />
+                    </span>
+                    <h4>{item.title}</h4>
+                    <p>{item.body}</p>
+                    <span>{item.detail}</span>
+                  </Reveal>
+                );
+              })}
+            </div>
           </div>
         </section>
 
