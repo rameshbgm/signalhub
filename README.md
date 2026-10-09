@@ -56,6 +56,7 @@ No `.env` editing, no hand-made secrets: they are generated on first start and k
 | Target | Command or guide |
 |---|---|
 | VPS / VM | `./install.sh` ([setup guide](docs/OPEN_SOURCE_SETUP_GUIDE.md)) |
+| Node.js, no Docker | `npm ci && npm run build && npm run start:all` ([guide](docs/deploy/node.md)) |
 | Kubernetes | `kubectl apply -k deploy/kubernetes/base` ([guide](docs/deploy/kubernetes.md)) |
 | Render | one-click Blueprint, [`render.yaml`](render.yaml) ([guide](docs/deploy/paas.md#render-one-click)) |
 | Railway, Fly.io, DigitalOcean | [PaaS guide](docs/deploy/paas.md) |

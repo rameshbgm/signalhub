@@ -107,7 +107,13 @@ Until a database and an administrator exist, SignalHub serves only the setup wiz
 
 **No wizard at all:** set `DATABASE_URL`, `SESSION_SECRET`, `ENCRYPTION_KEY` and `STATUS_BOOTSTRAP_PASSWORD` (plus optional `STATUS_BOOTSTRAP_USERNAME`, `_EMAIL`, `_NAME`, `_ORG_NAME`, `_ORG_SLUG`). On an empty database the administrator is created on start and must change the password at first sign-in. In `.env` for Compose, use `SIGNALHUB_DATABASE_URL` and `SIGNALHUB_PUBLIC_URL` (so a development `DATABASE_URL` in the same file never leaks into the container).
 
-**Lost access later?** `dist-runtime/bootstrap.mjs --password-stdin` resets (or creates) an administrator; see `--help` in [`scripts/bootstrap.ts`](../scripts/bootstrap.ts).
+**Database does not exist yet?** If the server is reachable but the database is missing, the wizard (and `signalhubctl setup`) offers **Create database**, which works when the user has the `CREATEDB` privilege.
+
+**Start over.** Saved the wrong database? On the administrator step choose **Wrong database? Start over with a different one**; nothing in that database is deleted. From the command line, `signalhubctl setup --reset` forgets the saved connection (secrets are kept) and the next start runs the wizard again.
+
+**Lost the setup token** (or someone else saw it)? `docker compose exec signalhub node dist-runtime/signalhubctl.mjs setup --new-token` prints a new one; the old one stops working immediately.
+
+**Forgot a password later?** The sign-in page has **Forgot password?**: with email configured (Platform console → Configuration) and `NEXT_PUBLIC_APP_URL` set, users get a one-time link valid for 30 minutes. Without email, or for a locked-out administrator, the operator runs `signalhubctl reset-password --username USER_ID` (prints a temporary password that must be changed at sign-in; add `--clear-mfa` for a lost authenticator).
 
 ---
 

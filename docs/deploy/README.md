@@ -5,6 +5,7 @@ One image, `ghcr.io/rameshbgm/signalhub`, runs everywhere. By default a containe
 | Where | How | Guide |
 |---|---|---|
 | A VPS or VM (DigitalOcean, Hetzner, Linode, EC2, …) | `./install.sh` | [Setup guide](../OPEN_SOURCE_SETUP_GUIDE.md) |
+| Any machine with Node.js, no Docker | `npm ci && npm run build && npm run start:all` | [Node.js](node.md) |
 | Any Docker host | `docker compose up -d`, then the setup wizard | [Setup guide](../OPEN_SOURCE_SETUP_GUIDE.md#3-install) |
 | Kubernetes (any distribution, GKE, EKS, AKS) | `kubectl apply -k deploy/kubernetes/base` | [Kubernetes](kubernetes.md) |
 | Render, Railway, Fly.io, DigitalOcean App Platform | one service + managed Postgres | [PaaS](paas.md) |

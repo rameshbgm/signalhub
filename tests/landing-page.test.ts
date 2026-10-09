@@ -23,7 +23,7 @@ describe("SignalHub landing page surface", () => {
       'const REPOSITORY_URL = "https://github.com/rameshbgm/signalhub"'
     );
     expect(landingSource).toContain(
-      "https://github.com/rameshbgm/signalhub/blob/main/docs/OPEN_SOURCE_SETUP_GUIDE.md"
+      "https://github.com/rameshbgm/signalhub/blob/main/docs/deploy/README.md"
     );
     expect(landingSource).toContain("Get SignalHub on GitHub");
     expect(landingSource).toContain("Read the deployment guide");

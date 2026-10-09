@@ -19,6 +19,7 @@ All runtime configuration is environment variables (see [`.env.example`](../.env
 | Variable | Default | Description |
 |---|---|---|
 | `SIGNALHUB_DATA_DIR` | `/app/data` (image), `./data` | Where the wizard stores `signalhub.json` (mode 0600) and the one-time `setup-token`. Mount a persistent volume here, or provide the core variables instead. |
+| `SIGNALHUB_HOST` | `127.0.0.1` | Listen address for `npm run start:all` from a checkout (the container always listens on all interfaces). |
 | `STATUS_BOOTSTRAP_PASSWORD` | (unset) | Creates the first administrator on start when the database has **no users**, then is ignored. The password must be changed at first sign-in. |
 | `STATUS_BOOTSTRAP_USERNAME` / `_EMAIL` / `_NAME` / `_ORG_NAME` / `_ORG_SLUG` | `admin` / empty / `Instance Administrator` / `Default Organization` / `default` | Details for that administrator and its organization (also defaults for `bootstrap.mjs`). |
 
@@ -120,7 +121,7 @@ Monitor interval is configurable per monitor from 10 seconds to 24 hours. Check 
 
 ## Administrator recovery
 
-`bootstrap.mjs` creates or resets an administrator (break-glass recovery); pass the password with `--password-stdin`. First-time setup normally uses the [setup wizard](OPEN_SOURCE_SETUP_GUIDE.md#4-the-setup-wizard) or `STATUS_BOOTSTRAP_PASSWORD`.
+Users reset forgotten passwords themselves from **Forgot password?** on the sign-in page; that needs email configured in the platform console and `NEXT_PUBLIC_APP_URL` (links are never built from the request's host). Operators recover any account with `signalhubctl reset-password --username USER_ID [--password-stdin] [--clear-mfa]`. `bootstrap.mjs` creates or resets an administrator and its organization; pass the password with `--password-stdin`. First-time setup normally uses the [setup wizard](OPEN_SOURCE_SETUP_GUIDE.md#4-the-setup-wizard) or `STATUS_BOOTSTRAP_PASSWORD`.
 
 ## Development and test only
 
