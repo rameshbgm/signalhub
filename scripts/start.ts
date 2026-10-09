@@ -1,17 +1,18 @@
 /**
- * Container entrypoint (`node dist-runtime/start.mjs [--role all|web|worker]`).
+ * SignalHub supervisor: `node dist-runtime/start.mjs [--role all|web|worker] [--dev]`.
  *
- * One process supervises the whole installation so a single container is a
- * complete deployment:
+ * The image's entrypoint, `npm run start:all` in a plain Node checkout, and
+ * (with --dev) `npm run dev` / `npm run dev:all`. One process runs the whole
+ * installation:
  *   1. merge SIGNALHUB_DATA_DIR/signalhub.json under the environment (env wins)
- *      and generate missing session/encryption secrets on first boot;
+ *      and generate missing session/encryption secrets on first start;
  *   2. with no DATABASE_URL, start only the web server in setup mode so the
  *      operator can enter the database in the browser (/setup);
- *   3. otherwise migrate, then start web and worker, or the admin step of the
- *      setup wizard when no user exists yet.
- * The web server exits with SETUP_RELOAD_EXIT_CODE after the wizard saves; the
- * supervisor then re-reads the configuration in place, so no container restart
- * (and no restart policy) is needed.
+ *   3. otherwise migrate, then start web and worker, or the administrator step
+ *      of the setup wizard when no user exists yet.
+ * After the wizard saves, the web server signals SIGUSR2 (or exits with
+ * SETUP_RELOAD_EXIT_CODE) and the supervisor reloads in place, so no container
+ * restart and no restart policy is needed.
  *
  * Database work runs in a short-lived child (`--prepare`) because the database
  * client binds DATABASE_URL at import time and must not outlive a config change.
@@ -21,16 +22,39 @@ import { randomBytes } from "node:crypto";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { resolveRuntimeEnv, runtimeConfigPath, SETUP_RELOAD_EXIT_CODE } from "@/lib/setup/config-file";
+import { dataDir, resolveRuntimeEnv, runtimeConfigPath, SETUP_RELOAD_EXIT_CODE } from "@/lib/setup/config-file";
 import { issueSetupToken, revokeSetupToken, setupTokenPath } from "@/lib/setup/token";
 
 type Role = "all" | "web" | "worker";
+type SetupMode = "db" | "admin";
 type PrepareResult = { users: number; bootstrapped: boolean };
 
 const self = fileURLToPath(import.meta.url);
 const root = process.cwd();
-const serverEntry = path.join(root, "server.js");
-const workerEntry = path.join(root, "dist-runtime", "worker.mjs");
+const dev = process.argv.includes("--dev");
+
+/**
+ * Where the web server lives: next to us in the image, in .next/standalone
+ * after `npm run build` in a checkout, or `next dev` in development.
+ */
+function webCommand(): { args: string[]; checkout: boolean } {
+  if (dev) {
+    const port = process.env.PORT || "3301";
+    return { args: [path.join(root, "node_modules/next/dist/bin/next"), "dev", "--webpack", "-p", port], checkout: true };
+  }
+  const image = path.join(root, "server.js");
+  if (existsSync(image)) return { args: [image], checkout: false };
+  const standalone = path.join(root, ".next/standalone/server.js");
+  if (existsSync(standalone)) return { args: [standalone], checkout: true };
+  throw new Error("No built web server found. Run `npm run build` first (or use `npm run dev` for development).");
+}
+
+function workerCommand() {
+  if (dev) return [path.join(root, "node_modules/tsx/dist/cli.mjs"), path.join(root, "worker/index.ts")];
+  const worker = path.join(root, "dist-runtime/worker.mjs");
+  if (!existsSync(worker)) throw new Error("dist-runtime/worker.mjs not found. Run `npm run build` first.");
+  return [worker];
+}
 
 function log(message: string) {
   console.log(`[signalhub] ${message}`);
@@ -43,12 +67,28 @@ function parseRole(): Role {
   throw new Error(`Unknown --role ${value}; use all, web or worker`);
 }
 
-async function resolveEnvironment() {
+async function resolveEnvironment(checkout: boolean) {
   const { env, generated } = await resolveRuntimeEnv();
   if (generated.length) {
     log(`Generated ${generated.join(" and ")} in ${runtimeConfigPath(env)}. Back this file up: without ENCRYPTION_KEY stored credentials cannot be decrypted.`);
   }
-  return env;
+  return {
+    ...env,
+    // Children may change directory (the standalone server does), so pin
+    // the data directory and tell them who to signal for a reload.
+    SIGNALHUB_DATA_DIR: dataDir(env),
+    SIGNALHUB_SUPERVISOR_PID: String(process.pid),
+    // A checkout listens on localhost behind a reverse proxy unless told
+    // otherwise. Nothing probes the worker's health port outside containers,
+    // so a free port avoids clashes between several instances on one machine.
+    ...(checkout ? {
+      // The image sets NODE_ENV; a checkout gets it from the mode it runs in.
+      NODE_ENV: env.NODE_ENV || (dev ? "development" : "production"),
+      PORT: env.PORT || "3301",
+      HOSTNAME: env.SIGNALHUB_HOST || "127.0.0.1",
+      WORKER_HEALTH_PORT: env.WORKER_HEALTH_PORT || "0",
+    } : {}),
+  } as NodeJS.ProcessEnv;
 }
 
 function waitForExit(child: ChildProcess) {
@@ -69,7 +109,7 @@ async function prepareDatabase(env: NodeJS.ProcessEnv) {
   return result as PrepareResult;
 }
 
-/** Runs inside the `--prepare` child with the final environment already set. */
+/** Runs inside the `--prepare` child (or a Kubernetes initContainer) with the final environment. */
 async function prepare() {
   const { runMigrations } = await import("@/lib/migrations");
   const { migrateJobSchema } = await import("@/lib/job-schema");
@@ -102,36 +142,31 @@ async function prepare() {
   }
 }
 
-function banner(token: string, mode: "db" | "admin", env: NodeJS.ProcessEnv) {
-  // Inside a container the published host port is unknown, so without a
-  // configured public URL point at the path and the usual local address.
+function banner(token: string, mode: SetupMode, env: NodeJS.ProcessEnv, checkout: boolean) {
   const url = env.NEXT_PUBLIC_APP_URL
     ? `${env.NEXT_PUBLIC_APP_URL.replace(/\/$/, "")}/setup`
-    : "/setup on this server (Docker Compose default: http://localhost:3301/setup)";
+    : checkout
+      ? `http://localhost:${env.PORT}/setup`
+      // Inside a container the published host port is unknown.
+      : "/setup on this server (Docker Compose default: http://localhost:3301/setup)";
   const lines = [
     mode === "db" ? "SignalHub needs a database. Finish setup in your browser:" : "Create the first administrator in your browser:",
     `  ${url}`,
     "SETUP TOKEN:",
     `  ${token}`,
-    `(also in ${setupTokenPath(env)})`,
+    `(also in ${setupTokenPath(env)}; new token: signalhubctl setup --new-token)`,
   ];
-  const width = Math.max(...lines.map((line) => line.length)) + 4;
+  const width = Math.min(Math.max(...lines.map((line) => line.length)) + 4, 72);
   const rule = "=".repeat(width);
   console.log([rule, ...lines.map((line) => `  ${line}`), rule].join("\n"));
 }
 
-function startChildren(role: Role, env: NodeJS.ProcessEnv) {
-  const children: ChildProcess[] = [];
-  if (role !== "worker") children.push(spawn(process.execPath, [serverEntry], { env, stdio: "inherit" }));
-  if (role !== "web") children.push(spawn(process.execPath, [workerEntry], { env, stdio: "inherit" }));
-  return children;
-}
-
 let current: ChildProcess[] = [];
 let stopping = false;
+let reloadRequested = false;
 
 function stopAll(signal: NodeJS.Signals) {
-  for (const child of current) if (child.exitCode === null) child.kill(signal);
+  for (const child of current) if (child.exitCode === null && child.signalCode === null) child.kill(signal);
 }
 
 async function supervise(role: Role) {
@@ -142,13 +177,27 @@ async function supervise(role: Role) {
       stopAll(signal);
     });
   }
-  if (!existsSync(serverEntry) && role !== "worker") {
-    throw new Error(`${serverEntry} not found. start.mjs runs from the built image (npm run build) directory.`);
+  if (process.platform !== "win32") {
+    process.on("SIGUSR2", () => {
+      reloadRequested = true;
+      stopAll("SIGTERM");
+    });
   }
+  const web = role === "worker" ? null : webCommand();
+  const checkout = web?.checkout ?? dev;
+  const worker = role === "web" ? null : workerCommand();
+
+  const startChildren = (roles: { web: boolean; worker: boolean }, env: NodeJS.ProcessEnv) => {
+    const children: ChildProcess[] = [];
+    if (roles.web && web) children.push(spawn(process.execPath, web.args, { env, stdio: "inherit" }));
+    if (roles.worker && worker) children.push(spawn(process.execPath, worker, { env, stdio: "inherit" }));
+    return children;
+  };
 
   while (!stopping) {
-    const env = await resolveEnvironment();
-    let setupMode: "db" | "admin" | null = null;
+    reloadRequested = false;
+    const env = await resolveEnvironment(checkout);
+    let setupMode: SetupMode | null = null;
 
     if (!env.DATABASE_URL) {
       if (role === "worker") throw new Error("The worker needs DATABASE_URL. Finish setup on a web instance first.");
@@ -160,33 +209,30 @@ async function supervise(role: Role) {
 
     if (setupMode) {
       const token = await issueSetupToken(env).catch(() => randomBytes(24).toString("base64url"));
-      banner(token, setupMode, env);
-      const setupEnv = {
+      banner(token, setupMode, env, checkout);
+      current = startChildren({ web: true, worker: false }, {
         ...env,
         SIGNALHUB_SETUP_MODE: setupMode,
         SIGNALHUB_SETUP_TOKEN: token,
         // Setup mode has no worker; readiness is reported by the setup gate.
         REQUIRE_WORKER: "false",
-      };
-      current = startChildren("web", setupEnv);
-      const code = await waitForExit(current[0]!);
-      if (stopping) return 0;
-      if (code === SETUP_RELOAD_EXIT_CODE) {
-        log("Configuration saved, reloading");
-        continue;
-      }
-      return code || 1;
+      });
+    } else {
+      await revokeSetupToken(env).catch(() => undefined);
+      current = startChildren({ web: role !== "worker", worker: role !== "web" }, env);
     }
 
-    await revokeSetupToken(env).catch(() => undefined);
-    current = startChildren(role, env);
-    // Any child exiting ends the installation: the platform restarts the
-    // container rather than leaving web up without its worker (or vice versa).
+    // Any child exiting ends this round: the platform restarts the container
+    // rather than leaving web up without its worker (or vice versa).
     const code = await Promise.race(current.map(waitForExit));
     if (!stopping) stopAll("SIGTERM");
     await Promise.all(current.map(waitForExit));
-    if (code === SETUP_RELOAD_EXIT_CODE && !stopping) continue;
-    return stopping ? 0 : code || 1;
+    if (stopping) return 0;
+    if (reloadRequested || code === SETUP_RELOAD_EXIT_CODE) {
+      log("Configuration changed, reloading");
+      continue;
+    }
+    return code || 1;
   }
   return 0;
 }

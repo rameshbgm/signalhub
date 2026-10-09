@@ -58,11 +58,12 @@ export function SetupWizard({
   );
   const [mode, setMode] = useState<Mode>(initialMode === "complete" ? "admin" : initialMode);
   const [backupAvailable, setBackupAvailable] = useState(false);
+  const [databaseChangeable, setDatabaseChangeable] = useState(false);
   const [applyingMessage, setApplyingMessage] = useState("");
   const [applyError, setApplyError] = useState<string | null>(null);
   const [createdUser, setCreatedUser] = useState("");
 
-  const visibleSteps = STEPS.filter((item) => item.id !== "database" || initialMode === "db");
+  const visibleSteps = STEPS.filter((item) => item.id !== "database" || initialMode === "db" || databaseChangeable);
   const activeIndex = visibleSteps.findIndex((item) => item.id === (step === "applying" ? (mode === "db" ? "database" : "admin") : step));
 
   /** Polls while the supervisor reloads; resolves once the server reports `target`. */
@@ -76,9 +77,10 @@ export function SetupWizard({
       try {
         const response = await fetchWithTimeout("/api/setup/status", { cache: "no-store" }, 5_000);
         if (response.ok) {
-          const status = await response.json() as { mode: Mode | null; backupAvailable: boolean };
+          const status = await response.json() as { mode: Mode | null; backupAvailable: boolean; databaseChangeable: boolean };
           if (status.mode === target) {
             setBackupAvailable(status.backupAvailable);
+            setDatabaseChangeable(status.databaseChangeable);
             if (target) setMode(target);
             return true;
           }
@@ -88,7 +90,7 @@ export function SetupWizard({
       }
       await new Promise((resolve) => setTimeout(resolve, 1_500));
     }
-    setApplyError("The server did not come back. Check the container logs (docker compose logs signalhub) and reload this page.");
+    setApplyError("The server did not come back. Check its logs (docker compose logs signalhub, or the terminal running SignalHub) and reload this page.");
     return false;
   }
 
@@ -96,7 +98,10 @@ export function SetupWizard({
     if (initialMode === "admin" && initiallyUnlocked) {
       fetchWithTimeout("/api/setup/status", { cache: "no-store" })
         .then((response) => response.json())
-        .then((status: { backupAvailable?: boolean }) => setBackupAvailable(Boolean(status.backupAvailable)))
+        .then((status: { backupAvailable?: boolean; databaseChangeable?: boolean }) => {
+          setBackupAvailable(Boolean(status.backupAvailable));
+          setDatabaseChangeable(Boolean(status.databaseChangeable));
+        })
         .catch(() => undefined);
     }
   }, [initialMode, initiallyUnlocked]);
@@ -159,6 +164,10 @@ export function SetupWizard({
             <AdminStep
               passwordMinimum={passwordMinimum}
               backupAvailable={backupAvailable}
+              databaseChangeable={databaseChangeable}
+              onChangeDatabase={async () => {
+                if (await waitForMode("db", "Forgetting the saved connection…")) setStep("database");
+              }}
               onCreated={async (username) => {
                 setCreatedUser(username);
                 if (await waitForMode(null, "Creating your account and starting SignalHub…")) setStep("done");
@@ -212,8 +221,19 @@ function UnlockStep({ onUnlocked }: { onUnlocked: () => void }) {
       </Field>
       <div className="mt-4 rounded-control bg-sunken px-4 py-3 text-xs leading-6 text-ink-soft">
         <p className="font-semibold text-ink">Where to find it</p>
-        <p>Docker Compose: <code className="font-mono">docker compose logs signalhub | grep -A1 &quot;SETUP TOKEN&quot;</code></p>
-        <p>Or read the file: <code className="font-mono">docker compose exec signalhub cat /app/data/setup-token</code></p>
+        <p>It is printed in the server log when SignalHub starts, and saved in the data directory:</p>
+        <ul className="mt-1 list-disc space-y-0.5 pl-4">
+          <li>Docker: <code className="font-mono">docker compose exec signalhub cat /app/data/setup-token</code></li>
+          <li>Node: <code className="font-mono">cat data/setup-token</code> in the SignalHub directory</li>
+        </ul>
+        <details className="mt-2">
+          <summary className="cursor-pointer font-semibold text-ink">Lost it, or someone else saw it?</summary>
+          <p className="mt-1">Create a new token; the old one stops working at once:</p>
+          <ul className="mt-1 list-disc space-y-0.5 pl-4">
+            <li>Docker: <code className="font-mono">docker compose exec signalhub node dist-runtime/signalhubctl.mjs setup --new-token</code></li>
+            <li>Node: <code className="font-mono">npm run signalhubctl -- setup --new-token</code></li>
+          </ul>
+        </details>
       </div>
       <Button type="submit" size="lg" loading={loading} className="mt-6 w-full"><KeyRound aria-hidden size={16} />Unlock</Button>
     </form>
@@ -250,9 +270,10 @@ function DatabaseStep({ bundledDatabase, defaultAppUrl, onSaved }: { bundledData
   const [appUrl, setAppUrl] = useState(defaultAppUrl);
   const [checks, setChecks] = useState<Check[]>([]);
   const [tested, setTested] = useState<{ ok: boolean; needsConfirmation: boolean } | null>(null);
+  const [missingDatabase, setMissingDatabase] = useState<string | null>(null);
   const [confirmShared, setConfirmShared] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState<"test" | "save" | null>(null);
+  const [busy, setBusy] = useState<"test" | "save" | "create" | null>(null);
   const appUrlRef = useRef<HTMLInputElement>(null);
 
   const connection = method === "bundled"
@@ -279,11 +300,30 @@ function DatabaseStep({ bundledDatabase, defaultAppUrl, onSaved }: { bundledData
       }
       setChecks((json.checks as Check[]) ?? []);
       setTested({ ok: Boolean(json.ok), needsConfirmation: Boolean(json.needsConfirmation) });
+      setMissingDatabase(typeof json.missingDatabase === "string" ? json.missingDatabase : null);
     } catch {
       setError("The test timed out. Check the host and that this server can reach it.");
     } finally {
       setBusy(null);
     }
+  }
+
+  async function create() {
+    setBusy("create");
+    setError(null);
+    try {
+      const { response, json } = await post("/api/setup/database/create", connection);
+      if (!response.ok) {
+        setError(json.error?.message ?? "Could not create the database.");
+        return;
+      }
+    } catch {
+      setError("Could not reach the server. Try again.");
+      return;
+    } finally {
+      setBusy(null);
+    }
+    await test();
   }
 
   async function save() {
@@ -395,6 +435,14 @@ function DatabaseStep({ bundledDatabase, defaultAppUrl, onSaved }: { bundledData
         </Button>
       </div>
       <CheckList checks={checks} />
+      {missingDatabase && (
+        <div className="mt-3 flex flex-wrap items-center gap-3 rounded-control border border-line px-4 py-3 text-sm">
+          <span className="min-w-0 flex-1">The server is reachable but has no database named <span className="font-semibold">{missingDatabase}</span>. SignalHub can create it if this user is allowed to.</span>
+          <Button type="button" variant="secondary" size="sm" onClick={create} loading={busy === "create"} disabled={busy !== null && busy !== "create"}>
+            Create database
+          </Button>
+        </div>
+      )}
       {tested?.needsConfirmation && (
         <label className="mt-3 flex items-start gap-2.5 text-sm">
           <Checkbox checked={confirmShared} onChange={(event) => setConfirmShared(event.target.checked)} className="mt-0.5" />
@@ -417,7 +465,15 @@ function DatabaseStep({ bundledDatabase, defaultAppUrl, onSaved }: { bundledData
   );
 }
 
-function AdminStep({ passwordMinimum, backupAvailable, onCreated }: { passwordMinimum: number; backupAvailable: boolean; onCreated: (username: string) => void }) {
+function AdminStep({ passwordMinimum, backupAvailable, databaseChangeable, onChangeDatabase, onCreated }: {
+  passwordMinimum: number;
+  backupAvailable: boolean;
+  databaseChangeable: boolean;
+  onChangeDatabase: () => void;
+  onCreated: (username: string) => void;
+}) {
+  const [confirmChange, setConfirmChange] = useState(false);
+  const [changing, setChanging] = useState(false);
   const [form, setForm] = useState({ organizationName: "", organizationSlug: "", name: "", username: "admin", email: "", password: "", confirm: "" });
   const [slugEdited, setSlugEdited] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -455,6 +511,23 @@ function AdminStep({ passwordMinimum, backupAvailable, onCreated }: { passwordMi
       setError("Could not reach the server. Try again.");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function changeDatabase() {
+    setChanging(true);
+    setError(null);
+    try {
+      const { response, json } = await post("/api/setup/database/reset", {});
+      if (response.ok) {
+        onChangeDatabase();
+        return;
+      }
+      setError(json.error?.message ?? "Could not change the database.");
+    } catch {
+      setError("Could not reach the server. Try again.");
+    } finally {
+      setChanging(false);
     }
   }
 
@@ -499,6 +572,23 @@ function AdminStep({ passwordMinimum, backupAvailable, onCreated }: { passwordMi
       </div>
       {error && <Alert tone="danger" className="mt-5">{error}</Alert>}
       <Button type="submit" size="lg" loading={loading} className="mt-6 w-full">Create administrator</Button>
+      {databaseChangeable && (
+        <div className="mt-5 border-t border-line pt-4 text-center text-sm text-ink-soft">
+          {confirmChange ? (
+            <div className="space-y-2">
+              <p>SignalHub will forget the saved connection and ask for a database again. Nothing in that database is deleted.</p>
+              <div className="flex justify-center gap-2">
+                <Button type="button" variant="ghost" size="sm" onClick={() => setConfirmChange(false)} disabled={changing}>Cancel</Button>
+                <Button type="button" variant="secondary" size="sm" loading={changing} onClick={changeDatabase}>Use a different database</Button>
+              </div>
+            </div>
+          ) : (
+            <button type="button" className="font-medium text-primary-ink underline-offset-4 hover:underline" onClick={() => setConfirmChange(true)}>
+              Wrong database? Start over with a different one
+            </button>
+          )}
+        </div>
+      )}
     </form>
   );
 }

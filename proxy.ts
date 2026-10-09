@@ -38,6 +38,7 @@ function setupGate(req: NextRequest) {
     pathname.startsWith("/api/setup/") ||
     pathname === "/api/health/live" ||
     pathname.startsWith("/_next/") ||
+    pathname.startsWith("/__nextjs") || // development overlay
     /\/[^/]+\.[a-z0-9]+$/i.test(pathname)
   ) {
     return nextWithRequestId(req);

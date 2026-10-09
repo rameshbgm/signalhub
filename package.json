@@ -13,19 +13,22 @@
     "url": "https://github.com/rameshbgm/signalhub/issues"
   },
   "engines": {
-    "node": ">=22"
+    "node": ">=22.9"
   },
   "scripts": {
-    "dev": "next dev --webpack -p 3301",
-    "dev:all": "trap 'kill 0' EXIT; npm run worker:dev & npm run dev",
+    "dev": "tsx --env-file-if-exists=.env scripts/start.ts --dev --role web",
+    "dev:web": "next dev --webpack -p 3301",
+    "dev:all": "tsx --env-file-if-exists=.env scripts/start.ts --dev",
     "build": "npm run build:web && npm run build:runtime",
-    "build:web": "next build --webpack",
+    "build:web": "next build --webpack && npm run build:assets",
+    "build:assets": "node -e \"const fs=require('node:fs');fs.cpSync('public','.next/standalone/public',{recursive:true});fs.cpSync('.next/static','.next/standalone/.next/static',{recursive:true})\"",
     "build:worker": "esbuild worker/index.ts --bundle --platform=node --format=esm --packages=external --outfile=dist-runtime/worker.mjs",
     "build:cli": "esbuild scripts/start.ts scripts/migrate.ts scripts/bootstrap.ts scripts/statusctl.ts scripts/signalhubctl.ts --bundle --platform=node --format=esm --packages=external --outdir=dist-runtime --out-extension:.js=.mjs",
     "build:runtime": "npm run build:worker && npm run build:cli",
     "start": "next start -p 3301",
+    "start:all": "node --env-file-if-exists=.env dist-runtime/start.mjs",
     "start:worker": "node dist-runtime/worker.mjs",
-    "worker:dev": "tsx --env-file=.env worker/index.ts",
+    "worker:dev": "tsx --env-file-if-exists=.env worker/index.ts",
     "lint": "eslint . --max-warnings=0",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
@@ -33,14 +36,14 @@
     "test:integration": "vitest run tests/integration",
     "test:e2e": "playwright test",
     "verify": "npm run lint && npm run typecheck && npm test && npm run build",
-    "db:migrate": "tsx --env-file=.env scripts/migrate.ts",
-    "db:seed": "tsx --env-file=.env scripts/seed.ts",
-    "db:seed-roles": "tsx --env-file=.env scripts/seed-role-users.ts",
-    "db:seed-demo": "tsx --env-file=.env scripts/seed-demo.ts",
-    "db:reset-dev": "tsx --env-file=.env scripts/reset-development.ts",
-    "bootstrap": "tsx --env-file=.env scripts/bootstrap.ts",
-    "signalhubctl": "tsx --env-file=.env scripts/signalhubctl.ts",
-    "statusctl": "tsx --env-file=.env scripts/statusctl.ts"
+    "db:migrate": "tsx --env-file-if-exists=.env scripts/migrate.ts",
+    "db:seed": "tsx --env-file-if-exists=.env scripts/seed.ts",
+    "db:seed-roles": "tsx --env-file-if-exists=.env scripts/seed-role-users.ts",
+    "db:seed-demo": "tsx --env-file-if-exists=.env scripts/seed-demo.ts",
+    "db:reset-dev": "tsx --env-file-if-exists=.env scripts/reset-development.ts",
+    "bootstrap": "tsx --env-file-if-exists=.env scripts/bootstrap.ts",
+    "signalhubctl": "tsx --env-file-if-exists=.env scripts/signalhubctl.ts",
+    "statusctl": "tsx --env-file-if-exists=.env scripts/statusctl.ts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

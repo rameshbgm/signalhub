@@ -1,8 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 import { postgresPoolOptions } from "@/lib/postgres/pool-options";
-import { mergeIntoEnv } from "@/lib/setup/config-file";
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { environmentKeys, mergeIntoEnv, readRuntimeConfig, removeRuntimeConfigKeys, writeRuntimeConfig } from "@/lib/setup/config-file";
 import { databaseUrlFromInput, describeConnectionError, looksLikeTransactionPooler } from "@/lib/setup/database-check";
-import { consumeSetupAttempt, setupCookieValid, setupCookieValue, setupTokenMatches, SETUP_ATTEMPTS_PER_MINUTE } from "@/lib/setup/token";
+import { consumeSetupAttempt, currentSetupToken, issueSetupToken, rotateSetupToken, setupCookieValid, setupCookieValue, setupTokenMatches, SETUP_ATTEMPTS_PER_MINUTE } from "@/lib/setup/token";
 
 vi.mock("@/lib/postgres/client", () => ({ database: {} }));
 const { adminInputErrors, slugFromName } = await import("@/lib/setup/admin");
@@ -100,3 +103,32 @@ describe("first admin validation", () => {
     expect(slugFromName("Acme Status — EU!")).toBe("acme-status-eu");
   });
 });
+
+describe("setup state on disk", () => {
+  const env = () => ({ SIGNALHUB_DATA_DIR: mkdtempSync(path.join(tmpdir(), "signalhub-setup-")) }) as unknown as NodeJS.ProcessEnv;
+
+  it("forgets only the database when setup restarts", async () => {
+    const data = env();
+    await writeRuntimeConfig({ DATABASE_URL: "postgresql://a", DATABASE_SSL_CA: "pem", SESSION_SECRET: "s", ENCRYPTION_KEY: "k" }, data);
+    await removeRuntimeConfigKeys(["DATABASE_URL", "DATABASE_SSL_CA"], data);
+    expect(await readRuntimeConfig(data)).toEqual({ SESSION_SECRET: "s", ENCRYPTION_KEY: "k" });
+  });
+
+  it("records which settings came from the real environment", () => {
+    expect(environmentKeys({ DATABASE_URL: "postgresql://x", NEXT_PUBLIC_APP_URL: "" })).toEqual(["DATABASE_URL"]);
+    expect(environmentKeys({ DATABASE_URL: "postgresql://merged", SIGNALHUB_ENV_KEYS: "" })).toEqual([]);
+  });
+
+  it("keeps the token across reloads and replaces it on request", async () => {
+    const data = { ...env(), SIGNALHUB_SETUP_MODE: "db" } as NodeJS.ProcessEnv;
+    const first = await issueSetupToken(data);
+    expect(await issueSetupToken(data)).toBe(first);
+    expect(currentSetupToken(data)).toBe(first);
+    const second = await rotateSetupToken(data);
+    expect(second).not.toBe(first);
+    expect(currentSetupToken(data)).toBe(second);
+    writeFileSync(path.join(data.SIGNALHUB_DATA_DIR!, "setup-token"), "");
+    expect(currentSetupToken({ ...data, SIGNALHUB_SETUP_TOKEN: "from-env" })).toBe("from-env");
+  });
+});
+

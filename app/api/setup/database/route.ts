@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { writeRuntimeConfig } from "@/lib/setup/config-file";
+import { setFromEnvironment, writeRuntimeConfig } from "@/lib/setup/config-file";
 import { testDatabase } from "@/lib/setup/database-check";
 import { databaseInputFromRequest } from "@/lib/setup/database-request";
 import { guardSetupRequest, readJson, reloadAfterResponse, setupError } from "@/lib/setup/http";
@@ -35,8 +35,8 @@ export async function POST(request: NextRequest) {
   await writeRuntimeConfig({
     DATABASE_URL: result.url,
     ...(result.ca ? { DATABASE_SSL_CA: result.ca } : {}),
-    // The environment still wins if the operator sets it later.
-    ...(process.env.NEXT_PUBLIC_APP_URL ? {} : { NEXT_PUBLIC_APP_URL: appUrl }),
+    // A URL set in the real environment wins and is not overwritten.
+    ...(setFromEnvironment("NEXT_PUBLIC_APP_URL") ? {} : { NEXT_PUBLIC_APP_URL: appUrl }),
   });
   reloadAfterResponse();
   return NextResponse.json({ saved: true });

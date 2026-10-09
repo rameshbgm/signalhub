@@ -58,6 +58,31 @@ export async function writeRuntimeConfig(patch: RuntimeConfig, env: NodeJS.Proce
   return next;
 }
 
+export async function removeRuntimeConfigKeys(keys: RuntimeConfigKey[], env: NodeJS.ProcessEnv = process.env) {
+  const current = await readRuntimeConfig(env);
+  for (const key of keys) delete current[key];
+  const file = runtimeConfigPath(env);
+  const temporary = `${file}.${process.pid}.tmp`;
+  await writeFile(temporary, `${JSON.stringify(current, null, 2)}\n`, { mode: 0o600 });
+  await rename(temporary, file);
+}
+
+/**
+ * Which runtime keys the operator set in the real environment (as opposed to
+ * the wizard's file). Recorded once in SIGNALHUB_ENV_KEYS before merging, so
+ * child processes know which settings the wizard may change.
+ */
+export function environmentKeys(env: Partial<NodeJS.ProcessEnv> = process.env): RuntimeConfigKey[] {
+  if (env.SIGNALHUB_ENV_KEYS !== undefined) {
+    return env.SIGNALHUB_ENV_KEYS.split(",").filter(Boolean) as RuntimeConfigKey[];
+  }
+  return RUNTIME_CONFIG_KEYS.filter((key) => Boolean(env[key]));
+}
+
+export function setFromEnvironment(key: RuntimeConfigKey, env: Partial<NodeJS.ProcessEnv> = process.env) {
+  return environmentKeys(env).includes(key);
+}
+
 /** Returns a copy of env where file values only fill keys env leaves empty. */
 export function mergeIntoEnv(env: Partial<NodeJS.ProcessEnv>, config: RuntimeConfig): Partial<NodeJS.ProcessEnv> {
   const merged: Partial<NodeJS.ProcessEnv> = { ...env };
@@ -89,9 +114,19 @@ export async function ensureGeneratedSecrets(env: Partial<NodeJS.ProcessEnv>) {
   return generated;
 }
 
+/**
+ * For operator commands run beside a wizard-configured server (signalhubctl,
+ * bootstrap.mjs, migrate.mjs): read the saved settings into process.env.
+ * Must run before anything imports lib/postgres/client.ts.
+ */
+export async function loadRuntimeConfigIntoEnv() {
+  const keys = environmentKeys(process.env).join(",");
+  Object.assign(process.env, mergeIntoEnv(process.env, await readRuntimeConfig()), { SIGNALHUB_ENV_KEYS: keys });
+}
+
 /** Environment plus config file plus any first-boot secrets, ready for a child process. */
 export async function resolveRuntimeEnv(env: NodeJS.ProcessEnv = process.env) {
-  const merged = mergeIntoEnv(env, await readRuntimeConfig(env)) as NodeJS.ProcessEnv;
+  const merged = { ...mergeIntoEnv(env, await readRuntimeConfig(env)), SIGNALHUB_ENV_KEYS: environmentKeys(env).join(",") } as NodeJS.ProcessEnv;
   const generated = await ensureGeneratedSecrets(merged);
   return { env: { ...merged, ...generated } as NodeJS.ProcessEnv, generated: Object.keys(generated) };
 }

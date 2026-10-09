@@ -17,26 +17,44 @@ type PostgresGlobal = {
 const globalForPostgres = globalThis as typeof globalThis & PostgresGlobal;
 
 function createPool() {
-  return new Pool(postgresPoolOptions(process.env));
-}
-
-export const postgresPool = globalForPostgres.signalHubPool ?? createPool();
-globalForPostgres.signalHubPool = postgresPool;
-if (postgresPool.listenerCount("error") === 0) {
-  postgresPool.on("error", (error) => {
+  const pool = new Pool(postgresPoolOptions(process.env));
+  pool.on("error", (error) => {
     logger.error({ err: error }, "Unexpected error from an idle PostgreSQL connection");
   });
-}
-if (postgresPool.listenerCount("connect") === 0) {
-  postgresPool.on("connect", (client) => {
+  pool.on("connect", (client) => {
     client.on("error", (error) => {
       logger.error({ err: error }, "Unexpected error from an active PostgreSQL connection");
     });
   });
+  return pool;
 }
 
+/**
+ * The pool is created on first use, not at import: `next build` and the
+ * first-run setup mode load route modules before any DATABASE_URL exists.
+ */
+function pool() {
+  globalForPostgres.signalHubPool ??= createPool();
+  return globalForPostgres.signalHubPool;
+}
+
+/** The shared pg Pool (created lazily); usable anywhere a Pool is expected. */
+export const postgresPool: Pool = new Proxy({} as Pool, {
+  get(_target, property) {
+    const target = pool();
+    const value = Reflect.get(target, property, target);
+    return typeof value === "function" ? value.bind(target) : value;
+  },
+  set(_target, property, value) {
+    return Reflect.set(pool(), property, value);
+  },
+  getPrototypeOf() {
+    return Pool.prototype;
+  },
+});
+
 export const database = globalForPostgres.signalHubDatabase ?? new Kysely<SignalHubDatabase>({
-  dialect: new PostgresDialect({ pool: postgresPool }),
+  dialect: new PostgresDialect({ pool: async () => pool() }),
   plugins: [new CamelCasePlugin()],
 });
 globalForPostgres.signalHubDatabase = database;
@@ -60,7 +78,10 @@ export async function verifyDatabaseConnection() {
 }
 
 export async function closeDatabase() {
+  // Kysely only ends the pool if it created a connection itself.
   await database.destroy();
+  const current = globalForPostgres.signalHubPool;
+  if (current && !current.ended) await current.end();
   delete globalForPostgres.signalHubDatabase;
   delete globalForPostgres.signalHubPool;
 }

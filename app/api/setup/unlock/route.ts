@@ -1,8 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { trustedClientIp } from "@/lib/network-policy";
-import { currentSetupMode, readJson, setupError } from "@/lib/setup/http";
+import { currentSetupMode, readJson, requestIsHttps, setupError } from "@/lib/setup/http";
 import {
   consumeSetupAttempt,
+  currentSetupToken,
   SETUP_COOKIE,
   SETUP_COOKIE_MAX_AGE_SECONDS,
   setupCookieValue,
@@ -15,7 +16,7 @@ export async function POST(request: NextRequest) {
     return setupError(429, "SETUP_RATE_LIMITED", "Too many attempts. Wait a minute and try again.");
   }
   const body = await readJson<{ token?: unknown }>(request);
-  const token = process.env.SIGNALHUB_SETUP_TOKEN;
+  const token = currentSetupToken();
   if (typeof body?.token !== "string" || !setupTokenMatches(body.token, token)) {
     return setupError(401, "SETUP_TOKEN_INVALID", "That setup token is not correct. Copy it from the server logs.");
   }
@@ -23,7 +24,7 @@ export async function POST(request: NextRequest) {
   response.cookies.set(SETUP_COOKIE, setupCookieValue(token!), {
     httpOnly: true,
     sameSite: "strict",
-    secure: request.nextUrl.protocol === "https:",
+    secure: requestIsHttps(request),
     path: "/",
     maxAge: SETUP_COOKIE_MAX_AGE_SECONDS,
   });

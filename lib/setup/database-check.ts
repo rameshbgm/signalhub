@@ -23,6 +23,8 @@ export type DatabaseTestResult = {
   ok: boolean;
   /** True when the database holds unrelated tables and the operator must confirm. */
   needsConfirmation: boolean;
+  /** Set when the server is reachable but the database does not exist yet. */
+  missingDatabase: string | null;
   url: string | null;
   ca: string | null;
   checks: DatabaseCheck[];
@@ -65,7 +67,7 @@ export function describeConnectionError(error: unknown): string {
     case "28000":
       return "The database rejected the user name or password.";
     case "3D000":
-      return "The database does not exist. Create it first (CREATE DATABASE …) or check the name.";
+      return "The database does not exist yet. Check the name, or create it.";
     case "ECONNREFUSED":
       return "Nothing is listening at that host and port. Check the host, the port and any firewall.";
     case "ENOTFOUND":
@@ -107,7 +109,7 @@ export async function testDatabase(input: DatabaseInput): Promise<DatabaseTestRe
     url = databaseUrlFromInput(input);
   } catch (error) {
     checks.push({ id: "input", status: "fail", message: (error as Error).message });
-    return { ok: false, needsConfirmation: false, url: null, ca, checks };
+    return { ok: false, needsConfirmation: false, missingDatabase: null, url: null, ca, checks };
   }
 
   const options = postgresPoolOptions({ DATABASE_URL: url, DATABASE_SSL_CA: ca ?? undefined });
@@ -118,6 +120,7 @@ export async function testDatabase(input: DatabaseInput): Promise<DatabaseTestRe
     application_name: "signalhub-setup",
   });
   let needsConfirmation = false;
+  let missingDatabase: string | null = null;
   try {
     await client.connect();
     checks.push({ id: "connect", status: "pass", message: "Connected and signed in." });
@@ -153,6 +156,7 @@ export async function testDatabase(input: DatabaseInput): Promise<DatabaseTestRe
       checks.push({ id: "contents", status: "warn", message: `The database already has ${state.tables} unrelated tables. A dedicated database is recommended.` });
     }
   } catch (error) {
+    if ((error as { code?: string }).code === "3D000") missingDatabase = databaseName(url);
     checks.push({ id: "connect", status: "fail", message: describeConnectionError(error) });
   } finally {
     await client.end().catch(() => undefined);
@@ -169,8 +173,51 @@ export async function testDatabase(input: DatabaseInput): Promise<DatabaseTestRe
   return {
     ok: !checks.some((check) => check.status === "fail"),
     needsConfirmation,
+    missingDatabase,
     url,
     ca,
     checks,
   };
+}
+
+function databaseName(url: string) {
+  return decodeURIComponent(new URL(url).pathname.replace(/^\//, ""));
+}
+
+/**
+ * Creates the database named in the connection, connecting to the server's
+ * maintenance database with the same credentials. Needs CREATEDB (or a
+ * superuser); managed providers usually grant it to their admin user.
+ */
+export async function createDatabase(input: DatabaseInput): Promise<{ ok: true } | { ok: false; message: string }> {
+  let url: URL;
+  try {
+    url = new URL(databaseUrlFromInput(input));
+  } catch (error) {
+    return { ok: false, message: (error as Error).message };
+  }
+  const name = databaseName(url.toString());
+  if (!name) return { ok: false, message: "Enter the database name first." };
+  let lastError: unknown = null;
+  for (const maintenance of ["postgres", "template1"]) {
+    url.pathname = `/${maintenance}`;
+    const options = postgresPoolOptions({ DATABASE_URL: url.toString(), DATABASE_SSL_CA: input.ca?.trim() || undefined });
+    const client = new Client({ connectionString: options.connectionString, ssl: options.ssl, connectionTimeoutMillis: 5_000, application_name: "signalhub-setup" });
+    try {
+      await client.connect();
+      await client.query(`CREATE DATABASE ${client.escapeIdentifier(name)}`);
+      return { ok: true };
+    } catch (error) {
+      const code = (error as { code?: string }).code;
+      if (code === "42P04") return { ok: true }; // already exists
+      if (code === "42501") {
+        return { ok: false, message: `This user may not create databases. Ask an administrator to run: CREATE DATABASE "${name}" OWNER "${decodeURIComponent(url.username)}";` };
+      }
+      lastError = error;
+      if (code !== "3D000") break; // only retry when the maintenance database is missing
+    } finally {
+      await client.end().catch(() => undefined);
+    }
+  }
+  return { ok: false, message: describeConnectionError(lastError) };
 }

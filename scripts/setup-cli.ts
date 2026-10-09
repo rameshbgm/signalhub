@@ -6,13 +6,17 @@
  * Non-interactive: --database-url URL [--database-ca-file PEM] [--public-url URL]
  *   --admin-username U --admin-name N --admin-email E --org-name O [--org-slug S]
  *   --password-stdin [--yes]
+ *
+ * Recovery:
+ *   --new-token  replace the setup token (lost or exposed); takes effect at once
+ *   --reset      forget the database saved by the wizard so setup runs again
  */
 import { readFile } from "node:fs/promises";
 import { stdin, stdout } from "node:process";
 import { createInterface } from "node:readline/promises";
-import { resolveRuntimeEnv, writeRuntimeConfig } from "@/lib/setup/config-file";
-import { testDatabase, type DatabaseInput } from "@/lib/setup/database-check";
-import { revokeSetupToken } from "@/lib/setup/token";
+import { removeRuntimeConfigKeys, resolveRuntimeEnv, setFromEnvironment, writeRuntimeConfig } from "@/lib/setup/config-file";
+import { createDatabase, testDatabase, type DatabaseInput } from "@/lib/setup/database-check";
+import { revokeSetupToken, rotateSetupToken, setupTokenPath } from "@/lib/setup/token";
 
 function flag(name: string) {
   const index = process.argv.indexOf(name);
@@ -105,8 +109,17 @@ async function configureDatabase(env: NodeJS.ProcessEnv) {
   }
   console.log("\nStep 1 of 2: database (PostgreSQL 14 or newer; an empty, dedicated database is best)\n");
   for (;;) {
-    const result = await testDatabase(await databaseInput());
+    const input = await databaseInput();
+    let result = await testDatabase(input);
     printChecks(result.checks);
+    if (result.missingDatabase && await confirm(`Create the database "${result.missingDatabase}" now?`)) {
+      const created = await createDatabase(input);
+      console.log(created.ok ? `Created database "${result.missingDatabase}".` : created.message);
+      if (created.ok) {
+        result = await testDatabase(input);
+        printChecks(result.checks);
+      }
+    }
     if (result.ok && result.url && (!result.needsConfirmation || await confirm("Use this database anyway?"))) {
       const publicUrl = flag("--public-url") ?? (env.NEXT_PUBLIC_APP_URL || await ask("Public URL people will use", "http://localhost:3301"));
       await writeRuntimeConfig({
@@ -155,7 +168,30 @@ async function createAdmin() {
   }
 }
 
+async function newToken() {
+  const token = await rotateSetupToken();
+  console.log(`New setup token (the old one no longer works):\n\n  ${token}\n\nAlso saved in ${setupTokenPath()}.`);
+}
+
+async function reset() {
+  if (setFromEnvironment("DATABASE_URL")) {
+    throw new Error("The database is set with the DATABASE_URL environment variable. Change or remove it there instead.");
+  }
+  console.log("This forgets the database connection saved by the setup wizard, so the next start runs setup again.");
+  console.log("Nothing in that database is changed or deleted, and the encryption key is kept.");
+  if (!await confirm("Reset the saved database connection?")) {
+    console.log("Nothing changed.");
+    return;
+  }
+  await removeRuntimeConfigKeys(["DATABASE_URL", "DATABASE_SSL_CA"]);
+  const token = await rotateSetupToken();
+  console.log(`\nDone. Restart SignalHub (docker compose restart signalhub, or restart the Node process),`);
+  console.log(`then open /setup with the new token:\n\n  ${token}\n`);
+}
+
 export async function setupCli() {
+  if (process.argv.includes("--new-token")) return newToken();
+  if (process.argv.includes("--reset")) return reset();
   const env = await configureDatabase((await resolveRuntimeEnv()).env);
   // The database modules read DATABASE_URL when first imported, so set the
   // final environment before loading them.

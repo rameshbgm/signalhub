@@ -1,4 +1,5 @@
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+import { readFileSync } from "node:fs";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { dataDir } from "@/lib/setup/config-file";
@@ -27,6 +28,27 @@ export async function issueSetupToken(env: NodeJS.ProcessEnv = process.env) {
   await mkdir(dataDir(env), { recursive: true });
   await writeFile(setupTokenPath(env), `${token}\n`, { mode: 0o600 });
   return token;
+}
+
+/** Forces a fresh token (`signalhubctl setup --new-token`): unlocked browsers must unlock again. */
+export async function rotateSetupToken(env: NodeJS.ProcessEnv = process.env) {
+  await rm(setupTokenPath(env), { force: true });
+  return issueSetupToken(env);
+}
+
+/**
+ * The token the web server accepts right now. Read from the file on every
+ * call so a token rotated from the command line takes effect immediately;
+ * the environment copy covers read-only filesystems.
+ */
+export function currentSetupToken(env: NodeJS.ProcessEnv = process.env) {
+  try {
+    const value = readFileSync(setupTokenPath(env), "utf8").trim();
+    if (value) return value;
+  } catch {
+    // No file (read-only filesystem, or setup finished).
+  }
+  return env.SIGNALHUB_SETUP_MODE ? env.SIGNALHUB_SETUP_TOKEN : undefined;
 }
 
 export async function revokeSetupToken(env: NodeJS.ProcessEnv = process.env) {

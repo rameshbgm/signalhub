@@ -1,5 +1,5 @@
-import { closeDatabase } from "@/lib/postgres/client";
-import { bootstrapInstance, type AdminInput } from "@/lib/setup/admin";
+import { loadRuntimeConfigIntoEnv } from "@/lib/setup/config-file";
+import type { AdminInput } from "@/lib/setup/admin";
 
 async function readPasswordFromStdin() {
   const chunks: Buffer[] = [];
@@ -41,15 +41,21 @@ async function bootstrapInput(): Promise<AdminInput> {
 }
 
 async function main() {
-  // The CLI deliberately resets an existing admin (break-glass recovery), so
-  // it does not use the wizard's first-run-only guard.
-  const result = await bootstrapInstance(await bootstrapInput(), { onlyIfNoUsers: false, mustChangePassword: true });
-  console.log(`Admin ${result.username} is ready for ${result.organization} and must complete account setup at the next login.`);
+  // Settings saved by the setup wizard load before the database modules.
+  await loadRuntimeConfigIntoEnv();
+  const { bootstrapInstance } = await import("@/lib/setup/admin");
+  const { closeDatabase } = await import("@/lib/postgres/client");
+  try {
+    // The CLI deliberately resets an existing admin (break-glass recovery), so
+    // it does not use the wizard's first-run-only guard.
+    const result = await bootstrapInstance(await bootstrapInput(), { onlyIfNoUsers: false, mustChangePassword: true });
+    console.log(`Admin ${result.username} is ready for ${result.organization} and must complete account setup at the next login.`);
+  } finally {
+    await closeDatabase();
+  }
 }
 
-main()
-  .catch((error) => {
-    console.error(error instanceof Error ? error.message : error);
-    process.exitCode = 1;
-  })
-  .finally(() => closeDatabase());
+main().catch((error) => {
+  console.error(error instanceof Error ? error.message : error);
+  process.exitCode = 1;
+});
