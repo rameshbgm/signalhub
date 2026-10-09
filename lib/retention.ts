@@ -138,6 +138,7 @@ export async function runRetentionSweep(workerId: string, now = new Date()) {
   await Promise.all([
     database.deleteFrom("rateLimits").where("expiresAt", "<", now).execute(),
     database.deleteFrom("subscriptionOtps").where("expiresAt", "<", now).execute(),
+    database.deleteFrom("passwordResetTokens").where("expiresAt", "<", now).execute(),
     database.deleteFrom("authSessions")
       .where("absoluteExpiresAt", "<", cutoff(now, EXPIRED_SESSION_HISTORY_DAYS)).execute(),
   ]);

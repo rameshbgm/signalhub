@@ -179,6 +179,29 @@ async function queueExport() {
   console.log(JSON.stringify({ jobId: job.id, status: job.status }, null, 2));
 }
 
+/**
+ * Break-glass recovery when someone (often the only administrator) cannot
+ * sign in and email reset is unavailable: sets a temporary password that must
+ * be changed at sign-in. --clear-mfa also removes a lost authenticator.
+ */
+async function resetPassword() {
+  const user = flag("--username") ?? flag("--email");
+  if (!user) throw new Error("Usage: signalhubctl reset-password --username USER_ID [--password-stdin] [--clear-mfa]");
+  let password: string | undefined;
+  if (process.argv.includes("--password-stdin")) {
+    const chunks: Buffer[] = [];
+    for await (const chunk of process.stdin) chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    password = Buffer.concat(chunks).toString("utf8").trimEnd();
+  }
+  const { operatorResetPassword } = await import("@/lib/password-reset");
+  const result = await operatorResetPassword(user, { password, clearMfa: process.argv.includes("--clear-mfa") });
+  console.log(`Password reset for ${result.username}. All of its sessions were signed out.`);
+  if (result.generated) console.log(`Temporary password (shown once): ${result.password}`);
+  console.log("It must be changed at the next sign-in.");
+  if (process.argv.includes("--clear-mfa")) console.log("The authenticator app was removed; set it up again after signing in.");
+  if (result.disabled) console.log("Note: this account is disabled. An administrator must re-enable it before it can sign in.");
+}
+
 async function main() {
   const command = process.argv[2];
   if (command === "doctor") await doctor();
@@ -192,13 +215,14 @@ async function main() {
       await runMigrations();
       await migrateJobSchema();
     }
-  } else if (command === "backup") await backup();
+  } else if (command === "reset-password") await resetPassword();
+  else if (command === "backup") await backup();
   else if (command === "restore") await restore();
   else if (command === "audit") await audit();
   else if (command === "export") await queueExport();
   else if (command === "rotate-encryption-key") await rotateEncryption();
   else {
-    console.log("Usage: signalhubctl <setup|doctor|preflight|migrate [--check]|backup|restore|audit|export --org ID [--requested-by USER_ID]|rotate-encryption-key>");
+    console.log("Usage: signalhubctl <setup [--reset|--new-token]|reset-password --username USER_ID [--password-stdin] [--clear-mfa]|doctor|preflight|migrate [--check]|backup|restore|audit|export --org ID [--requested-by USER_ID]|rotate-encryption-key>");
     process.exitCode = 2;
   }
 }

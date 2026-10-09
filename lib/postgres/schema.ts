@@ -152,6 +152,16 @@ export interface MembershipTable {
   createdAt: GeneratedTimestamp;
 }
 
+export interface PasswordResetTokenTable {
+  id: Generated<string>;
+  userId: string;
+  tokenHash: string;
+  expiresAt: Date;
+  usedAt: NullableTimestamp;
+  requestedIp: string | null;
+  createdAt: GeneratedTimestamp;
+}
+
 export interface AuthSessionTable {
   id: Generated<string>;
   kind: Generated<"TENANT" | "PLATFORM">;
@@ -848,6 +858,7 @@ export interface SignalHubDatabase {
   users: UserTable;
   memberships: MembershipTable;
   authSessions: AuthSessionTable;
+  passwordResetTokens: PasswordResetTokenTable;
   supportSessions: SupportSessionTable;
   platformAuditLogs: PlatformAuditLogTable;
   platformJobs: PlatformJobTable;

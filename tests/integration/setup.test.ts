@@ -43,3 +43,52 @@ describe.skipIf(!enabled)("first-run setup", () => {
     ).rejects.toBeInstanceOf(setup.SetupAlreadyCompleteError);
   });
 });
+
+describe.skipIf(!enabled)("password recovery", () => {
+  let reset: typeof import("../../lib/password-reset");
+  let client: typeof import("../../lib/postgres/client");
+  let secrets: typeof import("../../lib/secrets");
+  let auth: typeof import("../../lib/auth");
+  let userId = "";
+  const username = `recover-${Date.now()}`;
+
+  beforeAll(async () => {
+    await (await import("../../lib/migrations")).runMigrations();
+    reset = await import("../../lib/password-reset");
+    client = await import("../../lib/postgres/client");
+    secrets = await import("../../lib/secrets");
+    auth = await import("../../lib/auth");
+    const setup = await import("../../lib/setup/admin");
+    await setup.bootstrapInstance({
+      username, password: "an-original-long-passphrase", name: "Recover Me",
+      email: `${username}@example.com`, organizationName: "Recover", organizationSlug: username,
+    }, { onlyIfNoUsers: false, mustChangePassword: false });
+    userId = (await client.database.selectFrom("users").select("id").where("canonicalUsername", "=", username).executeTakeFirstOrThrow()).id;
+  });
+
+  it("resets with a valid link exactly once", async () => {
+    const { token, hash } = secrets.generateSecret("shpr_");
+    await client.database.insertInto("passwordResetTokens").values({ userId, tokenHash: hash, expiresAt: new Date(Date.now() + 60_000), requestedIp: null }).execute();
+    expect(await reset.describeResetToken(token)).toEqual({ username });
+    await expect(reset.resetPasswordWithToken(token, "short")).rejects.toMatchObject({ code: "PASSWORD_POLICY_FAILED" });
+    await reset.resetPasswordWithToken(token, "a-brand-new-long-passphrase");
+    const user = await client.database.selectFrom("users").select("passwordHash").where("id", "=", userId).executeTakeFirstOrThrow();
+    expect(await auth.verifyPassword("a-brand-new-long-passphrase", user.passwordHash!)).toBe(true);
+    await expect(reset.resetPasswordWithToken(token, "another-long-passphrase-x")).rejects.toMatchObject({ code: "RESET_LINK_INVALID" });
+  });
+
+  it("rejects expired links", async () => {
+    const { token, hash } = secrets.generateSecret("shpr_");
+    await client.database.insertInto("passwordResetTokens").values({ userId, tokenHash: hash, expiresAt: new Date(Date.now() - 1_000), requestedIp: null }).execute();
+    expect(await reset.describeResetToken(token)).toBeNull();
+  });
+
+  it("lets the operator set a temporary password and clear MFA", async () => {
+    const result = await reset.operatorResetPassword(username, { clearMfa: true });
+    expect(result.generated).toBe(true);
+    const user = await client.database.selectFrom("users").select(["passwordHash", "mustChangePassword", "totpSecretCiphertext"]).where("id", "=", userId).executeTakeFirstOrThrow();
+    expect(await auth.verifyPassword(result.password, user.passwordHash!)).toBe(true);
+    expect(user.mustChangePassword).toBe(true);
+    expect(user.totpSecretCiphertext).toBeNull();
+  });
+});

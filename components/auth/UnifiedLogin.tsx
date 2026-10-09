@@ -83,7 +83,10 @@ export function UnifiedLogin({ returnTo }: { returnTo: string | null }) {
               <Input id="login-username" suppressHydrationWarning value={username} onChange={(event) => setUsername(event.target.value)} autoComplete="username" placeholder="User ID" disabled={mfaRequired} required className="h-10" />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="login-password">Password</Label>
+              <div className="flex items-baseline justify-between gap-3">
+                <Label htmlFor="login-password">Password</Label>
+                <Link href="/forgot-password" className="text-xs font-medium text-primary-ink underline-offset-4 hover:underline">Forgot password?</Link>
+              </div>
               <Input id="login-password" suppressHydrationWarning value={password} onChange={(event) => setPassword(event.target.value)} type="password" autoComplete="current-password" placeholder="Password" disabled={mfaRequired} required className="h-10" />
             </div>
             {mfaRequired && (
