@@ -1,3 +1,4 @@
+import { selectedPage } from "@/lib/selected-page";
 import Link from "next/link";
 import { Gauge } from "lucide-react";
 import { requireSession } from "@/lib/require-session";
@@ -17,7 +18,7 @@ export default async function MetricsPage({ searchParams }: { searchParams: Prom
   const { session, org } = await requireSession();
   const { pageId: pageIdParam } = await searchParams;
   const pages = await getScopedPages(session, org.id, { isHub: false });
-  const pageId = pageIdParam && pages.some((p) => p.id === pageIdParam) ? pageIdParam : pages[0]?.id;
+  const pageId = (await selectedPage(pages, session, pageIdParam))?.id;
   if (!pageId) {
     return (
       <div className="space-y-8">
@@ -68,7 +69,7 @@ export default async function MetricsPage({ searchParams }: { searchParams: Prom
         title="Metrics"
         icon={Gauge}
         hue="sky"
-        description="Publish numbers such as response time or error rate on your status page."
+        description="Choose which metrics appear on your status page. Hiding a metric keeps monitoring and data collection running."
         actions={
           <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
             <div className="w-full sm:w-60">

@@ -23,6 +23,15 @@ export type CheckResult = {
   response?: string | null;
 };
 
+/** Settings needed for a check, including an unsaved configuration test. */
+export type MonitorCheckInput = Pick<MonitorRow,
+  | "id" | "type" | "target" | "port" | "method" | "requestBody" | "requestHeaders"
+  | "expectedStatusRange" | "keywordMatch" | "keywordAbsent" | "authType" | "authUsername"
+  | "authSecret" | "authHeaderName" | "authConfigCiphertext" | "timeoutMs" | "verifyTls"
+  | "cacheBuster" | "ipFamily" | "sslWarnDays" | "saveErrorResponse" | "upsideDown"
+  | "dnsRecordType" | "dnsExpectedValue" | "intervalSec" | "heartbeatGraceSec" | "lastHeartbeatAt" | "createdAt"
+>;
+
 function failure(started: number, error: string, statusCode: number | null = null): CheckResult {
   return { ok: false, latencyMs: Date.now() - started, statusCode, error };
 }
@@ -58,7 +67,7 @@ export function applyUpsideDown(result: CheckResult, monitor: Pick<MonitorRow, "
     : { ...result, ok: true, error: null };
 }
 
-async function httpCheck(monitor: MonitorRow, allowPrivate: boolean, proxy: ProxyConfig | null): Promise<CheckResult> {
+async function httpCheck(monitor: MonitorCheckInput, allowPrivate: boolean, proxy: ProxyConfig | null): Promise<CheckResult> {
   const started = Date.now();
   try {
     let url = await validateHttpTarget(monitor.target, { allowPrivate });
@@ -129,7 +138,7 @@ async function httpCheck(monitor: MonitorRow, allowPrivate: boolean, proxy: Prox
   }
 }
 
-async function tcpCheck(monitor: MonitorRow, allowPrivate: boolean): Promise<CheckResult> {
+async function tcpCheck(monitor: MonitorCheckInput, allowPrivate: boolean): Promise<CheckResult> {
   const started = Date.now();
   try {
     const host = await validateNetworkHost(monitor.target, allowPrivate);
@@ -153,7 +162,7 @@ async function tcpCheck(monitor: MonitorRow, allowPrivate: boolean): Promise<Che
   }
 }
 
-async function tlsCheck(monitor: MonitorRow, allowPrivate: boolean, defaultWarnDays: number): Promise<CheckResult> {
+async function tlsCheck(monitor: MonitorCheckInput, allowPrivate: boolean, defaultWarnDays: number): Promise<CheckResult> {
   const started = Date.now();
   try {
     const target = monitor.target.includes("://") ? new URL(monitor.target) : null;
@@ -192,7 +201,7 @@ async function tlsCheck(monitor: MonitorRow, allowPrivate: boolean, defaultWarnD
   }
 }
 
-async function icmpCheck(monitor: MonitorRow, allowPrivate: boolean): Promise<CheckResult> {
+async function icmpCheck(monitor: MonitorCheckInput, allowPrivate: boolean): Promise<CheckResult> {
   const started = Date.now();
   try {
     if (!setting("monitorEnableIcmp")) {
@@ -225,7 +234,7 @@ async function icmpCheck(monitor: MonitorRow, allowPrivate: boolean): Promise<Ch
   }
 }
 
-async function dnsCheck(monitor: MonitorRow): Promise<CheckResult> {
+async function dnsCheck(monitor: MonitorCheckInput): Promise<CheckResult> {
   const started = Date.now();
   try {
     const recordType = monitor.dnsRecordType ?? "A";
@@ -263,7 +272,7 @@ export function heartbeatCheck(monitor: Pick<MonitorRow, "lastHeartbeatAt" | "cr
 }
 
 /** `proxy` applies to HTTP and keyword checks only; the worker resolves it from the monitor's proxy_id. */
-export async function runCheck(monitor: MonitorRow, context: { proxy?: ProxyConfig | null; certWarnDays?: number } = {}) {
+export async function runCheck(monitor: MonitorCheckInput, context: { proxy?: ProxyConfig | null; certWarnDays?: number } = {}) {
   const allowPrivate = setting("monitorAllowPrivateTargets");
   if (monitor.type === "HTTP" || monitor.type === "KEYWORD") return httpCheck(monitor, allowPrivate, context.proxy ?? null);
   if (monitor.type === "TCP") return tcpCheck(monitor, allowPrivate);

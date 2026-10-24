@@ -44,6 +44,8 @@ export type MonitorListItem = {
   checks: MonitorCheck[];
   /** Public status page this monitor reports to. */
   pageHref: string;
+  /** Visibility controls for this monitor's response-time chart, independent of checks. */
+  metric?: { visible: boolean; toggle: Action };
   /** Read-only settings for the details dialog; holds no secrets. */
   details: MonitorDetails;
   actions: { run: Action; toggle: Action; remove: Action };
@@ -401,8 +403,9 @@ export function MonitorList({ monitors, canManage, now, bulkAction, viewsKey }: 
         </div>
       ) : (
         <>
-          <div className="overflow-hidden rounded-card border border-line bg-surface shadow-card">
-            <Table>
+          <div className="overflow-clip rounded-card border border-line bg-surface shadow-card">
+            {/* Keep the page as the scroll container so each monitor's actions can stick below the app header. */}
+            <Table containerClassName="overflow-visible">
               <thead className="border-b border-line-strong bg-sunken/60">
                 <tr>
                   <th scope="col" className="w-10"><span className="sr-only">Select</span></th>

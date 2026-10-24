@@ -1,3 +1,4 @@
+import { selectedPage } from "@/lib/selected-page";
 import Link from "next/link";
 import { Info, MonitorDot } from "lucide-react";
 import { requireSession } from "@/lib/require-session";
@@ -13,6 +14,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { publicPagePath } from "@/lib/public-path";
 import { PageHeader } from "@/components/ui/page-header";
+import { toggleMetricVisible } from "../metrics/actions";
 
 /** Names only: header values often carry API keys and never leave the server. */
 function headerNames(json: string) {
@@ -28,7 +30,7 @@ export default async function MonitorsPage({ searchParams }: { searchParams: Pro
   const { session, org } = await requireSession();
   const { pageId: pageIdParam } = await searchParams;
   const pages = await getScopedPages(session, org.id, { isHub: false });
-  const pageId = pageIdParam && pages.some((p) => p.id === pageIdParam) ? pageIdParam : pages[0]?.id;
+  const pageId = (await selectedPage(pages, session, pageIdParam))?.id;
   if (!pageId) {
     return (
       <div className="space-y-8">
@@ -44,6 +46,8 @@ export default async function MonitorsPage({ searchParams }: { searchParams: Pro
   const checksByMonitor = await latestChecksByMonitor(monitorIds, 30);
   const components = await database.selectFrom("components").select(["id", "name"]).where("pageId", "=", pageId).execute();
   const componentsById = new Map(components.map((c) => [c.id, c.name]));
+  const metrics = await database.selectFrom("metrics").select(["id", "visible"]).where("pageId", "=", pageId).execute();
+  const metricById = new Map(metrics.map((metric) => [metric.id, metric]));
   const latestHeartbeat = await database.selectFrom("workerHeartbeats").selectAll()
     .orderBy("lastSeenAt", "desc").executeTakeFirst();
   // Server-render timestamp used only to classify a persisted heartbeat.
@@ -66,6 +70,7 @@ export default async function MonitorsPage({ searchParams }: { searchParams: Pro
     lastLatencyMs: m.lastLatencyMs,
     checks: checksByMonitor.get(m.id) ?? [],
     pageHref,
+    metric: m.metricId && metricById.has(m.metricId) ? { visible: metricById.get(m.metricId)!.visible, toggle: toggleMetricVisible.bind(null, m.metricId) } : undefined,
     details: {
       createdAt: m.createdAt.toISOString(),
       intervalSec: m.intervalSec,

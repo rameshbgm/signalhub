@@ -1,3 +1,4 @@
+import { selectedPage } from "@/lib/selected-page";
 import Link from "next/link";
 import { ArrowLeft, Siren } from "lucide-react";
 import { requireSession } from "@/lib/require-session";
@@ -14,7 +15,7 @@ export default async function NewIncidentPage({ searchParams }: { searchParams: 
   await requireCapability("incident.manage");
   const { pageId: pageIdParam } = await searchParams;
   const pages = await getScopedPages(session, org.id, { isHub: false });
-  const pageId = pageIdParam && pages.some((p) => p.id === pageIdParam) ? pageIdParam : pages[0]?.id;
+  const pageId = (await selectedPage(pages, session, pageIdParam))?.id;
 
   const components = pageId
     ? await database.selectFrom("components").selectAll().where("pageId", "=", pageId).orderBy("order", "asc").execute()

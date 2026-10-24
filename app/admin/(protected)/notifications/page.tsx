@@ -1,3 +1,4 @@
+import { selectedPage } from "@/lib/selected-page";
 import { requireSession } from "@/lib/require-session";
 import { database } from "@/lib/postgres/client";
 import { PageSelect } from "@/components/admin/PageSelect";
@@ -23,7 +24,7 @@ export default async function NotificationsPage({
   await requireCapability("integration.manage");
   const requested = (await searchParams).pageId;
   const pages = await getScopedPages(session, org.id, { orderBy: "name" });
-  const page = pages.find((item) => item.id === requested) ?? pages[0];
+  const page = await selectedPage(pages, session, requested);
   if (!page) return <div className="space-y-8"><PageHeader title="Notifications and destinations" icon={BellRing} hue="teal" description="Configure subscriber delivery and team integrations for your status pages." /><EmptyState icon={BellRing} hue="teal" title="Create a status page first" description="Notifications and destinations belong to a status page." /></div>;
   const [destinations, endpoints, capabilities, enabledChannels, components, defaults, connections] = await Promise.all([
     database.selectFrom("notificationDestinations").selectAll().where("pageId", "=", page.id).orderBy("createdAt", "asc").execute(),

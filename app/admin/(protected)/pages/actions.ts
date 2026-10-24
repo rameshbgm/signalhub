@@ -16,7 +16,6 @@ import { publicPagePath } from "@/lib/public-path";
 import { database, type DatabaseTransaction } from "@/lib/postgres/client";
 import type { PageTable } from "@/lib/postgres/schema";
 import { recordTenantAudit } from "@/lib/tenant-audit";
-import { generateAutomationToken } from "@/lib/tokens";
 
 type AdminSession = Awaited<ReturnType<typeof requireCapability>>;
 
@@ -117,34 +116,6 @@ export async function createPage(formData: FormData) {
       deletedBy: null,
       createdAt: now,
     }).returning("id").executeTakeFirstOrThrow();
-    if (!isHub) {
-      const token = generateAutomationToken();
-      const component = await transaction.insertInto("components").values({
-        pageId: page.id,
-        groupId: null,
-        name: "Service",
-        description: "",
-        status: "OPERATIONAL",
-        order: 0,
-        visible: true,
-        showUptime: true,
-        manualStatus: "OPERATIONAL",
-        isThirdParty: false,
-        thirdPartyProvider: null,
-        automationTokenHash: token.hash,
-        automationTokenPrefix: token.prefix,
-        automationTokenLastFour: token.lastFour,
-        createdAt: now,
-      }).returning("id").executeTakeFirstOrThrow();
-      await transaction.insertInto("componentStatusEvents").values({
-        componentId: component.id,
-        status: "OPERATIONAL",
-        startedAt: now,
-        endedAt: null,
-        isMaintenance: false,
-        note: null,
-      }).execute();
-    }
     await audit(transaction, session, "CREATE_PAGE_DRAFT", page.id, { slug });
     return page.id;
   });
@@ -165,7 +136,7 @@ export async function finishPageSetup(pageId: string) {
     if (!page.isHub) {
       const component = await transaction.selectFrom("components").select("id")
         .where("pageId", "=", pageId).where("visible", "=", true).executeTakeFirst();
-      if (!component) throw new Error("Add at least one visible component before publishing this page");
+      if (!component) throw new Error("Add at least one visible service before publishing this page");
     }
     const now = new Date();
     await transaction.updateTable("pages").set({

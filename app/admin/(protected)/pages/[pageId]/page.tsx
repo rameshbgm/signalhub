@@ -18,6 +18,8 @@ import {
 import { CopyButton } from "@/components/CopyButton";
 import { SetupSteps, type SetupStep } from "@/components/admin/SetupSteps";
 import { ServiceOverviewList } from "@/components/admin/ServiceOverviewList";
+import { ServiceEditorDialog } from "@/components/admin/ServiceEditorDialog";
+import { createComponent } from "./components-actions";
 import { PageGroup } from "@/components/admin/page-group";
 import { memberRow } from "@/lib/page-rows";
 import { attachChildPage, bulkPageAction } from "../actions";
@@ -72,7 +74,7 @@ export default async function PageOverview({ params }: { params: Promise<{ pageI
 type OverviewPage = PageRow;
 
 async function StatusPageOverview({ page }: { page: OverviewPage }) {
-  const [components, groups, openIncidents, maintenance, subscriberRow] = await Promise.all([
+  const [components, groups, openIncidents, maintenance, subscriberRow, monitors] = await Promise.all([
     database.selectFrom("components").select(["id", "name", "status", "visible", "groupId"])
       .where("pageId", "=", page.id).orderBy("order").execute(),
     database.selectFrom("componentGroups").select(["id", "name"]).where("pageId", "=", page.id).execute(),
@@ -86,6 +88,8 @@ async function StatusPageOverview({ page }: { page: OverviewPage }) {
     database.selectFrom("subscribers").select(({ fn }) => fn.countAll<number>().as("count"))
       .where("pageId", "=", page.id).where("verified", "=", true).where("quarantined", "=", false)
       .executeTakeFirstOrThrow(),
+    database.selectFrom("monitors").select(["id", "name", "enabled"])
+      .where("pageId", "=", page.id).where("componentId", "is", null).orderBy("name").execute(),
   ]);
 
   const visible = components.filter((component) => component.visible);
@@ -173,7 +177,7 @@ async function StatusPageOverview({ page }: { page: OverviewPage }) {
               {components.length ? (
                 <ServiceOverviewList services={components.map((component) => ({ id: component.id, name: component.name, status: component.status as ComponentStatus, visible: component.visible, groupName: component.groupId ? groupName.get(component.groupId) ?? "Ungrouped" : "Ungrouped" }))} />
               ) : (
-                <EmptyState icon={Boxes} hue="sky" title="No services yet" description="Services are the systems whose health this page shows." action={<Link href={`${base}/content`} className={buttonVariants()}>Add a service</Link>} className="py-10" />
+                <EmptyState icon={Boxes} hue="sky" title="No services yet" description="Services are the systems whose health this page shows." action={<ServiceEditorDialog pageId={page.id} groups={groups.map((group) => ({ ...group, serviceCount: components.filter((component) => component.groupId === group.id).length }))} monitors={monitors} action={createComponent.bind(null, page.id)} triggerLabel="Add a service" />} className="py-10" />
               )}
             </CardContent>
           </Card>

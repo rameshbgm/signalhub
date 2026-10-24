@@ -1,3 +1,4 @@
+import { selectedPage } from "@/lib/selected-page";
 import Link from "next/link";
 import { Settings, Siren } from "lucide-react";
 import { EventsList } from "@/components/admin/EventsList";
@@ -16,7 +17,7 @@ export default async function EventsPage({ searchParams }: { searchParams: Promi
   // Hubs hold no events of their own.
   const pages = await getScopedPages(session, org.id, { isHub: false });
   const { pageId, show, history } = await searchParams;
-  const filteredPage = pages.find((p) => p.id === pageId);
+  const filteredPage = await selectedPage(pages, session, pageId, true);
   const kind = parseEventKind(show);
   const historyPage = Math.max(1, Number.parseInt(history ?? "", 10) || 1);
   const canConfigure = sessionHasCapability(session, "page.configure");
@@ -48,7 +49,7 @@ export default async function EventsPage({ searchParams }: { searchParams: Promi
       {pages.length ? (
         <EventsList
           pageIds={filteredPage ? [filteredPage.id] : pages.map((p) => p.id)}
-          filteredPageId={filteredPage?.id}
+          filteredPageId={filteredPage?.id ?? (pageId === "all" ? "all" : undefined)}
           pageNameById={filteredPage ? undefined : Object.fromEntries(pages.map((p) => [p.id, p.name]))}
           kind={kind}
           historyPage={historyPage}

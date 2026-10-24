@@ -9,7 +9,8 @@ import {
   assertGroupInPage,
 } from "@/lib/admin-guard";
 import { deleteComponentCascade } from "@/lib/cascade";
-import { setComponentStatus } from "@/lib/component-status";
+import { reconcileComponentStatus, setComponentStatus } from "@/lib/component-status";
+import { isDatabaseId } from "@/lib/database-id";
 import { fenceActiveOrganizationMutation } from "@/lib/organization-mutation";
 import { database, withDatabaseTransaction } from "@/lib/postgres/client";
 import { publicPagePath } from "@/lib/public-path";
@@ -97,9 +98,25 @@ export async function createComponent(pageId: string, formData: FormData) {
   if (name.length > 120) throw new Error("Service names must be 120 characters or fewer");
   const description = String(formData.get("description") ?? "").trim();
   if (description.length > 1_000) throw new Error("Descriptions must be 1,000 characters or fewer");
+  const statusSource = String(formData.get("statusSource") ?? "MANUAL");
+  if (!["MANUAL", "AUTOMATIC"].includes(statusSource)) throw new Error("Choose automatic or manual status");
+  const monitorId = String(formData.get("monitorId") ?? "");
+  if (statusSource === "AUTOMATIC") {
+    await requireCapability("monitor.manage", pageId);
+    if (!isDatabaseId(monitorId)) throw new Error("Choose a monitor for automatic status");
+  }
   const automationToken = generateAutomationToken();
   await withDatabaseTransaction(async (transaction) => {
     await fenceActiveOrganizationMutation(session.orgId, transaction);
+    // Lock the monitor before creating the service so simultaneous submissions
+    // cannot silently move an existing service's monitor to a second service.
+    const monitor = statusSource === "AUTOMATIC"
+      ? await transaction.selectFrom("monitors").select(["id", "componentId", "enabled", "isDown", "downStatus"])
+        .where("id", "=", monitorId).where("pageId", "=", pageId).forUpdate().executeTakeFirst()
+      : null;
+    if (statusSource === "AUTOMATIC" && !monitor) throw new Error("Monitor not found on this page");
+    if (monitor?.componentId) throw new Error("This monitor is already linked to a service. Choose another monitor.");
+    const status = monitor?.enabled && monitor.isDown ? monitor.downStatus : "OPERATIONAL";
     const orderRow = await transaction.selectFrom("components")
       .select(sql<number>`coalesce(max("order"), -1) + 1`.as("nextOrder"))
       .where("pageId", "=", pageId).executeTakeFirstOrThrow();
@@ -108,7 +125,7 @@ export async function createComponent(pageId: string, formData: FormData) {
       groupId,
       name,
       description,
-      status: "OPERATIONAL",
+      status,
       order: Number(orderRow.nextOrder),
       visible: true,
       showUptime: true,
@@ -121,13 +138,19 @@ export async function createComponent(pageId: string, formData: FormData) {
     }).returning("id").executeTakeFirstOrThrow();
     await transaction.insertInto("componentStatusEvents").values({
       componentId: component.id,
-      status: "OPERATIONAL",
+      status,
       startedAt: new Date(),
       endedAt: null,
       isMaintenance: false,
       note: null,
     }).execute();
+    if (monitor) {
+      await transaction.updateTable("monitors").set({ componentId: component.id, actionFlipStatus: true })
+        .where("id", "=", monitor.id).where("pageId", "=", pageId).execute();
+      await reconcileComponentStatus(component.id, transaction);
+    }
   });
+  if (statusSource === "AUTOMATIC") revalidatePath("/organization/monitors");
   await revalidatePageSurfaces(page);
 }
 
@@ -140,8 +163,16 @@ export async function updateComponentStatus(pageId: string, componentId: string,
   if (!COMPONENT_STATUSES.includes(status as ComponentStatus)) throw new Error("Invalid component status");
   if (note.length > 1_000) throw new Error("Status notes must be 1,000 characters or fewer");
   await assertComponentInPage(componentId, pageId);
+  await assertManualServices(pageId, [componentId]);
   await setComponentStatus(componentId, status, { note: note || null });
   await revalidatePageSurfaces(page);
+}
+
+async function assertManualServices(pageId: string, componentIds: string[]) {
+  const automatic = await database.selectFrom("monitors").select("id")
+    .where("pageId", "=", pageId).where("componentId", "in", componentIds)
+    .where("actionFlipStatus", "=", true).executeTakeFirst();
+  if (automatic) throw new Error("Automatic services use their monitors. Select only manual services to change status.");
 }
 
 /** Applies one operator choice to an explicit, page-scoped set of services. */
@@ -156,6 +187,7 @@ export async function bulkComponentAction(pageId: string, componentIds: string[]
   const existing = await database.selectFrom("components").select("id").where("pageId", "=", pageId).where("id", "in", componentIds).execute();
   if (existing.length !== componentIds.length) throw new Error("Services changed; reload and select them again");
   if (operation === "status") {
+    await assertManualServices(pageId, componentIds);
     for (const id of componentIds) await setComponentStatus(id, status as ComponentStatus, { note: null });
   } else {
     await withDatabaseTransaction(async (transaction) => {

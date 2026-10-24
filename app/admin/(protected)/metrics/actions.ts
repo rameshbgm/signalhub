@@ -79,6 +79,7 @@ export async function toggleMetricVisible(metricId: string) {
     if (!changed) throw new Error("Metric state changed; reload and retry");
   });
   revalidatePath("/organization/metrics");
+  revalidatePath("/organization/monitors");
 }
 
 export async function deleteMetric(metricId: string) {
@@ -135,6 +136,7 @@ export async function bulkMetricAction(pageId: string, formData: FormData) {
   });
   revalidatePath("/organization/metrics");
   const page = await database.selectFrom("pages").select("slug").where("id", "=", pageId).executeTakeFirst();
+  revalidatePath("/organization/monitors");
   if (page) revalidatePath(`/${page.slug}`);
   return message;
 }

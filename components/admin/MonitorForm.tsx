@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import { Activity, Check, Globe, Info, Network, Server, Timer, type LucideIcon } from "lucide-react";
 import { PlatformActionForm } from "@/components/platform/PlatformActionForm";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -21,6 +21,8 @@ import { domainEligibility, monitorHostname } from "@/lib/domain-name";
 import { hostAndPort, kindOfType, MONITOR_KINDS, typeForKind, type MonitorKind } from "@/lib/monitor-kinds";
 import { cn } from "@/lib/utils";
 import { INPUT_LIMITS, MONITOR_TAGS_HINT, MONITOR_TAGS_PATTERN } from "@/lib/input-limits";
+import { Button } from "@/components/ui/button";
+import type { MonitorTestResult } from "@/lib/monitor-test";
 
 const KIND_ICON: Record<MonitorKind, LucideIcon> = { WEBSITE: Globe, PORT: Server, PING: Activity, DNS: Network, JOB: Timer };
 
@@ -134,6 +136,8 @@ export function MonitorForm({
   defaultProxyId = "",
   expiryDefaults = { certDays: 14, domainDays: 30 },
   pageSwitcher,
+  returnToService = false,
+  testAction,
 }: {
   action: (formData: FormData) => void;
   components: { id: string; name: string }[];
@@ -152,6 +156,9 @@ export function MonitorForm({
   expiryDefaults?: { certDays: number; domainDays: number };
   /** "Posting to <page> Change", the third field of the first row. */
   pageSwitcher?: React.ReactNode;
+  /** Return to Add a service after creating an unlinked monitor. */
+  returnToService?: boolean;
+  testAction?: (formData: FormData) => Promise<MonitorTestResult>;
 }) {
   const [kind, setKind] = useState<MonitorKind>(monitor ? kindOfType(monitor.type) : "WEBSITE");
   const [checkCertificate, setCheckCertificate] = useState(monitor?.type === "TLS" || monitor?.type === "SSL");
@@ -178,25 +185,36 @@ export function MonitorForm({
   const domain = domainEligibility(hostname);
   const editing = Boolean(monitor);
   const isHttpLike = kind === "WEBSITE";
+  const [testResult, setTestResult] = useState<MonitorTestResult | null>(null);
+  const [testing, startTest] = useTransition();
+  const testHint = testing ? "Testing the current settings…" : kind === "JOB" ? "Save the monitor, then send a ping to its heartbeat URL to test it." : testResult ? (
+    <span className={testResult.ok ? "text-ok-fg" : "text-danger-fg"}>
+      {testResult.ok ? "Last test passed" : `Last test failed: ${testResult.message}`}
+      {testResult.statusCode !== null && ` · HTTP ${testResult.statusCode}`}
+      {testResult.latencyMs !== null && ` · ${testResult.latencyMs} ms`}
+      {" · Nothing saved."}
+    </span>
+  ) : "Checks run in the worker on the interval you set. Changes apply on the next poll.";
 
   return (
     <PlatformActionForm action={action} preserveOnError successMessage={editing ? "Monitor saved" : "Monitor added"} className="space-y-6 text-sm">
+      {returnToService && <input type="hidden" name="returnToService" value="true" />}
       <div className="space-y-6">
-        <FormCard title="Monitor details" description="What to check, how often, and which component it reports to.">
+        <FormCard title="Monitor details" description="What to check, how often, and which service it reports to.">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
             <Field label="Monitor name" htmlFor="monitor-name" required>
               <Input id="monitor-name" name="name" defaultValue={monitor?.name} maxLength={INPUT_LIMITS.title} placeholder="Monitor name" required />
             </Field>
-            <Field label="Component" htmlFor="monitor-component" hint="Linked: this monitor updates the component's public status. Not linked: it only records checks and alerts.">
-              <Select id="monitor-component" aria-label="Component" name="componentId" defaultValue={monitor?.componentId ?? ""}>
-                <option value="">Not tied to a component</option>
+            {!returnToService && <Field label="Linked service" htmlFor="monitor-component" hint="Link a service and enable automatic status updates to update its public status. Without a link, this monitor only records checks and alerts.">
+              <Select id="monitor-component" aria-label="Linked service" name="componentId" defaultValue={monitor?.componentId ?? ""}>
+                <option value="">Not linked to a service</option>
                 {components.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.name}
                   </option>
                 ))}
               </Select>
-            </Field>
+            </Field>}
             {pageSwitcher}
             <div className="col-span-full"><KindPicker kind={kind} onChange={chooseKind} locked={editing} /></div>
             <input type="hidden" name="type" value={type} />
@@ -465,7 +483,7 @@ export function MonitorForm({
             </FormCard>
           )}
 
-          <FormCard title="Thresholds and failure status" description="How many checks it takes to change state, and what a failure does to the component.">
+          <FormCard title="Thresholds and failure status" description="How many checks it takes to change state, and what a failure does to the service.">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               {!isHttpLike && (
                 <Field label="Timeout (ms)" htmlFor="monitor-timeout">
@@ -479,11 +497,11 @@ export function MonitorForm({
                 <Input id="monitor-recover" name="recoverThreshold" type="number" min={1} max={20} defaultValue={monitor?.recoverThreshold ?? 1} placeholder="OKs before recovered" />
               </Field>
             </div>
-            <Field label="Component status on failure" htmlFor="monitor-down-status" className="sm:max-w-sm">
-              <Select id="monitor-down-status" aria-label="Component status on failure" name="downStatus" defaultValue={monitor?.downStatus ?? "MAJOR_OUTAGE"}>
+            <Field label="Service status on failure" htmlFor="monitor-down-status" className="sm:max-w-sm">
+              <Select id="monitor-down-status" aria-label="Service status on failure" name="downStatus" defaultValue={monitor?.downStatus ?? "MAJOR_OUTAGE"}>
                 {COMPONENT_STATUSES.filter((s: ComponentStatus) => s !== "OPERATIONAL" && s !== "UNDER_MAINTENANCE").map((s) => (
                   <option key={s} value={s}>
-                    On failure, set component to: {COMPONENT_STATUS_LABEL[s]}
+                    On failure, set service to: {COMPONENT_STATUS_LABEL[s]}
                   </option>
                 ))}
               </Select>
@@ -492,7 +510,7 @@ export function MonitorForm({
 
           <FormCard title="Automated actions" description="What happens automatically when the monitor changes state.">
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <CheckRow name="actionFlipStatus" defaultChecked={monitor?.actionFlipStatus ?? true} label="Flip component status" />
+              <CheckRow name="actionFlipStatus" defaultChecked={monitor?.actionFlipStatus ?? true} label="Update service status automatically" />
               <CheckRow name="actionRecordMetric" defaultChecked={monitor?.actionRecordMetric ?? true} label="Record response-time metric" />
               <CheckRow name="actionAutoIncident" defaultChecked={monitor?.actionAutoIncident} label="Auto open/close incident" hint="Creates an incident when the monitor goes down and resolves it when the monitor recovers." />
               <CheckRow name="actionNotify" defaultChecked={monitor?.actionNotify} label="Notify subscribers" hint="Sends a notification to all subscribers on this page when the monitor status changes." />
@@ -501,7 +519,18 @@ export function MonitorForm({
         </div>
       </div>
 
-      <FormActionBar hint="Checks run in the worker on the interval you set. Changes apply on the next poll." submitLabel={editing ? "Save monitor" : "Add monitor"} cancelHref={cancelHref} />
+      <FormActionBar hint={testHint} submitLabel={editing ? "Save monitor" : "Add monitor"} cancelHref={cancelHref} leadingAction={testAction && (
+        <Button type="button" variant="secondary" data-button-guard="off" loading={testing} disabled={kind === "JOB"} title={kind === "JOB" ? "Send a heartbeat after saving to test this monitor" : "Run one check with the current settings without saving"} onClick={(event) => {
+          const form = event.currentTarget.form;
+          if (!form || !form.reportValidity() || testing) return;
+          const data = new FormData(form);
+          setTestResult(null);
+          startTest(async () => {
+            try { setTestResult(await testAction(data)); }
+            catch { setTestResult({ ok: false, message: "Could not reach the server. Try again.", latencyMs: null, statusCode: null }); }
+          });
+        }}>{testing ? "Testing…" : "Test"}</Button>
+      )} />
     </PlatformActionForm>
   );
 }

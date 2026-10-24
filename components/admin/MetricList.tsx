@@ -89,10 +89,21 @@ function MetricRowView({ metric, canManage, now, selected, focused, expanded, in
         <td className="hidden px-3 py-2.5 sm:table-cell"><StatusBadge tone={metric.visible ? "ok" : "neutral"}>{metric.visible ? "Visible" : "Hidden"}</StatusBadge></td>
         <td className="hidden px-3 py-2.5 text-xs text-ink-soft lg:table-cell">{metric.componentName ?? "—"}</td>
         <td className="hidden px-3 py-2.5 text-right text-xs tabular-nums text-ink-dim sm:table-cell">{metric.lastPointAt ? relativeTime(metric.lastPointAt, now) : "no data"}</td>
-        <td className="w-10 py-2.5 pr-3">
-          <Button type="button" variant="ghost" size="icon" data-button-guard="off" className="size-8" aria-expanded={expanded} aria-label={`${expanded ? "Hide" : "Show"} details of ${metric.name}`} onClick={(event) => { event.stopPropagation(); onFocus(); onToggleExpand(); }}>
-            <ChevronDown aria-hidden size={16} className={cn("text-primary transition-transform", expanded && "rotate-180")} />
-          </Button>
+        <td className="whitespace-nowrap py-2.5 pr-3" onClick={(event) => event.stopPropagation()}>
+          <div className="flex items-center justify-end gap-1.5">
+            {canManage && (
+              <PlatformActionForm action={metric.actions.toggle} successMessage={`${metric.name} ${metric.visible ? "hidden from" : "shown on"} the status page`} className="flex">
+                <PageSubmitButton variant="secondary" size="sm" pendingLabel="Saving…" aria-label={`${metric.visible ? "Hide" : "Show"} ${metric.name} ${metric.visible ? "from" : "on"} the status page`} title={metric.visible ? "Hide from the status page. Monitoring and data collection continue." : "Show this metric on the status page."}>
+                  {metric.visible ? <EyeOff aria-hidden size={14} /> : <Eye aria-hidden size={14} />}
+                  <span className="sm:hidden">{metric.visible ? "Hide" : "Show"}</span>
+                  <span className="hidden sm:inline">{metric.visible ? "Hide from page" : "Show on page"}</span>
+                </PageSubmitButton>
+              </PlatformActionForm>
+            )}
+            <Button type="button" variant="ghost" size="icon" data-button-guard="off" className="size-8" aria-expanded={expanded} aria-label={`${expanded ? "Hide" : "Show"} details of ${metric.name}`} onClick={() => { onFocus(); onToggleExpand(); }}>
+              <ChevronDown aria-hidden size={16} className={cn("text-primary transition-transform", expanded && "rotate-180")} />
+            </Button>
+          </div>
         </td>
       </tr>
       {expanded && (
@@ -132,12 +143,6 @@ function MetricRowView({ metric, canManage, now, selected, focused, expanded, in
 
           {canManage && (
             <ActionRow className="flex flex-wrap items-center gap-1.5 border-t border-line pt-3" messageClassName="justify-end">
-              <InlineActionForm action={metric.actions.toggle}>
-                <Button type="submit" variant="secondary" size="sm" aria-label={`${metric.visible ? "Hide" : "Show"} ${metric.name}`}>
-                  {metric.visible ? <EyeOff aria-hidden size={14} /> : <Eye aria-hidden size={14} />}
-                  {metric.visible ? "Hide" : "Show"}
-                </Button>
-              </InlineActionForm>
               <InlineActionForm action={metric.actions.remove}>
                 <PageSubmitButton variant="ghost" size="sm" pendingLabel="Deleting…" confirmMessage={`Delete ${metric.name} and all of its data points? This cannot be undone.`} className="hover:bg-danger-bg hover:text-danger-fg [&_svg]:!text-danger hover:[&_svg]:!text-danger-fg">
                   <Trash2 aria-hidden size={14} />
@@ -356,7 +361,7 @@ export function MetricList({ metrics, canManage, now, bulkAction, viewsKey }: { 
                   <SortHeader label="Visibility" active={sort === "hidden"} onClick={() => setSortKey("hidden")} className="hidden sm:table-cell" />
                   <SortHeader label="Component" active={false} onClick={() => setSortKey("name")} className="hidden lg:table-cell" />
                   <SortHeader label="Updated" align="right" active={sort === "recent"} onClick={() => setSortKey("recent")} className="hidden sm:table-cell" />
-                  <th scope="col" className="w-10"><span className="sr-only">Details</span></th>
+                  <th scope="col"><span className="sr-only">Actions</span></th>
                 </tr>
               </thead>
               <tbody>

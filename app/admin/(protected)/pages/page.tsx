@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowUpRight, Layers3, LayoutGrid, PanelsTopLeft, Pencil, Plus, Rocket, Trash2 } from "lucide-react";
+import { ArrowUpRight, FilePlus2, Layers3, LayoutGrid, PanelsTopLeft, Pencil, Rocket, Trash2 } from "lucide-react";
 import { requireSession } from "@/lib/require-session";
 import { getScopedPages, sessionHasCapability } from "@/lib/admin-guard";
 import { formatPageDate } from "@/lib/page-locale";
@@ -108,8 +108,8 @@ export default async function PagesListPage() {
           ) : null}
           {canConfigure && (
             <div className="flex shrink-0 items-center">
+              <Link href={`/organization/pages/new?hubParentId=${hub.id}`} aria-label="Create status page in this hub" title="New page" className={iconAction()}><FilePlus2 aria-hidden size={16} /></Link>
               <Link href={`/organization/pages/${hub.id}`} aria-label={`Edit ${hub.name}`} title="Edit page" className={iconAction()}><Pencil aria-hidden size={16} /></Link>
-              <Link href={`/organization/pages/new?hubParentId=${hub.id}`} aria-label="Create status page in this hub" title="Add page to hub" className={iconAction()}><Plus aria-hidden size={16} /></Link>
               {children.length ? (
                 <span
                   role="img"

@@ -26,7 +26,7 @@ describe("unified page creation workflow", () => {
     expect(actions).toContain("setupCompletedAt: null");
     expect(actions).toContain("publicVisible: false");
     expect(actions).toContain("export async function finishPageSetup");
-    expect(actions).toContain("Add at least one visible component");
+    expect(actions).toContain("Add at least one visible service");
     expect(actions).toContain("if (!page.isHub)");
     expect(actions).not.toContain("at least one child status page");
   });

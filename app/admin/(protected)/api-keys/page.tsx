@@ -1,3 +1,4 @@
+import { selectedPage as selectPage } from "@/lib/selected-page";
 import { requireSession } from "@/lib/require-session";
 import { PlatformNav } from "@/components/platform/PlatformNav";
 import { database } from "@/lib/postgres/client";
@@ -21,7 +22,7 @@ export default async function ApiKeysPage({ searchParams }: { searchParams: Prom
   const keys = await database.selectFrom("apiKeys").selectAll().where("orgId", "=", org.id)
     .where("revokedAt", "is", null).orderBy("createdAt", "asc").execute();
   const pages = await getScopedPages(session, org.id);
-  const pageId = pageIdParam && pages.some((p) => p.id === pageIdParam) ? pageIdParam : pages[0]?.id;
+  const pageId = (await selectPage(pages, session, pageIdParam))?.id;
   const webhookEndpoints = pageId
     ? await database.selectFrom("webhookEndpoints").selectAll().where("pageId", "=", pageId).execute()
     : [];

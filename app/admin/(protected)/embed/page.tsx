@@ -1,3 +1,4 @@
+import { selectedPage } from "@/lib/selected-page";
 import { appBaseUrl } from "@/lib/settings/request";
 import { requireSession } from "@/lib/require-session";
 import { PageSelect } from "@/components/admin/PageSelect";
@@ -25,7 +26,7 @@ export default async function EmbedPage({ searchParams }: { searchParams: Promis
   await requireCapability("integration.manage");
   const { pageId: pageIdParam } = await searchParams;
   const pages = await getScopedPages(session, org.id);
-  const pageId = pageIdParam && pages.some((p) => p.id === pageIdParam) ? pageIdParam : pages[0]?.id;
+  const pageId = (await selectedPage(pages, session, pageIdParam))?.id;
   const page = pages.find((p) => p.id === pageId);
 
   const appBase = appBaseUrl();

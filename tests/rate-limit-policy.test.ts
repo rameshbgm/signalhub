@@ -29,6 +29,8 @@ const ORIGINAL: Record<string, [limit: number, windowMs: number]> = {
   "mfa-account": [15, 15 * 60_000],
   "mfa-request-ip": [5, 60 * 60_000],
   "mfa-request-account": [3, 60 * 60_000],
+  // Interactive monitor setup tests.
+  "monitor-test-account": [10, 60_000],
 };
 
 describe("catalogue", () => {

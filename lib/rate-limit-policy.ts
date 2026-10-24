@@ -53,6 +53,7 @@ export const LIMITERS = [
   L("analytics", "Page view events per address", "Faking visitor statistics", "ip", 120, 3600, 20, 5000),
   L("heartbeat-ip", "Heartbeat requests per address", "Excessive heartbeat lookups and writes", "ip", 1200, 60, 60, 120000),
   L("heartbeat-monitor", "Heartbeat updates per monitor", "Excessive updates to one monitor", "token", 120, 60, 10, 6000),
+  L("monitor-test-account", "Monitor tests per account", "Excessive checks from monitor setup", "account", 10, 60, 1, 120),
   L("automation", "Component automation calls per address", "Abuse of automation tokens", "ip", 120, 60, 10, 6000),
 ] as const satisfies readonly Limiter[];
 

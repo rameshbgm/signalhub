@@ -5,6 +5,8 @@ import { redirect } from "next/navigation";
 import { getScopedPages } from "@/lib/admin-guard";
 import { roleCapabilities } from "@/lib/identity";
 import { AdminShell } from "@/components/admin/AdminShell";
+import { PageSelectionProvider } from "@/components/admin/PageSelectionProvider";
+import { selectedPage } from "@/lib/selected-page";
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const { session, org } = await requireSession();
@@ -15,8 +17,10 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     getUserOrganizations(session.userId),
   ]);
   const organizations = userOrganizations;
+  const remembered = await selectedPage(pages, session, undefined, true);
 
   return (
+    <PageSelectionProvider key={`${org.id}:${session.userId}`} scope={{ orgId: org.id, userId: session.userId }} pageIds={pages.map((page) => page.id)} initialPageId={remembered?.id}>
     <AdminShell
       capabilities={capabilities}
       user={{ name: session.name, email: session.email }}
@@ -33,5 +37,6 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     >
       {children}
     </AdminShell>
+    </PageSelectionProvider>
   );
 }

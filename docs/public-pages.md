@@ -1,5 +1,16 @@
 # Public pages, history, retention, and demo data
 
+## Adding services
+
+New status pages start as hidden drafts with no services. On an empty page's overview, **Add a service** opens the service dialog directly. **Manage services** opens the full **Services & groups** list, where **Add service** opens the same dialog. Choose a status source:
+
+- **Automatic — Use a monitor:** choose an existing, unlinked monitor on the same page. Its name is suggested as the public service name and can be changed. Saving links the monitor and enables automatic service status updates, using its current health immediately. Paused monitors stay paused and are labeled in the service list. Incidents and maintenance can still affect the public status.
+- **Manual — Update yourself:** enter a service name, then use its status dropdown and Save button to publish status changes.
+
+If no monitor is available, **Create a monitor** opens monitor setup and returns to Add a service with the new monitor selected. Creating the monitor does not add a service; saving the service is a separate, explicit step. Automatic services show **Manage monitor** instead of a manual status dropdown. Bulk status changes apply only to manual services.
+
+Add at least one visible service before publishing a status page. Existing pages and services are preserved.
+
 ## Service groups
 
 Choose **Default service group view** when creating a status page:

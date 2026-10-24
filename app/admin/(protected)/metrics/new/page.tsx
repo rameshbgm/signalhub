@@ -1,3 +1,4 @@
+import { selectedPage } from "@/lib/selected-page";
 import Link from "next/link";
 import { ArrowLeft, Gauge } from "lucide-react";
 import { requireSession } from "@/lib/require-session";
@@ -20,7 +21,7 @@ export default async function NewMetricPage({ searchParams }: { searchParams: Pr
   await requireCapability("monitor.manage");
   const { pageId: pageIdParam } = await searchParams;
   const pages = await getScopedPages(session, org.id, { isHub: false });
-  const pageId = pageIdParam && pages.some((p) => p.id === pageIdParam) ? pageIdParam : pages[0]?.id;
+  const pageId = (await selectedPage(pages, session, pageIdParam))?.id;
   const backHref = pageId ? `/organization/metrics?pageId=${pageId}` : "/organization/metrics";
   const components = pageId ? await database.selectFrom("components").select(["id", "name"]).where("pageId", "=", pageId).orderBy("order", "asc").execute() : [];
 

@@ -102,7 +102,7 @@ export function MonitorDetailsDialog({ monitor, canManage, onClose }: { monitor:
   const watching: Row[] = [
     ["Type", `${monitorTypeLabel(m.type)} (${m.type})`],
     ["Target", <span key="t" className="font-mono text-[0.8125rem]">{target}</span>],
-    ["Component", monitor.componentName ?? "Not tied to a component"],
+    ["Linked service", monitor.componentName ?? "Not linked to a service"],
     ["Group", m.groupName ?? "Ungrouped"],
     ["Tags", m.tags.length ? <span key="g" className="flex flex-wrap gap-1.5">{m.tags.map((tag) => <span key={tag} className="rounded-chip border border-line bg-sunken px-2 py-0.5 text-xs">{tag}</span>)}</span> : "None"],
     ["Created", when(d.createdAt)],

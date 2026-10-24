@@ -1,3 +1,4 @@
+import { selectedPage } from "@/lib/selected-page";
 import { PageSubmitButton } from "@/components/admin/PageSubmitButton";
 import { PlatformActionForm } from "@/components/platform/PlatformActionForm";
 import Link from "next/link";
@@ -38,7 +39,7 @@ export default async function SubscribersPage({ searchParams }: { searchParams: 
   await requireCapability("subscriber.manage");
   const { pageId: pageIdParam, channel: channelParam } = await searchParams;
   const pages = await getScopedPages(session, org.id, { isHub: false });
-  const pageId = pageIdParam && pages.some((p) => p.id === pageIdParam) ? pageIdParam : pages[0]?.id;
+  const pageId = (await selectedPage(pages, session, pageIdParam))?.id;
 
   if (!pageId) {
     const canCreate = sessionHasCapability(session, "page.configure");

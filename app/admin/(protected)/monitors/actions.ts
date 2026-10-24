@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { assertPageInOrg, requireCapability } from "@/lib/admin-guard";
+import { assertPageInOrg, requireCapability, sessionHasCapability } from "@/lib/admin-guard";
 import { encryptSecret } from "@/lib/encryption";
 import { resolveAuthConfig } from "@/lib/monitor-auth";
 import { deleteMonitorCascade } from "@/lib/cascade";
@@ -14,6 +14,11 @@ import { writeSupportMutationAudit } from "@/lib/support-audit";
 import { enqueueJobSweep, JOB_TASKS } from "@/lib/jobs";
 import { isDatabaseId } from "@/lib/database-id";
 import { BULK_MONITOR_LIMIT, bulkMonitorDeletePhrase, isBulkMonitorIntent, matchesBulkMonitorDeletePhrase, monitorCountLabel } from "@/lib/monitor-bulk";
+import { runMonitorTest, type MonitorTestResult } from "@/lib/monitor-test";
+import { effectiveMonitoringSettings } from "@/lib/monitoring-settings";
+import { loadMonitorProxy } from "@/lib/proxies";
+import { consumeNamedLimit } from "@/lib/rate-limit";
+import { z } from "zod";
 
 function string(formData: FormData, key: string, fallback = "") {
   return String(formData.get(key) ?? fallback);
@@ -91,6 +96,8 @@ export async function createMonitor(pageId: string, formData: FormData) {
   const session = await requireCapability("monitor.manage", pageId);
   await assertPageInOrg(pageId, session.orgId);
   const rawInput = monitorInputFromForm(formData);
+  const returnToService = formData.get("returnToService") === "true" && sessionHasCapability(session, "page.configure");
+  if (returnToService) rawInput.componentId = null;
   const monitor = await createMonitorDomain(session.orgId, pageId, rawInput);
   await writeSupportMutationAudit(session, {
     action: "CREATE_MONITOR",
@@ -99,7 +106,29 @@ export async function createMonitor(pageId: string, formData: FormData) {
     metadata: { pageId, type: rawInput.type },
   });
   revalidatePath("/organization/monitors");
+  if (returnToService) redirect(`/organization/pages/${pageId}/content?addService=automatic&monitorId=${monitor.id}`);
   redirect(`/organization/monitors?pageId=${pageId}`);
+}
+
+export async function testMonitor(pageId: string, monitorId: string | null, formData: FormData): Promise<MonitorTestResult> {
+  try {
+    const session = await requireCapability("monitor.manage", pageId);
+    await assertPageInOrg(pageId, session.orgId);
+    await consumeNamedLimit("monitor-test-account", `${session.orgId}:${session.userId}`);
+    if (monitorId && !isDatabaseId(monitorId)) throw new Error("Monitor not found on this page");
+    const saved = monitorId ? await database.selectFrom("monitors").select(["authType", "authSecret", "authConfigCiphertext"])
+      .where("id", "=", monitorId).where("pageId", "=", pageId).executeTakeFirst() : undefined;
+    if (monitorId && !saved) throw new Error("Monitor not found on this page");
+    const input = await prepareMonitorInput(monitorInputFromForm(formData));
+    if (input.proxyId) {
+      const proxy = await database.selectFrom("proxies").select("id").where("id", "=", input.proxyId).where("orgId", "=", session.orgId).executeTakeFirst();
+      if (!proxy) throw new Error("Proxy not found in your organization");
+    }
+    const [proxy, settings] = await Promise.all([loadMonitorProxy({ proxyId: input.proxyId ?? null }), effectiveMonitoringSettings(session.orgId)]);
+    return await runMonitorTest(input, { saved, proxy, certWarnDays: settings.certExpiryWarnDays });
+  } catch (error) {
+    return { ok: false, message: error instanceof z.ZodError ? error.issues[0]?.message ?? "Check the monitor settings" : error instanceof Error ? error.message.slice(0, 300) : "Could not test this monitor", latencyMs: null, statusCode: null };
+  }
 }
 
 async function monitorContext(monitorId: string) {

@@ -1,4 +1,6 @@
 "use client";
+import { usePageSelection } from "@/components/admin/PageSelectionProvider";
+import { pageScopedHref } from "@/lib/page-selection";
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -33,6 +35,7 @@ function Brand({ collapsed = false }: { collapsed?: boolean }) {
 
 /** Grouped section links. `collapsed` shows icons only, with the label as a hover tip. */
 function SidebarNav({ sections, pathname, collapsed = false, onNavigate }: { sections: NavSection[]; pathname: string; collapsed?: boolean; onNavigate?: () => void }) {
+  const { selectedPageId } = usePageSelection();
   return (
     <nav aria-label="Main" className="space-y-5">
       {sections.map((section) => (
@@ -46,7 +49,7 @@ function SidebarNav({ sections, pathname, collapsed = false, onNavigate }: { sec
               return (
                 <li key={item.href}>
                   <Link
-                    href={item.href}
+                    href={pageScopedHref(item.href, selectedPageId)}
                     onClick={onNavigate}
                     aria-current={active ? "page" : undefined}
                     aria-label={collapsed ? item.label : undefined}
@@ -119,6 +122,7 @@ export function AdminShell({
   children: ReactNode;
 }) {
   const pathname = usePathname();
+  const { selectedPageId } = usePageSelection();
   const focusedFlow = pathname === "/organization/pages/new" || /^\/organization\/pages\/[^/]+\/setup\//.test(pathname);
   const sections = useMemo(() => visibleSections(capabilities), [capabilities]);
   const current = activeNav(sections, pathname);
@@ -138,7 +142,7 @@ export function AdminShell({
     ] : []),
     ...(capabilities.includes("monitor.manage") ? [{ href: "/organization/monitors/new", label: "Add monitor", group: "Action", icon: MonitorDot, hue: "sky" as const }] : []),
     ...(capabilities.includes("page.configure") ? pages.map((page) => ({ href: `/organization/pages/${page.id}`, label: page.name, group: "Page", icon: PanelsTopLeft, hue: "violet" as const })) : []),
-  ], [sections, pages, capabilities]);
+  ].map((entry) => ({ ...entry, href: pageScopedHref(entry.href, selectedPageId) })), [sections, pages, capabilities, selectedPageId]);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {

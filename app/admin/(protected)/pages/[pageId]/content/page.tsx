@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Boxes, Eye, EyeOff, Layers3, Trash2 } from "lucide-react";
+import { ArrowUpRight, Boxes, Eye, EyeOff, Layers3, Trash2 } from "lucide-react";
 import { ComponentOrderList } from "@/components/admin/ComponentOrderList";
 import { PageSubmitButton } from "@/components/admin/PageSubmitButton";
 import { ServiceEditorDialog } from "@/components/admin/ServiceEditorDialog";
@@ -10,19 +10,20 @@ import { Select } from "@/components/ui/select";
 import { PlatformActionForm } from "@/components/platform/PlatformActionForm";
 import { assertPageInOrg, requireCapability } from "@/lib/admin-guard";
 import { database } from "@/lib/postgres/client";
+import { publicPagePath } from "@/lib/public-path";
 import { COMPONENT_STATUS_LABEL, COMPONENT_STATUS_TONE, type ComponentStatus } from "@/lib/status";
 import { attachChildPage, bulkPageAction } from "../../actions";
 import { PageGroup } from "@/components/admin/page-group";
 import { memberRow } from "@/lib/page-rows";
 import { createComponent, deleteComponent, setComponentVisibility, updateComponentDetails, updateComponentStatus } from "../components-actions";
 import { Badge } from "@/components/ui/badge";
-import { buttonVariants } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { InlineActionForm } from "@/components/InlineActionForm";
 
-export default async function PageContent({ params }: { params: Promise<{ pageId: string }> }) {
+export default async function PageContent({ params, searchParams }: { params: Promise<{ pageId: string }>; searchParams: Promise<{ addService?: string; monitorId?: string }> }) {
   const { pageId } = await params;
   const session = await requireCapability("page.configure", pageId);
   await assertPageInOrg(pageId, session.orgId);
@@ -30,7 +31,8 @@ export default async function PageContent({ params }: { params: Promise<{ pageId
     .where("id", "=", pageId).where("orgId", "=", session.orgId).where("deletedAt", "is", null)
     .executeTakeFirst();
   if (!page) notFound();
-  return page.isHub ? <HubContent pageId={pageId} orgId={session.orgId} /> : <StatusPageContent pageId={pageId} />;
+  const query = await searchParams;
+  return page.isHub ? <HubContent pageId={pageId} orgId={session.orgId} /> : <StatusPageContent pageId={pageId} liveHref={page.setupCompletedAt && page.publicVisible ? publicPagePath(page) : null} initialOpen={query.addService === "automatic"} initialMonitorId={query.monitorId} />;
 }
 
 async function HubContent({ pageId, orgId }: { pageId: string; orgId: string }) {
@@ -73,10 +75,12 @@ async function HubContent({ pageId, orgId }: { pageId: string; orgId: string }) 
   );
 }
 
-async function StatusPageContent({ pageId }: { pageId: string }) {
-  const [groups, components] = await Promise.all([
+async function StatusPageContent({ pageId, liveHref, initialOpen, initialMonitorId }: { pageId: string; liveHref: string | null; initialOpen: boolean; initialMonitorId?: string }) {
+  const [groups, components, monitors] = await Promise.all([
     database.selectFrom("componentGroups").selectAll().where("pageId", "=", pageId).orderBy("order").execute(),
     database.selectFrom("components").selectAll().where("pageId", "=", pageId).orderBy("order").execute(),
+    database.selectFrom("monitors").select(["id", "name", "componentId", "actionFlipStatus", "enabled", "lastCheckedAt"])
+      .where("pageId", "=", pageId).orderBy("name").execute(),
   ]);
   const groupOptions = groups.map((group) => ({
     id: group.id,
@@ -84,14 +88,14 @@ async function StatusPageContent({ pageId }: { pageId: string }) {
     serviceCount: components.filter((component) => component.groupId === group.id).length,
   }));
   const groupName = new Map(groups.map((group) => [group.id, group.name]));
-  const addService = <ServiceEditorDialog pageId={pageId} groups={groupOptions} action={createComponent.bind(null, pageId)} />;
+  const addService = <ServiceEditorDialog pageId={pageId} groups={groupOptions} monitors={monitors.filter((monitor) => !monitor.componentId)} initialOpen={initialOpen} initialMonitorId={initialMonitorId} action={createComponent.bind(null, pageId)} />;
 
   return (
     <Card>
       <CardHeader className="flex-row flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">
           <CardTitle>Services{components.length ? <span className="ml-2 font-normal text-ink-dim">{components.length}</span> : null}</CardTitle>
-          <CardDescription className="mt-1 max-w-2xl">The systems whose health appears on this page. Save a status to publish it. Drag handles in page order to reorder; dropping saves automatically.</CardDescription>
+          <CardDescription className="mt-1 max-w-2xl">Show a monitor&apos;s automatic status or manage a service manually. Drag handles in page order to reorder; dropping saves automatically.</CardDescription>
         </div>
         {addService}
       </CardHeader>
@@ -100,6 +104,9 @@ async function StatusPageContent({ pageId }: { pageId: string }) {
           <ComponentOrderList key={components.map((component) => `${component.id}:${component.status}:${component.visible}:${component.groupId}`).join(":")} pageId={pageId} groups={groups.map(({ id, name }) => ({ id, name }))} components={components.map((component) => ({ id: component.id, name: component.name, description: component.description, groupId: component.groupId, status: component.status as ComponentStatus, visible: component.visible }))}>
             {components.map((component) => {
               const status = component.status as ComponentStatus;
+              const linkedMonitors = monitors.filter((monitor) => monitor.componentId === component.id && monitor.actionFlipStatus);
+              const automatic = linkedMonitors.length > 0;
+              const monitoringPaused = automatic && linkedMonitors.every((monitor) => !monitor.enabled);
               const details = [
                 component.groupId ? groupName.get(component.groupId) ?? "Ungrouped" : "Ungrouped",
                 component.description,
@@ -110,12 +117,25 @@ async function StatusPageContent({ pageId }: { pageId: string }) {
                     <div className="flex flex-wrap items-center gap-2">
                       <h3 className="truncate text-sm font-semibold text-ink">{component.name}</h3>
                       <StatusBadge tone={COMPONENT_STATUS_TONE[status]}>{COMPONENT_STATUS_LABEL[status]}</StatusBadge>
+                      <Badge>{automatic ? "Automatic" : "Manual"}</Badge>
                       {!component.visible && <Badge>Unpublished</Badge>}
                     </div>
                     <p className="mt-0.5 truncate text-xs text-ink-dim" title={details}>{details}</p>
+                    {automatic && <p className="mt-1 text-xs text-ink-soft">{linkedMonitors.map((monitor) => monitor.name).join(", ")}{monitoringPaused ? " · Monitoring paused" : linkedMonitors.every((monitor) => !monitor.lastCheckedAt) ? " · Waiting for first check" : ""}</p>}
                   </div>
                   <div className="flex items-start gap-1 sm:shrink-0">
-                    <ServiceStatusSelect action={updateComponentStatus.bind(null, pageId, component.id)} serviceId={component.id} serviceName={component.name} status={status} />
+                    {automatic ? (
+                      <Link href={linkedMonitors.length === 1 ? `/organization/monitors/${linkedMonitors[0].id}/edit` : `/organization/monitors?pageId=${pageId}`} className={buttonVariants({ variant: "secondary", size: "sm" })}>{linkedMonitors.length === 1 ? "Manage monitor" : "Manage monitors"}</Link>
+                    ) : <ServiceStatusSelect action={updateComponentStatus.bind(null, pageId, component.id)} serviceId={component.id} serviceName={component.name} status={status} />}
+                    {liveHref && component.visible ? (
+                      <a href={liveHref} target="_blank" rel="noreferrer" aria-label={`Live preview for ${component.name}`} title="Live preview" className={buttonVariants({ variant: "ghost", size: "icon", className: `size-8 ${toneIcon.view}` })}>
+                        <ArrowUpRight aria-hidden size={16} />
+                      </a>
+                    ) : (
+                      <Button type="button" variant="ghost" size="icon" disabled className="size-8" aria-label={`Live preview for ${component.name}`} title={liveHref ? "Publish this service to enable live preview" : "Publish this page to enable live preview"}>
+                        <ArrowUpRight aria-hidden size={16} />
+                      </Button>
+                    )}
                     <PlatformActionForm action={setComponentVisibility.bind(null, pageId, component.id, !component.visible)} successMessage={component.visible ? `${component.name} unpublished` : `${component.name} published`} className="flex">
                       <PageSubmitButton
                         variant="ghost"
@@ -134,7 +154,7 @@ async function StatusPageContent({ pageId }: { pageId: string }) {
                       pageId={pageId}
                       groups={groupOptions}
                       action={updateComponentDetails.bind(null, pageId, component.id)}
-                      service={{ id: component.id, name: component.name, description: component.description, groupId: component.groupId, visible: component.visible, showUptime: component.showUptime }}
+                      service={{ id: component.id, name: component.name, description: component.description, groupId: component.groupId, visible: component.visible, showUptime: component.showUptime, automatic }}
                     />
                     <InlineActionForm action={deleteComponent.bind(null, pageId, component.id)}>
                       <PageSubmitButton variant="ghost" size="icon" className={`size-8 ${toneIcon.delete}`} pendingLabel="" aria-label={`Delete ${component.name}`} title="Delete service" confirmMessage={`Delete ${component.name}? This action cannot be undone.`}>
@@ -151,8 +171,7 @@ async function StatusPageContent({ pageId }: { pageId: string }) {
             icon={Boxes}
             hue="sky"
             title="No services yet"
-            description="Add the first service to make this page publishable."
-            action={addService}
+            description="Add a service using a monitor's automatic status, or manage its status manually."
             className="py-12"
           />
         )}

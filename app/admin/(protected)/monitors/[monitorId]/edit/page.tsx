@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, MonitorDot } from "lucide-react";
 import { requireSession } from "@/lib/require-session";
 import { database } from "@/lib/postgres/client";
-import { updateMonitor } from "../../actions";
+import { testMonitor, updateMonitor } from "../../actions";
 import { HeartbeatTokenManager } from "@/components/admin/HeartbeatTokenManager";
 import { MonitorForm } from "@/components/admin/MonitorForm";
 import { buttonVariants } from "@/components/ui/button";
@@ -47,7 +47,7 @@ export default async function EditMonitorPage({ params }: { params: Promise<{ mo
         }
       />
       {monitor.type === "HEARTBEAT" && <HeartbeatTokenManager monitorId={monitor.id} auth={{ type: monitor.authType, username: monitor.authUsername }} />}
-      <MonitorForm action={updateMonitor.bind(null, monitor.id)} components={components} groups={groups} monitor={monitorFormValues(monitor)} cancelHref={backHref} proxies={proxies} createProxy={createProxy} expiryDefaults={{ certDays: settings.certExpiryWarnDays, domainDays: settings.domainExpiryWarnDays }} />
+      <MonitorForm testAction={testMonitor.bind(null, monitor.pageId, monitor.id)} action={updateMonitor.bind(null, monitor.id)} components={components} groups={groups} monitor={monitorFormValues(monitor)} cancelHref={backHref} proxies={proxies} createProxy={createProxy} expiryDefaults={{ certDays: settings.certExpiryWarnDays, domainDays: settings.domainExpiryWarnDays }} />
     </div>
   );
 }

@@ -1,3 +1,4 @@
+import { selectedPage } from "@/lib/selected-page";
 import { BarChart3, ChartNoAxesCombined, Eye, Percent, Siren, UserPlus, type LucideIcon } from "lucide-react";
 import { requireSession } from "@/lib/require-session";
 import { database } from "@/lib/postgres/client";
@@ -28,7 +29,7 @@ export default async function AnalyticsPage({
   const { session, org } = await requireSession();
   const requested = (await searchParams).pageId;
   const pages = await getScopedPages(session, org.id, { orderBy: "name" });
-  const selected = pages.find((page) => page.id === requested) ?? pages[0];
+  const selected = await selectedPage(pages, session, requested);
   const description = "Cookie-free, aggregate activity stored on your infrastructure.";
   if (!selected) {
     return (
