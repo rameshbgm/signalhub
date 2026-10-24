@@ -1,0 +1,49 @@
+import { NextResponse } from "next/server";
+import { getDeliveryConfig } from "@/lib/delivery-config";
+import { inspectMigrationState } from "@/lib/migrations";
+import { database, verifyDatabaseConnection } from "@/lib/postgres/client";
+
+export async function GET() {
+  const checks = {
+    database: false,
+    migrations: false,
+    worker: false,
+    smtpConfigured: false,
+    smsConfigured: false,
+    assetStorage: "db",
+    oidcConfigured: Boolean(
+      process.env.OIDC_ISSUER && process.env.OIDC_CLIENT_ID && process.env.OIDC_CLIENT_SECRET
+    ),
+    enterpriseIdentityConnections: 0,
+  };
+  try {
+    await verifyDatabaseConnection();
+    checks.database = true;
+    checks.migrations = (await inspectMigrationState()).current;
+    const identityCount = await database
+      .selectFrom("identityConnections")
+      .select(({ fn }) => fn.countAll<number>().as("count"))
+      .where("enabled", "=", true)
+      .executeTakeFirstOrThrow();
+    checks.enterpriseIdentityConnections = Number(identityCount.count);
+    const heartbeat = await database
+      .selectFrom("workerHeartbeats")
+      .select("id")
+      .where("status", "=", "READY")
+      .where("lastSeenAt", ">", new Date(Date.now() - 30_000))
+      .orderBy("lastSeenAt", "desc")
+      .executeTakeFirst();
+    checks.worker = Boolean(heartbeat);
+    const delivery = await getDeliveryConfig();
+    checks.smtpConfigured = Boolean(delivery.smtp);
+    checks.smsConfigured = Boolean(delivery.sms);
+  } catch {
+    // The structured response below identifies which dependency is unavailable.
+  }
+  const requireWorker = process.env.REQUIRE_WORKER !== "false";
+  const ready = checks.database && checks.migrations && (!requireWorker || checks.worker);
+  return NextResponse.json(
+    { ready, checks },
+    { status: ready ? 200 : 503, headers: { "cache-control": "no-store" } }
+  );
+}

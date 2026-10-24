@@ -1,0 +1,198 @@
+import { setting } from "@/lib/settings/effective";
+import { z } from "zod";
+import { authConfigInputSchema, resolveAuthConfig } from "@/lib/monitor-auth";
+import { isDatabaseId } from "@/lib/database-id";
+import { INPUT_LIMITS } from "@/lib/input-limits";
+import { withDatabaseTransaction, type DatabaseTransaction } from "@/lib/postgres/client";
+import { encryptSecret } from "@/lib/encryption";
+import { generateAutomationToken } from "@/lib/tokens";
+import { MONITOR_TYPES, normalizeMonitorConfiguration } from "@/lib/monitor-validation";
+import { validateMonitorTarget } from "@/lib/monitor-target-validation";
+import { fenceActiveOrganizationMutation } from "@/lib/organization-mutation";
+import { enqueueJobSweep, JOB_TASKS } from "@/lib/jobs";
+
+const MONITOR_DOWN_STATUSES = ["DEGRADED_PERFORMANCE", "PARTIAL_OUTAGE", "MAJOR_OUTAGE"] as const;
+
+const monitorInputSchema = z.object({
+  name: z.string().trim().min(1).max(INPUT_LIMITS.title),
+  type: z.enum(MONITOR_TYPES),
+  componentId: z.string().refine(isDatabaseId, "Component not found on this page").nullable(),
+  target: z.string().trim().max(INPUT_LIMITS.url),
+  port: z.number().int().min(1).max(65_535).nullable(),
+  method: z.enum(["GET", "POST", "HEAD", "PUT", "PATCH"]),
+  requestBody: z.string().max(INPUT_LIMITS.monitorRequestBody).nullable(),
+  requestHeaders: z.string().max(INPUT_LIMITS.monitorRequestHeaders),
+  expectedStatusRange: z.string().trim().max(INPUT_LIMITS.monitorStatusRange),
+  keywordMatch: z.string().max(INPUT_LIMITS.monitorKeyword).nullable(),
+  keywordAbsent: z.string().max(INPUT_LIMITS.monitorKeyword).nullable(),
+  sslWarnDays: z.number().int().min(1).max(365).nullable(),
+  authType: z.enum(["NONE", "BASIC", "BEARER", "HEADER", "OAUTH2", "MTLS"]),
+  authConfig: authConfigInputSchema.nullable().optional(),
+  authUsername: z.string().max(INPUT_LIMITS.monitorAuthUsername).nullable(),
+  authSecret: z.string().max(INPUT_LIMITS.monitorAuthSecret).nullable(),
+  authHeaderName: z.string().max(INPUT_LIMITS.monitorAuthHeaderName).nullable(),
+  verifyTls: z.boolean(),
+  cacheBuster: z.boolean().optional(),
+  ipFamily: z.enum(["AUTO", "IPV4", "IPV6"]).optional(),
+  upsideDown: z.boolean().optional(),
+  proxyId: z.string().uuid().nullable().optional(),
+  saveErrorResponse: z.boolean().optional(),
+  certExpiryNotify: z.boolean().optional(),
+  domainExpiryNotify: z.boolean().optional(),
+  intervalSec: z.number().int().min(10).max(86_400),
+  timeoutMs: z.number().int().min(100).max(60_000),
+  failThreshold: z.number().int().min(1).max(20),
+  recoverThreshold: z.number().int().min(1).max(20),
+  downStatus: z.enum(MONITOR_DOWN_STATUSES),
+  actionFlipStatus: z.boolean(),
+  actionRecordMetric: z.boolean(),
+  actionAutoIncident: z.boolean(),
+  actionNotify: z.boolean(),
+  tags: z.array(z.string().trim().min(1).max(INPUT_LIMITS.monitorTag)).max(INPUT_LIMITS.monitorTags).optional(),
+  groupName: z.string().trim().max(INPUT_LIMITS.monitorGroup).nullable().optional(),
+  heartbeatGraceSec: z.number().int().min(0).max(86_400).nullable().optional(),
+  dnsRecordType: z.enum(["A", "AAAA", "CNAME", "MX", "TXT", "NS"]).nullable().optional(),
+  dnsExpectedValue: z.string().max(INPUT_LIMITS.url).nullable().optional(),
+});
+
+export type MonitorInput = z.infer<typeof monitorInputSchema>;
+declare const preparedMonitorInputBrand: unique symbol;
+export type PreparedMonitorInput = MonitorInput & { readonly [preparedMonitorInputBrand]: true };
+
+export async function prepareMonitorInput(rawInput: MonitorInput): Promise<PreparedMonitorInput> {
+  const parsed = monitorInputSchema.parse(rawInput);
+  const input = normalizeMonitorConfiguration(parsed);
+  await validateMonitorTarget(input, setting("monitorAllowPrivateTargets"));
+  if (input.type === "HEARTBEAT") assertHeartbeatAuth(input);
+  if (input.requestHeaders.trim()) {
+    let headers: unknown;
+    try {
+      headers = JSON.parse(input.requestHeaders);
+    } catch {
+      throw new Error("Request headers must be valid JSON, for example {\"X-Api-Key\": \"abc\"}");
+    }
+    if (!headers || Array.isArray(headers) || typeof headers !== "object") {
+      throw new Error("Request headers must be a JSON object");
+    }
+  }
+  return input as PreparedMonitorInput;
+}
+
+/** Heartbeat URLs can require Basic or Bearer credentials on top of the secret path. */
+export function assertHeartbeatAuth(input: Pick<MonitorInput, "authType" | "authUsername">) {
+  if (!["NONE", "BASIC", "BEARER"].includes(input.authType)) {
+    throw new Error("A heartbeat URL can require HTTP Basic or Bearer credentials");
+  }
+  if (input.authType === "BASIC" && !input.authUsername?.trim()) {
+    throw new Error("Enter the username your job will send to the heartbeat URL");
+  }
+}
+
+export const isHttpLike = (type: string) => type === "HTTP" || type === "KEYWORD";
+
+/** A monitor may only use a proxy that belongs to its own organization. */
+export async function assertProxyInOrg(proxyId: string | null | undefined, orgId: string, transaction: DatabaseTransaction) {
+  if (!proxyId) return;
+  const proxy = await transaction.selectFrom("proxies").select("id").where("id", "=", proxyId).where("orgId", "=", orgId).executeTakeFirst();
+  if (!proxy) throw new Error("Proxy not found");
+}
+
+export async function createPreparedMonitor(
+  orgId: string,
+  pageId: string,
+  input: PreparedMonitorInput,
+  transaction: DatabaseTransaction
+) {
+  await fenceActiveOrganizationMutation(orgId, transaction);
+  const page = await transaction.selectFrom("pages").select("id")
+    .where("id", "=", pageId).where("orgId", "=", orgId)
+    .where("deletedAt", "is", null).forShare().executeTakeFirst();
+  if (!page) throw new Error("Page not found in your organization");
+  if (input.componentId) {
+    const component = await transaction.selectFrom("components").select("id")
+      .where("id", "=", input.componentId).where("pageId", "=", page.id).executeTakeFirst();
+    if (!component) throw new Error("Component not found on this page");
+  }
+  await assertProxyInOrg(input.proxyId, orgId, transaction);
+  if (input.type === "HEARTBEAT" && input.authType !== "NONE" && !input.authSecret) {
+    throw new Error(`Enter the ${input.authType === "BASIC" ? "password" : "token"} your job will send to the heartbeat URL`);
+  }
+  const metric = input.actionRecordMetric
+    ? await transaction.insertInto("metrics").values({
+        pageId: page.id,
+        componentId: input.componentId,
+        name: `${input.name} response time`,
+        suffix: "ms",
+        description: `Automatically recorded by monitor "${input.name}"`,
+        visible: true,
+        decimals: 0,
+      }).returning("id").executeTakeFirstOrThrow()
+    : null;
+  const now = new Date();
+  const heartbeatToken = input.type === "HEARTBEAT" ? generateAutomationToken() : null;
+  const monitor = await transaction.insertInto("monitors").values({
+    pageId: page.id,
+    componentId: input.componentId,
+    name: input.name,
+    type: input.type,
+    enabled: true,
+    target: input.target,
+    port: input.port,
+    method: input.method,
+    requestBody: input.requestBody,
+    requestHeaders: input.requestHeaders,
+    expectedStatusRange: input.expectedStatusRange,
+    keywordMatch: input.keywordMatch,
+    keywordAbsent: input.keywordAbsent,
+    sslWarnDays: input.sslWarnDays,
+    authType: input.authType,
+    authUsername: input.authUsername,
+    authSecret: input.authSecret && ["BASIC", "BEARER", "HEADER"].includes(input.authType) ? encryptSecret(input.authSecret) : null,
+    authConfigCiphertext: resolveAuthConfig(input.authType, input.authConfig, null),
+    authHeaderName: input.authHeaderName,
+    verifyTls: input.verifyTls,
+    cacheBuster: input.cacheBuster ?? false,
+    ipFamily: input.ipFamily ?? "AUTO",
+    upsideDown: input.upsideDown ?? false,
+    saveErrorResponse: isHttpLike(input.type) && (input.saveErrorResponse ?? false),
+    certExpiryNotify: isHttpLike(input.type) && (input.certExpiryNotify ?? false),
+    domainExpiryNotify: input.type !== "HEARTBEAT" && (input.domainExpiryNotify ?? false),
+    proxyId: isHttpLike(input.type) ? input.proxyId ?? null : null,
+    intervalSec: input.intervalSec,
+    timeoutMs: input.timeoutMs,
+    failThreshold: input.failThreshold,
+    recoverThreshold: input.recoverThreshold,
+    downStatus: input.downStatus,
+    actionFlipStatus: input.actionFlipStatus,
+    actionRecordMetric: input.actionRecordMetric,
+    actionAutoIncident: input.actionAutoIncident,
+    actionNotify: input.actionNotify,
+    metricId: metric?.id ?? null,
+    lastCheckedAt: null,
+    lastLatencyMs: null,
+    lastOk: null,
+    lastError: null,
+    consecutiveFails: 0,
+    consecutiveOks: 0,
+    isDown: false,
+    currentIncidentId: null,
+    leaseOwner: null,
+    leaseExpiresAt: null,
+    runRequestedAt: now,
+    createdAt: now,
+    tags: input.tags ?? [],
+    groupName: input.groupName ?? null,
+    heartbeatTokenHash: heartbeatToken?.hash ?? null,
+    heartbeatGraceSec: input.heartbeatGraceSec ?? 60,
+    lastHeartbeatAt: null,
+    dnsRecordType: input.dnsRecordType ?? null,
+    dnsExpectedValue: input.dnsExpectedValue ?? null,
+  }).returningAll().executeTakeFirstOrThrow();
+  await enqueueJobSweep(transaction, JOB_TASKS.monitors);
+  return monitor;
+}
+
+export async function createMonitor(orgId: string, pageId: string, rawInput: MonitorInput) {
+  const input = await prepareMonitorInput(rawInput);
+  return withDatabaseTransaction((transaction) => createPreparedMonitor(orgId, pageId, input, transaction));
+}

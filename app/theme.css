@@ -1,0 +1,303 @@
+/* SignalHub design tokens: light only.
+   Direction: professional console. Neutral canvas, white bordered surfaces,
+   restrained radii, violet brand with a gradient accent reserved for the
+   logo and hero moments, gradient icon tiles, quick subtle motion.
+   `static` keeps every token in the output so components can also read them
+   through var(--token) in arbitrary values, not just through utilities. */
+@theme static {
+  /* Surfaces and lines */
+  --color-canvas: #f8f8fb;
+  --color-surface: #ffffff;
+  --color-sunken: #f3f3f8;
+  --color-line: #e6e6ee;
+  --color-line-strong: #d4d4de;
+
+  /* Text. ink-dim stays above 4.6:1 on white; never go lighter for readable text. */
+  --color-ink: #16131f;
+  --color-ink-soft: #4a4759;
+  --color-ink-dim: #6b6880;
+
+  /* Brand */
+  --color-primary: #7c3aed;
+  --color-primary-hover: #6d28d9;
+  --color-primary-soft: #f3edff;
+  --color-primary-ink: #6d28d9;
+  --color-on-primary: #ffffff;
+  --color-accent: #db2777;
+  --color-flare: #f97316;
+
+  /* Status: solid colours match lib/status.ts; badge pairs are text/background */
+  --color-ok: #10b981;
+  --color-ok-fg: #047857;
+  --color-ok-bg: #d1fae5;
+  --color-warn: #f59e0b;
+  --color-warn-fg: #92400e;
+  --color-warn-bg: #fef3c7;
+  --color-danger: #ef4444;
+  --color-danger-fg: #b91c1c;
+  --color-danger-bg: #fee2e2;
+  --color-info: #3b82f6;
+  --color-info-fg: #1d4ed8;
+  --color-info-bg: #dbeafe;
+
+  /* Fonts. The variables are set on <html> by next/font in app/layout.tsx. */
+  --font-sans: var(--font-jakarta), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: var(--font-jetbrains), ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  /* Type: Tailwind's scale plus one small step. Nothing below 11px. */
+  --text-2xs: 0.6875rem;
+  --text-2xs--line-height: 1rem;
+
+  /* Radius: restrained. Controls 6px, cards 10px, dialogs 14px. */
+  --radius-chip: 0.25rem;
+  --radius-control: 0.375rem;
+  --radius-card: 0.625rem;
+  --radius-sheet: 0.875rem;
+
+  /* Shadows: violet-tinted and soft */
+  --shadow-card: 0 1px 2px rgb(15 23 42 / 0.05);
+  --shadow-raised: 0 1px 3px rgb(15 23 42 / 0.06), 0 8px 20px -8px rgb(15 23 42 / 0.14);
+  --shadow-float: 0 6px 12px rgb(76 29 149 / 0.06), 0 30px 60px -16px rgb(76 29 149 / 0.3);
+  --shadow-primary: 0 1px 2px rgb(76 29 149 / 0.3), inset 0 1px 0 rgb(255 255 255 / 0.12);
+
+  /* Motion */
+  --ease-soft: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --duration-fast: 140ms;
+  --duration-base: 240ms;
+  --duration-slow: 420ms;
+
+  --animate-rise: sh-rise var(--duration-slow) var(--ease-soft) both;
+  --animate-pop: sh-pop var(--duration-base) var(--ease-spring) both;
+  --animate-fade: sh-fade var(--duration-base) ease-out both;
+  --animate-pulse-ring: sh-pulse-ring 2.4s ease-out infinite;
+  --animate-shimmer: sh-shimmer 1.6s ease-in-out infinite;
+  --animate-bar-in: sh-bar-in 560ms var(--ease-soft) both;
+  --animate-sheet: sh-sheet var(--duration-slow) var(--ease-soft) both;
+  --animate-drop: sh-drop var(--duration-base) var(--ease-spring) both;
+  --animate-float: sh-float 6s ease-in-out infinite;
+  --animate-gradient: sh-gradient 8s ease infinite;
+}
+
+@keyframes sh-flash {
+  0%, 80% { opacity: 1; }
+  100% { opacity: 0; visibility: hidden; }
+}
+
+@keyframes sh-rise {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes sh-pop {
+  from { opacity: 0; transform: scale(0.92); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes sh-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes sh-pulse-ring {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, currentColor 50%, transparent); }
+  70%, 100% { box-shadow: 0 0 0 9px transparent; }
+}
+
+@keyframes sh-bar-in {
+  from { opacity: 0; transform: scaleY(0.1); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes sh-drawer {
+  from { transform: translateX(-100%); }
+  to { transform: none; }
+}
+
+@keyframes sh-sheet {
+  from { transform: translateY(100%); }
+  to { transform: none; }
+}
+
+@keyframes sh-drop {
+  from { opacity: 0; transform: translateY(-10px) scale(0.96); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes sh-shimmer {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 1; }
+}
+
+@keyframes sh-float {
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  50% { transform: translate3d(0, -14px, 0); }
+}
+
+@keyframes sh-gradient {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+/* Icon orbs: <IconTile hue="sky"> sets data-hue. Each hue is a two-stop
+   gradient (from/to) plus a soft wash, so components never hardcode colour. */
+[data-hue] {
+  --hue-from: #94a3b8;
+  --hue-to: #64748b;
+  --hue-bg: #f1f5f9;
+  --hue-fg: #475569;
+}
+[data-hue="indigo"] { --hue-from: #818cf8; --hue-to: #6d28d9; --hue-bg: #eef0ff; --hue-fg: #4f46e5; }
+[data-hue="sky"] { --hue-from: #38bdf8; --hue-to: #2563eb; --hue-bg: #e0f2fe; --hue-fg: #0369a1; }
+[data-hue="emerald"] { --hue-from: #34d399; --hue-to: #0d9488; --hue-bg: #d1fae5; --hue-fg: #047857; }
+[data-hue="amber"] { --hue-from: #fbbf24; --hue-to: #f97316; --hue-bg: #fef3c7; --hue-fg: #b45309; }
+[data-hue="rose"] { --hue-from: #fb7185; --hue-to: #db2777; --hue-bg: #ffe4e6; --hue-fg: #be123c; }
+[data-hue="violet"] { --hue-from: #c084fc; --hue-to: #7c3aed; --hue-bg: #f3e8ff; --hue-fg: #7e22ce; }
+[data-hue="teal"] { --hue-from: #2dd4bf; --hue-to: #0891b2; --hue-bg: #ccfbf1; --hue-fg: #0f766e; }
+[data-hue="slate"] { --hue-from: #60a5fa; --hue-to: #6366f1; --hue-bg: #eef2f7; --hue-fg: #475569; }
+
+/* Brand gradient fill and text. */
+@utility bg-prism {
+  background-image: linear-gradient(120deg, var(--color-primary), var(--color-accent) 55%, var(--color-flare));
+  background-size: 200% 200%;
+}
+@utility text-prism {
+  background-image: linear-gradient(100deg, var(--color-primary), var(--color-accent) 60%, var(--color-flare));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Aurora wash behind every signed-in and auth canvas. */
+@utility bg-wash {
+  background-color: var(--color-canvas);
+}
+
+/* Always-visible thin scrollbar (macOS hides overlay scrollbars unless they are styled). */
+@utility scroll-thin {
+  overflow-y: auto;
+  &::-webkit-scrollbar {
+    width: 5px;
+  }
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  &::-webkit-scrollbar-thumb {
+    background: var(--color-line-strong);
+    border-radius: 999px;
+  }
+  &::-webkit-scrollbar-thumb:hover {
+    background: var(--color-ink-dim);
+  }
+  @supports not selector(::-webkit-scrollbar) {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-line-strong) transparent;
+  }
+}
+
+/* Frosted glass panel. */
+@utility glass {
+  background-color: color-mix(in srgb, var(--color-surface) 78%, transparent);
+  backdrop-filter: blur(18px) saturate(1.6);
+  -webkit-backdrop-filter: blur(18px) saturate(1.6);
+}
+
+@layer base {
+  html {
+    font-family: var(--font-sans);
+    color: var(--color-ink);
+    text-rendering: optimizeLegibility;
+    -webkit-text-size-adjust: 100%;
+    font-feature-settings: "cv11", "ss01";
+  }
+
+  h1, h2, h3 {
+    letter-spacing: -0.02em;
+  }
+
+  ::selection {
+    background: color-mix(in srgb, var(--color-accent) 22%, transparent);
+  }
+
+  /* One icon stroke everywhere: a CSS property beats the strokeWidth attribute. */
+  .lucide {
+    stroke-width: 2;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+  }
+
+  /* A bare `grid` has one auto column that grows to its widest unbreakable child and overflows
+     small screens. Make it shrinkable; grid-cols-* utilities (a later layer) still win. */
+  .grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* Staggered entrance for direct children of any `.stagger` container. */
+  .stagger > * { animation: var(--animate-rise); }
+  .stagger > *:nth-child(2) { animation-delay: 40ms; }
+  .stagger > *:nth-child(3) { animation-delay: 80ms; }
+  .stagger > *:nth-child(4) { animation-delay: 120ms; }
+  .stagger > *:nth-child(5) { animation-delay: 160ms; }
+  .stagger > *:nth-child(n + 6) { animation-delay: 200ms; }
+}
+
+/* iOS Safari zooms the page when a focused field is under 16px. Touch devices only. */
+@media (pointer: coarse) {
+  input:not([type="checkbox"], [type="radio"], [type="range"], [type="file"]),
+  select,
+  textarea {
+    font-size: max(16px, 1em);
+  }
+}
+
+/* Hit areas: small buttons, tabs and links get an invisible 44px target on touch devices
+   without changing layout. `position: relative` sits in the base layer so absolute/fixed
+   utilities still win; text links inside paragraphs are left alone. */
+@layer base {
+  @media (pointer: coarse) {
+    :where(button, [role="button"], [role="tab"], [role="radio"], summary, a):not(:is(p, td, dd, h1, h2, h3, h4, h5, h6) a) {
+      position: relative;
+    }
+  }
+}
+@media (pointer: coarse) {
+  :where(button, [role="button"], [role="tab"], [role="radio"], summary, a):not(:is(p, td, dd, h1, h2, h3, h4, h5, h6) a)::before {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: max(100%, 2.75rem);
+    height: max(100%, 2.75rem);
+    transform: translate(-50%, -50%);
+  }
+}
+
+/* Touch targets: at least 40px for buttons and form fields on touch devices. */
+@media (pointer: coarse) {
+  [data-ui-button]:not([data-variant="link"]) {
+    min-height: 2.5rem;
+  }
+  [data-ui-button].size-8,
+  [data-ui-button].size-9 {
+    min-width: 2.5rem;
+  }
+  input:not([type="checkbox"], [type="radio"], [type="range"], [type="file"], [type="hidden"]),
+  textarea,
+  [role="combobox"] {
+    min-height: 2.5rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

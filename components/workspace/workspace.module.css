@@ -1,0 +1,92 @@
+.page {
+  display: flex;
+  min-height: 100svh;
+  flex-direction: column;
+}
+
+.header {
+  width: 100%;
+  max-width: 75rem;
+  margin-inline: auto;
+  padding: clamp(1rem, 3svh, 2rem) 1.5rem;
+}
+
+.main {
+  display: grid;
+  flex: 1;
+  place-items: center;
+  padding: 1rem 1.5rem 2rem;
+}
+
+.welcome {
+  width: 100%;
+  max-width: 36rem;
+  padding-bottom: clamp(0rem, 4svh, 2rem);
+  text-align: center;
+}
+
+.illustration {
+  display: block;
+  width: 100%;
+  max-width: 26rem;
+  height: clamp(9rem, 29svh, 15rem);
+  margin-inline: auto;
+  color: var(--color-primary);
+}
+
+.title {
+  margin-top: 1.25rem;
+  font-size: 2.75rem;
+  font-weight: 700;
+  letter-spacing: -0.035em;
+  line-height: 1.16;
+}
+
+.description {
+  margin-top: 1.25rem;
+  color: var(--color-ink-soft);
+  font-size: 0.9375rem;
+  line-height: 1.75;
+  text-wrap: balance;
+}
+
+.signIn {
+  width: 18rem;
+  max-width: 100%;
+  min-height: 3rem;
+  margin-top: 1.75rem;
+  padding-inline: 1.125rem;
+}
+
+.footer {
+  padding: 1rem 1.5rem 1.5rem;
+  text-align: center;
+}
+
+@media (max-width: 639px) {
+  .title {
+    font-size: 2.125rem;
+  }
+}
+
+@media (max-height: 700px) {
+  .illustration {
+    height: 9rem;
+  }
+
+  .welcome {
+    padding-bottom: 0;
+  }
+
+  .title {
+    margin-top: 0.75rem;
+  }
+
+  .description {
+    margin-top: 0.875rem;
+  }
+
+  .signIn {
+    margin-top: 1.25rem;
+  }
+}

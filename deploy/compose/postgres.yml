@@ -1,0 +1,38 @@
+# Bundled PostgreSQL for trying SignalHub on one host. For production prefer a
+# managed database with automatic backups and enter it in the setup wizard.
+#
+#   COMPOSE_FILE=docker-compose.yml:deploy/compose/postgres.yml
+#   POSTGRES_PASSWORD=...   (install.sh generates one)
+#
+# The wizard then offers "Bundled PostgreSQL" as a one-click choice.
+services:
+  postgres:
+    image: postgres:18.4-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-signalhub}
+      POSTGRES_USER: ${POSTGRES_USER:-signalhub}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql
+    networks: [default]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 5s
+    security_opt: ["no-new-privileges:true"]
+
+  signalhub:
+    environment:
+      # Same Docker network, so TLS is off for this hop.
+      SIGNALHUB_BUNDLED_DATABASE_URL: postgresql://${POSTGRES_USER:-signalhub}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-signalhub}?sslmode=disable
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  postgres_data:

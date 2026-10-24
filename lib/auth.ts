@@ -1,0 +1,281 @@
+import { createHash, randomBytes } from "node:crypto";
+import { hash as argonHash, verify as argonVerify } from "@node-rs/argon2";
+import { decodeProtectedHeader, SignJWT, jwtVerify } from "jose";
+import { cookies, headers } from "next/headers.js";
+import bcrypt from "bcryptjs";
+import { getSessionSigningKeys } from "@/lib/session-secret";
+import { database } from "@/lib/postgres/client";
+import type { AuthMethod } from "@/lib/postgres/schema";
+import { isDatabaseId, newDatabaseId } from "@/lib/database-id";
+import { hashSecret } from "@/lib/secrets";
+import { setting } from "@/lib/settings/effective";
+import { secureCookiesFor } from "@/lib/settings/request";
+
+const SESSION_COOKIE = "sp_session";
+const ACCESS_COOKIE_PREFIX = "sp_access_"; // per-page access cookie for private/audience pages
+
+/** Environment-only tuning (Argon2 cost): a number clamped to a range, or the fallback. */
+function envNumber(name: string, fallback: number, minimum: number, maximum: number) {
+  const value = Number(process.env[name] ?? fallback);
+  return Number.isFinite(value) ? Math.min(maximum, Math.max(minimum, value)) : fallback;
+}
+
+function tenantIdleSeconds() {
+  return setting("sessionIdleSeconds");
+}
+
+function tenantAbsoluteSeconds() {
+  return setting("sessionAbsoluteSeconds");
+}
+
+/** Secure only when the site is served over HTTPS, so a plain-HTTP intranet can still sign in (see lib/settings/request.ts). */
+async function secureCookie() {
+  return secureCookiesFor(await headers());
+}
+
+export type SessionPayload = {
+  userId: string;
+  membershipId: string;
+  orgId: string;
+  username: string;
+  email: string;
+  name: string;
+  role: string;
+  supportSessionId?: string;
+  supportSessionToken?: string;
+  supportActorEmail?: string;
+  supportActorName?: string;
+  supportMode?: "VIEW" | "OPERATE";
+  sessionId?: string;
+  authMethod?: AuthMethod;
+  mfaVerified?: boolean;
+};
+
+export async function createSession(
+  payload: SessionPayload,
+  options: {
+    maxAgeSeconds?: number;
+    authMethod?: AuthMethod;
+    mfaVerified?: boolean;
+    ipAddress?: string | null;
+    userAgent?: string | null;
+  } = {}
+) {
+  const absoluteSeconds = options.maxAgeSeconds ?? tenantAbsoluteSeconds();
+  const idleSeconds = Math.min(tenantIdleSeconds(), absoluteSeconds);
+  const now = new Date();
+  const sessionId = newDatabaseId();
+  const verifier = randomBytes(32).toString("base64url");
+  const { active } = getSessionSigningKeys();
+  const sessionPayload = {
+    ...payload,
+    sessionId,
+    sessionVerifier: verifier,
+    authMethod: options.authMethod ?? (payload.supportSessionId ? "SUPPORT" : "PASSWORD"),
+    mfaVerified: options.mfaVerified ?? true,
+  };
+  const token = await new SignJWT(sessionPayload)
+    .setProtectedHeader({ alg: "HS256", kid: active.id })
+    .setAudience("org")
+    .setIssuedAt()
+    .setExpirationTime(`${absoluteSeconds}s`)
+    .sign(active.secret);
+
+  await database.insertInto("authSessions").values({
+    id: sessionId,
+    kind: "TENANT",
+    tokenHash: hashSecret(verifier),
+    userId: payload.userId,
+    membershipId: payload.membershipId,
+    orgId: payload.orgId,
+    sessionVersion: 1,
+    authMethod: sessionPayload.authMethod,
+    mfaVerified: sessionPayload.mfaVerified,
+    ipAddress: options.ipAddress ?? null,
+    userAgent: options.userAgent ?? null,
+    createdAt: now,
+    lastSeenAt: now,
+    idleExpiresAt: new Date(now.getTime() + idleSeconds * 1000),
+    absoluteExpiresAt: new Date(now.getTime() + absoluteSeconds * 1000),
+    revokedAt: null,
+    revokedReason: null,
+  }).execute();
+
+  const store = await cookies();
+  store.set(SESSION_COOKIE, token, {
+    httpOnly: true,
+    secure: await secureCookie(),
+    sameSite: "lax",
+    path: "/",
+    maxAge: absoluteSeconds,
+  });
+}
+
+export async function destroySession() {
+  const store = await cookies();
+  const token = store.get(SESSION_COOKIE)?.value;
+  if (token) {
+    const payload = await verifySignedToken(token, "org").catch(() => null);
+    if (isDatabaseId(payload?.sessionId)) {
+      await database
+        .updateTable("authSessions")
+        .set({ revokedAt: new Date(), revokedReason: "logout" })
+        .where("id", "=", payload.sessionId)
+        .where("revokedAt", "is", null)
+        .execute();
+    }
+  }
+  store.delete(SESSION_COOKIE);
+}
+
+async function verifySignedToken(token: string, audience: "org") {
+  const { all } = getSessionSigningKeys();
+  const kid = decodeProtectedHeader(token).kid;
+  const candidates = kid ? all.filter((key) => key.id === kid) : all;
+  let lastError: unknown = new Error("No matching signing key");
+  for (const candidate of candidates) {
+    try {
+      return (await jwtVerify(token, candidate.secret, { audience })).payload;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw lastError;
+}
+
+async function activeSession(
+  payload: Record<string, unknown>,
+  kind: "TENANT" | "PLATFORM"
+) {
+  if (
+    typeof payload.sessionId !== "string" ||
+    typeof payload.sessionVerifier !== "string" ||
+    !isDatabaseId(payload.sessionId)
+  ) {
+    return null;
+  }
+  const now = new Date();
+  const session = await database
+    .selectFrom("authSessions")
+    .selectAll()
+    .where("id", "=", payload.sessionId)
+    .where("kind", "=", kind)
+    .where("tokenHash", "=", hashSecret(payload.sessionVerifier))
+    .where("revokedAt", "is", null)
+    .where("idleExpiresAt", ">", now)
+    .where("absoluteExpiresAt", ">", now)
+    .executeTakeFirst();
+  if (!session) return null;
+  if (now.getTime() - session.lastSeenAt.getTime() > 5 * 60_000) {
+    const idleSeconds = tenantIdleSeconds();
+    const idleExpiresAt = new Date(
+      Math.min(session.absoluteExpiresAt.getTime(), now.getTime() + idleSeconds * 1000)
+    );
+    await database
+      .updateTable("authSessions")
+      .set({ lastSeenAt: now, idleExpiresAt })
+      .where("id", "=", session.id)
+      .where("revokedAt", "is", null)
+      .where("idleExpiresAt", ">", now)
+      .execute();
+  }
+  return session;
+}
+
+export async function getSession(): Promise<SessionPayload | null> {
+  const store = await cookies();
+  const token = store.get(SESSION_COOKIE)?.value;
+  if (!token) return null;
+  try {
+    const payload = await verifySignedToken(token, "org");
+    if (
+      typeof payload.userId !== "string" ||
+      typeof payload.membershipId !== "string" ||
+      typeof payload.orgId !== "string"
+    ) {
+      return null;
+    }
+    const stored = await activeSession(payload, "TENANT");
+    if (
+      !stored ||
+      stored.userId !== payload.userId ||
+      stored.membershipId !== payload.membershipId ||
+      stored.orgId !== payload.orgId
+    ) {
+      return null;
+    }
+    return payload as unknown as SessionPayload;
+  } catch {
+    return null;
+  }
+}
+
+export async function hashPassword(password: string) {
+  return argonHash(password, {
+    algorithm: 2,
+    memoryCost: envNumber("ARGON2_MEMORY_KIB", 19_456, 8_192, 262_144),
+    timeCost: envNumber("ARGON2_TIME_COST", 2, 1, 10),
+    parallelism: envNumber("ARGON2_PARALLELISM", 1, 1, 4),
+    outputLen: 32,
+  });
+}
+
+export async function verifyPassword(password: string, hash: string) {
+  if (hash.startsWith("$argon2")) return argonVerify(hash, password);
+  return bcrypt.compare(password, hash);
+}
+
+export function passwordNeedsRehash(hash: string) {
+  return !hash.startsWith("$argon2id$");
+}
+
+// ---- Page-visitor access sessions (for PRIVATE / AUDIENCE pages) ----
+
+/**
+ * Short fingerprint of the credential a visitor proved. Access tokens carry
+ * it, so changing a page or audience password invalidates earlier sessions.
+ */
+export function credentialVersion(passwordHash: string | null | undefined) {
+  return passwordHash ? createHash("sha256").update(passwordHash).digest("base64url").slice(0, 22) : "";
+}
+
+export type PageAccessClaims = { pageId: string; userId?: string; email?: string; cv?: string };
+
+export async function createPageAccessSession(pageId: string, data: Omit<PageAccessClaims, "pageId">) {
+  const { active } = getSessionSigningKeys();
+  const token = await new SignJWT({ pageId, ...data })
+    .setProtectedHeader({ alg: "HS256", kid: active.id })
+    .setIssuedAt()
+    .setExpirationTime("7d")
+    .sign(active.secret);
+  const store = await cookies();
+  store.set(`${ACCESS_COOKIE_PREFIX}${pageId}`, token, {
+    httpOnly: true,
+    secure: await secureCookie(),
+    sameSite: "lax",
+    path: "/",
+    maxAge: 60 * 60 * 24 * 7,
+  });
+}
+
+export async function getPageAccessSession(pageId: string): Promise<PageAccessClaims | null> {
+  const store = await cookies();
+  const token = store.get(`${ACCESS_COOKIE_PREFIX}${pageId}`)?.value;
+  if (!token) return null;
+  try {
+    const { all } = getSessionSigningKeys();
+    const kid = decodeProtectedHeader(token).kid;
+    const candidates = kid ? all.filter((candidate) => candidate.id === kid) : all;
+    for (const candidate of candidates) {
+      try {
+        const { payload } = await jwtVerify(token, candidate.secret);
+        return payload as unknown as PageAccessClaims;
+      } catch {
+        // Continue through rotation keys.
+      }
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}

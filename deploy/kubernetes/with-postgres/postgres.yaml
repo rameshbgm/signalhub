@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: signalhub-postgres
+  labels: { app.kubernetes.io/component: postgres }
+spec:
+  serviceName: signalhub-postgres
+  replicas: 1
+  selector:
+    matchLabels: { app.kubernetes.io/name: signalhub, app.kubernetes.io/component: postgres }
+  template:
+    metadata:
+      labels: { app.kubernetes.io/name: signalhub, app.kubernetes.io/component: postgres }
+    spec:
+      securityContext: { runAsNonRoot: true, runAsUser: 70, fsGroup: 70, seccompProfile: { type: RuntimeDefault } }
+      containers:
+        - name: postgres
+          image: postgres:18.4-alpine
+          ports: [{ name: postgres, containerPort: 5432 }]
+          env:
+            - { name: POSTGRES_DB, value: signalhub }
+            - { name: POSTGRES_USER, value: signalhub }
+            - name: POSTGRES_PASSWORD
+              valueFrom: { secretKeyRef: { name: signalhub-secrets, key: POSTGRES_PASSWORD } }
+          securityContext: { allowPrivilegeEscalation: false, capabilities: { drop: ["ALL"] } }
+          readinessProbe: { exec: { command: ["pg_isready", "-U", "signalhub", "-d", "signalhub"] }, periodSeconds: 5 }
+          resources:
+            requests: { cpu: 100m, memory: 256Mi }
+          volumeMounts: [{ name: data, mountPath: /var/lib/postgresql }]
+  volumeClaimTemplates:
+    - metadata: { name: data }
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources: { requests: { storage: 10Gi } }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: signalhub-postgres
+spec:
+  clusterIP: None
+  selector: { app.kubernetes.io/name: signalhub, app.kubernetes.io/component: postgres }
+  ports: [{ name: postgres, port: 5432, targetPort: postgres }]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: signalhub-postgres
+spec:
+  podSelector:
+    matchLabels: { app.kubernetes.io/name: signalhub, app.kubernetes.io/component: postgres }
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector: { matchLabels: { app.kubernetes.io/name: signalhub } }
+      ports: [{ port: 5432 }]

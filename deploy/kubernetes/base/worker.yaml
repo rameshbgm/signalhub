@@ -1,0 +1,30 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: signalhub-worker
+  labels: { app.kubernetes.io/component: worker }
+spec:
+  # Jobs and sweeps are lease-based; add replicas for many monitors.
+  replicas: 1
+  selector:
+    matchLabels: { app.kubernetes.io/name: signalhub, app.kubernetes.io/component: worker }
+  template:
+    metadata:
+      labels: { app.kubernetes.io/name: signalhub, app.kubernetes.io/component: worker }
+    spec:
+      securityContext: { runAsNonRoot: true, runAsUser: 1001, fsGroup: 1001, seccompProfile: { type: RuntimeDefault } }
+      containers:
+        - name: worker
+          image: signalhub
+          command: ["node", "dist-runtime/worker.mjs"]
+          ports: [{ name: health, containerPort: 8081 }]
+          envFrom: [{ secretRef: { name: signalhub-secrets } }, { configMapRef: { name: signalhub-config } }]
+          # ICMP (ping) monitors: set MONITOR_ENABLE_ICMP=true in config.env and add NET_RAW here.
+          securityContext: { allowPrivilegeEscalation: false, capabilities: { drop: ["ALL"] }, readOnlyRootFilesystem: true }
+          readinessProbe: { httpGet: { path: /ready, port: health }, periodSeconds: 10, timeoutSeconds: 5 }
+          livenessProbe: { httpGet: { path: /live, port: health }, periodSeconds: 20, timeoutSeconds: 5 }
+          resources:
+            requests: { cpu: 100m, memory: 256Mi }
+            limits: { memory: 768Mi }
+          volumeMounts: [{ name: tmp, mountPath: /tmp }]
+      volumes: [{ name: tmp, emptyDir: {} }]

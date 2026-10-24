@@ -1,0 +1,27 @@
+# Only the web port is reachable; the worker accepts nothing but kubelet probes.
+# Egress stays open: monitors, email/SMS and webhooks call out to the internet.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: signalhub-web
+spec:
+  podSelector:
+    matchLabels: { app.kubernetes.io/name: signalhub, app.kubernetes.io/component: web }
+  policyTypes: [Ingress]
+  ingress:
+    # Any pod in the cluster can reach the web port. To accept only your ingress
+    # controller (recommended on shared clusters), add for example:
+    #   - from: [{ namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: ingress-nginx } } }]
+    #     ports: [{ port: 3000 }]
+    - ports: [{ port: 3000 }]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: signalhub-worker
+spec:
+  podSelector:
+    matchLabels: { app.kubernetes.io/name: signalhub, app.kubernetes.io/component: worker }
+  policyTypes: [Ingress]
+  ingress:
+    - ports: [{ port: 8081 }]

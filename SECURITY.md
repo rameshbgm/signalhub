@@ -1,0 +1,22 @@
+# Security policy
+
+Please do not report vulnerabilities in public issues. Email a concise report
+to the maintainers (or the security contact configured by your deployment)
+with reproduction steps, affected versions, and impact. We will acknowledge
+reports within 5 business days and coordinate a fix and disclosure timeline.
+
+For self-hosted deployments, rotate exposed signing/encryption keyring
+entries, API keys, SCIM tokens, webhook secrets, and SMTP/IdP credentials
+immediately. Keep PostgreSQL and the SignalHub administration interface on trusted
+networks, restrict installation administration with
+`PLATFORM_ADMIN_ALLOWED_CIDRS`, configure forwarded headers only for a known
+proxy hop count, and use TLS for all public traffic.
+
+Turn on **Require authenticator codes** (Platform administration → Configuration → Runtime → Sign-in policy) and keep at least two administrators so a lost device can be recovered without shell access. See [docs/mfa.md](docs/mfa.md) and [docs/security.md](docs/security.md).
+
+Enterprise deployments should use a highly available PostgreSQL cluster, authenticated
+metrics, external secret management, and the restricted container defaults.
+Retain a local Admin as a break-glass account,
+test backup restoration, and periodically verify the audit hash chains.
+
+We support the latest released version and the preceding minor release.

@@ -1,0 +1,134 @@
+import { subscriptionCapabilities } from "@/lib/notification-capabilities";
+import { notFound, redirect } from "next/navigation";
+import Link from "next/link";
+import { checkPageAccess } from "@/lib/access";
+import { getIncidentsForPage, splitActiveAndPast } from "@/lib/public-data";
+import { PublicHeader, PublicFooter } from "@/components/public/PublicChrome";
+import { IncidentCard } from "@/components/public/IncidentTimeline";
+import { publicPagePath } from "@/lib/public-path";
+import { formatPageDate } from "@/lib/page-locale";
+import { pageDesignFor, pageHistoryDays } from "@/lib/page-design";
+import { historyWindowStart, recentHistory } from "@/lib/public-history";
+import { PageDesignShell } from "@/components/public/PageDesignShell";
+import { scopeCustomCss } from "@/lib/custom-css";
+import { PageSurfaceLayout } from "@/components/public/PageSurfaceLayout";
+import type { PageDesignBlock } from "@/lib/page-design";
+import { AnnouncementList } from "@/components/public/AnnouncementList";
+import { SubscribeModal } from "@/components/public/SubscribeModal";
+import { getActivePageAnnouncements, getPublicHubChildren, getPublicPageBySlug } from "@/lib/pages";
+
+export default async function HistoryPage({ params, searchParams }: { params: Promise<{ slug: string }>; searchParams?: Promise<{ type?: string }> }) {
+  const { slug } = await params;
+  const pageDoc = await getPublicPageBySlug(slug);
+  if (!pageDoc) notFound();
+  const page = pageDoc!;
+  const design = pageDesignFor(page);
+  const basePath = publicPagePath(page);
+
+  const access = await checkPageAccess(page);
+  if (!access.ok) {
+    if (access.reason === "unavailable") notFound();
+    redirect(`${basePath}/access`);
+  }
+
+  const maintenanceView = (await searchParams)?.type === "maintenance";
+  const historyDays = pageHistoryDays(design);
+  const historyQuery = { since: historyWindowStart(historyDays), limit: null };
+  const incidentDocs = page.isHub
+    ? (await Promise.all((await getPublicHubChildren(page.id, page.orgId)).map(async (child) => {
+        const childAccess = await checkPageAccess(child);
+        if (!childAccess.ok) return [];
+        return (await getIncidentsForPage(child.id, childAccess.visibleComponentIds, historyQuery))
+          .map((incident) => ({ ...incident, name: `[${child.name}] ${incident.name}`, linkSlug: child.slug }));
+      }))).flat()
+    : await getIncidentsForPage(page.id, access.visibleComponentIds, historyQuery);
+  const { past } = splitActiveAndPast(incidentDocs);
+  const incidents = recentHistory(past.filter((incident) => incident.isMaintenance === maintenanceView), historyDays);
+  const incidentPageSlug = page.slug;
+  const announcementDocs = await getActivePageAnnouncements(page.id, "HISTORY");
+
+  const byMonth = new Map<string, typeof incidents>();
+  for (const inc of incidents) {
+    const key = formatPageDate(inc.createdAt, {
+      language: page.language,
+      timeZone: page.timezone,
+      month: "long",
+      year: "numeric",
+    });
+    if (!byMonth.has(key)) byMonth.set(key, []);
+    byMonth.get(key)!.push(inc);
+  }
+  const subscriptions = await subscriptionCapabilities(page.id);
+
+  function renderBlock(block: PageDesignBlock) {
+    if (block.type === "HISTORY_LIST") {
+      return (
+        <div>
+          {[...byMonth.entries()].map(([month, incs]) => (
+            <div key={month} className="mb-8">
+              <h2 className="mb-3 text-sm font-semibold text-[var(--fg-soft)]">{month}</h2>
+              <div className="space-y-3">
+                {incs.map((incident) => (
+                  <IncidentCard key={incident.id} incident={incident} pageSlug={incidentPageSlug} locale={page.language} timeZone={page.timezone} />
+                ))}
+              </div>
+            </div>
+          ))}
+          {incidents.length === 0 && <p className="text-sm text-[var(--fg-dim)]">No {maintenanceView ? "completed maintenance" : "past incidents"} in the past {historyDays} days.</p>}
+        </div>
+      );
+    }
+    if (block.type === "ANNOUNCEMENTS") {
+      return <AnnouncementList pageId={page.id} maxItems={block.settings.maxItems} announcements={announcementDocs.map((announcement) => ({ id: announcement.id, title: announcement.title, body: announcement.body, severity: announcement.severity, ctaLabel: announcement.ctaLabel, ctaUrl: announcement.ctaUrl, dismissible: announcement.dismissible }))} />;
+    }
+    if (block.type === "RICH_TEXT") {
+      return <article className={`page-panel border border-[var(--line)] bg-[var(--surface)] p-[var(--page-block-padding)] ${block.settings.align === "CENTER" ? "text-center" : ""}`}>{block.settings.heading && <h2 className="text-xl font-semibold">{block.settings.heading}</h2>}<p className="mt-2 whitespace-pre-wrap text-sm text-[var(--fg-soft)]">{block.settings.body}</p></article>;
+    }
+    if (block.type === "SUBSCRIBE") {
+      return subscriptions.available ? <SubscribeModal initialCapabilities={subscriptions} pageSlug={page.slug} brandColor={design.theme.palette.brand} feedsEnabled={page.type === "PUBLIC"} components={[]} /> : null;
+    }
+    if (block.type === "LINK_CARDS") {
+      return <div className="grid gap-3 sm:grid-cols-2">{block.settings.links.map((link) => <a key={link.url} href={link.url} className="page-panel border border-[var(--line)] bg-[var(--surface)] p-4"><strong>{link.label}</strong><p className="text-sm text-[var(--fg-soft)]">{link.description}</p></a>)}</div>;
+    }
+    return null;
+  }
+
+  return (
+    <PageDesignShell pageId={page.id} publishedVersion={page.publishedDesignVersion} design={design} customCss={scopeCustomCss(page.customCss, page.id)} language={page.language}>
+      <PublicHeader
+        name={page.name}
+        logoUrl={page.logoUrl}
+        supportUrl={page.supportUrl}
+        layout={page.layout}
+        coverImageUrl={page.coverImageUrl}
+        coverImageFit={page.coverImageFit}
+        coverImagePositionX={page.coverImagePositionX}
+        coverImagePositionY={page.coverImagePositionY}
+        coverImageCropX={page.coverImageCropX}
+        coverImageCropY={page.coverImageCropY}
+        coverImageCropWidth={page.coverImageCropWidth}
+        coverImageCropHeight={page.coverImageCropHeight}
+        brandColor={page.brandColor}
+        design={design}
+        subscribeSlot={subscriptions.available ? <SubscribeModal initialCapabilities={subscriptions} pageSlug={page.slug} brandColor={design.theme.palette.brand} feedsEnabled={page.type === "PUBLIC"} components={[]} /> : null}
+      />
+      <PageSurfaceLayout
+        design={design}
+        surface="history"
+        intro={(
+          <div className="mb-6">
+            <Link href={basePath || "/"} className="text-sm underline" style={{ color: "var(--page-brand)" }}>← Back to {page.name}</Link>
+            <h1 className="mt-4 text-xl font-semibold">{maintenanceView ? "Maintenance history" : "Incident history"}</h1>
+            <p className="mt-1 text-sm text-[var(--fg-soft)]">Showing the last {historyDays} days.</p>
+            <nav aria-label="History type" className="mt-4 flex gap-5 border-b border-[var(--line)] text-sm">
+              <Link href={`${basePath}/history`} aria-current={!maintenanceView ? "page" : undefined} className={`border-b-2 pb-2 ${!maintenanceView ? "border-[var(--page-brand)] font-semibold text-[var(--fg)]" : "border-transparent text-[var(--fg-soft)] hover:text-[var(--fg)]"}`}>Incidents</Link>
+              <Link href={`${basePath}/history?type=maintenance`} aria-current={maintenanceView ? "page" : undefined} className={`border-b-2 pb-2 ${maintenanceView ? "border-[var(--page-brand)] font-semibold text-[var(--fg)]" : "border-transparent text-[var(--fg-soft)] hover:text-[var(--fg)]"}`}>Maintenance</Link>
+            </nav>
+          </div>
+        )}
+        renderBlock={renderBlock}
+      />
+      <PublicFooter removeBranding={page.removeBranding} design={design} termsUrl={page.termsUrl} privacyUrl={page.privacyUrl} supportUrl={page.supportUrl} />
+    </PageDesignShell>
+  );
+}

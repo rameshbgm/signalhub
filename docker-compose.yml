@@ -1,0 +1,98 @@
+# SignalHub, one container: web, worker and migrations under one supervisor.
+#
+#   docker compose up -d        then open http://localhost:3301/setup
+#
+# Optional add-ons, enabled with COMPOSE_FILE in .env (see install.sh):
+#   deploy/compose/postgres.yml  bundled PostgreSQL for trials
+#   deploy/compose/https.yml     automatic HTTPS with Caddy for DOMAIN
+name: signalhub
+
+x-signalhub-environment: &signalhub-environment
+  # Everything below is optional. Leave SIGNALHUB_DATABASE_URL empty to enter the
+  # database in the browser at /setup; secrets are generated on first start
+  # and kept in the signalhub_data volume unless you set them here.
+  DATABASE_URL: ${SIGNALHUB_DATABASE_URL:-}
+  DATABASE_SSL_CA: ${DATABASE_SSL_CA:-}
+  SESSION_SECRET: ${SESSION_SECRET:-}
+  ENCRYPTION_KEY: ${ENCRYPTION_KEY:-}
+  SESSION_SIGNING_KEYS: ${SESSION_SIGNING_KEYS:-}
+  SESSION_ACTIVE_KEY_ID: ${SESSION_ACTIVE_KEY_ID:-}
+  ENCRYPTION_KEYS: ${ENCRYPTION_KEYS:-}
+  ENCRYPTION_ACTIVE_KEY_ID: ${ENCRYPTION_ACTIVE_KEY_ID:-}
+  NEXT_PUBLIC_APP_URL: ${SIGNALHUB_PUBLIC_URL:-}
+  SIGNALHUB_INSTANCE_NAME: ${SIGNALHUB_INSTANCE_NAME:-}
+  SIGNALHUB_INSTANCE_LOGO_URL: ${SIGNALHUB_INSTANCE_LOGO_URL:-}
+  SIGNALHUB_MIGET_ATTRIBUTION: ${SIGNALHUB_MIGET_ATTRIBUTION:-false}
+  TENANT_SESSION_IDLE_SECONDS: ${TENANT_SESSION_IDLE_SECONDS:-28800}
+  TENANT_SESSION_ABSOLUTE_SECONDS: ${TENANT_SESSION_ABSOLUTE_SECONDS:-604800}
+  ARGON2_MEMORY_KIB: ${ARGON2_MEMORY_KIB:-19456}
+  ARGON2_TIME_COST: ${ARGON2_TIME_COST:-2}
+  ARGON2_PARALLELISM: ${ARGON2_PARALLELISM:-1}
+  PASSWORD_MIN_LENGTH: ${PASSWORD_MIN_LENGTH:-14}
+  # Blank = managed from Platform administration > Configuration (default Auto). Set to override.
+  TRUST_PROXY_HEADERS: ${TRUST_PROXY_HEADERS:-}
+  TRUSTED_PROXY_HOPS: ${TRUSTED_PROXY_HOPS:-}
+  PLATFORM_ADMIN_ALLOWED_CIDRS: ${PLATFORM_ADMIN_ALLOWED_CIDRS:-}
+  METRICS_TOKEN: ${METRICS_TOKEN:-}
+  LOG_LEVEL: ${LOG_LEVEL:-info}
+  OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+  OTEL_EXPORTER_OTLP_HEADERS: ${OTEL_EXPORTER_OTLP_HEADERS:-}
+  MONITOR_ALLOW_PRIVATE_TARGETS: ${MONITOR_ALLOW_PRIVATE_TARGETS:-false}
+  MONITOR_ENABLE_ICMP: ${MONITOR_ENABLE_ICMP:-false}
+  MONITOR_MAX_RESPONSE_BYTES: ${MONITOR_MAX_RESPONSE_BYTES:-1048576}
+  REQUIRE_WORKER: ${REQUIRE_WORKER:-true}
+  STATUS_BOOTSTRAP_PASSWORD: ${STATUS_BOOTSTRAP_PASSWORD:-}
+  STATUS_BOOTSTRAP_USERNAME: ${STATUS_BOOTSTRAP_USERNAME:-}
+  STATUS_BOOTSTRAP_NAME: ${STATUS_BOOTSTRAP_NAME:-}
+  STATUS_BOOTSTRAP_EMAIL: ${STATUS_BOOTSTRAP_EMAIL:-}
+  STATUS_BOOTSTRAP_ORG_NAME: ${STATUS_BOOTSTRAP_ORG_NAME:-}
+  STATUS_BOOTSTRAP_ORG_SLUG: ${STATUS_BOOTSTRAP_ORG_SLUG:-}
+  # Legacy: SMTP_* / TWILIO_* are imported once by db:migrate on upgrade,
+  # then managed in Platform configuration. Remove after upgrading.
+  SMTP_HOST: ${SMTP_HOST:-}
+  SMTP_PORT: ${SMTP_PORT:-587}
+  SMTP_SECURE: ${SMTP_SECURE:-false}
+  SMTP_USERNAME: ${SMTP_USERNAME:-}
+  SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+  SMTP_FROM: ${SMTP_FROM:-SignalHub <signalhub@localhost>}
+  TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID:-}
+  TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN:-}
+  TWILIO_FROM_NUMBER: ${TWILIO_FROM_NUMBER:-}
+  OIDC_ISSUER: ${OIDC_ISSUER:-}
+  OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-}
+  OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:-}
+  NEXT_PUBLIC_OIDC_ENABLED: ${NEXT_PUBLIC_OIDC_ENABLED:-false}
+
+services:
+  signalhub:
+    build:
+      context: .
+      target: runtime
+    image: ${STATUS_IMAGE:-signalhub:local}
+    restart: unless-stopped
+    environment:
+      <<: *signalhub-environment
+      SIGNALHUB_DATA_DIR: /app/data
+      WORKER_HEALTH_PORT: 8081
+    ports:
+      - "127.0.0.1:${STATUS_PORT:-3301}:3000"
+    volumes:
+      - signalhub_data:/app/data
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/api/health/live').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: ["ALL"]
+    stop_grace_period: 30s
+
+volumes:
+  signalhub_data:

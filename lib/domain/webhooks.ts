@@ -1,0 +1,87 @@
+import { boundedResponseText } from "@/lib/limited-response";
+import { createHmac, randomBytes } from "node:crypto";
+import type { Insertable } from "kysely";
+import type { DatabaseTransaction } from "@/lib/postgres/client";
+import type { WebhookEndpointTable } from "@/lib/postgres/schema";
+import { newDatabaseId } from "@/lib/database-id";
+import { decryptSecret, encryptSecret } from "@/lib/encryption";
+import { guardedFetch } from "@/lib/guarded-fetch";
+import { hashSecret } from "@/lib/secrets";
+import { validateHttpTarget } from "@/lib/target-validation";
+import { generateWebhookSecret } from "@/lib/tokens";
+
+export async function prepareVerifiedWebhookEndpoint(pageId: string, rawUrl: string) {
+  const url = String(rawUrl).trim();
+  await validateHttpTarget(url, { httpsOnly: true, allowPrivate: false });
+  const challenge = randomBytes(24).toString("base64url");
+  const response = await guardedFetch(url, {
+    method: "POST",
+    headers: { "content-type": "application/json", "user-agent": "SignalHub-Webhook-Verifier/1.0" },
+    body: JSON.stringify({ type: "signalhub.webhook.verify", challenge }),
+    signal: AbortSignal.timeout(5_000),
+  });
+  const responseBody = await boundedResponseText(response, 10_000);
+  if (responseBody.length > 10_000) throw new Error("Webhook verification response is too large");
+  let echoed: unknown = null;
+  try {
+    echoed = JSON.parse(responseBody);
+  } catch {
+    // The structured failure below is intentionally generic.
+  }
+  if (
+    !response.ok || !echoed || typeof echoed !== "object" ||
+    !("challenge" in echoed) || (echoed as { challenge?: unknown }).challenge !== challenge
+  ) {
+    throw new Error("Webhook verification failed: endpoint must echo the HTTPS challenge");
+  }
+  const secret = generateWebhookSecret();
+  const document: Insertable<WebhookEndpointTable> & { id: string } = {
+    id: newDatabaseId(),
+    pageId,
+    url,
+    secretHash: secret.hash,
+    secretCiphertext: encryptSecret(secret.token),
+    secretPrefix: secret.prefix,
+    secretLastFour: secret.lastFour,
+    active: true,
+    verifiedAt: new Date(),
+    verificationTokenHash: hashSecret(challenge),
+    createdAt: new Date(),
+  };
+  return { document, result: { endpoint: document, secret: secret.token } };
+}
+
+export async function insertVerifiedWebhookEndpoint(
+  prepared: Awaited<ReturnType<typeof prepareVerifiedWebhookEndpoint>>,
+  transaction: DatabaseTransaction
+) {
+  const endpoint = await transaction.insertInto("webhookEndpoints")
+    .values(prepared.document).returningAll().executeTakeFirstOrThrow();
+  return { endpoint, secret: prepared.result.secret };
+}
+
+export async function rotateWebhookEndpointSecret(endpointId: string, transaction: DatabaseTransaction) {
+  const secret = generateWebhookSecret();
+  const result = await transaction.updateTable("webhookEndpoints").set({
+    secretHash: secret.hash,
+    secretCiphertext: encryptSecret(secret.token),
+    secretPrefix: secret.prefix,
+    secretLastFour: secret.lastFour,
+  }).where("id", "=", endpointId).where("active", "=", true)
+    .returning("id").executeTakeFirst();
+  return result ? secret : null;
+}
+
+/** Headers for one signed delivery: HMAC-SHA256 over `${timestamp}.${body}`. */
+export function signedWebhookHeaders(secretCiphertext: string, eventType: string, deliveryId: string, body: string) {
+  const timestamp = Math.floor(Date.now() / 1000).toString();
+  const signature = createHmac("sha256", decryptSecret(secretCiphertext))
+    .update(`${timestamp}.${body}`)
+    .digest("hex");
+  return {
+    "x-status-event": eventType,
+    "x-status-timestamp": timestamp,
+    "x-status-signature": `sha256=${signature}`,
+    "x-status-delivery": deliveryId,
+  };
+}

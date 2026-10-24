@@ -1,0 +1,160 @@
+"use client";
+
+import { useCallback, useState } from "react";
+import { Send } from "lucide-react";
+import { PageSubmitButton } from "@/components/admin/PageSubmitButton";
+import { PlatformActionForm } from "@/components/platform/PlatformActionForm";
+import { Field } from "@/components/ui/field";
+import { Textarea } from "@/components/ui/textarea";
+import { Select } from "@/components/ui/select";
+import { CheckRow } from "@/components/admin/operate-ui";
+import {
+  INCIDENT_STATUSES,
+  INCIDENT_STATUS_LABEL,
+  MAINTENANCE_STATUSES,
+  MAINTENANCE_STATUS_LABEL,
+} from "@/lib/status";
+import { INPUT_LIMITS } from "@/lib/input-limits";
+
+const UPDATE_PLACEHOLDER = "What changed, who is affected, and when is the next update?";
+
+export function IncidentUpdateComposer({
+  action,
+  currentStatus,
+  publicVisible = true,
+}: {
+  action: (formData: FormData) => void;
+  currentStatus: string;
+  publicVisible?: boolean;
+}) {
+  const [status, setStatus] = useState(currentStatus);
+  const [body, setBody] = useState("");
+  // Keep the composer open after posting, empty for the next update.
+  const clearBody = useCallback(() => setBody(""), []);
+  const [notify, setNotify] = useState(false);
+
+  return (
+    <PlatformActionForm action={action} successMessage="Update posted" onSuccess={clearBody} className="space-y-4">
+      <Field label="Status" htmlFor="incident-update-status" className="sm:max-w-xs">
+        <Select id="incident-update-status" aria-label="Update status" name="status" value={status} onChange={(event) => setStatus(event.target.value)}>
+          {INCIDENT_STATUSES.map((value) => <option key={value} value={value}>{INCIDENT_STATUS_LABEL[value]}</option>)}
+        </Select>
+      </Field>
+      <Field label="Message" htmlFor="incident-update-body" required>
+        <Textarea id="incident-update-body" name="body" maxLength={INPUT_LIMITS.body} value={body} onChange={(event) => setBody(event.target.value)} rows={4} placeholder={UPDATE_PLACEHOLDER} required />
+      </Field>
+      <CheckRow name="notify" checked={publicVisible && notify} disabled={!publicVisible} onChange={(event) => setNotify(event.target.checked)} label="Notify subscribers" hint={!publicVisible ? "Restore public visibility before notifying subscribers." : undefined} />
+      <div className="flex justify-end">
+        <PageSubmitButton pendingLabel="Posting…"><Send aria-hidden size={16} />Post update</PageSubmitButton>
+      </div>
+    </PlatformActionForm>
+  );
+}
+
+export function MaintenanceUpdateComposer({
+  action,
+  currentStatus,
+}: {
+  action: (formData: FormData) => void;
+  currentStatus: string;
+}) {
+  const [status, setStatus] = useState(currentStatus);
+  const [body, setBody] = useState("");
+  // Keep the composer open after posting, empty for the next update.
+  const clearBody = useCallback(() => setBody(""), []);
+  const [notify, setNotify] = useState(true);
+  const allowedStatuses =
+    ({
+      SCHEDULED: ["SCHEDULED", "IN_PROGRESS", "COMPLETED"],
+      IN_PROGRESS: ["IN_PROGRESS", "VERIFYING", "COMPLETED"],
+      VERIFYING: ["VERIFYING", "IN_PROGRESS", "COMPLETED"],
+      COMPLETED: ["COMPLETED"],
+    } as Record<string, readonly (typeof MAINTENANCE_STATUSES)[number][]>)[
+      currentStatus
+    ] ?? [];
+
+  return (
+    <PlatformActionForm action={action} successMessage="Maintenance update posted" onSuccess={clearBody} className="space-y-4">
+      <Field label="Status" htmlFor="maintenance-update-status" className="sm:max-w-xs">
+        <Select
+          id="maintenance-update-status"
+          aria-label="Maintenance status"
+          name="maintenanceStatus"
+          value={status}
+          onChange={(event) => setStatus(event.target.value)}
+        >
+          {allowedStatuses.map((value) => (
+            <option key={value} value={value}>
+              {MAINTENANCE_STATUS_LABEL[value]}
+            </option>
+          ))}
+        </Select>
+      </Field>
+      <Field label="Message" htmlFor="maintenance-update-body" required>
+        <Textarea
+          id="maintenance-update-body"
+          name="body"
+          maxLength={INPUT_LIMITS.body}
+          value={body}
+          onChange={(event) => setBody(event.target.value)}
+          rows={4}
+          placeholder={UPDATE_PLACEHOLDER}
+          required
+        />
+      </Field>
+      <CheckRow
+        name="notify"
+        checked={notify}
+        onChange={(event) => setNotify(event.target.checked)}
+        label="Notify subscribers about this update"
+      />
+      <div className="flex justify-end">
+        <PageSubmitButton pendingLabel="Posting…"><Send aria-hidden size={16} />Post maintenance update</PageSubmitButton>
+      </div>
+    </PlatformActionForm>
+  );
+}
+
+export function PostmortemComposer({
+  action,
+  initialBody,
+  published,
+  publicVisible = true,
+}: {
+  action: (formData: FormData) => void;
+  initialBody: string;
+  published: boolean;
+  publicVisible?: boolean;
+}) {
+  const [body, setBody] = useState(initialBody);
+  const [publish, setPublish] = useState(published);
+  const [notify, setNotify] = useState(false);
+
+  return (
+    <PlatformActionForm action={action} successMessage="Postmortem saved" className="space-y-4">
+      <Field label="Postmortem" htmlFor="postmortem-body" hint="Shown as plain text on the public incident page, with line breaks kept.">
+        <Textarea id="postmortem-body" name="postmortemBody" maxLength={INPUT_LIMITS.postmortem} rows={10} value={body} onChange={(event) => setBody(event.target.value)} placeholder={"## Summary\n## Timeline\n## Root cause\n## Remediation"} className="font-mono" />
+      </Field>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <CheckRow
+          name="publish"
+          checked={publish}
+          onChange={(event) => setPublish(event.target.checked)}
+          label="Publish to the public page"
+          hint={published ? (publish ? "Currently published." : "Saving will unpublish it.") : undefined}
+        />
+        <CheckRow
+          name="notify"
+          checked={publicVisible && !published && notify}
+          onChange={(event) => setNotify(event.target.checked)}
+          disabled={!publicVisible || published || !publish}
+          label="Notify subscribers when publishing"
+          hint={!publicVisible ? "Restore public visibility before notifying subscribers." : published ? "Subscribers were offered this postmortem when it was first published." : undefined}
+        />
+      </div>
+      <div className="flex justify-end">
+        <PageSubmitButton pendingLabel="Saving…">Save postmortem</PageSubmitButton>
+      </div>
+    </PlatformActionForm>
+  );
+}
