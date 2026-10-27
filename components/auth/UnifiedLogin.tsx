@@ -19,7 +19,7 @@ import { Label } from "@/components/ui/label";
 import styles from "./login.module.css";
 
 type Step = "password" | "code" | "enroll";
-type LoginBody = { mustChangePassword?: boolean; mustCompleteProfile?: boolean };
+type LoginBody = { mustChangePassword?: boolean; mustCompleteProfile?: boolean; redirectTo?: string };
 
 export function UnifiedLogin({ returnTo }: { returnTo: string | null }) {
   const router = useRouter();
@@ -43,7 +43,7 @@ export function UnifiedLogin({ returnTo }: { returnTo: string | null }) {
   }, []);
 
   function enter(body: LoginBody) {
-    router.push(body.mustChangePassword || body.mustCompleteProfile ? "/organization/change-password" : returnTo ?? "/organization");
+    router.push(body.mustChangePassword || body.mustCompleteProfile ? "/organization/change-password" : body.redirectTo ?? returnTo ?? "/organization");
     router.refresh();
   }
 

@@ -6,6 +6,8 @@ import { LogoutButton } from "@/components/admin/LogoutButton";
 import { getSession } from "@/lib/auth";
 import { database } from "@/lib/postgres/client";
 import { organizationStatus } from "@/lib/organization-state";
+import Link from "next/link";
+import { buttonVariants } from "@/components/ui/button";
 
 export default async function OrgSuspendedPage() {
   // The normal admin guard intentionally rejects frozen organizations. This
@@ -14,7 +16,7 @@ export default async function OrgSuspendedPage() {
   const session = await getSession();
   if (!session) redirect("/login");
   const [membership, user, organization] = await Promise.all([
-    database.selectFrom("memberships").select("id")
+    database.selectFrom("memberships").select(["id", "role"])
       .where("id", "=", session.membershipId).where("userId", "=", session.userId)
       .where("orgId", "=", session.orgId).where("status", "!=", "REVOKED").executeTakeFirst(),
     database.selectFrom("users").select("id")
@@ -32,6 +34,7 @@ export default async function OrgSuspendedPage() {
         {organization.name} has been suspended by a platform administrator. Contact support if you believe this is a mistake.
       </p>
       <div className="mt-8">
+        {membership.role === "ADMIN" && <Link href="/organization/platform" className={buttonVariants({ className: "mb-3 w-full" })}>Open platform administration</Link>}
         <LogoutButton className="border border-line-strong bg-surface shadow-card" />
       </div>
     </AuthShell>

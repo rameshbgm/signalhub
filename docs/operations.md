@@ -149,3 +149,9 @@ The worker sweeps expired removal requests (7 days), abandoned setups (10 minute
 | Lost `ENCRYPTION_KEY` | Encrypted credentials and subscriber contacts are unrecoverable; restore the key from your secret manager backup |
 
 Incident records and timelines are retained; Admins and Incident Managers can hide and restore public visibility. Incident history is not removed by the retention sweep.
+
+## Recovering a suspended organization
+
+An installation Admin can sign in with their existing User ID, password, and any required MFA after suspending their own organization, including when no active organizations remain. The sign-in opens `/organization/platform` in a restricted platform shell. Select **Reactivate** for the organization to restore workspace access. Suspension is never reversed automatically, and signing in does not reset the account password.
+
+If platform access is denied, check that the account is enabled, its Admin membership and session have not been revoked, and the request satisfies the configured platform network restrictions. Other organization roles do not receive platform recovery access.

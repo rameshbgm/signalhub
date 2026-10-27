@@ -19,18 +19,10 @@ import { isDatabaseId } from "@/lib/database-id";
 
 export { AdminAuthError } from "@/lib/admin-auth-error";
 
-export async function requireOrgSession() {
+/** Live identity checks only. Tenant access additionally requires an active organization. */
+async function requireIdentitySession() {
   const session = await getSession();
   if (!session) throw new AdminAuthError("Not authenticated", 401, "UNAUTHENTICATED");
-
-  const organization = await database
-    .selectFrom("organizations")
-    .selectAll()
-    .where("id", "=", session.orgId)
-    .executeTakeFirst();
-  if (!organization || !organizationIsActive(organization)) {
-    throw new AdminAuthError("Session is no longer authorized", 401, "SESSION_REVOKED");
-  }
 
   const [membership, user] = await Promise.all([
     database
@@ -76,6 +68,16 @@ export async function requireOrgSession() {
     supportMode: undefined,
     supportScopes: [] as Capability[],
   };
+}
+
+export async function requireOrgSession() {
+  const session = await requireIdentitySession();
+  const organization = await database.selectFrom("organizations").selectAll()
+    .where("id", "=", session.orgId).executeTakeFirst();
+  if (!organization || organization.suspended || !organizationIsActive(organization)) {
+    throw new AdminAuthError("Session is no longer authorized", 401, "SESSION_REVOKED");
+  }
+  return session;
 }
 
 export function assertSessionReady(session: { mfaVerified?: boolean; mustChangePassword: boolean }) {
@@ -163,7 +165,7 @@ export function platformAdminAllowedCidrs(): string[] {
 
 /** Installation management is a capability of the standard Admin identity. */
 export async function requirePlatformSession() {
-  const session = await requireOrgSession();
+  const session = await requireIdentitySession();
   assertSessionReady(session);
   if (session.role !== "ADMIN") {
     throw new AdminAuthError("Installation administration requires the Admin role", 403, "PLATFORM_PERMISSION_REQUIRED");

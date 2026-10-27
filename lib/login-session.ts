@@ -3,7 +3,8 @@ import { NextResponse } from "next/server";
 import { AdminAuthError } from "@/lib/admin-auth-error";
 import { apiError } from "@/lib/api-response";
 import { createSession, hashPassword, passwordNeedsRehash } from "@/lib/auth";
-import { database } from "@/lib/postgres/client";
+import { database, withDatabaseTransaction, type DatabaseTransaction } from "@/lib/postgres/client";
+import { writePlatformAudit } from "@/lib/platform-policy";
 import { requestIp } from "@/lib/rate-limit";
 import { writeActiveTenantAudit } from "@/lib/tenant-audit";
 
@@ -32,27 +33,47 @@ export async function completeLogin(
     organizationQuery = organizationQuery.where("id", "in", memberships.map((membership) => membership.orgId));
   }
   const organizations = await organizationQuery.orderBy("createdAt", "asc").execute();
-  const targetOrganization = input.orgId
+  const activeOrganization = input.orgId
     ? organizations.find((organization) => organization.id === input.orgId)
     : organizations.find((organization) => globalAdminMembership?.orgId === organization.id) ?? organizations[0];
+  // An installation administrator must be able to manage suspended tenants even
+  // when no active workspace remains. This context never authorizes tenant data:
+  // requireOrgSession still rejects every inactive organization.
+  const platformOnly = !activeOrganization && Boolean(globalAdminMembership);
+  const targetOrganization = activeOrganization ?? (globalAdminMembership
+    ? await database.selectFrom("organizations").selectAll().where("id", "=", globalAdminMembership.orgId).executeTakeFirst()
+    : undefined);
   const membership = globalAdminMembership ?? memberships.find((item) => targetOrganization && item.orgId === targetOrganization.id);
   if (!membership || !targetOrganization) {
     return apiError(403, "ORGANIZATION_SUSPENDED", "No active organization is available for this account");
   }
 
   const passwordHash = user.passwordHash;
-  const authorized = await writeActiveTenantAudit(targetOrganization.id, {
-    actor: user.username, action: "LOGIN", target: "session", metadata: { method: "password" }, createdAt: new Date(),
-  }, async (transaction) => {
+  const verifyLoginState = async (transaction: DatabaseTransaction) => {
     const currentUser = await transaction.selectFrom("users").selectAll()
       .where("id", "=", user.id).where("passwordHash", "=", passwordHash).where("disabled", "=", false).executeTakeFirst();
     const currentMembership = await transaction.selectFrom("memberships").selectAll()
       .where("id", "=", membership.id).where("userId", "=", user.id).where("status", "=", "ACTIVE").executeTakeFirst();
-    if (!currentUser || !currentMembership) {
+    if (!currentUser || !currentMembership || currentMembership.role !== membership.role ||
+      (platformOnly && currentMembership.role !== "ADMIN") ||
+      (currentMembership.role !== "ADMIN" && currentMembership.orgId !== targetOrganization.id)) {
       throw new AdminAuthError("Login authorization changed. Sign in again.", 403, "LOGIN_STATE_CHANGED");
     }
     return { user: currentUser, membership: currentMembership };
-  });
+  };
+  const authorized = platformOnly
+    ? await withDatabaseTransaction(async (transaction) => {
+        const verified = await verifyLoginState(transaction);
+        await writePlatformAudit({
+          actorId: verified.user.id, actorEmail: verified.user.email, actorRole: "ADMIN",
+          action: "PLATFORM_LOGIN", targetType: "session", targetId: verified.user.id,
+          organizationId: targetOrganization.id, metadata: { method: "password", platformOnly: true },
+        }, { executor: transaction });
+        return verified;
+      })
+    : await writeActiveTenantAudit(targetOrganization.id, {
+        actor: user.username, action: "LOGIN", target: "session", metadata: { method: "password" }, createdAt: new Date(),
+      }, verifyLoginState);
 
   if (input.password && passwordNeedsRehash(passwordHash)) {
     await database.updateTable("users").set({ passwordHash: await hashPassword(input.password), updatedAt: new Date() })
@@ -74,5 +95,6 @@ export async function completeLogin(
     organizations: organizations.map((organization) => ({ id: organization.id, name: organization.name })),
     mustChangePassword: authorized.user.mustChangePassword,
     mustCompleteProfile: authorized.user.mustCompleteProfile,
+    ...(platformOnly ? { redirectTo: "/organization/platform" } : {}),
   });
 }

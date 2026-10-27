@@ -5,7 +5,6 @@ import { StatusWall } from "@/components/platform/PlatformStat";
 import { pageLinks, sortLinks } from "@/components/platform/table/links";
 import { TableCard } from "@/components/platform/table/TableCard";
 import { PageHeader } from "@/components/ui/page-header";
-import { requireOrgSession } from "@/lib/admin-guard";
 import { inspectMigrationState } from "@/lib/migrations";
 import { subscriptionCapabilities } from "@/lib/notification-capabilities";
 import { organizationPurgeCanBeCancelled } from "@/lib/platform-job-policy";
@@ -24,7 +23,6 @@ const DEFAULTS = { sort: "created", dir: "desc" as SortDir };
 
 export default async function PlatformOverviewPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const actor = await requirePlatformPageCapability("overview.read");
-  const session = await requireOrgSession();
   const query = parseTableQuery(await searchParams, { sorts: SORTS, defaultSort: "created", defaultDir: "desc", filters: { status: STATUSES } });
   // eslint-disable-next-line react-hooks/purity
   const now = Date.now();
@@ -93,7 +91,7 @@ export default async function PlatformOverviewPage({ searchParams }: { searchPar
     id: organization.id, name: organization.name, slug: organization.slug, status: organization.status ?? "ACTIVE",
     contactEmail: organization.contactEmail, members: Number(organization.members ?? 0), pages: Number(organization.pages ?? 0),
     createdAt: organization.createdAt.toISOString(), purgeCancellable: organizationPurgeCanBeCancelled(latestPurge.get(organization.id)),
-    current: organization.id === session.orgId,
+    current: organization.id === actor.orgId,
   }));
   const label = (value: string) => value.charAt(0) + value.slice(1).toLowerCase();
 
