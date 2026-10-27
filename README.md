@@ -240,6 +240,10 @@ SignalHub is licensed under [Apache-2.0](LICENSE). You may use, modify, and run 
 
 ## Acknowledgments
 
-Thank you to [Sarvesh](https://www.linkedin.com/in/sarvesh-chand-ab634336/) and [Rohit](https://www.linkedin.com/in/rohit-pokhriyal/) for their help with SignalHub’s development and contributions to the project.
+Thank you to 
+[Yankamma](https://www.linkedin.com/in/yankamma-alli-23774b39/)
+[Sarvesh](https://www.linkedin.com/in/sarvesh-chand-ab634336/) 
+[Rohit](https://www.linkedin.com/in/rohit-pokhriyal/) 
+for their help with SignalHub’s development and contributions to the project.
 
 Thank you to [Miget](https://miget.com/) for sponsoring the infrastructure for our public demo.
